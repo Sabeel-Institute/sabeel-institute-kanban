@@ -7,8 +7,10 @@ history. This file is the machine-readable restatement plus the app-level decisi
 the palette itself does not state (accessibility cuts, the no-dark-mode call).
 
 **Both apps share this palette exactly** — the Kanban board and the sibling
-`sabeel-institute-time-tracker`. It is one identity across two products; the
-values here are the authority for both.
+`sabeel-institute-time-tracker`. It is one identity across two products. The
+canonical write-up for every Sabeel surface is the shared **`sabeel-brand`
+skill** in [Sabeel-Institute/brand](https://github.com/Sabeel-Institute/brand); when the
+two disagree, the skill wins.
 
 ## The palette
 
@@ -196,7 +198,7 @@ It only clears the platforms named by `--platform`, which is why
   the same size at `text.secondary` (~5.8:1) and is for small CONTENT that must
   read: empty-state messages, field labels, emails, short helper sentences.
   Muted-weight content was the legibility bug the colour-scheme verification pass
-  found (empty states washed out on a phone); see the `sabeel-color-scheme`
+  found (empty states washed out on a phone); see the `sabeel-brand`
   skill's muted-vs-secondary test.
 - Card **priority** colors are a functional scale, not brand colors: red/amber/
   green must read as urgency and cannot be replaced by the brand palette without
