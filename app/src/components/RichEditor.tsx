@@ -172,9 +172,21 @@ export function RichEditor({
    * prop is named `initialMarkdown`, so honouring that is this component's job,
    * and no caller can reintroduce the loop. The web sibling already does the
    * same thing with its `seeded` ref.
+   *
+   * And IN `<html>`, the library's own envelope, or the box is born the wrong
+   * height. Only an enveloped value goes to the library's parser everywhere;
+   * a bare one is shown through its HTML normaliser, but its FIRST height
+   * measurement (`MeasurementStore.getInitialText`) skips the normaliser and
+   * measures the tags as plain text, and on first mount the later correction
+   * does not reach layout. Measured in the sibling LMS app on an AVD, from
+   * cold starts: a 495 px box for 542 px of text every time, its last line
+   * hidden; enveloped, it fit. Every tag `markdownToHtml` emits (p, br, b, i,
+   * a, ul, ol, li) is in that parser's vocabulary.
    */
   const initialHtml = useRef<string | null>(null);
-  if (initialHtml.current === null) initialHtml.current = markdownToHtml(initialMarkdown);
+  if (initialHtml.current === null) {
+    initialHtml.current = `<html>${markdownToHtml(initialMarkdown)}</html>`;
+  }
   const [marks, setMarks] = useState<RichMarks>(EMPTY_MARKS);
   /**
    * The link sheet, and the SELECTION IT WAS OPENED ON — range and text both.
