@@ -158,6 +158,14 @@ number rather than an impression:
 | `enriched-html` vs the committed `android/` | Autolinks, no config plugin, no SDK/Kotlin/AGP bump. APK **36.1 → 37.2 MB** |
 | keyboard-controller + a Fabric non-`TextInput` | **Scrolls it clear.** Editor, toolbar row and Save row all visible with the IME up, inside the existing 96px budget |
 
+**Measured again on 2026-10-13: that +223 KB carried both of Lexical's builds.**
+Lexical's default entry imports its development and its production build and
+picks one at run time; Metro does not tree-shake, so both shipped.
+`app/metro.config.js` resolves Lexical's packages to their `production` export
+condition in an export (`development` under the dev server). From the export's
+source map: Lexical 988 → 445 KB minified, every Lexical file a `.prod.mjs`;
+the web bundle 4.18 → 3.63 MB, 1,032 → 902 KB gzipped.
+
 Two corrections to this document's own recommendation, both found by building:
 
 1. **`@lexical/markdown` is NOT the save path.** It escapes a different set from

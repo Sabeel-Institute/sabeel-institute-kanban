@@ -395,6 +395,36 @@ the team.
 
 ## Deploy log
 
+### 2026-10-13 — The Android editor's first height, and one build of Lexical — unreleased
+
+**The Android editor could come up a line short.** `react-native-enriched-html`
+parses a value with its own parser only inside `<html>…</html>`, and
+`RichEditor` seeded it bare. The view still rendered it correctly, through the
+library's HTML normaliser, but the first height measurement
+(`MeasurementStore.getInitialText`) skips the normaliser and measures the tags
+as plain text, and on first mount the later correction does not reach layout.
+Measured as one run of text, a document of several paragraphs or a list comes
+out shorter than it lays out. Found in the sibling LMS app, which ported this
+editor: from cold starts on an AVD its box came up a line short every time,
+495 px for 542 px of text, the last line hidden. The seed is now enveloped;
+every tag `markdownToHtml` emits (p, br, b, i, a, ul, ol, li) is in that
+parser's vocabulary.
+
+**The web bundle carried both of Lexical's builds.** Its default entry imports
+the development and the production build and picks one at run time; Metro does
+not tree-shake. `app/metro.config.js` resolves the `production` export
+condition for Lexical's packages and their subpaths in an export
+(`development` under the dev server), and nothing else's. From the export's
+source map: Lexical 988 → 445 KB minified, every Lexical file a `.prod.mjs`;
+the bundle 4.18 → 3.63 MB, 1,032 → 902 KB gzipped.
+
+**Verified:** lint, typecheck, unit; the web export measured before and after.
+No build was made, at Faisal's direction, so neither fix has run on a device
+here; the envelope was measured on the LMS app's AVD with the same library
+version (1.1.0), and CI runs the e2e suites against the dev server's
+`development` resolution. **Committed, not shipped:** it goes out with the next
+release, whose version this heading takes.
+
 ### 2026-09-20 — A Google 503 at sign-in stops paging — v0.11.5
 
 **Two pages, same class, no defect.** `SABEEL-KANBAN-WEB-C`: Google's Firebase
