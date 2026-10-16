@@ -37,11 +37,11 @@ testing, and on iPhones through TestFlight:
   admin approval that un-gates the app live. A rejected account is told why
   rather than left spinning. One more address, the store reviewers'
   `apps-reviewer@oursabeel.com`, signs in with a password and is always a member
-  (iPhone build 13 on; the web from its next release).
+  (v0.12.0).
 - Admin people-management: approve, reject, disable, change roles.
 - **The institute's rules, accepted once** before any board, and **Report a
   problem** in More, which keeps the report and emails it to the institute's
-  administrators (next release; `docs/STORE-RELEASE.md` § 4).
+  administrators (v0.12.0; `docs/STORE-RELEASE.md` § 4).
 - **Authority is two independent things** — an org role (member / organizer /
   admin) and per-board ownership. A plain member can own a board; only an admin
   sees a board they were not added to. `docs/PERMISSIONS.md` states it fully.
@@ -403,10 +403,25 @@ the team.
 
 ## Deploy log
 
-### 2026-10-16 — A slow first sign-in is "still setting up", never Wrong account — unreleased
+### 2026-10-16 — The institute's rules, Report a problem, and a patient first sign-in — v0.12.0
 
-**Not released.** On branch `signin-race`; clients only, no backend change.
-It goes out with the next release.
+The three entries below, released together: web, the download page, Play
+internal testing and TestFlight build 14. The backend went out with the rules
+entry (2026-10-16); this release changes no function or rule.
+
+- **The institute's rules, once.** The next time you open the app it shows the
+  institute's rules for what is posted here; tap **I agree** to carry on. Once
+  per account.
+- **Report a problem**, in More: write what or who you are reporting and what
+  is wrong. It goes to the institute's administrators by email.
+- **A slow first sign-in is "Still setting up your account"**, with Try again,
+  never "Wrong account".
+- **On Android**, the card editor no longer comes up a line short.
+- **On iPhone**, the box before Google sign-in names the app "Sabeel Kanban".
+
+### 2026-10-16 — A slow first sign-in is "still setting up", never Wrong account — in v0.12.0
+
+**Released in v0.12.0.** Clients only, no backend change.
 
 **A genuine colleague could be told "Wrong account".** The app waited ten
 seconds for the profile `onUserCreate` writes on a first sign-in and then
@@ -441,11 +456,10 @@ to your work, post nothing abusive, harassing, hateful, sexual or otherwise
 objectionable, and never abuse another member. The institute tolerates
 neither." `RULES_VERSION` stays 1: the meaning is the same.
 
-### 2026-10-16 — The institute's rules, and Report a problem — unreleased
+### 2026-10-16 — The institute's rules, and Report a problem — in v0.12.0
 
-**Not released.** On branch `rules-and-report`; it goes out with the next
-release, together with the 2026-10-13 entry below, whose version that release
-takes. **Order:** the IAM grant in `docs/DEPLOY.md` § Prerequisites, item 5;
+**Released in v0.12.0**, together with the 2026-10-13 entry below; the
+backend was deployed on 2026-10-16, before the clients. **Order:** the IAM grant in `docs/DEPLOY.md` § Prerequisites, item 5;
 then rules and functions (`acceptRules`, `reportProblem`); then the clients. A
 client that shows the rules screen before `acceptRules` exists cannot get past
 it.
@@ -502,12 +516,11 @@ native apps (no AVD used; the coordinator runs the device pass). The web
 suite's first sign-in failed 3 times in 5 runs with the provisioned user
 document never reaching the client ("Wrong account"); clean `main` failed the
 same way, so it is not this branch, and the next run passed.
-### 2026-10-13 — The Android editor's first height, and one build of Lexical — web and Play unreleased
+### 2026-10-13 — The Android editor's first height, and one build of Lexical — in v0.12.0
 
-**Part released, part waiting.** Functions, rules and the two blocking
-functions are deployed (2026-10-15), and iPhone builds 11–13 are on TestFlight.
-Web and Play wait for the next release, whose version this heading takes:
-the build gates find an entry by its `— vX.Y.Z`.
+**Released in v0.12.0.** Functions, rules and the two blocking functions were
+deployed on 2026-10-15, and iPhone builds 11–13 went to TestFlight before the
+web and Play caught up.
 
 **The Android editor could come up a line short.** `react-native-enriched-html`
 parses a value with its own parser only inside `<html>…</html>`, and
