@@ -5,8 +5,18 @@
 #   bash scripts/build-ios.sh --check    # run every gate, build nothing
 #   bash scripts/build-ios.sh --no-upload  # archive and export an .ipa, stop there
 #
-# Runs on the Mac. Everything it needs lives in the gitignored
-# `app/.env.sentry-build-plugin`; nothing has to be exported by hand.
+# Runs on the Mac, and on GitHub's macOS runners (.github/workflows/ios.yml,
+# which always passes --no-upload and uploads in a job of its own). Everything
+# it needs lives in the gitignored `app/.env.sentry-build-plugin`; nothing has
+# to be exported by hand.
+#
+# SIGNING IS AUTOMATIC by default: Xcode mints and fetches the distribution
+# certificate and profile through the App Store Connect key, which suits the
+# Mac. With IOS_PROFILE_NAME set it is MANUAL: the app target signs with the
+# Apple Distribution identity already in the keychain and that App Store
+# profile, and nothing is minted. A runner needs manual. Automatic signing on a
+# fresh machine creates a certificate every run and throws its private key
+# away, until Apple's certificate limit stops every build for the team.
 #
 # WHY COMMAND LINE RATHER THAN THE XCODE GUI, beyond preference: Xcode runs build
 # phases in a SANITISED environment and, since Xcode 15, does not inherit the
@@ -26,7 +36,7 @@ for arg in "$@"; do
   case "$arg" in
     --check) CHECK_ONLY=true ;;
     --no-upload) UPLOAD=false ;;
-    -h | --help) sed -n '2,18p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,29p' "$0"; exit 0 ;;
     *) echo "Unknown option: $arg" >&2; exit 1 ;;
   esac
 done
@@ -43,6 +53,18 @@ die() { echo "$@" >&2; exit 1; }
 command -v xcodebuild >/dev/null || die "xcodebuild not found. Install Xcode and run: sudo xcode-select -s /Applications/Xcode.app"
 command -v pod >/dev/null || die "CocoaPods not found. Install it: sudo gem install cocoapods (or brew install cocoapods)"
 
+# 0b. A release points at production. Metro inlines every EXPO_PUBLIC_* it finds
+#     in the environment and in app/.env.local, so the dev loop's
+#     EXPO_PUBLIC_USE_EMULATORS=1 in either would ship an app that talks to
+#     127.0.0.1, and nothing in the archive would say so.
+[ -z "${EXPO_PUBLIC_USE_EMULATORS:-}" ] || die "EXPO_PUBLIC_USE_EMULATORS is set in this shell.
+A release built from here would point at the local emulators. Unset it (or use a fresh terminal)."
+if grep -qE '^\s*EXPO_PUBLIC_USE_EMULATORS\s*=\s*\S' app/.env.local 2>/dev/null; then
+  die "app/.env.local sets EXPO_PUBLIC_USE_EMULATORS.
+A release built from here would point at the local emulators. Remove the line;
+the dev loop passes the flag itself (scripts/dev.sh, npm run dev:*)."
+fi
+
 # 1. The build-machine values, loaded BEFORE the gates rather than after.
 #    check:ios warns when the Sentry variables are missing, and running it first
 #    made it warn about values this script was about to supply — a check crying
@@ -52,6 +74,7 @@ command -v pod >/dev/null || die "CocoaPods not found. Install it: sudo gem inst
 
 VERSION="$(node -p "require('./app/app.json').expo.version")"
 BUILD_NUMBER="$(node -p "require('./app/app.json').expo.ios.buildNumber")"
+BUNDLE_ID="$(node -p "require('./app/app.json').expo.ios.bundleIdentifier")"
 
 # 2. Store-legal version — one check shared with Android and web.
 node scripts/check-version.mjs
@@ -122,6 +145,33 @@ It downloads from App Store Connect exactly once — if it is lost, revoke the k
 and generate another."
 fi
 
+# 7b. Manual signing: the named profile must be installed, be for THIS app, and
+#     not have expired. Xcode says each of these too, but only after prebuild and
+#     pod install. The LMS signs with the same certificate, so its profile is
+#     the easy one to install here by mistake.
+PROFILE_PLIST=""
+if [ -n "${IOS_PROFILE_NAME:-}" ]; then
+  PROFILE_PLIST="$(mktemp)"
+  trap 'rm -f "$PROFILE_PLIST"' EXIT
+  found=false
+  for f in "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"/*.mobileprovision \
+    "$HOME/Library/MobileDevice/Provisioning Profiles"/*.mobileprovision; do
+    [ -f "$f" ] || continue
+    security cms -D -i "$f" >"$PROFILE_PLIST" 2>/dev/null || continue
+    if [ "$(plutil -extract Name raw "$PROFILE_PLIST")" = "$IOS_PROFILE_NAME" ]; then
+      found=true
+      break
+    fi
+  done
+  [ "$found" = true ] || die "IOS_PROFILE_NAME is \"${IOS_PROFILE_NAME}\", and no installed provisioning profile has that name.
+Xcode reads them from ~/Library/Developer/Xcode/UserData/Provisioning Profiles."
+  PROFILE_APP="$(plutil -extract Entitlements.application-identifier raw "$PROFILE_PLIST")"
+  [ "$PROFILE_APP" = "${IOS_TEAM_ID}.${BUNDLE_ID}" ] || die "Profile \"${IOS_PROFILE_NAME}\" is for ${PROFILE_APP}, not ${IOS_TEAM_ID}.${BUNDLE_ID}."
+  PROFILE_EXPIRES="$(plutil -extract ExpirationDate raw "$PROFILE_PLIST")"
+  [[ "$PROFILE_EXPIRES" > "$(date -u +%Y-%m-%dT%H:%M:%SZ)" ]] || die "Profile \"${IOS_PROFILE_NAME}\" expired ${PROFILE_EXPIRES}.
+docs/IOS-BUILD.md, \"Builds on GitHub\", has how to renew it."
+fi
+
 # 8. The signing keychain has to be USABLE, and the only proof is signing
 #    something. Every gate above is a value; this one is a capability, and it is
 #    the last thing standing between here and twenty minutes of compiling.
@@ -156,10 +206,28 @@ fi
 # set-key-partition-list rather than an unlock. Signing a throwaway binary
 # exercises the exact mechanism the archive will use, and costs about a second.
 #
-# No identity is NOT an error: -allowProvisioningUpdates mints one through the
-# App Store Connect key during the archive, which is how this Mac has always
-# worked — it holds development certificates and no distribution one.
-SIGN_ID="$(security find-identity -v -p codesigning 2>/dev/null | awk '/^ *1\)/ {print $2}')"
+# In automatic mode no identity is NOT an error: -allowProvisioningUpdates mints
+# one through the App Store Connect key during the archive, which is how the Mac
+# has always worked — it holds development certificates and no distribution one.
+# Manual mode signs as "Apple Distribution", so that identity must be here, and
+# the profile must carry its certificate: a renewed certificate needs a profile
+# made on it, and installing one without the other is the mistake to expect.
+if [ -n "${IOS_PROFILE_NAME:-}" ]; then
+  SIGN_ID="$(security find-identity -v -p codesigning 2>/dev/null | awk '/"Apple Distribution: / {print $2; exit}')"
+  [ -n "$SIGN_ID" ] || die "IOS_PROFILE_NAME is set (manual signing), but the keychain holds no Apple Distribution identity.
+Import the distribution .p12 first."
+  carried=false
+  n="$(plutil -extract DeveloperCertificates raw "$PROFILE_PLIST")"
+  for ((i = 0; i < n; i++)); do
+    sha="$(plutil -extract "DeveloperCertificates.$i" raw "$PROFILE_PLIST" | base64 --decode | shasum -a 1 | awk '{print toupper($1)}')"
+    [ "$sha" != "$SIGN_ID" ] || carried=true
+  done
+  [ "$carried" = true ] || die "Profile \"${IOS_PROFILE_NAME}\" does not carry the certificate of the
+Apple Distribution identity in the keychain (${SIGN_ID}). Make a profile on that
+certificate, or import the certificate the profile was made on."
+else
+  SIGN_ID="$(security find-identity -v -p codesigning 2>/dev/null | awk '/^ *1\)/ {print $2}')"
+fi
 if [ -n "$SIGN_ID" ]; then
   PROBE_DIR="$(mktemp -d)"
   cp /bin/echo "${PROBE_DIR}/probe"
@@ -182,9 +250,10 @@ else
 fi
 
 echo
-echo "app          Sabeel Kanban (com.sabeelinstitute.kanban)"
+echo "app          Sabeel Kanban (${BUNDLE_ID})"
 echo "version      ${VERSION}  (build ${BUILD_NUMBER})"
 echo "team         ${IOS_TEAM_ID}"
+echo "signing      $([ -n "${IOS_PROFILE_NAME:-}" ] && echo "manual, profile \"${IOS_PROFILE_NAME}\" (expires ${PROFILE_EXPIRES})" || echo "automatic")"
 echo "symbols      ${SENTRY_PROJECT:-<none>}"
 echo "upload       $([ "$UPLOAD" = true ] && echo "yes, to TestFlight" || echo "no (--no-upload)")"
 echo
@@ -203,7 +272,9 @@ node scripts/gen-build-info.mjs
 
 # 9. Regenerate ios/. ALWAYS --platform ios: a bare prebuild is clean by default
 #    and would delete the committed android/, silently dropping minSdkVersion 33.
-(cd app && npx expo prebuild --platform ios)
+#    --no-install because the next line installs the pods; without it prebuild
+#    installed them too, and every build paid for `pod install` twice.
+(cd app && npx expo prebuild --platform ios --no-install)
 (cd app/ios && pod install)
 
 WORKSPACE="$(find app/ios -maxdepth 1 -name '*.xcworkspace' | head -1)"
@@ -229,6 +300,27 @@ SCHEME="$(xcodebuild -project "$PROJECT" -list -json | node -e '
 [ -n "$SCHEME" ] || die "could not determine the Xcode scheme from $PROJECT."
 echo "scheme       ${SCHEME}"
 
+# Manual signing for the APP TARGET ONLY, written into the regenerated project.
+# Passed on the xcodebuild command line instead, PROVISIONING_PROFILE_SPECIFIER
+# would reach every pod target too, and each fails with "does not support
+# provisioning profiles". The xcodeproj gem ships with CocoaPods.
+if [ -n "${IOS_PROFILE_NAME:-}" ]; then
+  ruby -rxcodeproj -e '
+    project = Xcodeproj::Project.open(ARGV[0])
+    target = project.native_targets.find { |t| t.name == ARGV[1] } or abort("no target #{ARGV[1]} in #{ARGV[0]}")
+    target.build_configurations.select { |c| c.name == "Release" }.each do |c|
+      c.build_settings["CODE_SIGN_STYLE"] = "Manual"
+      c.build_settings["CODE_SIGN_IDENTITY"] = "Apple Distribution"
+      c.build_settings["CODE_SIGN_IDENTITY[sdk=iphoneos*]"] = "Apple Distribution"
+      c.build_settings["PROVISIONING_PROFILE_SPECIFIER"] = ARGV[2]
+      c.build_settings["DEVELOPMENT_TEAM"] = ARGV[3]
+    end
+    attributes = (project.root_object.attributes["TargetAttributes"] ||= {})
+    (attributes[target.uuid] ||= {})["ProvisioningStyle"] = "Manual"
+    project.save
+  ' "$PROJECT" "$SCHEME" "$IOS_PROFILE_NAME" "$IOS_TEAM_ID"
+fi
+
 ARCHIVE="build/ios/${SCHEME}-${VERSION}-${BUILD_NUMBER}.xcarchive"
 EXPORT_DIR="build/ios/export"
 rm -rf "$ARCHIVE" "$EXPORT_DIR"
@@ -237,29 +329,36 @@ mkdir -p build/ios
 # All four or none: a partially-set key is how `set -u` turns a config mistake
 # into an unbound-variable error twenty minutes into a build. The FILE has to be
 # there too — a path alone gets as far as xcodebuild before it means anything.
+# Manual signing fetches nothing, so it takes neither the key nor
+# -allowProvisioningUpdates: with either, Xcode could still mint.
 AUTH=()
-if [ -n "${ASC_KEY_ID:-}" ] && [ -n "${ASC_ISSUER_ID:-}" ] &&
-  [ -n "${ASC_KEY_PATH:-}" ] && [ -f "${ASC_KEY_PATH}" ]; then
-  AUTH=(-authenticationKeyPath "${ASC_KEY_PATH}"
-        -authenticationKeyID "${ASC_KEY_ID}"
-        -authenticationKeyIssuerID "${ASC_ISSUER_ID}")
+PROVISIONING=()
+if [ -z "${IOS_PROFILE_NAME:-}" ]; then
+  PROVISIONING=(-allowProvisioningUpdates)
+  if [ -n "${ASC_KEY_ID:-}" ] && [ -n "${ASC_ISSUER_ID:-}" ] &&
+    [ -n "${ASC_KEY_PATH:-}" ] && [ -f "${ASC_KEY_PATH}" ]; then
+    AUTH=(-authenticationKeyPath "${ASC_KEY_PATH}"
+          -authenticationKeyID "${ASC_KEY_ID}"
+          -authenticationKeyIssuerID "${ASC_ISSUER_ID}")
+  fi
 fi
 
-# Both xcodebuild calls below expand AUTH as `${AUTH[@]+"${AUTH[@]}"}` rather
+# Both xcodebuild calls below expand AUTH and PROVISIONING as `${AUTH[@]+"${AUTH[@]}"}` rather
 # than the obvious `"${AUTH[@]}"`. macOS ships bash 3.2, where expanding an EMPTY
 # array under `set -u` counts as UNBOUND: the script dies with `AUTH[@]: unbound
 # variable`, naming a variable that is right there, correctly declared, four
 # lines up. Bash 4.4 and later expand it to nothing as intended — so the bug
 # cannot be reproduced in any shell newer than the one every Mac actually runs.
 
-# 10. Archive. `-allowProvisioningUpdates` lets Xcode create and download the
-#    signing assets itself, which is what removes the last reason to open the UI.
+# 10. Archive. In automatic mode `-allowProvisioningUpdates` lets Xcode create
+#    and download the signing assets itself, which is what removes the last
+#    reason to open the UI.
 xcodebuild -workspace "$WORKSPACE" \
   -scheme "$SCHEME" \
   -configuration Release \
   -destination 'generic/platform=iOS' \
   -archivePath "$ARCHIVE" \
-  -allowProvisioningUpdates \
+  ${PROVISIONING[@]+"${PROVISIONING[@]}"} \
   ${AUTH[@]+"${AUTH[@]}"} \
   DEVELOPMENT_TEAM="$IOS_TEAM_ID" \
   archive
@@ -278,6 +377,13 @@ xcodebuild -workspace "$WORKSPACE" \
 #     or Transporter.
 PLIST="build/ios/ExportOptions.plist"
 DESTINATION=$([ "$UPLOAD" = true ] && echo upload || echo export)
+if [ -n "${IOS_PROFILE_NAME:-}" ]; then
+  SIGNING="<key>signingStyle</key><string>manual</string>
+  <key>signingCertificate</key><string>Apple Distribution</string>
+  <key>provisioningProfiles</key><dict><key>${BUNDLE_ID}</key><string>${IOS_PROFILE_NAME}</string></dict>"
+else
+  SIGNING="<key>signingStyle</key><string>automatic</string>"
+fi
 cat > "$PLIST" <<PLISTEOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -286,7 +392,7 @@ cat > "$PLIST" <<PLISTEOF
   <key>method</key><string>app-store-connect</string>
   <key>destination</key><string>${DESTINATION}</string>
   <key>teamID</key><string>${IOS_TEAM_ID}</string>
-  <key>signingStyle</key><string>automatic</string>
+  ${SIGNING}
   <key>uploadSymbols</key><true/>
   <key>manageAppVersionAndBuildNumber</key><false/>
 </dict>
@@ -297,7 +403,7 @@ xcodebuild -exportArchive \
   -archivePath "$ARCHIVE" \
   -exportPath "$EXPORT_DIR" \
   -exportOptionsPlist "$PLIST" \
-  -allowProvisioningUpdates \
+  ${PROVISIONING[@]+"${PROVISIONING[@]}"} \
   ${AUTH[@]+"${AUTH[@]}"}
 
 echo
