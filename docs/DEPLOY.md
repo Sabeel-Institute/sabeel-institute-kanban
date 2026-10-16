@@ -468,7 +468,7 @@ emulator-mode bundle must never reach Hosting.
 
 `android/` is committed; there is no EAS. A ship touches **web, the APK download
 page, and Play**, and they go out in one batch after Faisal's go-ahead. (iOS is
-its own runbook.)
+its own runbook, `docs/IOS-BUILD.md`: from the Mac, or from GitHub's `ios.yml`.)
 
 ```sh
 # 0. app/app.json version + the deploy-log entry in docs/PHASE_STATUS.md
@@ -528,8 +528,8 @@ why a release exists.
 - Uploading is **scripted**: `npm run publish:play -- --internal` does the whole
   edit/upload/track/commit cycle, and `-- --check` proves the gates and the Play
   permission without uploading. The console is only needed for things the API
-  cannot do — permissions, and reading the app-signing fingerprints. There is
-  still deliberately **no deploy from CI** (see `CLAUDE.md`).
+  cannot do — permissions, and reading the app-signing fingerprints. Play is
+  deliberately **never deployed from CI** (see `CLAUDE.md`).
 - Internal app sharing is deliberately not supported; see above for why.
 - `versionCode` is derived from the semver (`major*1000000 + minor*1000 + patch`),
   so it increases on its own. Play rejects a duplicate outright, which is the

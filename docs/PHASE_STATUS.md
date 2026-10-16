@@ -425,6 +425,25 @@ version (1.1.0), and CI runs the e2e suites against the dev server's
 `development` resolution. **Committed, not shipped:** it goes out with the next
 release, whose version this heading takes.
 
+**iPhone builds on GitHub (2026-10-15).** `.github/workflows/ios.yml` builds a
+signed `.ipa` on GitHub's macOS runners and, as a separate opt-in job, uploads
+it to TestFlight. Never on a push; started by hand only, and an upload only
+with Faisal's go-ahead. A runner signs MANUALLY (`IOS_PROFILE_NAME` in
+`build-ios.sh`), with the team's one Apple Distribution certificate, shared
+with the LMS, and this app's App Store profile, both from secrets: automatic
+signing there would mint a certificate every run until Apple's limit stopped
+both apps' builds. The Mac keeps automatic signing. The job asserts the
+exported `.ipa` — push entitlement `production`, no `get-task-allow`, the CI
+profile, a clean stamp — and keeps a build record, the source map and the
+resolved `Podfile.lock`. `build-ios.sh` also gained gates that fail in seconds
+on a wrong, expired or mismatched profile, and a refusal of
+`EXPO_PUBLIC_USE_EMULATORS`. Nothing in the app changed. Certificate and
+profile expire 2027-10-16 (`TODO.md` D2). **Verified:** shellcheck, actionlint,
+lint and unit; each new gate failing as meant against real profiles on the
+Mac; the manual-signing project edit read back from a copy of the project.
+The workflow's first run is the test of the signing itself, since the
+certificate's key is not on the Mac.
+
 ### 2026-09-20 — A Google 503 at sign-in stops paging — v0.11.5
 
 **Two pages, same class, no defect.** `SABEEL-KANBAN-WEB-C`: Google's Firebase

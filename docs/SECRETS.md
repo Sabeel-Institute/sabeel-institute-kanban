@@ -97,6 +97,14 @@ terminal. Fill in `app/ios/sentry.properties` (a gitignored build product, so
 this is not repo config — but prebuild rewrites it), or archive with `xcodebuild`
 from the shell, which does inherit. `docs/IOS-BUILD.md` has both.
 
+**GitHub, for `ios.yml`** — the whole of `app/.env.sentry-build-plugin` is the
+`IOS_BUILD_ENV` secret and `app/.env.local` is `APP_ENV_LOCAL`, written into
+place before the build; the Apple Distribution certificate, the App Store
+profile and the App Store Connect key are secrets beside them. The table, and
+where each comes from, is in `docs/IOS-BUILD.md` § Builds on GitHub. The
+workflow masks every value on its own, because the logs are public and GitHub
+masks a multi-line secret only line by line.
+
 A config plugin cannot do the Android half. Plugins run at `prebuild`, and
 `app/android/` is committed and hand-edited — prebuild here is always scoped
 `--platform ios`. Gradle is the only mechanism that reaches it.

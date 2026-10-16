@@ -325,7 +325,9 @@ npm run build:ios                       # archive, export, upload to TestFlight
 `expo prebuild --platform ios`, `pod install`, `xcodebuild archive`, then export
 with `destination: upload` so it goes straight to App Store Connect. No
 Organizer, no Transporter, no signing dialog — `-allowProvisioningUpdates` with
-an App Store Connect API key lets Xcode fetch the signing assets itself.
+an App Store Connect API key lets Xcode fetch the signing assets itself. That is
+the Mac's **automatic** signing; a GitHub runner signs **manually** instead
+(see "Builds on GitHub").
 
 `--check` is free and runs every gate. Use it first; it catches a missing team
 id, a missing API key, an absent deploy-log entry or a locked signing keychain in
@@ -456,6 +458,130 @@ registration work. End-to-end push is verifiable only on a physical iPhone, whic
 means through TestFlight. Treat "push works on iOS" as unverified until it has
 been seen on a real device, and do not let a green simulator run stand in for it.
 
+## Builds on GitHub
+
+`.github/workflows/ios.yml` builds the app on GitHub's macOS runners, which are
+free and unlimited because this repo is public. It runs **only when started**,
+never on a push:
+
+```bash
+gh workflow run ios.yml -R faisal-shah/sabeel-institute-kanban                    # build a signed .ipa
+gh workflow run ios.yml -R faisal-shah/sabeel-institute-kanban -f testflight=true # build it, then upload it
+gh run watch <run id> -R faisal-shah/sabeel-institute-kanban
+```
+
+or Actions → iOS → Run workflow, or the REST API:
+`POST /repos/faisal-shah/sabeel-institute-kanban/actions/workflows/ios.yml/dispatches`
+with `{"ref": "main", "inputs": {"testflight": "true"}}`.
+
+**A build is free to run at any time. An upload is a release** and needs
+Faisal's go-ahead like any other (`CLAUDE.md`, Conventions).
+
+```mermaid
+flowchart TB
+  start([started by hand]) --> build
+  subgraph build [job: build]
+    direction LR
+    b1[env files from secrets] --> b2[keychain with the identity,<br/>App Store profile]
+    b2 --> b3[build-ios.sh:<br/>gates, archive, export]
+    b3 --> b4[assert the .ipa]
+    b4 --> b5[keep the .ipa and<br/>a build record, 14 days]
+  end
+  build -. "testflight=false" .-> done([done: build only])
+  build -- "testflight=true" --> tf
+  subgraph tf [job: testflight]
+    direction LR
+    t1[stop unless the build number<br/>is free for this version] --> t2[Apple validates the .ipa]
+    t2 --> t3[upload to App Store Connect]
+  end
+  tf -- "after Apple processes it" --> group([TestFlight group<br/>Sabeel Kanban Internal])
+```
+
+**build** writes the two gitignored env files from secrets, imports the
+signing identity into a keychain of its own, installs the App Store profile,
+and runs `build-ios.sh --no-upload`. It needs no new build number. It then
+asserts the exported `.ipa` — the one place the entitlements a device enforces
+exist (see "The push entitlement survives the prebuild"): `aps-environment`
+`production`, `get-task-allow` `false`, the CI profile embedded, and a build
+stamp equal to the commit with no `+`. Its artifacts, kept 14 days: the `.ipa`,
+and a build record — the JavaScript source map and the `Podfile.lock` it
+resolved, the only record of which pods went in, since `app/ios/` is not
+committed. Both are downloadable by anyone signed in to GitHub; neither holds
+a secret, and an App Store-signed `.ipa` installs only through Apple.
+
+**testflight** runs only with `testflight=true`. It asks App Store Connect
+whether the build number is free for the version (`scripts/testflight-check.mjs`
+— if not, it stops in seconds: raise `expo.ios.buildNumber`, commit, run again),
+has Apple validate the `.ipa`, and uploads it. The internal group "Sabeel
+Kanban Internal" has access to all builds, so testers get it after processing
+with no further step.
+
+**A run builds the workflow file AT the ref it is started on.** A commit that
+predates `ios.yml` cannot be built from GitHub at all, and a release built here
+should be started on its release commit or tag (`--ref vX.Y.Z`), not on a later
+main — the sign-in screen displays the commit.
+
+### Two signing modes, chosen by `IOS_PROFILE_NAME`
+
+| | The Mac | GitHub |
+|---|---|---|
+| Mode | automatic | **manual** (`IOS_PROFILE_NAME`, set by the workflow from the profile) |
+| Certificate | cloud-managed, minted through the Admin App Store Connect key at export; never in the keychain | the team's **Apple Distribution: Sabeel Institute** certificate (id `MQ8FC7CJVA`), shared with the LMS |
+| Profile | Xcode-managed | **"Sabeel Kanban App Store CI"**, push entitlement `production` |
+| Needs the `.p8` to build | yes | no — only the upload does |
+
+Manual signing writes the signing settings into the **app target alone**, with
+the `xcodeproj` gem that ships with CocoaPods. Passed on the xcodebuild command
+line, `PROVISIONING_PROFILE_SPECIFIER` would reach every pod target too, and
+each fails with "does not support provisioning profiles". It passes neither
+`-allowProvisioningUpdates` nor the key, so nothing can be minted.
+
+**Never let automatic signing run on a runner.** A fresh machine has no
+certificate, so automatic signing creates one every run and throws its private
+key away, until Apple's per-team certificate limit stops every build — the
+LMS's too.
+
+Manual mode's gates run in seconds, before prebuild: the profile is installed,
+is for `<team>.com.sabeelinstitute.kanban`, has not expired, and carries the
+certificate of the keychain's Apple Distribution identity. The last is the
+mistake to expect at renewal — a new certificate with the old profile.
+
+### Secrets
+
+| Secret | What | From |
+|---|---|---|
+| `IOS_DIST_P12`, `IOS_DIST_P12_PASSWORD` | the Apple Distribution certificate with its private key, base64, and its password | Faisal's Linux machine, `~/.config/sabeel-lms/ios-distribution/` (shared with the LMS); that machine and GitHub are the only places the key exists |
+| `IOS_PROFILE` | the App Store profile "Sabeel Kanban App Store CI", base64 | the same folder |
+| `ASC_KEY_P8` | the App Store Connect API key (Admin) — read by the upload job only | `~/.appstoreconnect/private_keys/` on Faisal's machine and on the Mac |
+| `IOS_BUILD_ENV` | `app/.env.sentry-build-plugin`: the Sentry three, `IOS_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID` | the Mac's copy, `NAME=value` lines only, no `ASC_KEY_PATH` |
+| `APP_ENV_LOCAL` | `app/.env.local` | the Mac's copy, `NAME=value` lines only |
+
+`app/GoogleService-Info.plist` is committed, so it needs no secret. Everything
+in the table is also in Faisal's vault, `~/.config/secrets-vault/sabeel/apple/`.
+
+Set one with `gh secret set NAME -R faisal-shah/sabeel-institute-kanban < file`
+(`base64 -w0 file | gh secret set NAME …` for the two binary ones). **Keep
+comment lines out of the two env secrets**: GitHub masks a multi-line secret
+line by line, so a line of `#` turns every `#` in the log into `***`. A line
+mask also does not cover a value printed on its own, so the workflow masks each
+value by itself before anything runs. The logs are public.
+
+### Renewal, before 16 October 2027
+
+The certificate and both App Store profiles — this one and the LMS's — expire
+on 16 October 2027. Renew them together, through the App Store Connect API,
+from Faisal's machine:
+
+1. A new private key and signing request with `openssl`; `POST /v1/certificates`
+   with `certificateType` `DISTRIBUTION`.
+2. `POST /v1/profiles` (`IOS_APP_STORE`) for each app's bundle id on the new
+   certificate, with the same names.
+3. Pack the key and certificate with `openssl pkcs12 -export -legacy`, and set
+   `IOS_DIST_P12`, `IOS_DIST_P12_PASSWORD` and `IOS_PROFILE` again, in **both**
+   repos.
+4. A build-only run of each app's workflow. Then revoke the old certificate
+   (`DELETE /v1/certificates/<id>`): a team may hold only a few.
+
 ## Four registrations, one bundle id — and they are not each other
 
 `com.sabeelinstitute.kanban` is registered four separate times, across three
@@ -529,10 +655,9 @@ They are both `.p8` files, both download exactly once, and both are real secrets
 | Installed at | Firebase console → Project settings → Cloud Messaging → iOS app (needs the key, its Key ID, and the Team ID) | wherever the upload runs |
 | Without it | push silently never arrives on iOS | you cannot upload a build |
 
-Neither belongs in this repo. If a CI upload is ever set up, the App Store
-Connect key goes in GitHub Actions secrets — note that **this repo's convention
-is no deploys from CI** (`CLAUDE.md`), so that would be a deliberate change to
-make, not a default.
+Neither belongs in this repo. The App Store Connect key is on the Mac in
+`~/.appstoreconnect/private_keys/` and in the `ASC_KEY_P8` secret, which only
+the GitHub upload job reads ("Builds on GitHub").
 
 ## Getting it to testers, and the login gate
 
@@ -618,18 +743,19 @@ for one organisation.
 
 The version story is unchanged and shared with the other two surfaces:
 `expo.version` in `app/app.json` is the one number. Bump it as usual and write
-the `docs/PHASE_STATUS.md` deploy-log entry. On Android `scripts/build-aab.sh`
-refuses to build without one; nothing enforces it for iOS, so write it anyway —
-the entry covers the release, not one platform's build.
+the `docs/PHASE_STATUS.md` deploy-log entry. `scripts/build-aab.sh` and
+`scripts/build-ios.sh` both refuse to build without one — the entry covers the
+release, not one platform's build.
 
 `ios.buildNumber` is separate and iOS-only: Apple wants it to **increase on every
 upload**, even for the same version. Bump it when re-uploading the same version
 after a rejection or a bad build; reset thinking is not required — a
 monotonically increasing integer is always valid.
 
-Archive in Xcode, then Distribute App to App Store Connect. TestFlight builds
-appear after processing; because `usesNonExemptEncryption` is answered, they go
-to testers without the manual export-compliance prompt.
+Upload from either machine: `npm run build:ios` on the Mac, or the iOS workflow
+with `testflight=true`, started on the release commit ("Builds on GitHub").
+TestFlight builds appear after processing; because `usesNonExemptEncryption` is
+answered, they go to testers without the manual export-compliance prompt.
 
 ### The handoff prompt
 
@@ -722,15 +848,10 @@ keyboard, on a real device.
   Firebase exposes no API for reading APNs configuration back, so nothing here
   can tell "uploaded" from "uploaded wrong". The only proof is a push arriving on
   a real device, which is why it is the first thing to check on the first build.
-- ~~The distribution certificate's private key.~~ **Closed 2026-08-15 — there is
-  no such key on this Mac.** The item assumed the Android keystore rule, a
-  private key held in one place and nowhere else. Signing is cloud-managed
-  instead: `-allowProvisioningUpdates` mints the distribution certificate through
-  the App Store Connect key at export and discards it, so `security
-  find-identity` on the Mac that has shipped every build finds *development*
-  certificates and no distribution one. What cannot be recreated is the **Admin
-  `.p8`**, and it is already backed up. A CI build would need that key, not a
-  `.p12`.
+  A push that does not arrive does not by itself indict the key: the app stores
+  what `getDevicePushTokenAsync()` returns, which on iOS is Apple's device token
+  rather than an FCM token, and the functions send every stored token through
+  FCM.
 - **iPad.** `supportsTablet` is `false`. If that changes, the phone-first layout
   needs a look at iPad widths — the breakpoint work in `scripts/screens-e2e.mjs`
   covers 320-500px only.

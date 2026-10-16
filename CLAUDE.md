@@ -337,8 +337,8 @@ itself is deliberately NOT darkened — that would collapse it into
   photo picker be permission-free and both external-storage permissions be removed
   outright — on 13+ the system photo picker needs neither.
 - One Expo codebase (`app/`) on **three** surfaces: Android (local Gradle builds,
-  committed `android/`), **iOS** (added 2026-08-01, local Xcode builds on a cloud
-  Mac, `app/ios/` gitignored) and web via react-native-web
+  committed `android/`), **iOS** (added 2026-08-01, Xcode builds on a cloud Mac
+  or on GitHub's macOS runners, `app/ios/` gitignored) and web via react-native-web
   (`expo export --platform web` → Firebase Hosting). **NO EAS** on any of them.
   Platform seams as `.web.ts(x)` siblings.
 - **`app/android/` is committed and hand-edited; `app/ios/` is a build product.**
@@ -349,6 +349,15 @@ itself is deliberately NOT darkened — that would collapse it into
   Because `ios/` is regenerated, **nothing changed in Xcode's UI survives**;
   anything that must persist belongs in `app/app.json`. `docs/IOS-BUILD.md` is the
   runbook, and `npm run check:ios` guards the config that fails late.
+- **iOS signs two ways, and a runner only ever MANUALLY.** The Mac signs
+  automatically through the Admin App Store Connect key. GitHub's
+  `.github/workflows/ios.yml` sets `IOS_PROFILE_NAME`, and `build-ios.sh` then
+  signs the app target alone with the team's one Apple Distribution certificate
+  (shared with the LMS) and an App Store profile, both from secrets. Never let
+  automatic signing run on a runner: a fresh machine mints a certificate every
+  run and throws its key away, until Apple's per-team limit stops every build,
+  the LMS's included. The certificate and profiles expire 2027-10-16;
+  `docs/IOS-BUILD.md` § Builds on GitHub has the renewal.
 - **One version string for all three surfaces.** `expo.version` only — never
   `ios.version`, which would override it and show Apple a different number.
   `scripts/check-version.mjs` already holds the version to Apple's `X.Y.Z` shape.
@@ -431,7 +440,10 @@ a new machine.
   if bypassed: a red screen quoting *another repo's* module paths after a
   perfectly successful build.
 - CI (GitHub Actions): lint + typecheck + unit + emulator + every e2e suite on
-  every push. Keep it green. No deploys from CI.
+  every push. Keep it green. **Nothing deploys on a push.** The one deploy CI
+  can make is the TestFlight job of `ios.yml`, which runs only when started by
+  hand with `testflight=true`, and only with Faisal's go-ahead, like any
+  release. Its build job uploads nothing and may be run at any time.
 - **A suite nothing invokes is not coverage.** `functions/test/unit/suite-coverage.test.ts`
   guards the emulator lists and `app/src/ciCoverage.test.ts` guards the e2e ones;
   add to both when adding a suite. `app/` runs plain `.ts` unit tests only —

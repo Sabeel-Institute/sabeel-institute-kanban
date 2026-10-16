@@ -373,24 +373,30 @@ Two things worth reusing next time:
    ```
    `--check` first. It catches a missing value in two seconds instead of twenty
    minutes into an archive.
+
+   **Or from GitHub, with no Mac at all:**
+   `gh workflow run ios.yml -R faisal-shah/sabeel-institute-kanban -f testflight=true`,
+   started on the release commit. `docs/IOS-BUILD.md` § Builds on GitHub.
 4. **Bump `expo.ios.buildNumber` before every re-upload.** Apple requires it to
    increase even for the same version; unlike Android's versionCode it does not
-   derive itself. Shipped so far: **v0.7.7 build 1**, **v0.7.8 build 2** (both
-   2026-08-13), **v0.8.0 build 4** (2026-08-15) and **v0.9.0 build 6**
-   (2026-08-17). Builds 3 and 5 were never uploaded — each was bumped past twice
-   — which cost nothing, and is the point: the number need only rise *within* a
-   version, so carrying it across versions is simply the cheapest way never to
-   collide. It is `7` now, unused, ready for the next upload.
+   derive itself. On App Store Connect so far: builds 1, 2, 4 and 6–10, the last
+   v0.11.3 build 10 (2026-08-29). Builds 3 and 5 were never uploaded — each was
+   bumped past twice — which cost nothing, and is the point: the number need
+   only rise *within* a version, so carrying it across versions is simply the
+   cheapest way never to collide. It is `11` now, unused, ready for the next
+   upload. The GitHub upload job checks it with Apple before uploading.
 5. **First thing on a real device: confirm a push arrives.** The only proof the
    APNs key was uploaded correctly — nothing on this side distinguishes
    "uploaded" from "uploaded wrong", and a simulator cannot test it because it
-   gets no real APNs token.
-6. ~~Export the iOS distribution certificate as a `.p12`.~~ **Dropped
-   2026-08-15 — there is no such certificate on the build Mac.** Signing is
-   cloud-managed: the certificate is minted through the App Store Connect API key
-   at export and discarded, so after three shipped builds `security
-   find-identity` finds four *development* certificates and no distribution one.
-   A GitHub Actions build would need the same Admin `.p8`, not a `.p12`.
+   gets no real APNs token. A push that does NOT arrive does not by itself
+   indict the key: see `docs/IOS-BUILD.md` § Things that are genuinely open.
+6. **Before 16 October 2027: renew the iOS distribution certificate and both App
+   Store profiles** (this app's and the LMS's — they share the certificate),
+   then set `IOS_DIST_P12`, `IOS_DIST_P12_PASSWORD` and `IOS_PROFILE` again in
+   both repos, and revoke the old certificate. Until then GitHub builds work
+   unattended; after it, the gates in `build-ios.sh` stop every GitHub build in
+   seconds with "expired". The Mac is unaffected (it signs automatically).
+   Steps: `docs/IOS-BUILD.md` § Builds on GitHub → Renewal.
 7. **On hold until the route is final (2026-08-17).** If it lands on unlisted:
    create and approve the review account, submit to App Review, then request
    unlisted distribution — against a release build, not a TestFlight one. None
