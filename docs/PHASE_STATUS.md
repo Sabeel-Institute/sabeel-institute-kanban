@@ -525,6 +525,15 @@ organizer (red with the app's lock removed). The suite's check of an owner's
 on the build Mac. **Deploy order:** functions
 with both blocking functions, registered as the project's blocking triggers;
 then rules; then the Email/Password provider switched on; then the account.
+**Deployed the same night**, in that order: both blocking functions registered
+as the project's `beforeCreate` and `beforeSignIn`, then both rule sets, then the
+provider on. A stranger's `accounts:signUp` through the public API is refused
+(`SIGN_UP_REFUSED: self-signup`). The account was made through the Admin API,
+provisioned pending by `onUserCreate`, approved as a member as `setUserAccess`
+writes it, and is the only other member of an **App Review** board of five
+sample cards; signed in through the public API it sees that board alone, and
+reading another board is refused. The web sign-in screen goes live with the next
+hosting deploy; iPhones get it in build 13.
 
 ### 2026-09-20 — A Google 503 at sign-in stops paging — v0.11.5
 
