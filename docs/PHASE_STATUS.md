@@ -39,6 +39,9 @@ testing, and on iPhones through TestFlight:
   `apps-reviewer@oursabeel.com`, signs in with a password and is always a member
   (iPhone build 13 on; the web from its next release).
 - Admin people-management: approve, reject, disable, change roles.
+- **The institute's rules, accepted once** before any board, and **Report a
+  problem** in More, which keeps the report and emails it to the institute's
+  administrators (next release; `docs/STORE-RELEASE.md` § 4).
 - **Authority is two independent things** — an org role (member / organizer /
   admin) and per-board ownership. A plain member can own a board; only an admin
   sees a board they were not added to. `docs/PERMISSIONS.md` states it fully.
@@ -74,9 +77,9 @@ testing, and on iPhones through TestFlight:
   which boards, or which people.
 - Sabeel brand palette (Option 1) and logo; single light theme, no dark mode.
 
-**Tests: 557 unit + 132 emulator integration + 680 browser e2e checks**, the last
-across four suites — access and board flow (150), attachments (21), the stats
-chart at nine widths (280), and every screen at five widths (229). Rich text (30)
+**Tests: 709 unit + 409 emulator integration + 736 browser e2e checks**, the last
+across four suites — access and board flow (176), attachments (21), the stats
+chart at nine widths (280), and every screen at five widths (259). Rich text (35)
 and typing performance (3) run beside them, and the migration scripts (96) run
 under their own emulator. All of them run in CI on every push, and
 `app/src/ciCoverage.test.ts` fails if a suite is ever left out of the workflow.
@@ -400,6 +403,67 @@ the team.
 
 ## Deploy log
 
+### 2026-10-16 — The institute's rules, and Report a problem — unreleased
+
+**Not released.** On branch `rules-and-report`; it goes out with the next
+release, together with the 2026-10-13 entry below, whose version that release
+takes. **Order:** the IAM grant in `docs/DEPLOY.md` § Prerequisites, item 5;
+then rules and functions (`acceptRules`, `reportProblem`); then the clients. A
+client that shows the rules screen before `acceptRules` exists cannot get past
+it.
+
+Both pieces of the shared store decision 4 (decided by Faisal 2026-10-16; the
+`sabeel-app-stores` skill; `docs/STORE-RELEASE.md` § 4, which has the whole of
+what, where and which test):
+
+- **The institute's rules, accepted once per account.** After approval and
+  before anything else, an active account that has not accepted
+  `RULES_VERSION` sees "Before you continue" with **I agree** and **Sign out**,
+  and App.tsx mounts nothing behind it: no nav, no deep link, no tapped
+  notification. `acceptRules` records `rulesVersion` and `rulesAcceptedAt` on
+  the user document for an active caller and the version shown only;
+  `firestore.rules` keeps both fields from the client. Every existing account
+  sees it once, on its next sign-in or app open.
+- **Report a problem**, in More: one field and Send, and a line saying
+  administrators can take a post down or remove someone from the app entirely.
+  `reportProblem` refuses an inactive caller, empty or overlong text and a
+  sixth report in an hour, storing and sending nothing; otherwise it stores
+  `reports/{id}` and emails it from `apps-noreply@oursabeel.com` to
+  `apps-reports@oursabeel.com` with Reply-To the reporter, by keyless
+  domain-wide delegation through `report-mailer`. The email is
+  multipart/alternative: plain text with one line per paragraph, and HTML with
+  the same facts, the person's words escaped. A failed send keeps the report
+  (`mail.status: 'failed'`), tells the person so, and is not retried. Clients
+  can neither read nor write `reports`. The privacy policy and the manual say
+  what a report carries.
+- **@mentions on Play: argue first** (Faisal, 2026-10-16). Blocking is all or
+  nothing: a person who wants someone stopped reports them and an
+  administrator removes that account from the service; mention notifications
+  can be turned off altogether. `docs/STORE-RELEASE.md` § 4 and the review
+  notes say so; a per-person mute is built only if Google objects.
+
+**`e2e-all.sh` reported every failed suite as passed.** A `|| true` after the
+filtered pipeline ran whenever pipefail failed it, and PIPESTATUS then held
+`true`'s status. Found when this branch's first web run failed and the script
+printed "all 2 e2e suites passed". Fixed: the suite's status is read straight
+after the pipeline, and an "E2E aborted" line is no longer filtered away.
+
+**Verified (2026-10-16, on this branch):** lint, typecheck, knip (nothing new);
+unit 709 (shared 463, functions 121, app 125); emulator 409 (rules 249,
+functions 160); browser e2e: web 176, screens 259 at five widths, attachments
+21, stats 280, rich text 35, typing performance 3, migration 96. Shown red with
+the code mutated: the `reports` rule opened; the acceptance fields made
+self-writable; each callable's activity check; the hourly limit and its window;
+the version check; keeping the first acceptance; recording a failed send;
+Reply-To; header sanitising; encoded-word splitting; the delegation scope and
+the token Gmail is called with; the HTML escaping of the text, the name and
+the quotes; the HTML part's text; a hard-wrapped plain paragraph. **Not
+verified here:** the real Gmail send from a deployed function (the grant is a
+deploy step; the delegation itself was proved by hand on 2026-10-16), and the
+native apps (no AVD used; the coordinator runs the device pass). The web
+suite's first sign-in failed 3 times in 5 runs with the provisioned user
+document never reaching the client ("Wrong account"); clean `main` failed the
+same way, so it is not this branch, and the next run passed.
 ### 2026-10-13 — The Android editor's first height, and one build of Lexical — web and Play unreleased
 
 **Part released, part waiting.** Functions, rules and the two blocking

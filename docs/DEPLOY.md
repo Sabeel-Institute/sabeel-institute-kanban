@@ -43,6 +43,31 @@ In place for `sabeel-institute-kanban`; every deploy assumes them:
 4. On the deploying machine, `app/.env.local` (`docs/SECRETS.md`): a hosting
    bundle without its VAPID key cannot register web push, and
    `npm run check:web-push` refuses it.
+5. **Report a problem can send mail.** `reportProblem` sends as
+   `apps-noreply@oursabeel.com` by domain-wide delegation, keyless: it asks IAM
+   Credentials to sign a delegation token as
+   `report-mailer@sabeel-institute-kanban.iam.gserviceaccount.com` (named in
+   `functions/.env.sabeel-institute-kanban`), trades it for the sender's token,
+   and calls the Gmail API. That needs:
+   - the **Gmail API** enabled in the project (it is, since 2026-10-16), and
+     IAM Credentials, which attachment signing already uses;
+   - the Admin console's **Domain-wide delegation** entry for `report-mailer`'s
+     client id, scope `https://www.googleapis.com/auth/gmail.send` only (in
+     place since 2026-10-16, when a test message reached `apps-reports@`);
+   - the functions' runtime account allowed to sign as `report-mailer`. Grant
+     it once, before the first deploy of `reportProblem`:
+
+     ```sh
+     gcloud iam service-accounts add-iam-policy-binding \
+       report-mailer@sabeel-institute-kanban.iam.gserviceaccount.com \
+       --project sabeel-institute-kanban \
+       --member serviceAccount:826656438175-compute@developer.gserviceaccount.com \
+       --role roles/iam.serviceAccountTokenCreator
+     ```
+
+     `826656438175-compute@` is the gen-2 runtime account every function here
+     runs as. Without the grant a report is still stored, its `mail.status` is
+     `failed` and `mail.error` begins "signing the delegation token: HTTP 403".
 
 A new project instead: the consoles in `TODO.md` § B–D, then § First admin
 below.
@@ -446,6 +471,15 @@ binding was never applied. See the trap below.
 non-org account is rejected. When the sign-in or rules changed, also sign in
 through **Sign in with email** as `apps-reviewer@oursabeel.com` (password in the
 vault): it reaches the App Review board and nothing else.
+
+**4. Report a problem sends.** After a deploy that touched `reportProblem`, or
+the IAM grant or delegation it rests on, send one report from the app (**More →
+Report a problem**). It should arrive at `apps-reports@oursabeel.com` within a
+minute, from "Sabeel Apps No Reply", with Reply-To the sender, and
+`reports/{id}` should show `mail.status: 'sent'` with Gmail's `messageId`. A
+`failed` status names the step in `mail.error`: *signing* is the IAM grant in
+§ Prerequisites, *exchanging* is the Admin console's delegation entry, *sending*
+is the Gmail API. Such a report was kept; nothing re-sends it.
 
 ## Known traps
 

@@ -130,6 +130,19 @@ refuses another role for a password-only account. The address is one constant,
 `passwordDoor.test.ts`. It is public on purpose (`docs/STORE-RELEASE.md`
 § 3, The review account): do not hide it behind a claim.
 
+**The institute's rules stand in front of every board, and reports belong to
+the server** (Faisal, 2026-10-16; `docs/STORE-RELEASE.md` § 4). An active
+account whose user document lacks the current `RULES_VERSION` gets
+`RulesScreen` INSTEAD of the signed-in app, so nothing that can post is
+mounted; only the `acceptRules` callable writes `rulesVersion` and
+`rulesAcceptedAt`, which `firestore.rules` keeps out of the self-writable list.
+Change a word of the rules and raise `RULES_VERSION` in the same commit.
+**Report a problem** stores `reports/{id}` and emails it from
+`apps-noreply@oursabeel.com` by keyless domain-wide delegation (`gmail.ts`); no
+client reads or writes `reports`, nothing in the app lists them, and a failed
+send is recorded, never retried. No blocking between members: an admin
+disabling the account is the block, by decision.
+
 ## Assignees, subscriptions and labels
 
 - **Assignees must be board members**, rules-enforced. This is what makes the

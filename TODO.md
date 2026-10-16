@@ -99,6 +99,16 @@ below is console work; the script is already written (`npm run publish:play`).
 - [ ] **Set the public-facing name.** Same screen, currently the generated
       `project-8266…`. This is the name users see on the Google consent screen
       when they sign in, so make it **Sabeel Institute Kanban**.
+- [x] **Report a problem's sender** (2026-10-16): the Gmail API is on, and
+      the Admin console's domain-wide delegation lets
+      `report-mailer@sabeel-institute-kanban.iam.gserviceaccount.com` send as
+      `apps-noreply@oursabeel.com` (scope `gmail.send` only); a test message
+      reached `apps-reports@`.
+- [ ] **Let the functions sign as `report-mailer`**, before the first deploy
+      of `reportProblem`: `roles/iam.serviceAccountTokenCreator` for
+      `826656438175-compute@developer.gserviceaccount.com` on it. The exact
+      command is `docs/DEPLOY.md` § Prerequisites, item 5; without it every
+      report is kept but its email fails at "signing the delegation token".
 
 ---
 

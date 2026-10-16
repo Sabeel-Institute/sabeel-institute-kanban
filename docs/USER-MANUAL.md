@@ -66,6 +66,21 @@ takes them one tap. Leave the page open: it lets you in by itself the moment the
 approve you, with no need to sign out or refresh. If you seem stuck here, contact
 your admin.
 
+### Then, once: the institute's rules
+
+![Before you continue: the institute's rules](manual/img/rules.png)
+
+Before your first board you see **"Before you continue"**: Kanban is for the
+institute's staff, what you post is seen only by members of your board, and by
+continuing you agree to the institute's rules — post only what belongs to your
+work or class, and nothing abusive, harassing, hateful, sexual or otherwise
+objectionable. Administrators may remove content and suspend accounts that break
+them.
+
+Tap **I agree** to go on, or **Sign out** if you would rather not. You agree once
+for your account: the screen does not come back on another phone, another
+browser, or the next time you sign in.
+
 ## 1.2 Finding your way around
 
 A slim navigation bar is always in reach — **along the bottom on a phone**, and
@@ -82,7 +97,7 @@ A slim navigation bar is always in reach — **along the bottom on a phone**, an
 - **Alerts** — what you've been told about; a badge shows how many are unread,
   and a screen reader says the number too.
 - **More** — everything that isn't a place you go often: **Stats** (admins),
-  **People** (admins), and **Sign out**. It also shows the version of
+  **People** (admins), **Report a problem**, **Privacy policy** and **Sign out**. It also shows the version of
   the app you're running, which is the first thing to quote if something looks
   wrong.
 
@@ -487,7 +502,39 @@ button becomes **Open settings** on a phone; in a browser, allow them from the
 site settings behind the icon in the address bar. Notifications follow the
 account signed in on the device.
 
-## 1.10 Signing out
+## 1.10 Reporting a problem
+
+<div class="pair">
+  <figure><img class="wide" src="manual/img/report-wide.png" alt="Report a problem in a browser, with a report written"><figcaption>In a browser</figcaption></figure>
+  <figure><img class="narrow" src="manual/img/report-phone.png" alt="Report a problem on a phone, with a report written"><figcaption>On a phone</figcaption></figure>
+</div>
+
+If something on a board breaks the institute's rules — a card, a comment, a file,
+or the way someone is behaving — tell the administrators: **More → Report a
+problem**.
+
+There is one box: **What or who are you reporting, and what is wrong?** Say which
+board and card, or which person, and what the problem is, in your own words.
+Then **Send**.
+
+- **"Sent. An administrator will reply by email within a day."** The report has
+  gone to the institute's administrators by email, with your name and email
+  address so they can answer you. They act on it within 24 hours: they can take
+  a post down, or remove someone from the app entirely.
+- **"Your report was saved but the email did not go out; it will be looked
+  at."** The report is kept, and the administrators will still see it; there is
+  no need to send it again.
+
+Leave the screen before sending and your words are still there when you come
+back. You can send up to five reports an hour. Nobody but the administrators
+sees a report.
+
+There is no way to block one colleague: blocking is all or nothing. If someone
+should be stopped, report them, and an administrator can remove them from the
+app. If @mentions are what bothers you, you can turn mention notifications off
+altogether in **Alerts → Settings**.
+
+## 1.11 Signing out
 
 **More → Sign out** (in the navigation bar). Signing out clears your session on
 this phone or browser and stops it receiving that account's notifications. The
@@ -784,6 +831,10 @@ they're a member of its board).
 **…see everything assigned to me?**
 **My Work** — grouped overdue → today → next seven days.
 
+**…report a post or a person?**
+**More → Report a problem** → say what or who, and what is wrong → **Send**. An
+administrator replies by email within a day.
+
 **…stop a noisy notification?**
 **Alerts → Settings** → switch off that kind, or **mute** the board.
 
@@ -890,6 +941,9 @@ stay.
 | What you see | What it means | What to do |
 |---|---|---|
 | "Waiting for approval" after signing in | Your account awaits admin approval | Ask your admin; the screen unlocks by itself once approved |
+| "Before you continue" after approval | The institute's rules, which every account accepts once | Read them and tap **I agree**; it does not come back |
+| "Your report was saved but the email did not go out" | Your report is kept, but its email failed | Nothing to do: the administrators will still see it |
+| "You have sent 5 reports in the last hour" | Five reports an hour is the most one account can send | Wait a while; or tell an administrator directly |
 | You can't sign in at all | Only @oursabeel.com Google accounts are allowed | Use your work account, not a personal one |
 | A card's due date is red | The card is overdue | Open it and update the date, or get the work done |
 | "This card is unavailable" from a shared link | You're not a member of its board, or the card was deleted | Ask one of that board's owners to add you |
@@ -903,6 +957,7 @@ stay.
 
 *Manual source: `docs/USER-MANUAL.md`. Its images live in `docs/manual/img/` and
 are regenerated from the seeded dev stack by `node scripts/manual-shots.mjs`
-(every one except `pending.png`, which needs an unapproved account). The PDF is
+(every one except `pending.png`, which needs an unapproved account; `rules.png`
+is taken by withdrawing a seeded account's acceptance first). The PDF is
 built from the markdown by `python3 docs/render-manual.py`. When the app
 changes, update all three in the same batch — text, images, PDF.*

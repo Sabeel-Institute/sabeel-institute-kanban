@@ -215,6 +215,17 @@ and aborted the suite until this gate was added.
   chunk and the line, and the web bundle is not minified past readability the way
   a Hermes bytecode frame is. Android and iOS *are* wired — see the build-machine
   section above.
+- **Any mail credential.** Report a problem sends as
+  `apps-noreply@oursabeel.com` through domain-wide delegation with no password
+  and no key: the function signs a delegation token as
+  `report-mailer@sabeel-institute-kanban.iam.gserviceaccount.com` through IAM,
+  which it may do because its runtime account holds
+  `roles/iam.serviceAccountTokenCreator` on that service account
+  (`docs/DEPLOY.md` § Prerequisites). The service account's name is a function
+  parameter, `REPORT_MAILER_SERVICE_ACCOUNT` in
+  `functions/.env.sabeel-institute-kanban`, not a secret. The rights it carries
+  are the IAM grant and the Admin console's delegation entry (scope
+  `gmail.send` only); there is nothing to put in Secret Manager or the vault.
 - **Any Cloud Storage credential** — the attachments bucket
   (`sabeel-institute-kanban.firebasestorage.app`) is reached through the Admin
   SDK and the client Firebase config, neither of which is a secret, and signed

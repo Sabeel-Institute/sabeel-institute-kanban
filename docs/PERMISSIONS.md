@@ -11,7 +11,8 @@ They are orthogonal. A plain member can own a board. An organizer can own none.
 Neither fact tells you anything about the other.
 
 Status gates everything above both of them: nothing at all works unless the
-account is `active`.
+account is `active`. And an active account sees only the institute's rules until
+it has accepted them, once (`acceptRules`; `docs/STORE-RELEASE.md` § 4).
 
 ## The org role
 
@@ -20,6 +21,7 @@ account is `active`.
 | Use the app at all | ✓ | ✓ | ✓ |
 | Create a board | — | ✓ | ✓ |
 | Create a label | ✓ | ✓ | ✓ |
+| Report a problem (five an hour) | ✓ | ✓ | ✓ |
 | Rename, recolour or delete a label | — | — | ✓ |
 | Stats | — | — | ✓ |
 | Approve accounts, change roles | — | — | ✓ |
@@ -166,6 +168,7 @@ One definition per rule, mirrored rather than duplicated:
 | See a board's contents | `onBoard()` in `firestore.rules` | `canAccessBoard(user, board)` |
 | Curate labels | `isAdmin()` in `firestore.rules`, `canCurateLabels` in `deleteLabel` | `canCurateLabels` |
 | Stats | `isAdmin()` in `firestore.rules` | `canViewStats` |
+| Report a problem; accept the rules | `canUseApp` inside `reportProblem` and `acceptRules`; `reports/*` closed to every client in `firestore.rules` | the rules screen in `App.tsx`; Report a problem in More |
 | Administer accounts | `checkAccessChange` in `setUserAccess` | `canAdministerUsers` |
 | The role and status a session acts with (the password door) | `isSignedIn()` and `role()` in `firestore.rules`, `isActive()` in `storage.rules`, `sessionAccess` through `actorOf` in every callable, `beforeSignIn` | `sessionAccess` in `session.ts` |
 

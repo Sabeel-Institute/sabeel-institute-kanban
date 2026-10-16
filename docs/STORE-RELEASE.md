@@ -218,16 +218,68 @@ What Kanban users post: cards (title and rich-text description), comments with
 links and @mentions, and attachments of any type up to 10 MB. Everything is
 seen only by members of the same board (and admins, who see every board).
 
-Before the first App Store submission or Play production release, whichever
-comes first, Kanban adds the skill's two pieces (decision 4, decided by Faisal
-2026-10-16) — **not built yet**:
+Kanban has the skill's two pieces (decision 4, decided by Faisal 2026-10-16),
+**built 2026-10-16** on branch `rules-and-report` and released with the next
+version, which must precede the first App Store submission or Play production
+release:
 
-1. **The institute's rules, accepted once**, at first sign-in and before
-   anything can be posted: the skill's text with "Kanban", "staff", "board" and
-   "More".
-2. **Report a problem** in More: the person types what is wrong, and it reaches
-   Kanban's admins, who answer within 24 hours by removing the content or
-   disabling the account.
+1. **The institute's rules, accepted once.** `RulesScreen`
+   (`app/src/screens/GateScreens.tsx`): the skill's text with "Kanban",
+   "staff", "your board" and "More", and two buttons, **I agree** and **Sign
+   out**. It states no minimum age. `App.tsx` renders it INSTEAD of the
+   signed-in app for an active account whose user document does not carry
+   `rulesVersion >= RULES_VERSION` (`packages/shared/src/report.ts`), so no
+   navigation, deep link or tapped notification reaches a board or a card
+   behind it; the pending and other approval screens come first. **I agree**
+   calls `acceptRules` (`functions/src/acceptRules.ts`), which for an active
+   caller (`actorOf`, so the review account counts as the member it is), and
+   only for the version the screen showed, writes `rulesVersion` and
+   `rulesAcceptedAt` (server time) on the caller's user document, keeping the
+   first acceptance. `firestore.rules` leaves both fields out of the
+   self-writable list. Existing accounts see the screen once on their next
+   sign-in or app open; raising `RULES_VERSION` with a change to the text
+   shows it to everyone once more.
+2. **Report a problem**, in the More menu beside Privacy policy
+   (`app/src/screens/ReportScreen.tsx`): a line saying the report goes to the
+   administrators with the sender's name and email address, and that they can
+   take a post down or remove someone from the app entirely; one field, "What
+   or who are you reporting, and what is wrong?"; and **Send**. Nothing else.
+   An unsent report survives Back (`reportDraft`, a view store, emptied at
+   sign-out). `reportProblem` (`functions/src/reports.ts`) refuses an inactive
+   caller, text outside 1–2000 trimmed characters, and a sixth report within
+   an hour, counted from the stored reports in the same transaction as the
+   write, storing and sending nothing; otherwise it stores `reports/{id}` (app,
+   uid, name, email, role, text, server time, platform and app version) and
+   emails it from `apps-noreply@oursabeel.com` ("Sabeel Apps No Reply") to
+   `apps-reports@oursabeel.com`, Reply-To the reporter, subject `[Sabeel
+   Kanban] Report from <name>`, and a body of who, when (Chicago time), app,
+   version and platform, and the text verbatim, as multipart/alternative: plain
+   text with one line per paragraph, and HTML with the same facts and the
+   person's words escaped, so a phone's mail app does not break it ragged. The send is keyless
+   domain-wide delegation (`functions/src/gmail.ts`: IAM `signJwt` as
+   `report-mailer`, the jwt-bearer exchange, Gmail `messages.send`). Its
+   outcome is recorded as `mail.status`: `sent` with Gmail's id; `failed` with
+   the error, the report kept, the person told "Your report was saved but the
+   email did not go out; it will be looked at.", and no retry; `skipped` under
+   the emulator, which sends nothing. No client can read or write `reports`.
+   The deploy-time IAM grant is in `docs/DEPLOY.md` § Prerequisites.
+
+| Promise | Test |
+|---|---|
+| The message: From, To, Reply-To, subject, RFC 2047 names, no header injection; a plain and an HTML part with the same who, when, app and verbatim text; nothing typed becoming markup | `functions/test/unit/reportMessage.test.ts` |
+| The send path whole, against a local fake of IAM, the token endpoint and Gmail, and each step's failure named | `functions/test/unit/gmail.test.ts` |
+| Signed out, pending or disabled: nothing stored, nothing sent; an active member: one report stored and one send attempted, To `apps-reports@`, Reply-To the reporter; the sixth in an hour refused with nothing stored or sent; a failed send kept as `failed`; the review account reports as a member | `functions/test/integration/reports.test.ts` |
+| Acceptance recorded once, for active accounts and the shown version only | `functions/test/integration/acceptRules.test.ts` |
+| No client reads or writes `reports`; no client writes its own acceptance | `functions/test/integration/rules.test.ts` |
+| Approval opens onto the rules and nothing behind them; "I agree" opens the boards; a reload, and signing out and in, do not bring them back; an existing account's card link waits behind them; Report a problem in More for a member, Back keeps the text, Send says "Sent." and clears the field, one report stored; the review account agrees and reports | `scripts/web-e2e.mjs` |
+| The rules screen, the More sheet and Report a problem at five widths | `scripts/screens-e2e.mjs` |
+
+Each lock was shown red with its code mutated: the `reports` rule opened, the
+acceptance fields made self-writable, the activity checks, the hourly limit and
+its window, the version check, keeping the first acceptance, recording a failed
+send, Reply-To, header sanitising, encoded-word splitting, the delegation scope,
+the token Gmail is called with, and the HTML escaping (`docs/PHASE_STATUS.md`,
+2026-10-16).
 
 Deliberately not: blocking between members (a colleague blocked on a shared
 board would hide the work the board exists for), a word filter, or automatic
@@ -235,19 +287,23 @@ removal. An admin blocks a user from the service by disabling the account in
 People, which revokes its sessions and leaves it only the account-disabled
 screen. Board owners and admins can already delete any comment.
 
-**Open, for Faisal, before Play production: @mentions.** Play requires in-app
-blocking for "UGC features that enable 1:1 user interaction with specific users
-(for example, direct messaging, tagging, mentioning)". Kanban has @mentions,
-and a mention notifies the person named. Not decided; the options:
+**@mentions, decided by Faisal 2026-10-16: argue first** (the skill, decision
+9). Play requires in-app blocking for "UGC features that enable 1:1 user
+interaction with specific users (for example, direct messaging, tagging,
+mentioning)", and Kanban has @mentions: a mention notifies the person named.
+The answer to Play:
 
-- argue that a mention can only name a member of the same board
-  (`firestore.rules` holds `mentionUids` to the board's members) and only
-  notifies them, so it is not interaction with strangers;
-- a per-person mute of mention notifications (today a person can turn off all
-  mention notifications in the Alerts settings, or mute a whole board, but not
-  one person);
-- drop @mentions from the Play build.
+- A mention can name only a member of the same board (`firestore.rules` holds
+  `mentionUids` to the board's members) and notifies only them; nobody can
+  mention, or be mentioned by, a stranger.
+- Blocking is all or nothing. There is no per-person block: a person who wants
+  someone stopped uses **Report a problem**, and an administrator disables that
+  account, which removes it from the service entirely, every board and every
+  notification included.
+- Mention notifications can be turned off altogether, in the Alerts settings,
+  and a whole board can be muted.
 
+A per-person "mute mentions from this person" is built only if Google objects.
 Internal testing is not reviewed against this, and Apple's 1.2 does not name
 mentions.
 
@@ -279,7 +335,9 @@ state no minimum age, which would otherwise force Apple's rating up.
   Google profile picture, from the Workspace account at sign-in; the content
   people enter — cards, comments, attached files; and crash and error
   diagnostics carrying the internal account id only (`setErrorUser` sends the
-  uid, never a name or email).
+  uid, never a name or email). A report made with Report a problem is emailed
+  to the institute's administrators with the reporter's name and email
+  address, and kept as a record; the policy says so.
 - **Third parties:** Google (sign-in); Google Cloud and Firebase (hosting and
   data, in the US); Sentry (crash and error diagnostics); and Apple's push
   service, through which an iPhone notification's title and text are
@@ -412,6 +470,11 @@ contact strangers. Guideline 1.2:
   between members is not offered because the app carries shared work:
   blocking between colleagues on shared work boards would hide the work they
   share.
+- Mentions: an @mention can name only a member of the same board and notifies
+  only them. Blocking is all or nothing: a person who wants someone stopped
+  uses Report a problem, and an administrator disables that account, which
+  removes it from the service entirely. Mention notifications can also be
+  turned off altogether in the app's Alerts settings.
 - Contact: https://sabeel-institute-kanban.web.app/support (the privacy
   policy, linked on the sign-in screen, gives the same address).
 
@@ -426,7 +489,7 @@ sign-in screen) states the address, the process and what is retained.
 - [ ] **Build 14 or later**, from a release with its own version and deploy-log
       entry (`docs/DEPLOY.md` § Shipping a release), carrying the Next and Go
       keys on the email form (on `main`), the rules screen and Report a problem
-      (§ 4, not built).
+      (§ 4, built).
 - [ ] **The iPhone refusal round trip** on a TestFlight install: a Google
       account with no Kanban account is refused, and production Auth shows no
       new record — the check Android passed on 2026-08-18.
@@ -444,8 +507,10 @@ sign-in screen) states the address, the process and what is retained.
 
 **Play production:**
 
-- [ ] The @mentions decision (§ 4) and the signing-key decision (§ 8).
-- [ ] The rules screen and Report a problem (§ 4).
+- [x] The @mentions decision (§ 4): argue first, decided 2026-10-16.
+- [ ] The signing-key decision (§ 8).
+- [x] The rules screen and Report a problem (§ 4): built 2026-10-16, released
+      with the next version.
 - [ ] App content: privacy policy URL, App access, ads, content rating (users
       interact), target audience, Data safety (including the push-token
       question above).
