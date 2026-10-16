@@ -8,6 +8,7 @@
 import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import { WEB_PORTS } from './lib/ports.mjs';
+import { RULES_TITLE } from './lib/rules.mjs';
 
 const BASE = process.env.E2E_BASE ?? `http://127.0.0.1:${WEB_PORTS.e2e}/`;
 
@@ -61,6 +62,27 @@ async function signIn(page, who) {
   return gate.isVisible().catch(() => false);
 }
 
+/**
+ * Agree to the institute's rules if this account is being asked to.
+ *
+ * Every account sees the rules screen once, after approval. A re-run against a
+ * seeded emulator finds them already accepted, so this waits for whichever
+ * comes first, the rules or the app, and agrees only to the first. (The
+ * browser suites use the strict `agreeToRules`; a seed has to be re-runnable.)
+ */
+async function agreeIfAsked(page) {
+  const rules = page.getByText(RULES_TITLE, { exact: true });
+  const app = page.getByRole('button', { name: 'More' });
+  await Promise.race([
+    rules.waitFor({ timeout: 40000 }).catch(() => {}),
+    app.waitFor({ timeout: 40000 }).catch(() => {}),
+  ]);
+  if (await rules.isVisible().catch(() => false)) {
+    await page.getByRole('button', { name: 'I agree', exact: true }).click();
+    await app.waitFor({ timeout: 40000 });
+  }
+}
+
 // The first account has to be granted out of band — there is no admin yet to
 // approve it. That is the same bootstrap a real deployment goes through.
 //
@@ -73,12 +95,16 @@ if (await signIn(admin, 'faisal')) {
     stdio: 'inherit',
   });
 }
+await agreeIfAsked(admin);
 await admin.getByRole('button', { name: 'New board' }).waitFor({ timeout: 40000 });
 
-// Two colleagues sign in and wait, then get approved.
+// Two colleagues sign in and wait, then get approved — and, their pages still
+// open, agree to the rules the approval brings up.
+const colleagues = [];
 for (const who of ['sara', 'omar']) {
   const p = await open(browser);
   await signIn(p, who);
+  colleagues.push(p);
 }
 // Section/account actions live in the app-wide nav now: People is inside the
 // Account menu (bottom of the left rail on wide, where this seed runs).
@@ -105,6 +131,7 @@ for (;;) {
   await admin.waitForTimeout(1500);
 }
 await admin.getByRole('button', { name: 'Back' }).first().click();
+for (const p of colleagues) await agreeIfAsked(p);
 
 /**
  * Fill a field and act on it, re-filling if the value is wiped underneath us.

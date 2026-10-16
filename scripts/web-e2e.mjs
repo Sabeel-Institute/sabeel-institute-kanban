@@ -18,11 +18,13 @@ import { chromium } from 'playwright';
 // The app's own org-timezone date, so this script cannot drift from ORG_TIMEZONE.
 import { todayInOrgTz } from '../packages/shared/lib/due.js';
 import { PASSWORD_SIGN_IN_EMAIL } from '../packages/shared/lib/constants.js';
+import { REPORT_TEXT_MAX } from '../packages/shared/lib/report.js';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { readFile, mkdir } from 'node:fs/promises';
 import { extname, join, resolve } from 'node:path';
 import { EMULATOR_PORTS, WEB_PORTS } from './lib/ports.mjs';
+import { RULES_TITLE, agreeToRules } from './lib/rules.mjs';
 
 const SHOTS = resolve(import.meta.dirname, '..', 'shots');
 // The Expo web DEV server, started by e2e.sh. It must be the dev server rather
@@ -101,7 +103,7 @@ function adminRun(body) {
   const code = `
     import { initializeApp } from 'firebase-admin/app';
     import { getAuth } from 'firebase-admin/auth';
-    import { getFirestore } from 'firebase-admin/firestore';
+    import { FieldValue, getFirestore } from 'firebase-admin/firestore';
     initializeApp({ projectId: 'demo-sabeel-kanban' });
     const auth = getAuth();
     const db = getFirestore();
@@ -166,7 +168,7 @@ async function decliningConfirm(page, fn) {
   }
 }
 
-async function newApp(browser, scheme = 'light') {
+async function newApp(browser, scheme = 'light', path = '') {
   const ctx = await browser.newContext({
     colorScheme: scheme,
     viewport: { width: 1100, height: 900 },
@@ -198,8 +200,25 @@ async function newApp(browser, scheme = 'light') {
   // pointing at whatever happened to run before it. Explicit timeouts still win;
   // this only puts a floor under the calls that never named one.
   page.setDefaultTimeout(45000);
-  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' });
   return { ctx, page };
+}
+
+/** The last line a few lines of Admin SDK code printed, as JSON. */
+async function adminJson(body) {
+  return JSON.parse((await adminRun(body)).trim().split('\n').pop());
+}
+
+/**
+ * Report a problem, the way a person does: More, the item, one field, Send.
+ * Returns the page on the report screen with the outcome drawn.
+ */
+const REPORT_FIELD = 'What or who are you reporting, and what is wrong?';
+const REPORT_SENT = 'Sent. An administrator will reply by email within a day.';
+async function openReport(page) {
+  await page.getByRole('button', { name: 'More' }).click();
+  await page.getByRole('button', { name: /^Report a problem/ }).click();
+  await page.getByLabel(REPORT_FIELD).waitFor({ timeout: 20000 });
 }
 
 /**
@@ -326,9 +345,46 @@ try {
   // No reload, no re-navigation: the open page must react on its own.
   const urlBefore = admin.url();
   await grantAdmin('faisal@oursabeel.com');
+
+  // ---- The institute's rules, before anything that can post ---------------
+  // Approval un-gates onto the rules screen, and nothing behind it is mounted:
+  // no board list, no New board, no nav. Sampled only once the screen's own
+  // title and button have drawn, so "absent" means withheld, not not-yet-loaded.
+  await admin.getByText(RULES_TITLE, { exact: true }).waitFor({ timeout: 25000 });
+  await admin.getByRole('button', { name: 'I agree', exact: true }).waitFor({ timeout: 10000 });
+  check('approval un-gates the OPEN app with no reload, onto the rules screen', admin.url() === urlBefore);
+  {
+    const said = await admin.locator('body').innerText();
+    check(
+      'the rules screen says who the app is for, what is not tolerated, and where to report',
+      /Kanban is for Sabeel Institute.s staff/.test(said) &&
+        /members of your board/.test(said) &&
+        /abusive, harassing, hateful, sexual or otherwise objectionable/.test(said) &&
+        /Report a problem in More; administrators respond within 24 hours/.test(said),
+      said.slice(0, 160),
+    );
+    check('and states no minimum age', !/\b(age|years old|13|16|18)\b/i.test(said));
+    const behind = [];
+    for (const name of ['New board', 'More', 'Boards', 'My Work', 'Search']) {
+      if (await admin.getByRole('button', { name, exact: true }).isVisible().catch(() => false)) behind.push(name);
+    }
+    check('an account that has not accepted reaches nothing it could post from', behind.length === 0, behind.join(', '));
+  }
+  await admin.screenshot({ path: join(SHOTS, 'p1-rules-light.png'), fullPage: true });
+  await admin.getByRole('button', { name: 'I agree', exact: true }).click();
   await admin.getByRole('button', { name: 'New board' }).waitFor({ timeout: 25000 });
-  check('approval un-gates the OPEN app with no reload', admin.url() === urlBefore);
+  check('"I agree" opens the boards', true);
   await admin.screenshot({ path: join(SHOTS, 'p1-home-light.png'), fullPage: true });
+
+  // Accepted once means accepted: a reload comes back to the boards. `load`,
+  // not `networkidle`: signed in, the app holds Firestore's listen channel
+  // open, so the network never goes idle.
+  await admin.reload({ waitUntil: 'load' });
+  await admin.getByRole('button', { name: 'New board' }).waitFor({ timeout: 30000 });
+  check(
+    'after a reload the rules do not come back',
+    !(await admin.getByText(RULES_TITLE, { exact: true }).isVisible().catch(() => false)),
+  );
 
   // ---- A second person signs in and waits ---------------------------------
   const { ctx: saraCtx, page: sara } = await newApp(browser);
@@ -365,8 +421,9 @@ try {
   // both a nav item and a page heading, so it matches twice and the strict
   // locator throws. This phrasing also says what un-gating actually means.
   await sara.getByText('Waiting for approval').waitFor({ state: 'detached', timeout: 25000 });
+  await agreeToRules(sara);
   await sara.getByRole('button', { name: 'More' }).waitFor({ timeout: 15000 });
-  check('approved member un-gates live', true);
+  check('approved member un-gates live, through the rules', true);
 
   // Look for People where it actually lives — INSIDE the Account menu. This
   // used to probe a top-level button that exists for nobody, so it passed
@@ -375,6 +432,10 @@ try {
   // Sign out is in the menu for everyone, so it proves the sheet is open
   // without matching the nav button that opened it.
   await sara.getByRole('button', { name: 'Sign out' }).waitFor({ timeout: 15000 });
+  check(
+    'a member finds Report a problem in More',
+    await sara.getByRole('button', { name: /^Report a problem/ }).isVisible().catch(() => false),
+  );
   const saraSeesPeople = await sara
     .getByRole('button', { name: 'People' })
     .isVisible()
@@ -2200,6 +2261,102 @@ try {
   check('a rejected account never reaches the approval queue', !reachedAGate);
   await bad.screenshot({ path: join(SHOTS, 'p1-wrong-domain-light.png'), fullPage: true });
 
+  // ---- An existing account meets the rules once, wherever it was going -----
+  // Every account made before the rules screen has no acceptance on its user
+  // document, which is how the release will find them. Sara's is taken away
+  // here to match, and she then follows a link to a card on her board: the
+  // rules come first with the card nowhere on screen, the card opens behind
+  // "I agree", and signing out and in does not bring the rules back.
+  const target = await adminJson(`
+    const u = (await db.collection('users').where('email', '==', 'sara@oursabeel.com').get()).docs[0];
+    await u.ref.update({ rulesVersion: FieldValue.delete(), rulesAcceptedAt: FieldValue.delete() });
+    const boards = await db.collection('boards').where('memberUids', 'array-contains', u.id).get();
+    let card = null;
+    for (const b of boards.docs) {
+      if (b.data().archived) continue;
+      const c = await db.collection('cards').where('boardId', '==', b.id).where('archived', '==', false).limit(1).get();
+      if (!c.empty) { card = { id: c.docs[0].id, title: c.docs[0].data().title }; break; }
+    }
+    console.log(JSON.stringify({ uid: u.id, card }));
+  `);
+  if (!target.card) throw new Error('Sara is on no board with a live card to link to');
+  {
+    const { ctx, page } = await newApp(browser, 'light', `c/${target.card.id}`);
+    pages.set('linked', page);
+    await page.getByRole('button', { name: 'sara', exact: true }).click();
+    await page.getByText(RULES_TITLE, { exact: true }).waitFor({ timeout: 40000 });
+    await page.getByRole('button', { name: 'I agree', exact: true }).waitFor({ timeout: 10000 });
+    const early = {
+      card: await page.getByRole('button', { name: 'Share card' }).isVisible().catch(() => false),
+      composer: await commentEditor(page).isVisible().catch(() => false),
+      nav: await page.getByRole('button', { name: 'More' }).isVisible().catch(() => false),
+    };
+    check(
+      'an existing account sees the rules once, before the card its link names',
+      !early.card && !early.composer && !early.nav,
+      JSON.stringify(early),
+    );
+    await page.getByRole('button', { name: 'I agree', exact: true }).click();
+    const opened = await page
+      .getByRole('button', { name: 'Share card' })
+      .waitFor({ timeout: 30000 })
+      .then(() => true, () => false);
+    check('and the card opens once she agrees', opened && (await page.getByText(target.card.title).first().isVisible()));
+    const accepted = await adminJson(`
+      const d = (await db.doc('users/${target.uid}').get()).data();
+      console.log(JSON.stringify({ v: d.rulesVersion, at: typeof d.rulesAcceptedAt?.toMillis }));
+    `);
+    check('her acceptance is recorded by the server, with its version and time', accepted.v === 1 && accepted.at === 'function', JSON.stringify(accepted));
+
+    // ---- Report a problem -------------------------------------------------
+    await openReport(page);
+    const field = page.getByLabel(REPORT_FIELD);
+    const send = page.getByRole('button', { name: 'Send', exact: true });
+    check('Report a problem is one field, capped at the limit', (await field.getAttribute('maxlength')) === String(REPORT_TEXT_MAX));
+    check('with nothing written, Send is off', (await send.getAttribute('aria-disabled')) === 'true');
+    const REPORT_TEXT = `The last comment on "${target.card.title}" calls Omar names.\nPlease take it down.`;
+    await field.fill(REPORT_TEXT);
+    await page.screenshot({ path: join(SHOTS, 'p13-report-light.png'), fullPage: true });
+    // Back, and back again: an unsent report is not lost.
+    await page.getByRole('button', { name: 'Back' }).first().click();
+    await page.getByRole('button', { name: 'Share card' }).waitFor({ timeout: 20000 });
+    await openReport(page);
+    check('an unsent report survives Back', (await page.getByLabel(REPORT_FIELD).inputValue()) === REPORT_TEXT);
+    await send.click();
+    const sent = await page.getByText(REPORT_SENT).waitFor({ timeout: 30000 }).then(() => true, () => false);
+    check('Send says it went, and when to expect an answer', sent);
+    check('and the field clears', (await field.inputValue()) === '');
+    await page.screenshot({ path: join(SHOTS, 'p13-report-sent-light.png'), fullPage: true });
+    const stored = await adminJson(`
+      const r = await db.collection('reports').where('uid', '==', '${target.uid}').get();
+      console.log(JSON.stringify(r.docs.map((d) => d.data())));
+    `);
+    const r0 = stored[0] ?? {};
+    check(
+      'exactly one report is kept, with who sent it, what they wrote, and where from',
+      stored.length === 1 &&
+        r0.text === REPORT_TEXT &&
+        r0.email === 'sara@oursabeel.com' &&
+        r0.role === 'member' &&
+        r0.platform === 'web' &&
+        /^\d+\.\d+\.\d+ \(/.test(r0.appVersion ?? '') &&
+        r0.mail?.status === 'skipped',
+      JSON.stringify(stored).slice(0, 200),
+    );
+
+    // Signed out and in again: straight to the app, no rules.
+    await page.getByRole('button', { name: 'More' }).click();
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await page.getByRole('button', { name: 'sara', exact: true }).click();
+    await page.getByRole('button', { name: 'More' }).waitFor({ timeout: 40000 });
+    check(
+      'after signing out and in, the rules do not come back',
+      !(await page.getByText(RULES_TITLE, { exact: true }).isVisible().catch(() => false)),
+    );
+    await ctx.close();
+    pages.delete('linked');
+  }
+
   // ---- The email door: one address, a member (Faisal, 2026-10-15) ----------
   // "should only accept that one email" and "Just a member", and "The sign in
   // page shouldn't indicate its a special thing for a reviewer". Both accounts
@@ -2271,6 +2428,8 @@ try {
     check('Return in the address field moves to the password', await focused(passwordField));
     await page.keyboard.type(DOOR_PASSWORD);
     await page.keyboard.press('Enter');
+    // A new account, so the rules first, as for anyone.
+    await agreeToRules(page);
     // Read off the LOADED Boards screen: its empty state, which is drawn in the
     // same render as New board and from the same session, and words itself by
     // role. Not the word "Boards" — the nav rail says it while the screen is
@@ -2288,6 +2447,21 @@ try {
     const canCreate = await page.getByRole('button', { name: 'New board' }).isVisible().catch(() => false);
     check('and is a member whatever its claims say: no New board', settled && asMember && !canCreate);
     await page.screenshot({ path: join(SHOTS, 'p1-email-door-member.png'), fullPage: true });
+
+    // The review account may report, as the member it is.
+    await openReport(page);
+    await page.getByLabel(REPORT_FIELD).fill('Checking that a report reaches the institute.');
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    const reviewerSent = await page.getByText(REPORT_SENT).waitFor({ timeout: 30000 }).then(() => true, () => false);
+    const reviewerReports = await adminJson(`
+      const r = await db.collection('reports').where('email', '==', ${JSON.stringify(PASSWORD_SIGN_IN_EMAIL)}).get();
+      console.log(JSON.stringify(r.docs.map((d) => d.data().role)));
+    `);
+    check(
+      'the review account can report, and is recorded as a member',
+      reviewerSent && reviewerReports.length === 1 && reviewerReports[0] === 'member',
+      JSON.stringify(reviewerReports),
+    );
     await ctx.close();
   }
 

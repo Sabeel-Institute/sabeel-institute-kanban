@@ -24,6 +24,7 @@ import { resolve } from 'node:path';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { EMULATOR_PORTS, WEB_PORTS } from './lib/ports.mjs';
+import { agreeToRules } from './lib/rules.mjs';
 
 const BASE = process.env.E2E_BASE ?? `http://127.0.0.1:${WEB_PORTS.e2e}/`;
 const ROOT = resolve(import.meta.dirname, '..');
@@ -56,6 +57,7 @@ async function provision(who, email) {
   await p.getByRole('button', { name: who, exact: true }).click();
   await p.getByText('Waiting for approval').waitFor({ timeout: 25000 });
   await grant(email);
+  await agreeToRules(p);
   await ctx.close();
 }
 await provision('faisal', 'faisal@oursabeel.com');

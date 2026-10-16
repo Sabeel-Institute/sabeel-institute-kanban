@@ -26,13 +26,16 @@
  * `pending.png` is the ONE image still captured by hand: it needs an account
  * that has signed in and NOT been approved, and the dev seed approves everyone
  * it creates. It is also the most stable screen in the app. Everything else
- * here is automatic.
+ * here is automatic — `rules.png` included: the seed's accounts have all
+ * accepted the institute's rules, so that shot takes Omar's acceptance away
+ * first, photographs the screen, and agrees again.
  */
 import { chromium } from 'playwright';
 import { mkdir } from 'node:fs/promises';
 import { initializeApp } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { EMULATOR_PORTS, WEB_PORTS } from './lib/ports.mjs';
+import { RULES_TITLE } from './lib/rules.mjs';
 
 const OUT = 'docs/manual/img';
 const BASE = process.env.MANUAL_BASE ?? `http://127.0.0.1:${WEB_PORTS.e2e}`;
@@ -338,6 +341,19 @@ const SHOTS = {
     await p.getByText(/^Members \(/).first().waitFor({ timeout: 30000 });
     await p.waitForTimeout(900);
   },
+  // Report a problem with a report written but not yet sent: the screen's
+  // whole content, and what the manual's section walks through.
+  report: async (p) => {
+    await nav(p, 'Boards');
+    await p.getByRole('button', { name: 'More' }).click();
+    await p.getByRole('button', { name: /^Report a problem/ }).click();
+    const field = p.getByLabel('What or who are you reporting, and what is wrong?');
+    await field.waitFor({ timeout: 30000 });
+    await field.fill(
+      'The latest comment on "Book the venue" is rude about a volunteer by name. Could it come down?',
+    );
+    await p.waitForTimeout(600);
+  },
   // The breakdown only exists while a bar is SELECTED, so it needs its own
   // shot. The seed can leave a quiet chart with nothing to tap, in which case
   // this photographs the chart alone rather than failing the whole run.
@@ -387,6 +403,29 @@ if (wanted('signin')) {
   console.log('  signin.png');
   made += 1;
   await p.close();
+}
+
+// The institute's rules: shown once per account, and every seeded account has
+// accepted them. So Omar's acceptance is taken away — the state every account
+// was in before the screen existed — and he agrees again after the shot.
+if (wanted('rules')) {
+  const db = getFirestore();
+  const omar = (await db.collection('users').where('email', '==', 'omar@oursabeel.com').get()).docs[0];
+  if (!omar) throw new Error('omar missing — run scripts/dev.sh web first');
+  await omar.ref.update({ rulesVersion: FieldValue.delete(), rulesAcceptedAt: FieldValue.delete() });
+  const p = await fresh(1280, 900, { signIn: false });
+  try {
+    await p.getByRole('button', { name: 'omar', exact: true }).click();
+    await p.getByText(RULES_TITLE, { exact: true }).waitFor({ timeout: 90000 });
+    await p.waitForTimeout(800);
+    await p.screenshot({ path: `${OUT}/rules.png` });
+    console.log('  rules.png');
+    made += 1;
+  } finally {
+    await p.getByRole('button', { name: 'I agree', exact: true }).click();
+    await p.getByRole('button', { name: 'More' }).waitFor({ timeout: 60000 });
+    await p.close();
+  }
 }
 
 await browser.close();

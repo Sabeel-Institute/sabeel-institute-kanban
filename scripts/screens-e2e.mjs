@@ -47,8 +47,10 @@ import { spawn } from 'node:child_process';
 import { mkdir, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { initializeApp } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { RULES_VERSION } from '../packages/shared/lib/report.js';
 import { EMULATOR_PORTS, WEB_PORTS } from './lib/ports.mjs';
+import { RULES_TITLE, agreeToRules } from './lib/rules.mjs';
 
 const BASE = process.env.E2E_BASE ?? `http://127.0.0.1:${WEB_PORTS.e2e}/`;
 const ROOT = resolve(import.meta.dirname, '..');
@@ -72,11 +74,20 @@ function check(name, ok, detail = '') {
 /**
  * Approve + set a role, the way an admin does. `grant-admin.mjs` only makes
  * admins, and an account left `pending` cannot see a board at all.
+ *
+ * These two are fixtures for the board tours, so their acceptance of the
+ * institute's rules is written here as acceptRules would write it. The rules
+ * SCREEN is toured as Faisal, at every width, below.
  */
 const setUserRole = async (email, role) => {
   const snap = await db.collection('users').where('email', '==', email).get();
   const ref = snap.docs[0].ref;
-  await ref.update({ role, status: 'active' });
+  await ref.update({
+    role,
+    status: 'active',
+    rulesVersion: RULES_VERSION,
+    rulesAcceptedAt: FieldValue.serverTimestamp(),
+  });
   const { getAuth } = await import('firebase-admin/auth');
   await getAuth().setCustomUserClaims(ref.id, { role, status: 'active' });
 };
@@ -125,6 +136,7 @@ const browser = await chromium.launch();
   await page.getByRole('button', { name: 'faisal', exact: true }).click();
   await page.getByText('Waiting for approval').waitFor({ timeout: 25000 });
   await grantAdmin('faisal@oursabeel.com');
+  await agreeToRules(page);
   await page.getByRole('button', { name: 'New board' }).waitFor({ timeout: 25000 });
   await ctx.close();
 }
@@ -457,8 +469,44 @@ const smallTargets = (page) =>
     ),
   ]);
 
+/**
+ * THE INSTITUTE'S RULES, the one screen between approval and every board.
+ *
+ * Shown once per account, so each width starts by taking Faisal's acceptance
+ * away again — the state every account was in before the screen existed — and
+ * signing in onto it. Its way out is Sign out, not Back or the tab bar: it is
+ * a gate, and nothing behind it may be reachable until "I agree". That is
+ * checked here at every width, after the title has drawn, so the absence of
+ * the nav means the screen withheld it and not that nothing had loaded yet.
+ */
+async function rulesScreen(page, tag, width) {
+  await page.getByText(RULES_TITLE, { exact: true }).waitFor({ timeout: 30000 });
+  await page.waitForTimeout(500);
+  const faults = await layoutFaults(page, width);
+  check(`${tag} / rules`, faults.length === 0, faults.join('; ').slice(0, 160));
+  const gate = await page.evaluate(() => {
+    const label = (e) => (e.getAttribute('aria-label') || e.textContent || '').trim();
+    const shown = [...document.querySelectorAll('[role="button"]')]
+      .filter((e) => e.getBoundingClientRect().width > 0)
+      .map(label);
+    return {
+      agree: shown.includes('I agree'),
+      signOut: shown.includes('Sign out'),
+      behind: shown.filter((l) => /^(More|Boards|My Work|Search|Alerts|New board)(,|$)/.test(l)),
+    };
+  });
+  check(
+    `${tag} / rules offers I agree and Sign out, and nothing behind it`,
+    gate.agree && gate.signOut && gate.behind.length === 0,
+    JSON.stringify(gate),
+  );
+  await page.screenshot({ path: join(SHOTS, `${tag}-rules.png`), fullPage: true });
+  await page.getByRole('button', { name: 'I agree', exact: true }).click();
+  await page.getByText(RULES_TITLE, { exact: true }).waitFor({ state: 'detached', timeout: 30000 });
+}
+
 // ---- The tour --------------------------------------------------------------
-const SCREENS = 18;
+const SCREENS = 20;
 
 async function tour(page, tag, width) {
   /**
@@ -596,6 +644,28 @@ async function tour(page, tag, width) {
     await nav('Boards');
     await page.getByRole('button', { name: 'More' }).click();
     await page.getByRole('button', { name: 'People' }).click();
+  });
+
+  /**
+   * The More sheet, open: it gained Report a problem, with a detail line, and
+   * 320px is where a row and its detail run out of room.
+   */
+  await visit('more', async () => {
+    await nav('Boards');
+    await page.getByRole('button', { name: 'More' }).click();
+    await page.getByRole('button', { name: /^Report a problem/ }).waitFor({ timeout: 15000 });
+  });
+  /**
+   * Report a problem with a report half-written: the explanation, the field's
+   * label, the field holding more than it shows, and Send, at every width.
+   */
+  await visit('report', async () => {
+    await page.getByRole('button', { name: /^Report a problem/ }).click();
+    const field = page.getByLabel('What or who are you reporting, and what is wrong?');
+    await field.waitFor({ timeout: 15000 });
+    await field.fill(
+      'The comment on "Book the venue for the spring fundraiser" calls a colleague names.\n\nIt was posted this morning.',
+    );
   });
 
   await visit('board', async () => {
@@ -1098,8 +1168,13 @@ try {
     });
     const page = await ctx.newPage();
     page.on('pageerror', (e) => check(`${tag} page error`, false, String(e).slice(0, 90)));
+    await db.doc(`users/${uid}`).update({
+      rulesVersion: FieldValue.delete(),
+      rulesAcceptedAt: FieldValue.delete(),
+    });
     await page.goto(BASE, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'faisal', exact: true }).click();
+    await rulesScreen(page, tag, width);
     await page.getByRole('button', { name: 'More' }).waitFor({ timeout: 30000 });
     await tour(page, tag, width);
     await ctx.close();

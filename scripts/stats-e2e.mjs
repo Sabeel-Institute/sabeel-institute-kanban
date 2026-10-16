@@ -21,6 +21,7 @@ import { join, resolve } from 'node:path';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { EMULATOR_PORTS, WEB_PORTS } from './lib/ports.mjs';
+import { agreeToRules } from './lib/rules.mjs';
 
 const BASE = process.env.E2E_BASE ?? `http://127.0.0.1:${WEB_PORTS.e2e}/`;
 const SHOTS = resolve(import.meta.dirname, '..', 'shots');
@@ -229,6 +230,7 @@ try {
   await page.getByRole('button', { name: 'faisal', exact: true }).click();
   await page.getByText('Waiting for approval').waitFor({ timeout: 25000 });
   await grantAdmin('faisal@oursabeel.com');
+  await agreeToRules(page);
   await page.getByRole('button', { name: 'More' }).waitFor({ timeout: 30000 });
 
   await page.getByRole('button', { name: 'More' }).click();

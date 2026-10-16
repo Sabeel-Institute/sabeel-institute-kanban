@@ -26,7 +26,7 @@ const OUT = resolve(ROOT, 'shots', 'sweep-report.html');
 
 /** Tour order, then anything new alphabetically after it. */
 const ORDER = [
-  'boards', 'mywork', 'search', 'alerts', 'stats', 'people',
+  'rules', 'boards', 'mywork', 'search', 'alerts', 'stats', 'people', 'more', 'report',
   'board', 'board-owner', 'board-member', 'roster-owner', 'roster-member',
   'board-longname', 'board-empty', 'bulk', 'card', 'card-editing', 'card-comment',
   'settings', 'archive',
@@ -50,6 +50,9 @@ const NARROW_ONLY = new Set([
 
 /** What each screen is, so the report explains itself to someone else. */
 const BLURB = {
+  rules: 'The institute\u2019s rules, once per account, between approval and every board. Its one way out is Sign out: nothing behind it is mounted until I agree.',
+  more: 'The More sheet open, with Report a problem beside the privacy policy.',
+  report: 'Report a problem with a report half-written: one field and Send, nothing else.',
   boards: 'The board list — the home screen.',
   mywork: 'Every card assigned to you, across every board, grouped by when it is due.',
   search: 'Search and its filter chips. The cursor is taken on desktop widths only.',
