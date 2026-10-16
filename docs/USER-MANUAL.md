@@ -73,9 +73,9 @@ your admin.
 Before your first board you see **"Before you continue"**: Kanban is for the
 institute's staff, what you post is seen only by members of your board, and by
 continuing you agree to the institute's rules — post only what belongs to your
-work or class, and nothing abusive, harassing, hateful, sexual or otherwise
-objectionable. Administrators may remove content and suspend accounts that break
-them.
+work, post nothing abusive, harassing, hateful, sexual or otherwise
+objectionable, and never abuse another member. Administrators may remove content
+and suspend accounts that break them.
 
 Tap **I agree** to go on, or **Sign out** if you would rather not. You agree once
 for your account: the screen does not come back on another phone, another

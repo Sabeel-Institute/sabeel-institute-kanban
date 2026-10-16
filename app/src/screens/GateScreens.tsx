@@ -99,8 +99,10 @@ export function WrongDomainScreen() {
  *
  * The text is the shared decision's, with this app's words in its brackets. It
  * states no minimum age: an age above the store's own rating would force that
- * rating up. Change a word here and raise `RULES_VERSION` in the same commit,
- * so everyone reads the new text once.
+ * rating up. Change what the rules MEAN here and raise `RULES_VERSION` in the
+ * same commit, so everyone reads the new text once; a rewording that keeps the
+ * meaning (2026-10-16: naming both things the institute does not tolerate)
+ * keeps the version.
  */
 export function RulesScreen() {
   const { run, busy, error } = useAction('acceptRules');
@@ -114,9 +116,9 @@ export function RulesScreen() {
         </Body>
         <Body>
           By continuing you agree to the institute&rsquo;s rules: post only what
-          belongs to your work or class, and nothing abusive, harassing, hateful,
-          sexual or otherwise objectionable. The institute does not tolerate
-          either.
+          belongs to your work, post nothing abusive, harassing, hateful, sexual
+          or otherwise objectionable, and never abuse another member. The
+          institute tolerates neither.
         </Body>
         <Body>
           Administrators may remove content and suspend accounts that break these

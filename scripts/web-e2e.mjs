@@ -359,7 +359,7 @@ try {
       'the rules screen says who the app is for, what is not tolerated, and where to report',
       /Kanban is for Sabeel Institute.s staff/.test(said) &&
         /members of your board/.test(said) &&
-        /abusive, harassing, hateful, sexual or otherwise objectionable/.test(said) &&
+        /post only what belongs to your work, post nothing abusive, harassing, hateful, sexual or otherwise objectionable, and never abuse another member\. The institute tolerates neither\./.test(said) &&
         /Report a problem in More; administrators respond within 24 hours/.test(said),
       said.slice(0, 160),
     );

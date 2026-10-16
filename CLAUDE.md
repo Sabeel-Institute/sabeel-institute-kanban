@@ -136,7 +136,8 @@ account whose user document lacks the current `RULES_VERSION` gets
 `RulesScreen` INSTEAD of the signed-in app, so nothing that can post is
 mounted; only the `acceptRules` callable writes `rulesVersion` and
 `rulesAcceptedAt`, which `firestore.rules` keeps out of the self-writable list.
-Change a word of the rules and raise `RULES_VERSION` in the same commit.
+Change what the rules mean and raise `RULES_VERSION` in the same commit; a
+rewording that keeps the meaning keeps the version.
 **Report a problem** stores `reports/{id}` and emails it from
 `apps-noreply@oursabeel.com` by keyless domain-wide delegation (`gmail.ts`); no
 client reads or writes `reports`, nothing in the app lists them, and a failed
