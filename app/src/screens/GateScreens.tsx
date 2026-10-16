@@ -6,9 +6,12 @@
  * each updates LIVE — the moment an admin approves someone, session.ts refreshes
  * the token and the app un-gates without a sign-out.
  */
+import { StyleSheet, Text } from 'react-native';
 import { ALLOWED_EMAIL_DOMAIN } from '@sabeel/shared';
 import type { SessionUser } from '../session';
 import { signOut } from '../session';
+import { acceptRules } from '../reports';
+import { useAction } from '../useAction';
 import { Body, Button, Card, Screen, Spinner, Title } from '../components/ui';
 
 export function ProvisioningScreen() {
@@ -83,3 +86,59 @@ export function WrongDomainScreen() {
     </Screen>
   );
 }
+
+/**
+ * The institute's rules, accepted once per account, before anything can be
+ * posted (decided by Faisal 2026-10-16; docs/STORE-RELEASE.md § 4).
+ *
+ * App.tsx renders this INSTEAD of the signed-in app for an active account that
+ * has not accepted the current `RULES_VERSION`: no navigation, no deep link and
+ * no notification can open a board or a card behind it, because none of them
+ * is mounted. "I agree" asks the acceptRules callable to record it; the screen
+ * goes when the user document says so, on every device the account is open on.
+ *
+ * The text is the shared decision's, with this app's words in its brackets. It
+ * states no minimum age: an age above the store's own rating would force that
+ * rating up. Change a word here and raise `RULES_VERSION` in the same commit,
+ * so everyone reads the new text once.
+ */
+export function RulesScreen() {
+  const { run, busy, error } = useAction('acceptRules');
+  return (
+    <Screen width="read">
+      <Title>Before you continue</Title>
+      <Card>
+        <Body>
+          Kanban is for Sabeel Institute&rsquo;s staff, and what you post is seen
+          only by members of your board.
+        </Body>
+        <Body>
+          By continuing you agree to the institute&rsquo;s rules: post only what
+          belongs to your work or class, and nothing abusive, harassing, hateful,
+          sexual or otherwise objectionable. The institute does not tolerate
+          either.
+        </Body>
+        <Body>
+          Administrators may remove content and suspend accounts that break these
+          rules.
+        </Body>
+        <Body>
+          To report something or someone, use{' '}
+          <Text style={styles.strong}>Report a problem</Text> in More;
+          administrators respond within 24 hours.
+        </Body>
+      </Card>
+      {error ? (
+        <Card>
+          <Body>{error}</Body>
+        </Card>
+      ) : null}
+      <Button label="I agree" busy={busy} onPress={() => void run(acceptRules)} />
+      <Button label="Sign out" variant="secondary" disabled={busy} onPress={signOut} />
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  strong: { fontWeight: '700' },
+});

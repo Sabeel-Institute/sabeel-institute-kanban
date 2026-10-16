@@ -25,6 +25,7 @@ import {
   PendingScreen,
   ProvisioningScreen,
   RejectedScreen,
+  RulesScreen,
   WrongDomainScreen,
 } from './src/screens/GateScreens';
 import { BoardsScreen } from './src/screens/BoardsScreen';
@@ -37,6 +38,7 @@ import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { SearchScreen } from './src/screens/SearchScreen';
 import { UsersScreen } from './src/screens/UsersScreen';
 import { StatsScreen } from './src/screens/StatsScreen';
+import { ReportScreen } from './src/screens/ReportScreen';
 import {
   Body,
   Card,
@@ -118,6 +120,8 @@ function renderScreen(route: Route, user: SessionUser) {
       ) : (
         <NotForYou what="Stats" />
       );
+    case 'report':
+      return <ReportScreen />;
     default:
       return <BoardsScreen user={user} />;
   }
@@ -210,8 +214,11 @@ function Routes() {
           return <RejectedScreen user={user} />;
         case 'disabled':
           return <DisabledScreen user={user} />;
+        // The institute's rules come after approval and before anything else:
+        // until they are accepted, nothing that could post is even mounted —
+        // not the nav, not a deep link, not a tapped notification.
         case 'active':
-          return <SignedInRoutes user={user} />;
+          return user.rulesAccepted ? <SignedInRoutes user={user} /> : <RulesScreen />;
       }
     }
   }

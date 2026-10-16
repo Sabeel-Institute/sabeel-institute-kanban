@@ -28,6 +28,7 @@ import {
   canCreateBoards,
   canUseApp,
   canViewStats,
+  hasAcceptedRules,
   sessionAccess,
 } from '@sabeel/shared';
 import type { Role, UserStatus } from '@sabeel/shared';
@@ -41,6 +42,14 @@ export interface SessionUser {
   photoUrl: string | null;
   role: Role;
   status: UserStatus;
+  /**
+   * Whether this account has accepted the institute's rules at the current
+   * version. Until it has, an active account sees the rules screen and nothing
+   * else (App.tsx). From the user document, which only the acceptRules
+   * callable writes, so it moves live — the same snapshot that un-gates an
+   * approval un-gates an acceptance, on every device the account is open on.
+   */
+  rulesAccepted: boolean;
 }
 
 export type Session =
@@ -197,6 +206,7 @@ async function handleUserSnapshot(fbUser: User, snap: DocumentSnapshot): Promise
       photoUrl: (data.photoUrl as string | null) ?? null,
       role: claims.role,
       status: claims.status,
+      rulesAccepted: hasAcceptedRules(data),
     },
   });
 

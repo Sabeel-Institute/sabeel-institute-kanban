@@ -21,7 +21,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Sheet, SheetOption } from './Sheet';
 import { Caption } from './ui';
-import { GET_APP_URL, PRIVACY_URL } from '@sabeel/shared';
+import { APP_NAME, GET_APP_URL, PRIVACY_URL } from '@sabeel/shared';
 import { BUILD_INFO } from '../build-info';
 import { useNav, type Route } from '../nav';
 import { useUnreadCount } from '../notifications';
@@ -100,7 +100,7 @@ export function AppNav({
       icon="more-horiz"
       label="More"
       rail={rail}
-      active={active === 'users' || active === 'stats'}
+      active={active === 'users' || active === 'stats' || active === 'report'}
       onPress={() => setMenuOpen(true)}
     />
   );
@@ -135,6 +135,17 @@ export function AppNav({
       ) : null}
 
       <MenuSection label="You" />
+      {/* Where the institute's rules tell people to look (RulesScreen), and
+          what both stores ask of an app whose members post: a way to report
+          content and users, inside the app. docs/STORE-RELEASE.md § 4. */}
+      <SheetOption
+        label="Report a problem"
+        detail="A post or a person that breaks the rules"
+        onPress={() => {
+          setMenuOpen(false);
+          nav.push({ name: 'report' });
+        }}
+      />
       {/* Required to be reachable INSIDE the app, not just in store metadata —
           App Store Review Guideline 5.1.1(i). Absolute URL so it opens from a
           phone as well as the browser. */}
@@ -172,7 +183,7 @@ export function AppNav({
           only place the version appears is the screen you have already left. */}
       <View style={styles.build}>
         <Caption>
-          Sabeel Kanban · v{BUILD_INFO.version} · {BUILD_INFO.commit}
+          {APP_NAME} · v{BUILD_INFO.version} · {BUILD_INFO.commit}
         </Caption>
       </View>
     </Sheet>
