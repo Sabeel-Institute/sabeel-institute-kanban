@@ -146,6 +146,25 @@ export function notificationText(params: {
 export const PUSH_CHANNEL_ID = 'sabeel-alerts';
 export const PUSH_CHANNEL_NAME = 'Card alerts and approvals';
 
+/** Apple's two push services. A token from one is refused by the other. */
+export type ApnsEnvironment = 'development' | 'production';
+
+/**
+ * A registered device, at `users/{uid}/pushTokens/{token}`; the token is the
+ * document id, so re-registering a device overwrites its row.
+ *
+ * Android and web tokens are FCM's, and FCM delivers them. An iPhone's token is
+ * Apple's own (hex): nothing on the phone registers with FCM, because the
+ * Firebase JS SDK has no messaging on a native app and expo-notifications asks
+ * Apple directly. The server sends those straight to Apple's push service
+ * (functions/src/apns.ts), and must ask the service that issued the token,
+ * which only the build that minted it knows — so the phone says. firestore.rules
+ * admits exactly these two shapes.
+ */
+export type PushTokenDoc =
+  | { platform: 'android' | 'web'; updatedAt: number }
+  | { platform: 'ios'; apnsEnvironment: ApnsEnvironment; updatedAt: number };
+
 /**
  * How long an inbox entry is kept before the weekly sweep removes it.
  *

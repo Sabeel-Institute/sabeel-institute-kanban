@@ -283,6 +283,56 @@ describe('push tokens', () => {
     );
   });
 
+  it('an iPhone registers with the Apple service that issued its token', async () => {
+    const db = ctx('member1', 'member', 'active');
+    for (const apnsEnvironment of ['development', 'production']) {
+      await assertSucceeds(
+        setDoc(doc(db, `users/member1/pushTokens/${apnsEnvironment}-tok`), {
+          platform: 'ios',
+          apnsEnvironment,
+          updatedAt: 1,
+        }),
+      );
+    }
+  });
+
+  it('admits exactly the two shapes, and nothing a send path would misread', async () => {
+    // Each refusal beside the same write made valid, so a refusal cannot pass
+    // on a malformed fixture.
+    const db = ctx('member1', 'member', 'active');
+    const tok = doc(db, 'users/member1/pushTokens/shape');
+    const refused: Record<string, unknown>[] = [
+      { platform: 'ios', updatedAt: 1 }, // which service?
+      { platform: 'ios', apnsEnvironment: 'sandbox', updatedAt: 1 },
+      { platform: 'android', apnsEnvironment: 'production', updatedAt: 1 },
+      { platform: 'ios-simulator', updatedAt: 1 },
+      { platform: 'web', updatedAt: 1, owner: 'someone' },
+    ];
+    for (const row of refused) await assertFails(setDoc(tok, row));
+    await assertSucceeds(setDoc(tok, { platform: 'web', updatedAt: 1 }));
+    await assertSucceeds(setDoc(tok, { platform: 'ios', apnsEnvironment: 'production', updatedAt: 1 }));
+  });
+
+  it("an iPhone's old 'android' row is replaced in place, not left beside the new one", async () => {
+    // Every build up to v0.11.5 build 11 filed Apple's token as 'android'. The
+    // token is the document id, so the current build re-registering the same
+    // device writes the same document: one row, now in the iPhone's shape.
+    const db = ctx('member1', 'member', 'active');
+    const apple = 'ab'.repeat(32);
+    await assertSucceeds(setDoc(doc(db, `users/member1/pushTokens/${apple}`), { platform: 'android', updatedAt: 1 }));
+    await assertSucceeds(
+      setDoc(doc(db, `users/member1/pushTokens/${apple}`), {
+        platform: 'ios',
+        apnsEnvironment: 'production',
+        updatedAt: 2,
+      }),
+    );
+    const rows = await getDocs(collection(db, 'users/member1/pushTokens'));
+    expect(rows.docs.map((d) => [d.id, d.data()])).toEqual([
+      [apple, { platform: 'ios', apnsEnvironment: 'production', updatedAt: 2 }],
+    ]);
+  });
+
   it("nobody may READ someone else's tokens", async () => {
     // Which devices a person carries is not admin business.
     await env.withSecurityRulesDisabled(async (c) => {

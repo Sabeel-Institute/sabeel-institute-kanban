@@ -110,6 +110,16 @@ export const ATTACHMENT_UPLOAD_STALE_MS = 24 * 60 * 60 * 1000;
 export const EMULATOR_PROJECT_ID = 'demo-sabeel-kanban';
 
 /**
+ * The phone apps' id: the Android package and the iOS bundle id, one value.
+ *
+ * Apple's push service is addressed by it — the `apns-topic` of every iPhone
+ * notification, refused unless it is the bundle the device token was issued
+ * to — so the server needs it as much as the builds do. `app/app.json` must say
+ * the same; functions/test/unit/apns.test.ts holds the two together.
+ */
+export const APP_ID = 'com.sabeelinstitute.kanban';
+
+/**
  * Cloud Storage buckets, stated explicitly on every surface.
  *
  * Neither side can be trusted to work one out for itself. The Admin SDK throws

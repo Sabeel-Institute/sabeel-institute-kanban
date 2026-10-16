@@ -3,18 +3,18 @@ import { onDocumentCreated, onDocumentWritten } from 'firebase-functions/v2/fire
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions/v2';
 import { guardedEvent, sentryDsn } from './sentry';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import { getMessaging } from 'firebase-admin/messaging';
+import { getFirestore, FieldValue, type DocumentReference } from 'firebase-admin/firestore';
 import {
   NOTIFICATION_RETENTION_DAYS,
   ORG_TIMEZONE,
-  PUSH_CHANNEL_ID,
   addDays,
   notificationText,
   shouldNotify,
   todayInOrgTz,
   type NotifyEvent,
+  type PushTokenDoc,
 } from '@sabeel/shared';
+import { PUSH_SECRETS, send, type Delivery } from './messaging';
 
 /**
  * Notifications: an in-app inbox entry plus a push, for a deliberately small set
@@ -150,62 +150,55 @@ async function notify(params: {
     targets.map((r) => db().collection(`users/${r.uid}/pushTokens`).get()),
   );
 
-  // One message per DEVICE, not one multicast: `sendEachForMulticast` takes a
-  // single payload for every token, and the payload now has to differ per
-  // recipient because it carries that person's own inbox id. Keep the owning ref
-  // beside each message — a failed send has to be traced back to the token
-  // document that has to be deleted.
-  const sends = targets.flatMap((r, i) =>
-    tokenSnaps[i].docs.map((d) => ({
-      ref: d.ref,
-      message: {
+  // One message per DEVICE: the payload differs per recipient, because it
+  // carries that person's own inbox id. Keep the owning ref beside each
+  // delivery — a token that turns out dead has to be traced back to the
+  // document to delete.
+  const refOf = new Map<Delivery, DocumentReference>();
+  const deliveries = targets.flatMap((r, i) =>
+    tokenSnaps[i].docs.map((d) => {
+      const delivery: Delivery = {
         token: d.id,
-        notification: { title: 'Sabeel Kanban', body: text },
-        // `type` is what lets a tapped notification open the right screen. It is
-        // the only routing signal a `newUserPending` carries — that event has no
-        // board and no card, so without it the tap has nowhere to go and the app
-        // just opens where it was. Must stay in step with the inbox document
-        // written above; the client maps both through one `routeForNotification`.
-        data: {
-          type: params.event,
-          boardId: params.boardId,
-          ...(params.cardId ? { cardId: params.cardId } : {}),
-          notifId: notifIdByUid.get(r.uid) ?? '',
+        device: d.data() as PushTokenDoc,
+        message: {
+          title: 'Sabeel Kanban',
+          body: text,
+          // `type` is what lets a tapped notification open the right screen. It
+          // is the only routing signal a `newUserPending` carries — that event
+          // has no board and no card, so without it the tap has nowhere to go
+          // and the app just opens where it was. Must stay in step with the
+          // inbox document written above; the client maps both through one
+          // `routeForNotification`.
+          data: {
+            type: params.event,
+            boardId: params.boardId,
+            ...(params.cardId ? { cardId: params.cardId } : {}),
+            notifId: notifIdByUid.get(r.uid) ?? '',
+          },
         },
-        // Without this every push lands in expo-notifications' fallback channel,
-        // which Android shows as "Miscellaneous" — see PUSH_CHANNEL_ID.
-        android: { notification: { channelId: PUSH_CHANNEL_ID } },
-      },
-    })),
+      };
+      refOf.set(delivery, d.ref);
+      return delivery;
+    }),
   );
-  if (sends.length === 0) return;
+  if (deliveries.length === 0) return;
 
-  try {
-    const res = await getMessaging().sendEach(sends.map((s) => s.message));
+  // Never throws (messaging.ts says why), so the inbox written above stands
+  // whatever happens to the push.
+  const { stale } = await send(deliveries);
 
-    // Prune tokens FCM has rejected as dead. Nothing else ever would: a token is
-    // removed on sign-out, but an uninstall, a data clear, or a factory reset
-    // leaves it behind forever. Left alone, every send to that person carries a
-    // growing tail of tokens that can only fail.
-    //
-    // Only these two codes mean "this token is gone". Everything else —
-    // quota, an unavailable backend, an internal error — is transient, and
-    // deleting on those would unregister working devices.
-    const dead = res.responses.flatMap((r, i) => {
-      const code = r.error?.code;
-      return code === 'messaging/registration-token-not-registered' ||
-        code === 'messaging/invalid-registration-token'
-        ? [sends[i].ref]
-        : [];
-    });
-    if (dead.length > 0) {
-      await Promise.all(dead.map((ref) => ref.delete()));
-      logger.info('pruned dead push tokens', { count: dead.length });
+  // Prune the tokens the transport called dead. Nothing else ever would: a
+  // token is removed on sign-out, but an uninstall, a data clear, or a factory
+  // reset leaves it behind for ever, and every send to that person would carry
+  // a growing tail of tokens that can only fail.
+  // Best-effort too: a failed delete must not fail the trigger and re-run it.
+  if (stale.length > 0) {
+    try {
+      await Promise.all(stale.map((d) => refOf.get(d)?.delete()));
+      logger.info('pruned dead push tokens', { count: stale.length });
+    } catch (e) {
+      logger.warn('pruning dead push tokens failed', { error: String(e) });
     }
-  } catch (e) {
-    logger.warn('push send failed (inbox entry was still written)', {
-      error: String(e),
-    });
   }
 }
 
@@ -229,7 +222,7 @@ async function notify(params: {
 export const onCommentNotify = onDocumentWritten(
   {
     document: 'cards/{cardId}/comments/{commentId}',
-    secrets: [sentryDsn],
+    secrets: [sentryDsn, ...PUSH_SECRETS],
   },
   guardedEvent(async (event) => {
     const before = event.data?.before?.data();
@@ -312,7 +305,7 @@ export const onCommentNotify = onDocumentWritten(
 
 /** Assignment and moves on a card someone owns. */
 export const onCardNotify = onDocumentWritten(
-  { document: 'cards/{cardId}', secrets: [sentryDsn] },
+  { document: 'cards/{cardId}', secrets: [sentryDsn, ...PUSH_SECRETS] },
   guardedEvent(async (event) => {
     const before = event.data?.before?.data();
     const after = event.data?.after?.data();
@@ -363,7 +356,7 @@ export const onCardNotify = onDocumentWritten(
 
 /** Admins hear about people waiting for approval. */
 export const onUserPending = onDocumentCreated(
-  { document: 'users/{uid}', secrets: [sentryDsn] },
+  { document: 'users/{uid}', secrets: [sentryDsn, ...PUSH_SECRETS] },
   guardedEvent(async (event) => {
     const data = event.data?.data();
     if (!data || data.status !== 'pending') return;
@@ -467,7 +460,7 @@ export async function runNotificationSweep(
  * notifies their assignees.
  */
 export const dueSoonReminders = onSchedule(
-  { schedule: '0 8 * * *', timeZone: ORG_TIMEZONE, secrets: [sentryDsn] },
+  { schedule: '0 8 * * *', timeZone: ORG_TIMEZONE, secrets: [sentryDsn, ...PUSH_SECRETS] },
   guardedEvent(async () => {
     const today = todayInOrgTz();
     const horizon = addDays(today, 1);

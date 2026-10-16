@@ -124,9 +124,26 @@ service cloud.firestore {
      * `isSignedIn` rather than `isActive` deliberately: registration happens as
      * soon as you sign in, which is before an admin has approved you. Holding a
      * token grants nothing on its own — the send path checks status separately.
+     *
+     * Exactly two shapes (`PushTokenDoc` in shared). An Android phone or a
+     * browser holds an FCM token; an iPhone holds Apple's and says which of
+     * Apple's two services issued it, because the send path must ask that one
+     * and the other refuses it (functions/src/apns.ts). `hasOnly`, because this
+     * row is read by the send path, and a field nobody expects is a field
+     * nobody validates. Writing over a row in the other shape is an ordinary
+     * update: an iPhone that filed itself as 'android' before iPhones had rows
+     * of their own replaces that row in place.
      */
     match /users/{userId}/pushTokens/{token} {
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
+      allow read, delete: if isSignedIn() && request.auth.uid == userId;
+      allow create, update: if isSignedIn() && request.auth.uid == userId
+        && (
+          (request.resource.data.keys().hasOnly(['platform', 'updatedAt'])
+            && request.resource.data.platform in ['android', 'web'])
+          || (request.resource.data.keys().hasOnly(['platform', 'apnsEnvironment', 'updatedAt'])
+            && request.resource.data.platform == 'ios'
+            && request.resource.data.apnsEnvironment in ['development', 'production'])
+        );
     }
 
     match /users/{userId}/notifications/{notifId} {
