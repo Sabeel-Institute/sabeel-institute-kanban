@@ -148,7 +148,7 @@ export function AppNav({
       {/* Web only: on a phone you already have the app. Deliberately not shown
           in the native apps for a second reason — this page tells people to sign
           in on the website first, and an app that points at that is an app
-          directing users to account creation. docs/STORE-RELEASE.md § 2. */}
+          directing users to account creation. docs/STORE-RELEASE.md § 1. */}
       {Platform.OS === 'web' ? (
         <SheetOption
           label="Get the app"

@@ -20,21 +20,24 @@ web. "The code looks right" is not verification.
 | 7 | Bulk actions | **complete** (2026-07-19) |
 | 8 | Comments + mentions | **complete** (2026-07-19) |
 | 9 | Activity history | **complete** (2026-07-19) |
-| 10 | Notifications | **complete** (2026-07-20). In-app inbox, per-event prefs, mute-a-board, and Android push. Web push is inert until a VAPID key exists (`TODO.md` § I); on-device delivery is still unverified — see below. |
+| 10 | Notifications | **complete** (2026-07-20). In-app inbox, per-event prefs, mute-a-board, and push on Android, the web and iPhones; what is confirmed on a device is in `TODO.md` § I and § D2. |
 | 11 | Search + archive | **complete** (2026-07-19) |
 | 12 | Polish + deploy readiness | **complete** (2026-07-19) |
 | 13 | Production deploy | **complete** (2026-07-20) — live at sabeel-institute-kanban.web.app; APKs published; indexes probed in production |
 | 14 | ClickUp import + launch | **complete** (2026-07-26) — three boards imported from a CSV export in one pass; `scripts/import-clickup.mjs` and the `sourceId` field remain so a re-run would update, not duplicate. See `docs/MIGRATION.md`. |
 | — | Since launch | The app is **in production and in daily use**. Work now ships as numbered releases rather than phases; the **deploy log** below is the running record. |
 
-## What works today (2026-08-29, v0.11.0)
+## What works today (2026-10-16)
 
 Every phase is complete and the app is **live and in daily use** at
-<https://sabeel-institute-kanban.web.app> with an Android APK beside it:
+<https://sabeel-institute-kanban.web.app>, on Android through Play internal
+testing, and on iPhones through TestFlight:
 
-- Google-only sign-in restricted to `@oursabeel.com`, enforced server-side, with
+- Google sign-in restricted to `@oursabeel.com`, enforced server-side, with
   admin approval that un-gates the app live. A rejected account is told why
-  rather than left spinning.
+  rather than left spinning. One more address, the store reviewers'
+  `app-review@oursabeel.com`, signs in with a password and is always a member
+  (iPhone build 13 on; the web from its next release).
 - Admin people-management: approve, reject, disable, change roles.
 - **Authority is two independent things** — an org role (member / organizer /
   admin) and per-board ownership. A plain member can own a board; only an admin
@@ -86,8 +89,10 @@ See `docs/DEVELOPING.md` to run it, `docs/USER-MANUAL.md` for the user guide and
 - **Push delivery is unverifiable locally.** FCM needs a real project, so the
   emulator suite proves the triggers fire, the preference logic, and that inbox
   entries are written — but not that a phone buzzes. Verified in production.
-- **Web push is inert** until a VAPID key exists (`TODO.md` § I). Android push
-  works.
+- **Push arriving is confirmed on Android only.** The web's VAPID key is
+  deployed and an iPhone push is proven on the simulator; a browser and a
+  TestFlight install still need a person to watch one arrive (`TODO.md` § I,
+  § D2).
 - **Board filters** (by assignee/label/priority *within* a board) exist in
   `@sabeel/shared` with tests, but are surfaced only through Search, not as a
   filter bar on the board itself. Deliberate for now — a filter bar is a row of
@@ -363,9 +368,9 @@ What it took:
   another person's collection **including an admin**, and nobody may read
   another person's devices.
 
-**Still unverified:** delivery itself. An emulator cannot prove it — it needs a
-push to arrive on Faisal's phone. Web push is deliberately inert until a Web Push
-certificate (VAPID) key exists; see `TODO.md` § I.
+Delivery is confirmed on an Android phone. The web's VAPID key is deployed, and
+iPhones are sent through Apple; what is still to be watched arriving is in
+`TODO.md` § I and § D2.
 
 ## Phase 13 — Production deploy
 
@@ -395,7 +400,12 @@ the team.
 
 ## Deploy log
 
-### 2026-10-13 — The Android editor's first height, and one build of Lexical — unreleased
+### 2026-10-13 — The Android editor's first height, and one build of Lexical — web and Play unreleased
+
+**Part released, part waiting.** Functions, rules and the two blocking
+functions are deployed (2026-10-15), and iPhone builds 11–13 are on TestFlight.
+Web and Play wait for the next release, whose version this heading takes:
+the build gates find an entry by its `— vX.Y.Z`.
 
 **The Android editor could come up a line short.** `react-native-enriched-html`
 parses a value with its own parser only inside `<html>…</html>`, and
@@ -460,7 +470,7 @@ v0.11.5 does not, so this build's label runs ahead of what the version means
 elsewhere until the next release, whose version this heading takes. Apple
 validated it before the upload; App Store Connect reports it VALID and in
 testing for "Sabeel Kanban Internal", with export compliance already answered;
-it expires 2027-01-13. `ios.buildNumber` is 12 for the next upload.
+it expires 2027-01-13.
 
 **iPhones get notifications (2026-10-15).** They never had: the app filed
 Apple's own device token as an Android one (`platform: 'android'`), the
@@ -483,8 +493,8 @@ Apple accepts the key for this app on both services
 through the rules, a real sandbox push from `scripts/send-test-push.mjs`
 showed a banner, and tapping it opened the card. Not verifiable here: a
 production delivery, and a tap with the app in the background or closed —
-TestFlight build 12 on a phone. **Deploy order:** the `APNS_KEY` secret (set),
-then functions and rules, then build 12; older builds keep working
+a TestFlight build on a phone. **Deploy order:** the `APNS_KEY` secret (set),
+then functions and rules, then the iPhone build; older builds keep working
 throughout, and their iPhone rows are pruned as before.
 
 **The functions deploy needed a lockfile.** The first deploy of this batch
@@ -513,8 +523,8 @@ token in any callable), and `setUserAccess` refuses another role for a
 password-only account. On the web, a Google sign-up the gate refuses says "Only
 @oursabeel.com accounts can use this app." instead of reporting a fault. The
 account and its board are made by an admin in ordinary ways
-(`docs/STORE-RELEASE.md` § 8); nothing in the code knows about reviewers but the
-address. **Verified:** unit (665), emulator (rules 244, triggers 142, both
+(`docs/STORE-RELEASE.md` § 3, The review account); nothing in the code knows
+about reviewers but the address. **Verified:** unit (665), emulator (rules 244, triggers 142, both
 blocking functions running), each lock mutation-checked against its own test
 (the rules address lock, the member lock, the storage lock, `beforeSignIn`,
 `beforeSignUp`, the promotion lock, `actorOf`, the restated literal), and the
@@ -534,6 +544,12 @@ writes it, and is the only other member of an **App Review** board of five
 sample cards; signed in through the public API it sees that board alone, and
 reading another board is refused. The web sign-in screen goes live with the next
 hosting deploy; iPhones get it in build 13.
+
+**Builds 12 and 13 on TestFlight (2026-10-15/16).** v0.11.5 build 12 (run
+38842511184, from `4d96791`) carries iPhone push through Apple; build 13 (run
+38850556753, from `e15365d`) adds the email sign-in. Both uploaded from GitHub,
+both VALID in "Sabeel Kanban Internal". `ios.buildNumber` is 14 for the next
+upload, which also carries the Return keys below.
 
 **Return keys on the email form (2026-10-16).** On a phone the keyboard covers
 **Sign in** while the address field has focus, so the form is now driven by its

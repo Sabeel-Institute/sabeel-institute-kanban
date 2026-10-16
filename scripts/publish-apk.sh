@@ -24,7 +24,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# UN-RETIRED 2026-08-03, for one job Play cannot do.
+# The developer's pre-release route, for one job Play cannot do.
 #
 # Android ships to the team through Google Play internal testing. But the
 # developer needs to test a release build BEFORE the testers receive it, and
@@ -36,13 +36,10 @@ cd "$(dirname "$0")/.."
 # So this channel is the developer's pre-release route, not a second channel for
 # the team. Play remains where testers get builds.
 #
-# WHAT CHANGED SINCE IT WAS RETIRED, and why publishing here is safe now:
-# the frozen asset was the last DEBUG-signed build, and replacing it with a
-# properly signed one meant anyone who had installed it could not update —
+# WHY PUBLISHING HERE IS SAFE: the team installs from Play, so the only person
+# holding a sideloaded build is the developer, who knows to uninstall first —
 # Android refuses an install whose signature does not match, with only "App not
-# installed" to explain it. That happened once, for 59 seconds. The team has
-# since moved to Play, so the population still holding a sideloaded build is the
-# developer, who knows to uninstall first.
+# installed" to explain it.
 #
 # THE SIGNATURE RULE STILL APPLIES, and always will: an APK from here is signed
 # with the UPLOAD key, while a Play install is signed with GOOGLE'S app signing
@@ -97,8 +94,8 @@ signer_dn="$("$apksigner" verify --print-certs "$APK" | sed -n 's/^Signer #1 cer
 case "$signer_dn" in
   *"CN=Android Debug"*)
     echo "REFUSING TO PUBLISH: $APK is signed with the DEBUG key ($signer_dn)." >&2
-    echo "Create a real upload keystore and app/android/keystore.properties," >&2
-    echo "then rebuild. See TODO.md section F." >&2
+    echo "Restore the EXISTING upload keystore and app/android/keystore.properties" >&2
+    echo "from the vault (never generate a new one), then rebuild. See docs/SECRETS.md." >&2
     exit 1 ;;
 esac
 echo "signature ok (${signer_dn})"

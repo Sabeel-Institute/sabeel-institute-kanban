@@ -1,23 +1,25 @@
 # Versioning — project specifics
 
-**The general rule lives in the `expo-firebase-stack` skill** (`../agent-skills/`,
-public), under *"The version number is a store contract, and Android hides that
+**The general rule lives in the `expo-firebase-stack` skill**
+(`faisal-shah/agent-skills` on GitHub, cloned at `../agent-skills/`; public), under *"The version number is a store contract, and Android hides that
 from you"*. Read that first. It covers Apple's format constraints (TN2420), the
 `versionCode` field-width collision, the leading-zero hole, and why enforcement
 belongs in three places.
 
-This file used to hold a full copy of that rule. It does not any more, for the
-same reason `docs/STACK-GOTCHAS.md` is a stub: the rule is true for anyone on
-this stack and nothing in it names this project, so a second copy only drifts —
-and two documents disagreeing about the same rule is worse than one of them not
-existing. Agreed with the time-tracker maintainer, who raised it.
+This file holds no copy of that rule, for the same reason
+`docs/STACK-GOTCHAS.md` is a stub: the rule is true for anyone on this stack and
+nothing in it names this project, so a second copy only drifts — and two
+documents disagreeing about the same rule is worse than one of them not
+existing.
 
 Everything below is what is true *here* and nowhere else.
 
 ## This project
 
 - **Source of truth:** `app/app.json` → `expo.version`. Currently on the **0.x
-  train** (0.1.x). Nothing derives a version from anywhere else.
+  train** (0.11.x). Nothing derives a version from anywhere else.
+- **`expo.ios.buildNumber`** is iOS-only and rises on every upload, even within
+  one version (`docs/IOS-BUILD.md` § Releasing).
 - **`versionCode`** is computed in `app/android/app/build.gradle` as
   `major*1000000 + minor*1000 + patch`. It was `10000/100` until 2026-07-26,
   which would have collided at 0.1.100 — see the deploy log for v0.1.33. Any

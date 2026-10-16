@@ -14,7 +14,8 @@ status and the deploy log).
 ## Stack knowledge lives in a shared skill, not here
 
 Recurring traps of this stack live in the **`expo-firebase-stack` skill** —
-`../agent-skills/skills/expo-firebase-stack/`, a **PUBLIC** repo.
+`../agent-skills/skills/expo-firebase-stack/`, a clone of the **PUBLIC** repo
+`faisal-shah/agent-skills`.
 `docs/STACK-GOTCHAS.md` is a stub for that reason: a stub cannot drift.
 
 **The boundary is one question: would this be true for a different company on
@@ -126,8 +127,8 @@ member whatever its claims (`sessionAccess`, `role()`, `actorOf` — no callable
 reads `auth.token` itself, `actor.test.ts` scans for it); and `setUserAccess`
 refuses another role for a password-only account. The address is one constant,
 `PASSWORD_SIGN_IN_EMAIL`, restated in both rule files and held to it by
-`passwordDoor.test.ts`. It is public on purpose (`docs/STORE-RELEASE.md` § 8):
-do not hide it behind a claim.
+`passwordDoor.test.ts`. It is public on purpose (`docs/STORE-RELEASE.md`
+§ 3, The review account): do not hide it behind a claim.
 
 ## Assignees, subscriptions and labels
 
@@ -369,11 +370,11 @@ itself is deliberately NOT darkened — that would collapse it into
   automatically through the Admin App Store Connect key. GitHub's
   `.github/workflows/ios.yml` sets `IOS_PROFILE_NAME`, and `build-ios.sh` then
   signs the app target alone with the team's one Apple Distribution certificate
-  (shared with the LMS) and an App Store profile, both from secrets. Never let
-  automatic signing run on a runner: a fresh machine mints a certificate every
-  run and throws its key away, until Apple's per-team limit stops every build,
-  the LMS's included. The certificate and profiles expire 2027-10-16;
-  `docs/IOS-BUILD.md` § Builds on GitHub has the renewal.
+  (shared with the LMS and the time tracker) and an App Store profile, both from
+  secrets. Never let automatic signing run on a runner: a fresh machine mints a
+  certificate every run and throws its key away, until Apple's per-team limit
+  stops every build, the other two apps' included. The certificate and profiles
+  expire 2027-10-16; `docs/IOS-BUILD.md` § Renewal has the steps.
 - **One version string for all three surfaces.** `expo.version` only — never
   `ios.version`, which would override it and show Apple a different number.
   `scripts/check-version.mjs` already holds the version to Apple's `X.Y.Z` shape.
@@ -411,9 +412,9 @@ itself is deliberately NOT darkened — that would collapse it into
 a new machine.
 
 - **This checkout owns emulator ports 61200-61207** and web dev-server port
-  61210; the sibling Sabeel repos own 61000+ and 61100+. All three used to pin
-  8080/9099/5001/9199, so whichever suite started second killed the other's
-  Firestore. Five files state the ports and
+  61210; the sibling Sabeel repos own 61000+ and 61100+. Were all three on the
+  defaults 8080/9099/5001/9199, whichever suite started second would kill the
+  other's Firestore. Five files state the ports and
   `functions/test/unit/emulatorPorts.test.ts` asserts they agree, that every one
   is inside the block, and that `dev.sh` sweeps **nothing this checkout does not
   own** — never widen that array. `61203` also reads as "this project,
@@ -626,10 +627,12 @@ factory rather than being silently dropped.
 
 - Agent: all code, rules, indexes, tests, emulator runs, CI, exact click-by-click
   console checklists, diagnosing pasted logs.
-- Faisal only: third-party consoles (Firebase/GCP/Sentry), OAuth/SHA-1
-  registration, anything with production secrets. He is already comfortable with
-  all three consoles — give him precise steps, not tutorials. Everything Faisal
-  must do himself is tracked in `TODO.md` — keep it current.
+- Faisal only: third-party consoles (Firebase/GCP, Sentry, Play Console, App
+  Store Connect, the Apple Developer portal), OAuth/SHA-1 registration,
+  anything with production secrets. He is already comfortable with these
+  consoles — give him precise steps, not tutorials. Everything Faisal must do
+  himself is tracked in `TODO.md` — keep it current. What a releaser needs
+  access to is `docs/DEPLOY.md` § Access.
 
 ## Conventions
 
@@ -651,40 +654,42 @@ factory rather than being silently dropped.
   including the commit, then **stop and show him what is ready**. Once he says go,
   ship **every** surface in one batch; never ask platform by platform. The gate
   exists because a release is only reversible *forwards*, through another release.
-  The surfaces are **web hosting, the APK download page, and Play internal
-  testing** — `docs/DEPLOY.md` § Shipping a release has the order, and the order
-  matters: **push `main` first** (a GitHub Release cannot attach to an unpushed
-  commit), and **build the artifacts after the last commit** or they stamp a
-  superseded hash onto the sign-in screen.
-- **Android ships through Google Play** (decided 2026-08-02), release-signed.
+  The surfaces are **the backend when it changed, web hosting, the APK download
+  page, Play internal testing and TestFlight** — `docs/DEPLOY.md` § Shipping a
+  release has the order, and the order matters: **push `main` first** (a GitHub
+  Release cannot attach to an unpushed commit), and **build the artifacts after
+  the last commit** or they stamp a superseded hash onto the sign-in screen.
+  Store decisions — tracks, testers, App Review — are `docs/STORE-RELEASE.md`.
+- **Android ships through Google Play** (decided 2026-08-02), release-signed:
+  internal testing now, to the account-wide "Sabeel staff" email list
+  (`docs/DEPLOY.md` § Testers); public production is the destination
+  (decided 2026-10-16, `docs/STORE-RELEASE.md`).
   Build with **`npm run build:aab`**, then **`npm run publish:play -- --internal`**
   — the upload is scripted through the Play Developer API, so it needs no browser.
   `-- --check` proves every gate and the Play permission without uploading
   anything. Play Console is still required for the things the API cannot do:
-  granting permissions, and reading the app-signing fingerprints. Play wants an
+  granting permissions, testers, and reading the app-signing fingerprints. Play wants an
   **AAB**, not APKs: one artifact carrying every ABI, from which Play generates
   per-device splits. The `splits` block in `app/android/app/build.gradle`
   therefore switches itself **off** for bundle tasks — both on at once fails with
   *"Multiple shrunk-resources files found"*. `build-aab.sh` repeats every gate the
   old publish script held: store-legal version, a deploy-log entry that exists
   *before* the build, and a signature that is not the debug key.
-- **Signing: the upload key lives outside the repo.** `signingConfigs.release`
-  reads a gitignored `app/android/keystore.properties`. Absent it, a release build
-  still works but is debug-signed and logs a loud warning — every build up to and
-  including v0.7.4 went out that way, signed with the debug keystore committed to
-  this **public** repo. **Play App Signing re-signs with Google's own key**, so
+- **Signing: the upload key lives outside the repo**, with a copy in the vault;
+  a missing one is restored from there, never generated (`docs/SECRETS.md`).
+  `signingConfigs.release` reads a gitignored `app/android/keystore.properties`.
+  Absent it, a release build still works but is debug-signed with the keystore
+  committed to this **public** repo, and logs a loud warning; every publish
+  path refuses it. **Play App Signing re-signs with Google's own key**, so
   the SHA-1 that matters for Google Sign-In on a Play install is under Play
   Console → App integrity → *App signing key certificate*, NOT the upload key's.
   Both belong in Firebase; miss the former and sign-in fails with
   `DEVELOPER_ERROR` for Play users only, while local builds work.
-- **The GitHub-release APK is the DEVELOPER'S pre-release route** (un-retired
-  2026-08-03, reversing the 2026-08-02 retirement). Testers get builds from Play
-  internal testing; this channel exists because Faisal must test a release build
-  *before* they see it, from a phone, away from the machine — and Play's one
-  feature for that, **internal app sharing, refuses this app**: it requires the
-  app to have been PUBLISHED, and internal-testing releases do not count. The app
-  is a Draft, and for an internal tool it may always be. **The signature rule is
-  permanent**: an APK from here is signed with the UPLOAD key, a Play install with
+- **The GitHub-release APK is the DEVELOPER'S pre-release route.** Testers get
+  builds from Play internal testing; this channel exists because Faisal must
+  test a release build *before* they see it, from a phone, away from the
+  machine — and Play's one feature for that, internal app sharing, refuses this
+  app (`docs/DEPLOY.md` says why). **The signature rule is permanent**: an APK from here is signed with the UPLOAD key, a Play install with
   GOOGLE'S app signing key, and neither can replace the other — uninstall first,
   nothing is lost because all state is in Firestore.
 - **Never `git add` a binary** to any repo: committing per-release APKs bloated

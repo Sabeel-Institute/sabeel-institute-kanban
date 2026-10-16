@@ -43,7 +43,8 @@ Google, the claims' role; with a password, member whatever the claims say. A
 password sign-in is accepted for one address (`PASSWORD_SIGN_IN_EMAIL`), the
 account the store reviewers use; for any other it is refused at sign-in, and a
 session that got past would have no access at all. An admin cannot give a
-password-only account another role. `docs/STORE-RELEASE.md` § 8 has the why.
+password-only account another role. `docs/STORE-RELEASE.md` § 3, The review
+account, has the why.
 
 ## Board ownership
 

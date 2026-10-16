@@ -1,9 +1,10 @@
 # iOS — building, TestFlight, App Store
 
-The app is one Expo codebase on **three** surfaces: web, Android, and now iOS.
-This file is the iOS half. It is written for whoever picks the work up on the
-Mac — including a Claude Code instance there, which will not have the context of
-the session that set this up.
+The app is one Expo codebase on **three** surfaces: web, Android and iOS.
+This file is the iOS half. Release builds and TestFlight uploads run on GitHub
+(§ Builds on GitHub); the rest is for whoever works on the Mac — including a
+Claude Code instance there, which will not have the context of the session that
+set this up.
 
 Read the two rules under "Before you touch anything" first. Both destroy work
 silently, and neither announces itself.
@@ -120,7 +121,7 @@ way. The answer in both cases is `~/.local`: the account owns it and it is
 already first on `PATH`.
 
 None of this is needed to ARCHIVE — `build-ios.sh` needs only Xcode and the
-values in `app/.env.sentry-build-plugin`. This is what the LOCAL DEV LOOP needs,
+two gitignored env files (`docs/SECRETS.md`). This is what the LOCAL DEV LOOP needs,
 and every row was discovered by something failing:
 
 | Tool | Why it is needed | How, without brew |
@@ -584,7 +585,7 @@ main — the sign-in screen displays the commit.
 | | The Mac | GitHub |
 |---|---|---|
 | Mode | automatic | **manual** (`IOS_PROFILE_NAME`, set by the workflow from the profile) |
-| Certificate | cloud-managed, minted through the Admin App Store Connect key at export; never in the keychain | the team's **Apple Distribution: Sabeel Institute** certificate (id `MQ8FC7CJVA`), shared with the LMS |
+| Certificate | cloud-managed, minted through the Admin App Store Connect key at export; never in the keychain | the team's **Apple Distribution: Sabeel Institute** certificate (id `MQ8FC7CJVA`), shared with the LMS and the time tracker |
 | Profile | Xcode-managed | **"Sabeel Kanban App Store CI"**, push entitlement `production` |
 | Needs the `.p8` to build | yes | no — only the upload does |
 
@@ -597,7 +598,7 @@ each fails with "does not support provisioning profiles". It passes neither
 **Never let automatic signing run on a runner.** A fresh machine has no
 certificate, so automatic signing creates one every run and throws its private
 key away, until Apple's per-team certificate limit stops every build — the
-LMS's too.
+LMS's and the time tracker's too.
 
 Manual mode's gates run in seconds, before prebuild: the profile is installed,
 is for `<team>.com.sabeelinstitute.kanban`, has not expired, and carries the
@@ -608,7 +609,7 @@ mistake to expect at renewal — a new certificate with the old profile.
 
 | Secret | What | From |
 |---|---|---|
-| `IOS_DIST_P12`, `IOS_DIST_P12_PASSWORD` | the Apple Distribution certificate with its private key, base64, and its password | Faisal's Linux machine, `~/.config/sabeel-lms/ios-distribution/` (shared with the LMS); that machine and GitHub are the only places the key exists |
+| `IOS_DIST_P12`, `IOS_DIST_P12_PASSWORD` | the Apple Distribution certificate with its private key, base64, and its password | Faisal's Linux machine, `~/.config/sabeel-lms/ios-distribution/` (shared with the LMS and the time tracker), and the vault |
 | `IOS_PROFILE` | the App Store profile "Sabeel Kanban App Store CI", base64 | the same folder |
 | `ASC_KEY_P8` | the App Store Connect API key (Admin) — read by the upload job only | `~/.appstoreconnect/private_keys/` on Faisal's machine and on the Mac |
 | `IOS_BUILD_ENV` | `app/.env.sentry-build-plugin`: the Sentry three, `IOS_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID` | the Mac's copy, `NAME=value` lines only, no `ASC_KEY_PATH` |
@@ -628,19 +629,41 @@ value by itself before anything runs. The logs are public.
 
 ### Renewal, before 16 October 2027
 
-The certificate and both App Store profiles — this one and the LMS's — expire
-on 16 October 2027. Renew them together, through the App Store Connect API,
-from Faisal's machine:
+One Apple Distribution certificate signs the GitHub builds of three apps:
+`faisal-shah/sabeel-institute-kanban`, `Sabeel-Institute/lms` and
+`faisal-shah/sabeel-institute-time-tracker`. It and each app's App Store
+profile expire on **16 October 2027**; from then the gates in `build-ios.sh`
+stop every GitHub build in seconds with "expired". The Mac signs
+automatically and is unaffected.
 
-1. A new private key and signing request with `openssl`; `POST /v1/certificates`
-   with `certificateType` `DISTRIBUTION`.
-2. `POST /v1/profiles` (`IOS_APP_STORE`) for each app's bundle id on the new
-   certificate, with the same names.
-3. Pack the key and certificate with `openssl pkcs12 -export -legacy`, and set
-   `IOS_DIST_P12`, `IOS_DIST_P12_PASSWORD` and `IOS_PROFILE` again, in **both**
-   repos.
-4. A build-only run of each app's workflow. Then revoke the old certificate
-   (`DELETE /v1/certificates/<id>`): a team may hold only a few.
+Renew all of it together, from Faisal's Linux machine, through the App Store
+Connect API with the Admin key (`docs/SECRETS.md`; `scripts/testflight-check.mjs`
+shows how its token is signed). The current key, certificate, `.p12`, its
+password and the App Store profiles are in `~/.config/sabeel-lms/ios-distribution/`
+there, and all of them in the vault under `sabeel/apple/ios-distribution/`.
+
+1. A new private key and signing request:
+   `openssl req -new -newkey rsa:2048 -nodes -keyout distribution.key -out distribution.csr`.
+   `POST /v1/certificates` with `certificateType` `DISTRIBUTION` and the CSR;
+   base64-decode the returned `certificateContent` (DER) into `distribution.cer`.
+2. For each app's bundle id, `POST /v1/profiles` with `profileType`
+   `IOS_APP_STORE`, the bundle id, the new certificate and the profile's
+   existing name — this app's is "Sabeel Kanban App Store CI". Save
+   `profileContent` as the `.mobileprovision`. A profile carries its App ID's
+   capabilities, so the push entitlement comes with it.
+3. `openssl x509 -inform der -in distribution.cer -out distribution.pem`, then
+   `openssl pkcs12 -export -legacy -inkey distribution.key -in distribution.pem -out distribution.p12`
+   under a new password.
+4. In **each of the three repos**: `IOS_DIST_P12` (base64 of the `.p12`),
+   `IOS_DIST_P12_PASSWORD`, and that app's `IOS_PROFILE` (base64), with
+   `gh secret set NAME -R <repo>` as in § Secrets.
+5. Replace the files in `~/.config/sabeel-lms/ios-distribution/`, then
+   `bash ~/.config/secrets-vault/vault.sh collect`.
+6. A build-only run of each repo's `ios.yml`. Its gates check that the profile
+   carries the certificate of the keychain's identity — the mistake to expect
+   here.
+7. Revoke the old certificate (`DELETE /v1/certificates/<id>`): a team may hold
+   only a few.
 
 ## Four registrations, one bundle id — and they are not each other
 
@@ -652,7 +675,7 @@ only the portal identifier did — noticed when an upload had nowhere to land.
 | Registration | Where | What it gets you |
 |---|---|---|
 | **App ID** (+ capabilities) | developer.apple.com → Identifiers | The bundle id exists and is allowed to use Push. Signing and provisioning profiles are built against it. Without it, nothing can be signed. |
-| **APNs key** | developer.apple.com → Keys | The credential Apple accepts for sending push to this team. Uploaded to Firebase. |
+| **APNs key** | developer.apple.com → Keys | The credential Apple accepts for sending push to this team: the functions' `APNS_KEY` secret. |
 | **Firebase iOS app** | Firebase console | `GoogleService-Info.plist`, so the SDK knows which project it is. |
 | **App Store Connect app** | appstoreconnect.apple.com → Apps | The distribution record: versions, builds, **TestFlight**, App Review, availability. A build has nowhere to upload without it. |
 
@@ -721,44 +744,45 @@ the GitHub upload job reads ("Builds on GitHub").
 
 ## Getting it to testers, and the login gate
 
-**The destination is NOT settled (as of 2026-08-17). Ship to internal
-TestFlight until the prerequisites below are met.**
+**Internal TestFlight is the channel now; Unlisted App Distribution, after App
+Review, is the route** (decided 2026-08-18). The submission, the review account
+and every store decision are in `docs/STORE-RELEASE.md`.
 
-**DECIDED 2026-08-18: Unlisted App Distribution.** Faisal called it, and the
-Apple Developer account is an Organization account under Sabeel Institute, so
-listings carry the institute's name and the Account Holder files the request.
-The survey below stands as the reasoning.
+- **Internal TestFlight.** Faisal and core developers — people who genuinely
+  belong on the App Store Connect team. No Beta App Review; builds land minutes
+  after processing. The group **"Sabeel Kanban Internal"** has access to all
+  builds, so each upload reaches it with no further step.
+- **Unlisted App Distribution.** A normal App Store app that is not searchable
+  and appears in no category, chart or recommendation, reachable only by direct
+  link. No user cap, all App Store regions, managed and unmanaged devices alike,
+  and **no expiry**. Colleagues need no App Store Connect account, no MDM
+  enrolment and no redemption code — just the link. Apple asks that an unlisted
+  app carry its own access control, and this one does: `@oursabeel.com`-only
+  sign-in, enforced server-side, with admin approval on top.
 
-The old instruction here — do not create a review account, submit to App Review
-or request unlisted — was right while the route was open, and it is now replaced
-by a narrower one. **Those steps are gated on `docs/STORE-RELEASE.md`, not on a
-decision.** That document removes account creation from the app, which is what
-makes the release viable at all; submitting before it lands would put an app in
-front of Apple that owes an in-app account-deletion flow nobody has built.
-Internal TestFlight remains the channel meanwhile, and its 90-day build expiry
-is the cost of staying there.
+### Adding a tester
 
-- **Internal TestFlight — the standing channel.** Faisal and any core developer.
-  These are people who genuinely belong on the App Store Connect team, so the
-  standing-membership cost that rules internal out for the whole team does not
-  apply to two or three developers. No Beta App Review; builds land minutes
-  after processing. **Builds expire after 90 days**, so a release that must
-  outlive that needs re-uploading — the one real cost of staying here.
-- **Unlisted App Distribution — CHOSEN.** Surveyed 2026-08-12, decided
-  2026-08-18. A normal App
-  Store app that is not searchable and appears in no category, chart or
-  recommendation, reachable only by direct link. No user cap, all App Store
-  regions, managed and unmanaged devices alike, and **no expiry**: updates
-  arrive like any other app. Colleagues need no App Store Connect account, no
-  MDM enrolment and no redemption code — just the link.
+1. App Store Connect → **Users and Access** → **+** → their Apple ID email and
+   the **Developer** role, limited to this app.
+   Internal testers must hold a role on the team (up to 100 people).
+2. They accept the emailed invitation and sign in to App Store Connect once.
+3. TestFlight → Internal Testing → **Sabeel Kanban Internal** → **Testers** →
+   **+** → add them. TestFlight emails them; they install the **TestFlight**
+   app on the iPhone, signed in with that Apple ID, and accept.
 
-Unlisted would fit **both** Sabeel apps, which is the strongest argument for it
-over anything app-specific. Apple asks that an unlisted app carry its own access
-control, and this one already does: `@oursabeel.com`-only sign-in, enforced
-server-side, with admin approval on top. The sibling recordings app has the same
-shape with invited students beside staff.
+**Builds expire 90 days after upload.** Build 13 was uploaded 2026-10-16 UTC, so
+it expires around 2027-01-14; an upload before then gives the group a newer
+build.
 
-**What was considered and rejected, so it is not re-litigated:**
+### The review account
+
+A reviewer signs in through **Sign in with email** as `app-review@oursabeel.com`,
+an ordinary member of one board of sample cards — never through a Google
+Workspace sign-in, whose login challenge a reviewer cannot pass. Its password is in the
+vault and goes into App Store Connect's App Review Information
+(`docs/STORE-RELEASE.md`).
+
+### What was considered and rejected
 
 - **Apple Business Manager Custom Apps.** Free, but needs a D-U-N-S number, and
   on unmanaged personal devices — which is every device here, there is no MDM —
@@ -771,39 +795,19 @@ shape with invited students beside staff.
 - **Apple Developer Enterprise Program.** Requires **100+ employees** and is
   restricted to cases the App Store, Custom Apps, Ad Hoc and TestFlight cannot
   serve. A team this size does not qualify.
-
-Neither route below avoids review; the differences are who can install and what
-review costs:
-
-- **TestFlight, internal testers** — no Beta App Review, builds land within
-  minutes. The price is not small and is easy to miss: each tester must be a
-  **user on the App Store Connect team** (up to 100), holding Account Holder,
-  Admin, App Manager, Developer or Marketing. That is a role inside the Apple
-  developer account, accepted by invitation — not a download link. Every
-  colleague added is one more person with standing access to the account that
-  ships the app.
-- **TestFlight, external testers** — up to 10,000, invited by email or a public
-  link, **not** App Store Connect users. They need an Apple ID and the TestFlight
-  app, nothing more. The price is **Beta App Review on the first build of each
-  version**, which means the demo-credentials problem below.
-- **Public App Store, listed or unlisted** — full review either way. Unlisted is
-  the same submission with one extra request afterwards; the app must already be
-  submitted to App Review and **must not be in a beta state** when you ask, so
-  request it on a build you intend to release rather than a TestFlight one.
-
-For any reviewed route there is a hard problem to solve up front: **a reviewer
-cannot sign in.** Sign-in is Google-only, restricted to `@oursabeel.com`
-server-side, *and* every new account lands `pending` until an admin approves it.
-An app that cannot be opened is rejected, every time. So supply working demo
-credentials in App Store Connect's review notes — an `@oursabeel.com` account
-that is already approved — and expect to explain that the app is an internal tool
-for one organisation.
+- **TestFlight external testers.** Up to 10,000, invited by email or a public
+  link, without App Store Connect accounts, but every build expires after 90
+  days and the first build of each version goes through Beta App Review.
+- **TestFlight internal testers for the whole team.** No review, but each tester
+  must be a **user on the App Store Connect team** — standing access to the
+  account that ships the app, for every colleague added.
 
 ## Releasing
 
-The version story is unchanged and shared with the other two surfaces:
-`expo.version` in `app/app.json` is the one number. Bump it as usual and write
-the `docs/PHASE_STATUS.md` deploy-log entry. `scripts/build-aab.sh` and
+The iPhone build is part of the one release batch (`docs/DEPLOY.md` § Shipping a
+release), and shares its version with the other two surfaces: `expo.version` in
+`app/app.json` is the one number, with a `docs/PHASE_STATUS.md` deploy-log entry
+headed by it. `scripts/build-aab.sh` and
 `scripts/build-ios.sh` both refuse to build without one — the entry covers the
 release, not one platform's build.
 
@@ -812,93 +816,45 @@ upload**, even for the same version. Bump it when re-uploading the same version
 after a rejection or a bad build; reset thinking is not required — a
 monotonically increasing integer is always valid.
 
-Upload from either machine: `npm run build:ios` on the Mac, or the iOS workflow
-with `testflight=true`, started on the release commit ("Builds on GitHub").
-TestFlight builds appear after processing; because `usesNonExemptEncryption` is
+Upload with the iOS workflow and `testflight=true`, started on the release tag
+("Builds on GitHub"); `npm run build:ios` on the Mac does the same when GitHub
+cannot. TestFlight builds appear after processing; because `usesNonExemptEncryption` is
 answered, they go to testers without the manual export-compliance prompt.
 
-### The handoff prompt
+### The handoff prompt, for a Mac session
 
-Web, Android and iOS ship from different machines, so the iOS half is handed to
-whoever is at the Mac — usually a Claude Code session there, which has none of
-the context of the session that cut the release. Paste this, filling in the one
-blank. It is deliberately short on instruction and long on *what not to assume*:
-this file is the runbook, and a prompt that restates it would be a second copy to
-keep in sync.
+The release build and its TestFlight upload run on GitHub. A Claude Code session
+on the Mac is for what needs a live Mac — simulator checks, or a build when
+GitHub cannot make one — and has none of the context of the session that cut
+the release. Paste this, filling in the blanks. It says what not to assume; this
+file is the runbook.
 
 ```text
-You are on the build Mac, in a clone of sabeel-institute-kanban. Ship the
-iOS build of release <TAG> to TESTFLIGHT. Not App Review, not unlisted
-distribution — those are gated on this build being seen working first.
-
-Read docs/IOS-BUILD.md, all of it, before anything. Two things in it
-destroy work silently: a bare `npx expo prebuild` deletes the committed
-android/ folder, and app/ios/ is a build product, so nothing you change
-in Xcode's UI survives.
+You are on the build Mac, in a clone of sabeel-institute-kanban, for
+release <TAG>. Read docs/IOS-BUILD.md, all of it, before anything. Two
+things in it destroy work silently: a bare `npx expo prebuild` deletes
+the committed android/ folder, and app/ios/ is a build product, so
+nothing you change in Xcode's UI survives.
 
 Start from the release commit, not from main:
     git fetch --tags && git checkout <TAG>
-This is the commit web and Android already shipped, and the sign-in
-screen displays it — building from a later main puts a different hash in
-front of testers for the same version number.
+The sign-in screen displays the commit.
 
-Do not change the version. `expo.version` is one number across all three
-surfaces and is already correct. If App Store Connect rejects the upload
-and you re-upload, raise `ios.buildNumber` alone.
-
-You need two gitignored files a fresh clone does not have —
-app/.env.local and app/.env.sentry-build-plugin. Without the first the
-build SUCCEEDS and ships with crash reporting silently off.
-`npm run build:ios -- --check` is free and runs every gate; run it before
-the twenty-minute archive.
-
-NEW IN THIS RELEASE, and the reason this build matters:
-
-1. The @mention popover no longer renders inside the editor. It is
-   published to MentionOverlay, a layer mounted as the LAST child of the
-   app root and OUTSIDE SafeAreaProvider, positioned in SCREEN
-   coordinates. That has been verified on web and on a real Android
-   phone. It has NEVER run on iOS, and iOS has the largest safe-area
-   insets of the three — if the overlay's origin assumption is wrong
-   anywhere, it is wrong there. Open a card, type a few words into the
-   comment box, then "@": the list must sit AT the caret, not shifted
-   down by the status bar or Dynamic Island and not clipped at the top.
-   Check it with the keyboard up. Screenshot it.
-
-2. The native caret comes from react-native-keyboard-controller's
-   focused-input tracking, through the app's only reanimated worklet.
-   That path is proven on Android only. If iOS reports no caret the
-   popover falls back to sitting above the whole field — that fallback
-   is designed and nothing breaks — but SAY WHICH ONE YOU SAW. "It
-   worked" is not an answer to this question.
-
-3. A mention must not survive a line break. Type "@", and without
-   picking anyone put the caret on the line below it. The list must NOT
-   reopen. iOS is expected to be correct already: the library's own iOS
-   code refuses a newline separator and says so in a comment, while its
-   Android code did not. So this is a confirmation, not a fix under
-   test — if it DOES reopen on iOS, that is new information and worth
-   reporting loudly.
-
-4. There are no functions, rules or index changes in this release, so
-   there is no deploy dependency. A build from this tag works against
-   production exactly as it stands.
+Do not change the version, and upload nothing unless told to: TestFlight
+uploads run on GitHub (ios.yml). If you are told to build and upload from
+here: app/.env.local and app/.env.sentry-build-plugin are gitignored, so
+copy them in first; run `npm run build:ios -- --check` before the
+twenty-minute archive; and if Apple refuses the build number, raise
+`expo.ios.buildNumber` alone.
 
 Scope: iOS only. Do not touch app/android/, do not commit app/ios/, and
-do not deploy hosting, functions or rules — those go out from Linux.
-If a gate fails, stop and report rather than working around it.
+do not deploy hosting, functions or rules.
 
-Report back: the build number, its App Store Connect processing state,
-whether ios/PrivacyInfo.xcprivacy was written, any ITMS-91053 email, and
-the version and commit read off the sign-in screen of the installed
-build — read, not inferred.
+What to check in this release: <CHECKS>.
 
-Then the three checks above, each answered with what you SAW and a
-screenshot of the open mention list. A negative result from an
-instrument that cannot drive the editor is not a result: `xcrun simctl`
-text injection could not open this popover on Android's equivalent
-harness, and a "no popover" from it would prove nothing. Type on a real
-keyboard, on a real device.
+Report what you SAW, with screenshots, and the version and commit read
+off the sign-in screen — read, not inferred. A negative result from an
+instrument that cannot drive the feature is not a result.
 ```
 
 ## Things that are genuinely open

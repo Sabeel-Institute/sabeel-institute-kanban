@@ -1,7 +1,8 @@
 # Running the app locally
 
-There is **no Firebase project yet** (that's Phase 13, `TODO.md`). Everything runs
-against the Firebase emulators, which need no accounts, no keys and no network.
+Local development runs against the Firebase emulators, which need no accounts,
+no keys and no network; production is `sabeel-institute-kanban`
+(`docs/DEPLOY.md`).
 
 ## Prerequisites
 
@@ -43,9 +44,9 @@ npm run emulators
 > storage 61207) and **61210** for the Expo web dev server. The sibling Sabeel
 > repos own 61000+ and 61100+.
 >
-> Three of them share this machine and all three used to pin 8080/9099/5001/9199,
-> so whichever suite started second killed the other's Firestore — and the
-> victim's symptoms looked like bugs in its own code. 61200+ because this box's
+> Three of them share this machine. On the defaults 8080/9099/5001/9199,
+> whichever suite started second would kill the other's Firestore — and the
+> victim's symptoms would look like bugs in its own code. 61200+ because this box's
 > ephemeral range is 32768-60999 and Firebase's own defaults stop at 9499, so the
 > block collides with nothing chosen at random or by the CLI.
 >

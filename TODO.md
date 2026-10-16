@@ -4,9 +4,8 @@ Console, account and secret-handling steps Claude can't (or shouldn't) do.
 Claude keeps this file current; you tick items off. Each item says **what to do**
 and **what to hand back**.
 
-**Nothing here blocks Phases 0–12** — everything runs against the Firebase
-emulators until the production deploy at Phase 13. Do the Sentry and GitHub bits
-whenever; leave the rest until Phase 12/13 if you like.
+The app is in production. Ticked items are the record of how each console was
+set up; unticked ones are open.
 
 **Never paste a secret into chat.** Client Firebase config and the Web OAuth
 client ID are *not* secrets and are committed. DSNs, service-account keys and
@@ -35,7 +34,7 @@ below is console work; the script is already written (`npm run publish:play`).
 - [x] **Give it Play access.** Play Console → *Users and permissions → Invite new
       user* → paste the service account's `…iam.gserviceaccount.com` address →
       restrict it to **this app** → tick **Release apps to testing tracks**.
-      That one permission also covers internal app sharing. Send the invite.
+      Send the invite.
 - [x] **Put the key where the script looks:**
       ```
       mkdir -p ~/keys
@@ -43,23 +42,11 @@ below is console work; the script is already written (`npm run publish:play`).
       chmod 600 ~/keys/sabeel-play-publisher.json
       ```
       **Never inside the repo — it is public.** Hand back nothing; do not paste
-      any part of it into chat.
+      any part of it into chat. A copy is in the vault (`docs/SECRETS.md`).
 - [x] **Confirm it works:** `npm run publish:play -- --check`. It runs every
       gate and proves the Play permission by creating and discarding an edit —
       a key mints a token whether or not Play granted it anything, so this
       checks the thing that actually fails. Uploads nothing.
-- [x] **Internal app sharing is NOT available to this app** — it requires the
-      app to have been published, and internal-testing releases do not count
-      (confirmed in Play Console, 2026-08-03). Nothing to do; `--internal` is
-      the channel until the app is published. The SHA-1 below was registered
-      anyway and will be needed the day it does unlock.
-- [ ] **Register the internal-app-sharing SHA-1** in Firebase, if not already:
-      Play Console → *Testing → Internal app sharing → Internal test
-      certificate* → copy the SHA-1 → Firebase Console → Project settings →
-      Android app `com.sabeelinstitute.kanban` → *Add fingerprint*. Without it
-      Google sign-in fails on shared builds **and nothing else**, which reads as
-      a device problem. Server-side only: no rebuild, no `google-services.json`
-      re-download, so this one can be done from your phone.
 
 ## Stats backfill — done
 
@@ -102,16 +89,16 @@ below is console work; the script is already written (`npm run publish:play`).
       here with unbounded per-user cost, so this is worth having; it is done, and
       nothing needs to re-raise it. Note the billing account carries four
       projects, so a budget is only meaningful scoped to this one.
-- [x] **Enable Google as the only sign-in provider.** Authentication → Sign-in
-      method → Google → Enable. Leave every other provider disabled.
-      The provider will not save until **Support email** is set — that is the
-      only required field on that screen. The SHA-1 notice above it is advance
-      warning about Android (§ D), not something that screen needs.
+- [x] **Sign-in providers: Google, and Email/Password for the one review
+      address** (Email/Password since 2026-10-15). The project is on
+      **Identity Platform**, and the blocking functions `beforeSignUp` and
+      `beforeSignIn` hold the door; `docs/DEPLOY.md` § Prerequisites has the
+      order that keeps it shut. No other provider.
+      Google will not save until **Support email** is set — the only required
+      field on that screen.
 - [ ] **Set the public-facing name.** Same screen, currently the generated
       `project-8266…`. This is the name users see on the Google consent screen
       when they sign in, so make it **Sabeel Institute Kanban**.
-
-> Needed at: Phase 13.
 
 ---
 
@@ -134,60 +121,45 @@ below is console work; the script is already written (`npm run publish:play`).
       These are non-sensitive scopes, which is why no Google verification review
       and no 100-user cap apply.
 
-**What this costs us, stated plainly.** The domain restriction now rests entirely
-on the server-side check in `onUserCreate` (it deletes any auth user whose email
-is unverified or not exactly `@oursabeel.com`). That check was always specified
-to stand alone, and firestore.rules grant nothing without an admin-set
-`status == 'active'` claim — so the window between a stray account being created
-and deleted gives no data access. But the outer wall is gone: anyone with any
-Google account can now reach the consent screen and briefly create an account.
+**What this costs us, stated plainly.** The domain restriction rests on the
+server: `beforeSignUp` refuses a sign-up that is not a verified
+`@oursabeel.com` Google account before any account exists, `onUserCreate`
+deletes any that gets past it, and firestore.rules grant nothing without an
+admin-set `status == 'active'` claim. But the outer wall is gone: anyone with
+any Google account can reach the consent screen.
 
 **If Sabeel ever wants this properly:** move the project into an `oursabeel.com`
 Cloud organization (keeps the project id and all data), then set Internal. That
 also fixes the larger issue that the nonprofit's production system currently
 lives in a personal Google account — a continuity risk independent of OAuth.
 
-> Needed at: Phase 13. The app's own admin-approval gate is separate and still
-> applies to every `@oursabeel.com` account.
+> The app's own admin-approval gate is separate and applies to every
+> `@oursabeel.com` account.
 
 ---
 
-## D. App registration
+## D. App registration — done
 
-- [ ] **Register the Web app** in Firebase (Project settings → Your apps → Web).
-      → **Hand back:** the config object. This is **not secret**; it gets
-      committed to `app/src/firebase-config.ts`.
-- [ ] **Register the Android app.** Package name: `com.sabeelinstitute.kanban`.
-      → **Hand back:** `google-services.json` (save it to `app/`).
-- [ ] **Add the debug SHA-1.** Adding the fingerprint in Firebase is what
-      creates the Android OAuth client, and native Google Sign-In fails with
-      `DEVELOPER_ERROR` until it exists. Registration is entirely SERVER-SIDE:
-      re-downloading `google-services.json` is not needed and no rebuild is
-      either — the plugin bakes no certificate hashes into the app (verified
-      2026-08-03, see `docs/DEPLOY.md` § DEVELOPER_ERROR).
-      The debug fingerprint for this repo's committed debug keystore is:
-
-      `5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25`
-
-      Not a secret — it is the fingerprint of a debug key that is committed to
-      the repo, and it only ever signs debug builds. Re-derive it any time with:
-
-      ```sh
-      keytool -list -v -keystore app/android/app/debug.keystore \
-        -alias androiddebugkey -storepass android -keypass android
-      ```
-
-      The **release** build uses a different key, so its SHA-1 must be added too
-      before sharing an APK (§ F).
-- [ ] **Web OAuth client ID** — Claude reads it from `google-services.json`
-      (the `client_type: 3` entry) and commits it as `WEB_CLIENT_ID`. Public, not
-      secret. Nothing for you to do beyond the above.
-
-> Needed at: Phase 13 (or earlier if you want to test real sign-in on a device).
+- [x] **Web app registered**; its config is committed in
+      `app/src/firebase-config.ts` (not secret).
+- [x] **Android apps registered**: `com.sabeelinstitute.kanban` and the
+      side-by-side `com.sabeelinstitute.kanban.debug`, in one
+      `google-services.json` committed byte-identical at `app/` and
+      `app/android/app/`.
+- [x] **Fingerprints registered** — the debug key on both packages, the upload
+      key, and Play's app signing key (§ F). Registration is entirely
+      SERVER-SIDE: no rebuild and no `google-services.json` re-download is
+      needed, because the plugin bakes no certificate hashes into the app
+      (`docs/DEPLOY.md` § DEVELOPER_ERROR). The committed debug keystore's
+      fingerprint (not a secret) is
+      `5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25`; re-derive it
+      with `keytool -list -v -keystore app/android/app/debug.keystore -alias androiddebugkey -storepass android -keypass android`.
+- [x] **`WEB_CLIENT_ID`** committed, from `google-services.json`'s
+      `client_type: 3` entry. Public, not secret.
 
 ---
 
-## D2. iOS registration — console work DONE; the route is the open decision
+## D2. iOS — registered and on TestFlight; App Review is next
 
 An iOS app was registered in the **right Firebase project**
 (`sabeel-institute-kanban`) but with the **wrong bundle id**:
@@ -205,9 +177,8 @@ creation**.
 - [x] **Registered the bundle id in the Apple Developer portal** (2026-08-01),
       at developer.apple.com -> Certificates, Identifiers & Profiles.
 - [x] **Created the app record in App Store Connect** (2026-08-13). SEPARATE FROM THE ABOVE,
-      on a different site, and this checklist previously recorded them as one
-      ticked item — which is how it went unnoticed until an upload had nowhere to
-      land. Registering an identifier in the portal does not create an app.
+      on a different site: registering an identifier in the portal does not
+      create an app, and an upload has nowhere to land without one.
       App Store Connect -> Apps -> **+** -> New App:
       platform **iOS**, name `Sabeel Kanban`, primary language English (U.S.),
       bundle id `com.sabeelinstitute.kanban` from the dropdown, SKU
@@ -221,74 +192,29 @@ creation**.
       Background Modes (our pushes are alerts, not silent), not Associated
       Domains (no universal links), not Sign in with Apple (the enterprise-account
       exemption to guideline 4.8 applies). Reasoning in `docs/IOS-BUILD.md`.
-- [x] **APNs authentication key created and uploaded to Firebase** → Project
-      settings → Cloud Messaging → iOS app, with its Key ID and Team ID
-      (2026-08-04). Not verifiable from this side: Firebase exposes no API for
-      reading APNs configuration, so the proof is a push actually arriving on a
-      device — worth doing as the first check after the first TestFlight build,
-      because until then nothing distinguishes "uploaded" from "uploaded wrong".
-      **This is NOT the App Store Connect API key.**
-      That one is a different `.p8`, made in App Store Connect → Users and
-      Access → Integrations, and it uploads builds rather than delivering
-      pushes. Both download exactly once and both are real secrets — keep either
-      out of the repo. Both are in Drive.
-- [ ] **Distribution route DECIDED 2026-08-18: Unlisted App Distribution.**
-      Surveyed 2026-08-12, briefly reopened on 2026-08-17 because it had not
-      actually been called, and now called. The Apple Developer account is an
-      **Organization** account under Sabeel Institute, so the Account Holder
-      files the unlisted request and listings carry the institute's name.
-      **Still do not submit yet** — App Review and the unlisted request are gated
-      on `docs/STORE-RELEASE.md` landing, which removes account creation from the
-      app. Submitting before that owes Apple an in-app deletion flow nobody has
-      built. Internal TestFlight remains the channel meanwhile.
-      Internal TestFlight is right for Faisal and core developers — people who
-      genuinely belong on the App Store Connect team — and avoids Beta App
-      Review entirely; its 90-day build expiry is the cost of staying on it.
-      **Unlisted** is a normal App Store app that is not
-      searchable and appears
-      in no chart or category, reachable only by direct link: no user cap, no
-      expiry, managed and unmanaged devices, and colleagues need no ASC account,
-      no MDM and no redemption code. It suits the recordings app equally, which
-      is the strongest argument for it over anything app-specific.
-      **Rejected:** Apple Business Manager Custom Apps (needs a D-U-N-S number,
-      reaches unmanaged devices only via country-locked redemption codes Apple is
-      migrating away from, still requires App Review, and is a *one-way door* —
-      an app distributed privately through ABM needs a brand-new App Store
-      Connect record before it can be made unlisted); the Apple Developer
-      Enterprise Program (requires 100+ employees). Reasoning in
-      `docs/IOS-BUILD.md`.
-
-- [x] **DROPPED (2026-08-15): there is no distribution certificate on this Mac to
-      export.** This item assumed the iOS rule matched the Android keystore — a
-      private key living on one machine and nowhere else. It does not. Signing
-      here is **cloud-managed**: `-allowProvisioningUpdates` mints the
-      distribution certificate through the App Store Connect API key at export
-      time and discards it afterwards, so nothing persists locally. Checked after
-      three successful uploads:
-
-      ```
-      security find-identity -v -p codesigning
-        4 valid identities found   # all "Apple Development: Created via API"
-      security find-certificate -a -c "Apple Distribution"   # nothing
-      ```
-
-      Four development certificates from the old non-Admin key, and **not one
-      distribution certificate**, on the machine that has shipped every build.
-      There is nothing to put in a `.p12`.
-
-      The thing that genuinely cannot be recreated is the **Admin `.p8` App Store
-      Connect key**, which downloads exactly once and is already in Drive. Apple's
-      cap on distribution certificates still exists, but the certificates are now
-      Apple's to manage rather than this Mac's to lose. If a future build machine
-      ever signs with a keychain identity instead, this item comes back.
-- [ ] **Create the review account — needed for the UNLISTED submission**, not for
-      internal TestFlight. A pre-approved `appreview@oursabeel.com` (or similar)
-      that Apple's reviewer can actually sign in with, since sign-in is
-      domain-restricted *and* admin-gated. An app a reviewer cannot open is
-      rejected every time. Create it, approve it, and keep it — every reviewed
-      submission needs it, so it is infrastructure rather than a one-off.
-      **On hold with the route (2026-08-17)** — internal TestFlight needs no
-      reviewer, so there is nothing to create until a reviewed route is chosen.
+- [x] **APNs authentication key** (2026-08-04). It is the `APNS_KEY` secret
+      the functions send to iPhones with (`functions/src/apns.ts`);
+      `npm run check:apple-push` asks Apple whether it accepts the key for this
+      app. **This is NOT the App Store Connect API key**, which is a different
+      `.p8` that uploads builds rather than delivering pushes. Both download
+      exactly once and both are real secrets; both are in the vault
+      (`docs/SECRETS.md`).
+- [x] **Distribution route: Unlisted App Distribution** (decided 2026-08-18).
+      The Apple Developer account is an **Organization** account under Sabeel
+      Institute, so the Account Holder files the unlisted request and listings
+      carry the institute's name. Internal TestFlight is the channel until App
+      Review. Reasoning and the alternatives rejected: `docs/IOS-BUILD.md`;
+      the submission: `docs/STORE-RELEASE.md`.
+- [x] **Apple Distribution certificate for GitHub builds** (2026-10-15). One
+      certificate, shared by Kanban, the LMS and the time tracker; its key,
+      `.p12` and the App Store profiles are in
+      `~/.config/sabeel-lms/ios-distribution/` and in the vault. The Mac signs
+      automatically instead (cloud-managed), so no distribution identity is ever
+      in its keychain.
+- [x] **Review account** (2026-10-15): `app-review@oursabeel.com`, through the
+      password door, a member of the App Review board and nothing else. Its
+      password is in the vault (`sabeel/review/kanban-app-review.txt`), never
+      here. `docs/STORE-RELEASE.md`.
 
 - [x] **Symbolication wired for BOTH platforms (2026-08-12), at parity.**
       `SENTRY_ORG`, `SENTRY_PROJECT` and `SENTRY_AUTH_TOKEN` in the build shell,
@@ -313,16 +239,13 @@ creation**.
       project-list endpoints answer 403 — `org:ci` grants exactly the CI/release
       permissions and nothing more, which is the right shape for a build secret.
 
-### Next, in order
+### iPhone builds
 
-Everything Claude could do is done: the build is one command, the gates run
-first, and the Sentry values are already in place. What is left is four values
-only you can get, then the build.
+Builds and TestFlight uploads run on GitHub (`docs/IOS-BUILD.md` § Builds on
+GitHub). What the Mac route taught, kept because none of it is guessable from
+its symptom:
 
-**RESOLVED 2026-08-13 — v0.7.7 build 1 is on TestFlight.** The first iOS build
-shipped. What it cost, kept because the cause is not guessable from the symptom:
-
-The App Store Connect API key needed the **Admin** role. Export failed with
+**The App Store Connect API key must have the Admin role.** Export failed with
 `Cloud signing permission error` and `No signing certificate "iOS Distribution"
 found`, while the archive itself was fine. Cloud signing
 (`-allowProvisioningUpdates`) mints the distribution certificate through that
@@ -333,7 +256,7 @@ via API") and no distribution one, so it could sign for debugging and nothing
 else. A new Admin key fixed it; only `ASC_KEY_ID` changed, the Issuer ID is
 per-team and stayed the same, and nothing in the repo needed editing.
 
-Two things worth reusing next time:
+Two more worth reusing:
 
 - **A cloud-managed distribution certificate never lands in the keychain.**
   After a successful export `security find-identity` still shows no distribution
@@ -343,67 +266,48 @@ Two things worth reusing next time:
   twenty-minute build. It exercises exactly the step that failed and uploads
   nothing.
 
-1. **Put the App Store Connect key file on the Mac.** Every identifier is
-   already in `app/.env.sentry-build-plugin` (created, gitignored, mode 600) —
-   the Sentry three, `IOS_TEAM_ID`, `ASC_KEY_ID` and `ASC_ISSUER_ID`. The only
-   thing missing is the `.p8` itself, which is a secret and lives in Drive:
-
-   ```bash
-   mkdir -p ~/.appstoreconnect/private_keys
-   cp AuthKey_<KEY_ID>.p8 ~/.appstoreconnect/private_keys/
-   ```
-
-   That is the directory Apple's own tooling searches, so nothing needs editing;
-   `ASC_KEY_PATH` only exists for keeping it somewhere else.
-
-   **It is NOT the APNs key**, and the two are easy to confuse because both
-   download as `AuthKey_<KeyID>.p8`. The tell is the **Issuer ID**: an App Store
-   Connect API key has one (a UUID), an APNs key never does — it has a Team ID
-   instead. The APNs key is the one already uploaded to Firebase for push, and
-   it belongs nowhere near this step.
-2. **Add core developers as App Store Connect users**, so internal TestFlight can
-   reach them. Only the few who need pre-release builds — each holds a role in
-   the developer account.
-3. **On the Mac:**
+1. **The App Store Connect key**, for a build or upload from the Mac: every
+   identifier is in `app/.env.sentry-build-plugin` (gitignored) — the Sentry
+   three, `IOS_TEAM_ID`, `ASC_KEY_ID` and `ASC_ISSUER_ID`; the `.p8` itself is
+   in the vault and goes in `~/.appstoreconnect/private_keys/`, the directory
+   Apple's own tooling searches (`ASC_KEY_PATH` only exists for keeping it
+   elsewhere). **It is NOT the APNs key**, and the two are easy to confuse
+   because both download as `AuthKey_<KeyID>.p8`. The tell is the **Issuer
+   ID**: an App Store Connect API key has one (a UUID), an APNs key never does.
+2. **Testers**: `docs/IOS-BUILD.md` § Adding a tester.
+3. **A build:**
+   `gh workflow run ios.yml -R faisal-shah/sabeel-institute-kanban --ref vX.Y.Z -f testflight=true`,
+   started on the release tag. From the Mac instead:
    ```bash
    git pull && npm ci
    # copy app/.env.local and app/.env.sentry-build-plugin across
    npm run build:ios -- --check     # free, proves every gate
    npm run build:ios                # archive + upload to TestFlight
    ```
-   `--check` first. It catches a missing value in two seconds instead of twenty
-   minutes into an archive.
-
-   **Or from GitHub, with no Mac at all:**
-   `gh workflow run ios.yml -R faisal-shah/sabeel-institute-kanban -f testflight=true`,
-   started on the release commit. `docs/IOS-BUILD.md` § Builds on GitHub.
-4. **Bump `expo.ios.buildNumber` before every re-upload.** Apple requires it to
-   increase even for the same version; unlike Android's versionCode it does not
-   derive itself. On App Store Connect so far: builds 1, 2, 4 and 6–11, the last
-   v0.11.5 build 11 (2026-10-15, the first upload from GitHub). Builds 3 and 5
-   were never uploaded — each was bumped past twice — which cost nothing, and is
-   the point: the number need only rise *within* a version, so carrying it
-   across versions is simply the cheapest way never to collide. It is `12` now,
-   unused, ready for the next upload. The GitHub upload job checks it with
+4. **`expo.ios.buildNumber` rises before every upload.** Apple requires it to
+   increase within a version; unlike Android's versionCode it does not derive
+   itself. On App Store Connect: builds 1, 2, 4 and 6–13, the last v0.11.5
+   build 13 (2026-10-16 UTC, VALID, in "Sabeel Kanban Internal"). Builds 3 and
+   5 were never uploaded, which cost nothing: the number need only rise
+   *within* a version, so carrying it across versions is the cheapest way never
+   to collide. It is `14` now, unused. The GitHub upload job checks it with
    Apple before uploading.
-5. **First thing on a TestFlight install: confirm a push arrives, and that
+5. [ ] **First thing on a TestFlight install: confirm a push arrives, and that
    tapping it with the app closed opens the card.** Apple accepts the key
    (`npm run check:apple-push`) and the sandbox path works on the simulator;
    the production service, and a tap from outside the app, only a phone can
    show. Assign yourself a card from another account, or have someone mention
    you, with the app in the background.
-6. **Before 16 October 2027: renew the iOS distribution certificate and both App
-   Store profiles** (this app's and the LMS's — they share the certificate),
-   then set `IOS_DIST_P12`, `IOS_DIST_P12_PASSWORD` and `IOS_PROFILE` again in
-   both repos, and revoke the old certificate. Until then GitHub builds work
-   unattended; after it, the gates in `build-ios.sh` stop every GitHub build in
-   seconds with "expired". The Mac is unaffected (it signs automatically).
-   Steps: `docs/IOS-BUILD.md` § Builds on GitHub → Renewal.
-7. **On hold until the route is final (2026-08-17).** If it lands on unlisted:
-   create and approve the review account, submit to App Review, then request
-   unlisted distribution — against a release build, not a TestFlight one. None
-   of that starts before Faisal says so; internal TestFlight is the standing
-   channel meanwhile.
+6. [ ] **Before 16 October 2027: renew the iOS distribution certificate and the
+   App Store profiles of all three apps that share it** — Kanban, the LMS and
+   the time tracker — set `IOS_DIST_P12`, `IOS_DIST_P12_PASSWORD` and
+   `IOS_PROFILE` again in all three repos, and revoke the old certificate. After
+   that date the gates in `build-ios.sh` stop every GitHub build in seconds
+   with "expired"; the Mac is unaffected (it signs automatically). Steps:
+   `docs/IOS-BUILD.md` § Renewal.
+7. [ ] **App Review, then unlisted distribution**, against build 14 or later —
+   build 14 carries the Next and Go keys on the email sign-in.
+   `docs/STORE-RELEASE.md` owns the steps; none starts before Faisal says so.
 
 **Answered 2026-08-15, and nothing goes under `ios.entitlements`.** The question
 was whether the `aps-environment` entitlement survives a prebuild. It does, and
@@ -417,9 +321,9 @@ detail.
 
 `docs/IOS-BUILD.md` is the runbook.
 
-> Everything left here is console or build-machine work. The repo side is done:
-> `app/app.json` carries the bundle id, the plist, the Google Sign-In plugin and
-> now the Sentry plugin, and `npm run check:ios` guards all of it.
+> The repo side is done: `app/app.json` carries the bundle id, the plist, the
+> Google Sign-In plugin and the Sentry plugin, and `npm run check:ios` guards
+> all of it.
 
 ---
 
@@ -456,212 +360,41 @@ SDKs are wired by hand instead — see `docs/SECRETS.md`.
 
 ---
 
-## F. Release signing — **a debug-signed APK is already published**
+## F. Release signing and Play
 
-**Every release so far, up to and including v0.6.1, is signed with the debug
-keystore**, which is committed to this repo. That is why the debug SHA-1 is the
-one registered in Firebase — and it means **anyone with this repo can sign an
-update that Android will accept as this app.**
+The upload key, Play App Signing and the fingerprints are set up. Android is on
+Play internal testing now; public production is the destination
+(`docs/STORE-RELEASE.md`).
 
-The original note said to close this "before the APK goes to the team". It has
-gone to the team; the app is in daily use. That does not make it urgent on its
-own — the audience is a dozen colleagues who install deliberately — but the
-condition it was written against has passed, so this is now a standing risk
-rather than a pre-launch task. Swapping keystores also forces a **reinstall for
-everyone** (Android refuses an update signed by a different key), which is the
-real reason to plan it rather than slip it into a release.
+- [x] **The upload keystore exists**: `~/keys/sabeel-kanban-upload.jks`, read
+      through the gitignored `app/android/keystore.properties`, both copied in
+      the vault. **On a new machine, restore both from the vault — never
+      generate a new key**: Play refuses a new upload key until Play Console
+      support resets it (`docs/DEPLOY.md` § The signing and publishing files).
+      Without `keystore.properties` a release build is debug-signed, and
+      `build-aab.sh`, `publish:play` and `publish-apk.sh` refuse it.
+- [x] **Play app created with Play App Signing**: Google generated and holds
+      the app signing key; the repo's key is only the upload key.
+- [x] **Fingerprints registered in Firebase** on `com.sabeelinstitute.kanban`
+      (2026-08-02): the upload key
+      `33:93:4A:A4:5F:51:60:23:E3:86:6F:68:84:8A:20:2C:44:28:2E:97` and Play's
+      app signing key
+      `A6:58:D9:33:B2:07:00:31:AF:58:5F:97:54:92:C2:6E:3D:25:77:B0`, plus the
+      debug key on both packages (§ D). Play's is the one Play installs run
+      under; miss it and sign-in fails with `DEVELOPER_ERROR` for Play users
+      only.
+- [x] **Android verified end to end (2026-08-03):** installed from the internal
+      testing track, signed in, and push received on the device.
+- [ ] **Tick "Sabeel staff" on the track**, once the list exists. Play Console → Kanban → *Testing →
+      Internal testing → Testers* → tick the **Sabeel staff** email list → Save.
+      Then copy the **opt-in link** from that page and send it to the team —
+      Play sends no email (`docs/DEPLOY.md` § Testers).
+- [ ] **Hand the opt-in link to Claude**, to replace "Link coming shortly" on
+      the Android button of `app/public/get-app.html`.
 
-- [x] **`build.gradle` is wired** (2026-08-02). `signingConfigs.release` reads a
-      **gitignored** `app/android/keystore.properties`. With no such file the
-      release build still works but is debug-signed and says so loudly, and
-      `scripts/publish-apk.sh` now **refuses to publish a debug-signed APK** —
-      verified by pointing it at the current one.
-- [ ] **Generate the upload keystore.** Store it somewhere backed up and OUTSIDE
-      the repo. Pick your own passwords; never paste them into chat or a file in
-      this repo.
-
-      ```sh
-      keytool -genkeypair -v \
-        -keystore ~/keys/sabeel-kanban-upload.jks \
-        -alias upload -keyalg RSA -keysize 4096 \
-        -validity 10000 -storetype PKCS12
-      ```
-
-- [ ] **Write `app/android/keystore.properties`** (gitignored):
-
-      ```properties
-      storeFile=/home/faisal/keys/sabeel-kanban-upload.jks
-      storePassword=...
-      keyAlias=upload
-      keyPassword=...
-      ```
-
-- [ ] **Export the public certificate** — this is what Play Console asks for. It
-      is a certificate, not a key; nothing secret leaves your machine.
-
-      ```sh
-      keytool -export -rfc -keystore ~/keys/sabeel-kanban-upload.jks \
-        -alias upload -file upload_certificate.pem
-      ```
-
-- [ ] **Register the new SHA-1 in Firebase**, then **re-download
-      `google-services.json`** — the re-download is what adds the OAuth client
-      (§ D). Read it with:
-
-      ```sh
-      keytool -list -v -keystore ~/keys/sabeel-kanban-upload.jks -alias upload
-      ```
-
-- [ ] **If using Play App Signing, add Play's certificate SHA-1 too.** Google
-      re-signs the app with an app signing key that is NOT your upload key, so
-      the fingerprint that matters for Google Sign-In on a Play install is the
-      one under Play Console → App integrity → *App signing key certificate*.
-      Miss it and sign-in fails with `DEVELOPER_ERROR` for exactly the users who
-      installed from Play, while your sideloaded build keeps working — so it
-      looks like a device problem rather than a config one. Add **both**.
-
-### Do these in order, next time you are at the computer
-
-**Order matters.** Debug builds are broken until step 1b lands — the
-google-services plugin fails outright with *"No matching client found for package
-name"*. Everything up to that point is already committed and waiting.
-
-1. **Firebase** → Project settings → **your existing Android app**
-   (`com.sabeelinstitute.kanban`) → add SHA-1
-   `33:93:4A:A4:5F:51:60:23:E3:86:6F:68:84:8A:20:2C:44:28:2E:97` (the upload
-   key). The re-download below is what creates the OAuth client; without it
-   sign-in fails with `DEVELOPER_ERROR`.
-1b. **Firebase** → **Add app → Android**, package name
-   **`com.sabeelinstitute.kanban.debug`**, and give it the DEBUG SHA-1
-   `5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25`. This is the
-   side-by-side dev build; it is a separate app to Android and to Firebase, but
-   lives in the SAME project, so one `google-services.json` covers both.
-1c. **Download `google-services.json` once**, after both of the above. It will
-   contain **two** `client` entries. Put the same file in **both** places — they
-   are byte-identical today and must stay so:
-   - `app/google-services.json` (Expo's copy)
-   - `app/android/app/google-services.json` (the one Gradle actually reads)
-
-   Both are committed by design. Easiest over the GitHub web UI: open each file,
-   "Edit", paste, commit — then tell me and I will pull and verify.
-2. **Play Console → All apps → Create app.** It asks for an app NAME, not a
-   package name — the package comes from the first AAB you upload. Take the
-   default on Play App Signing (*let Google create and manage the app signing
-   key*); your upload key is registered from that first bundle, so
-   `~/keys/upload_certificate.pem` is usually not needed at all. Keep it only in
-   case a screen explicitly asks for a certificate.
-
-   **Android developer verification is a DIFFERENT screen** and not the way in.
-   It links a package name to a signing key, and enforcement starts
-   **30 September 2026** — after which unverified apps cannot be installed on
-   certified devices, which is a hard expiry on the old sideloaded APK, not just
-   a plan to retire it. Creating the app registers the package automatically, so
-   leave any draft there alone rather than binding the package to the upload key
-   by hand: what users install is signed with Google's app signing key, not that
-   one.
-3. **Build and upload:** `npm run build:aab`, then Play Console → Testing →
-   Internal testing → Create new release.
-3b. **After the AAB finishes processing:** Internal testing -> Save -> Review
-   release -> Start rollout. Play will block on **App content** declarations
-   first (privacy policy, data safety, ads, content rating, target audience) —
-   the dashboard lists which. Then Testers tab -> add the team's emails -> copy
-   the **opt-in link**; testers must accept it before Play shows them the app.
-
-   **Play sends NO email for internal testing.** Adding someone to a list does
-   nothing on its own — the opt-in link has to be sent to them by hand, and they
-   must open it signed into the same Google account that is on the list, on the
-   account their phone's Play Store uses. Waiting for an invite that never
-   arrives is the default way to lose an afternoon here.
-
-   **If ONE tester gets "Item not found" while it works for everyone else**,
-   suspect device eligibility before anything else: `minSdkVersion 33` means
-   **Android 13 or newer**, which is a much higher floor than most apps set, and
-   Play renders "not available for your device" as this same screen when you
-   arrive by direct link. Check Settings -> About phone -> Android version.
-   Then check the Play Store's ACTIVE account (profile icon) — being signed in
-   is not the same as the Store using that account, and the mismatch never
-   resolves on its own. A pre-13 device is not fixable without reversing the
-   Android 13 floor; point that person at the web app instead.
-
-   **"Item not found" right after opting in is normal, not a fault.** The opt-in
-   page says so in passing and it is easy to miss: a first-time download can take
-   a while to propagate, and for a brand-new app's first release that is closer
-   to hours than minutes. Before debugging anything, confirm the phone's Play
-   Store is signed into the SAME account that opted in — a device with several
-   Google accounts gives this identical error forever. The `(unreviewed)`
-   temporary app name and "Not reviewed" in the console are unrelated and
-   expected; they just mean the store listing is not filled in, which internal
-   testing does not require. Also check the list is
-   actually *attached to the track* and saved (creating it is a separate step),
-   and that the release is rolled out rather than left a draft.
-   **A privacy policy is probably NOT needed.** Apps active *exclusively* on the
-   internal testing track are exempt from the Data safety section, which is what
-   drives the privacy-policy requirement — the exemption exists because only
-   staff added by email can install. It becomes required the moment the app also
-   goes to a closed, open or production track, i.e. anywhere the public can
-   reach it. Internal testing caps at 100 testers and needs no review, so for a
-   dozen colleagues it is a permanent home, not a workaround.
-
-   If Play does ask: any publicly reachable URL is acceptable — a `github.io`
-   page is fine, it need not be on the org's domain — and the URL can be changed
-   in Play Console later without touching the app.
-4. [x] **Done 2026-08-02.** Play's app signing certificate SHA-1
-   `A6:58:D9:33:B2:07:00:31:AF:58:5F:97:54:92:C2:6E:3D:25:77:B0` is registered on
-   `com.sabeelinstitute.kanban` and committed to both `google-services.json`
-   copies. Four fingerprints now cover the three signing identities: upload key,
-   debug key (twice — main package for existing sideloaded users, and the
-   `.debug` package), and Play's. This is the fingerprint Play-installed
-   copies actually run under. Easy to skip, and the failure looks like a device
-   problem: sign-in breaks only for people who installed from Play.
-
-   **No rebuild or re-upload is needed for this.** The registration is
-   server-side: `WEB_CLIENT_ID` is a hardcoded constant in
-   `app/src/firebase-config.ts`, not read from `google-services.json` at
-   runtime, so the binary does not carry the fingerprint list. Commit the
-   re-downloaded file to keep the repo honest, but the uploaded AAB stands. The
-   proof is signing in on a Play-installed build.
-**Android is verified end to end (2026-08-03):** installed from the internal
-testing track, signed in, and push received on the device. Nothing about the
-Android path is unproven any more.
-
-**Most of the team is on iPhone**, so iOS is the critical path from here, not a
-follow-up. Two interim points for the rollout message: the **web app works on
-iPhone** and can be added to the Home Screen, and **web push may already work
-there** (Safari has supported it for Home-Screen sites since iOS 16.4, and the
-service worker and VAPID key are both in place) — worth testing before promising
-it to anyone.
-
-5. **Tell the team to uninstall and reinstall** from the Play invite. Android
-   refuses an update signed by a different key, so there is no in-place upgrade
-   from the old sideloaded build. Nothing is lost — all state is in Firestore.
-   (This does NOT affect the `.debug` dev build, which is a separate app and can
-   stay installed alongside.)
-6. **Later, once everyone has moved:** remove the download section from the
-   kanban page in the pages repo, and delete the `kanban-latest` release there.
-
-> Decided 2026-08-02: Play is the Android channel from here on.
-> `scripts/publish-apk.sh` is retired and refuses to run without
-> `SK_LEGACY_APK_CHANNEL=1`; the frozen v0.7.4 download stays up until step 6.
-
-### Notes on the Play move
-
-- **`npm run build:aab` is the build.** It runs `bundleRelease` and repeats every
-  gate publish-apk.sh used to hold — store-legal version, a deploy-log entry
-  written *before* the build, and a signature that is not the debug key. The
-  per-ABI splits switch themselves off for bundle tasks; leaving both on fails
-  with *"Multiple shrunk-resources files found"*.
-- **One channel, decided.** Play replaces the GitHub download. Keeping both was
-  never really an option: Play signs installs with Google's app signing key and a
-  sideloaded APK carries the upload key, so Android will not let either update
-  the other. `scripts/publish-apk.sh` is retired accordingly.
-- **Changing the signing key forces everyone to reinstall.** Android refuses an
-  update signed by a different key, so there is no in-place upgrade from the old
-  debug-signed build. Nothing is lost — all state is in Firestore — but it needs
-  telling people, not discovering.
-- **Target API level.** Play enforces a minimum `targetSdkVersion` for new apps
-  and raises it annually; ours comes from `rootProject.ext.targetSdkVersion`
-  (Expo's default for SDK 57). Check the current floor in the console before
-  assuming it passes.
+**Target API level.** Play enforces a minimum `targetSdkVersion` and raises it
+annually; ours comes from `rootProject.ext.targetSdkVersion` (Expo's default for
+SDK 57). Check the current floor in the console before assuming it passes.
 
 ---
 
@@ -688,9 +421,11 @@ would update rather than duplicate.
 
 ---
 
-## I. Push notifications — two things only you can do
+## I. Push notifications — device checks only you can do
 
-Android push is wired and ships in the next APK. Two items are console work.
+Push is wired on all three surfaces: Android and the web through FCM, iPhones
+through Apple (`APNS_KEY`; § D2 item 5 is the iPhone check). The web push VAPID
+key is deployed.
 
 - [x] **Verify a push actually arrives.** Done, on your phone, 2026-09-16:
       two mention pushes minutes apart. What the screenshot ALSO showed was the
@@ -700,10 +435,10 @@ Android push is wired and ships in the next APK. Two items are console work.
       one push of EACH kind and checks both icons match. The steps below stay,
       because they are the procedure for that pass.
 
-      Install the new APK and sign in.
-      **Signing in no longer asks for permission** — that changed in v0.10.2,
-      because the prompt used to land on the *Waiting for approval* screen, and
-      Android only offers it twice ever. Press **Enable notifications** instead:
+      Install from Play and sign in.
+      **Signing in does not ask for permission** — the prompt would land on the
+      *Waiting for approval* screen, and Android only offers it twice ever.
+      Press **Enable notifications** instead:
       the card at the top of Boards, or the gear on Alerts. Allow it, and check
       the screen then says *Notifications are enabled on this device* — if it
       says *can't be set up*, no token was filed and nothing will arrive, so
@@ -729,14 +464,10 @@ Android push is wired and ships in the next APK. Two items are console work.
       `USE_EMULATORS` compiles to `false`, and `/firebase-messaging-sw.js`
       returns HTTP 200.
 
-      What was actually broken was neither of those: permission was requested
-      from a Firestore snapshot callback, and a browser only honours that
-      request straight from a click. Safari refused it silently and Chrome
-      demoted it to the quiet chip, so the site sat at `default` — in neither
-      the allowed nor the blocked list. Fixed; the ask is now on a button.
+      A browser honours a permission request only straight from a click, so the
+      ask is on a button.
 
-      So: open <https://sabeel-institute-kanban.web.app> once v0.11.4 is
-      deployed — the service worker that shows every push ships with it — use
+      So: open <https://sabeel-institute-kanban.web.app>, use
       **Enable notifications** (the card on Boards, or the gear on Alerts) and
       allow it. Check the screen then reads *Notifications
       are enabled on this device*: that message means a TOKEN WAS FILED, not
@@ -748,12 +479,9 @@ Android push is wired and ships in the next APK. Two items are console work.
       - **Someone else** has to do the action — `shouldNotify` drops the actor,
         so nothing is sent if you trigger it yourself.
       - **Try it both ways: once with the tab focused, once with it minimised.**
-        Since v0.11.4 the service worker shows every push itself, so a banner
-        should appear in BOTH cases, and exactly one each time — the Firebase
-        SDK's worker used to show a background push itself and then hand our
-        handler the same message, which drew a second banner, and to hand a
-        focused tab's push to the page, which drew none. Clicking the banner
-        should focus the app. The Alerts badge goes up either way, because the
+        The service worker shows every push itself, so a banner should appear
+        in BOTH cases, and exactly one each time. Clicking the banner should
+        focus the app. The Alerts badge goes up either way, because the
         notification is written to Firestore independently of the push — that
         badge moving is itself evidence the trigger fired, and separates "the
         server never sent" from "the push did not arrive".
@@ -964,33 +692,20 @@ questionnaire first and debug the phone never.**
       productivity tool with no ads, no purchases and no user-generated content
       shown to strangers, the outcome is the everyone/all-ages rating. The app
       stops being "Unrated" once it propagates.
-- [ ] While you are on that screen, clear whatever else **App content** still
-      lists — privacy policy, data safety, ads, target audience. Play blocks a
-      production rollout on these anyway, and `TODO.md` § F step 3b already
-      warned they would come due.
+- [ ] Whatever else **App content** lists — privacy policy, data safety, ads,
+      target audience. The answers are in `docs/STORE-RELEASE.md`.
 
-**Workaround until then, in order of preference:** you already have this exact
-build sideloaded from the download page, so nothing is blocking YOUR testing.
-For anyone else, either turn off parental controls on their device (Play Store →
-profile → Settings → Family → Parental controls) or send them the APK. Remember
-the signature rule if someone switches route: a Play install carries Google's
-app signing key and a downloaded APK carries the upload key, they cannot replace
-one another, and the only symptom is "App not installed" — uninstall first,
-nothing is lost because all state is in Firestore.
+## M. Privacy
 
-## M. v0.10.0 — do these two, they are the only ones outstanding
-
-- [ ] **Create `privacy@oursabeel.com`.** A Workspace GROUP with two admins on
-      it, not a person's alias — it is published in the privacy policy on both
-      the web app and the download page, and in the App Store listing later. It
-      does not exist yet, so a deletion request sent today bounces. This was
-      flagged before shipping and shipped anyway on your call; it is the one item
-      where waiting made it later rather than worse.
+- [ ] **Confirm `privacy@oursabeel.com` exists** (a Workspace group, two
+      admins). It is published in the privacy policy, on the support page, and
+      in the App Store listing.
 - [ ] **Read the privacy policy** at
       https://sabeel-institute-kanban.web.app/privacy. It is short. Three things
       in it are commitments you are making: a **30-day** response to deletion
       requests, an assertion that Google, Firebase and Sentry are under
-      agreements protecting the data to the same standard, and the retention
+      agreements protecting the data to the same standard (and that iPhone
+      notifications pass through Apple's push service), and the retention
       position — that cards, comments and authorship belong to the institute and
       survive somebody leaving. Reading it once already caught a paragraph that
       described an account model this app does not have.

@@ -1,29 +1,39 @@
 # Sabeel Institute Kanban
 
-Access-controlled kanban boards for Sabeel Institute — Android app and responsive
-website from one Expo codebase, on a Firebase backend. Replaces ClickUp.
+Access-controlled kanban boards for Sabeel Institute — Android and iPhone apps
+and a responsive website from one Expo codebase, on a Firebase backend. Replaces
+ClickUp.
 
 **Docs**
 - `docs/USER-MANUAL.md` — what the app does, for the people using it. Built to
   `docs/USER-MANUAL.pdf` with `docs/render-manual.py`; its screenshots come from
   `scripts/manual-shots.mjs`.
 - `docs/PRODUCT_BRIEF.md` — decisions, data model, access rules. Source of truth.
+- `docs/PERMISSIONS.md` — who can do what.
 - `docs/PHASE_STATUS.md` — the phase plan, exit criteria, live build status, and
   the **deploy log** (what shipped, when, and what it broke).
 - `docs/DEVELOPING.md` — the dev loops: emulators, tests, screenshots, the screen
   sweep.
-- `docs/DEPLOY.md` — deploying, the release APK, the public download page, rollback.
+- `docs/DEPLOY.md` — the access a releaser needs, deploying, shipping a release
+  (web, Play, the APK download page, TestFlight), rollback.
+- `docs/IOS-BUILD.md` — the iPhone app: builds on GitHub, TestFlight testers,
+  signing and its renewal.
+- `docs/STORE-RELEASE.md` — Kanban on the App Store and Google Play: where it
+  stands, its store answers, the review account, the submission checklist. The
+  decisions shared by every Sabeel app are in the `sabeel-app-stores` skill
+  (`Sabeel-Institute/brand`).
 - `docs/BRAND.md` — the authority for Sabeel Institute colors (the designer's
   Option 1 palette, shared with the time-tracker; supersedes the archived
   `docs/brand/sabeel-color-usage-guide.jpg`). Consult before any design decision.
 - `docs/INHERITED-STACK.md` — what carries over from the sibling time-tracker
   project, and the traps it already paid for.
-- `docs/SECRETS.md` — which values are secret, and where each one lives.
+- `docs/SECRETS.md` — which values are secret, where each one lives, and the
+  vault that holds a copy of every file.
 - `docs/VERSIONING-RULE.md` — what a version means here and where it is enforced.
 - `docs/MIGRATION.md` — the ClickUp import, done once.
 - `docs/STACK-GOTCHAS.md` — a stub; the traps live in the `expo-firebase-stack`
   skill, which is public and shared with the sibling project.
-- `TODO.md` — console/account steps only Faisal can do.
+- `TODO.md` — console and account steps only Faisal can do.
 - `CLAUDE.md` — working rules for the agent.
 
 ## Quick start
@@ -78,7 +88,7 @@ scripts/emulator.sh shot my-screen  # → shots/my-screen.png
 ## Layout
 
 ```
-app/            @sabeel/app — Expo + react-native-web (Android + web)
+app/            @sabeel/app — Expo + react-native-web (Android, iOS, web)
 functions/      Cloud Functions (nodejs22, esbuild-bundled)
 packages/shared @sabeel/shared — types, constants, cross-surface logic
 scripts/        emulator, test, e2e, screenshot, migration and release helpers

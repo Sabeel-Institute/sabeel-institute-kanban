@@ -13,7 +13,7 @@ being casual with the one thing that actually grants access.
 |---|---|---|
 | **Public by design** | Firebase web config, `WEB_CLIENT_ID` | **Committed.** Access is controlled by `firestore.rules`, never by hiding these. Hiding them would buy nothing and make setup harder. |
 | **Not secret, still not committed** | Sentry client DSNs | Gitignored `app/.env.local`. They ship inside every browser and app bundle, so they cannot be secret; they are kept out of git only so a fork or public mirror does not inherit this project's event quota. |
-| **Genuinely secret** | `SENTRY_DSN` (functions), `SENTRY_AUTH_TOKEN`, any service-account key | **Secret Manager**, or nothing. Never in the repo, never in chat. |
+| **Genuinely secret** | `SENTRY_DSN` and `APNS_KEY` (functions), `SENTRY_AUTH_TOKEN`, the signing keys, the Play service-account key | **Secret Manager** for the functions; a file outside the repo, copied into the vault, for build and publish credentials (below). Never in the repo, never in chat. |
 
 ## Client — gitignored `app/.env.local`
 
@@ -21,6 +21,7 @@ being casual with the one thing that actually grants access.
 |---|---|---|
 | `EXPO_PUBLIC_SENTRY_DSN_WEB` | `app/src/sentry.web.ts` | Sentry → web project → Client Keys (DSN) |
 | `EXPO_PUBLIC_SENTRY_DSN_NATIVE` | `app/src/sentry.ts` | Sentry → React Native project → Client Keys (DSN) |
+| `EXPO_PUBLIC_FCM_VAPID_KEY` | `app/src/notify.web.ts`: web push | Firebase console → Project settings → Cloud Messaging → Web Push certificates (console only). `npm run check:web-push` refuses a bundle without it |
 
 Web and native are **separate Sentry projects** with separate DSNs, so their
 releases and source maps do not collide. A single shared variable would send
@@ -46,8 +47,8 @@ that does not: unbound, a secret reads as empty, and iPhones hear nothing.
 `npm run check:apple-push` asks Apple whether it accepts the key for this app.
 
 Bind it on any function whose failures matter, via `secrets: [sentryDsn]`.
-**Every v2 function carries it** — the list here used to name three and was four
-releases out of date, so the rule is stated instead of enumerated. The one
+**Every v2 function carries it** — the rule is stated rather than enumerated,
+because a list here goes out of date. The one
 exception is `onUserCreate`, a v1 auth trigger: v1 functions have no `secrets`
 option, which is why `sentry.ts` also reads the DSN from the environment.
 
@@ -60,7 +61,7 @@ may sign in with a password. Rules cannot read a secret, so it is a literal in
 `firestore.rules` and `storage.rules` and in this public repository; the
 account's security is its long generated password (Faisal's vault, never here)
 and Firebase's rate limiting, and signed in it is a member of one board of
-sample cards. `docs/STORE-RELEASE.md` § 8.
+sample cards. `docs/STORE-RELEASE.md` § 3, The review account.
 
 ## Build machine — the shell that cuts a RELEASE, on either platform
 
@@ -147,6 +148,58 @@ files and Metro config and writes a `sentry.properties` containing a real token.
 The plugin registration in `app/app.json` and the gated `apply from:` in
 `build.gradle` are the whole configuration.
 
+## Build and publish credentials — files outside the repo
+
+Each lives at its path on the machine that uses it and is copied into the vault
+(below). None is ever in this repository.
+
+| What | Live path | Used by | Vault copy |
+|---|---|---|---|
+| Play **upload** keystore `sabeel-kanban-upload.jks` | `~/keys/` | `build:aab`, `build:apk`, through `keystore.properties` | `sabeel/kanban/android/` |
+| `keystore.properties` (keystore path and passwords) | `app/android/` (gitignored) | `signingConfigs.release` | `sabeel/kanban/android/` |
+| `upload_certificate.pem` (public) | `~/keys/` | a Play upload-key reset only | `sabeel/kanban/android/` |
+| Play service-account key `sabeel-play-publisher.json` | `~/keys/` (or `SK_PLAY_KEY`) | `npm run publish:play` | `sabeel/google-play/` |
+| `app/.env.local` | gitignored | every bundle (table above) | `sabeel/kanban/env/` |
+| `app/.env.sentry-build-plugin`: the Sentry three, `IOS_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID` | gitignored | native release builds, `build:ios` | `sabeel/kanban/env/` |
+| App Store Connect API key `AuthKey_<ASC_KEY_ID>.p8` (Admin) | `~/.appstoreconnect/private_keys/` | `build:ios`, `testflight-check.mjs`, the `ASC_KEY_P8` secret | `sabeel/apple/` |
+| APNs key `AuthKey_<APNS_KEY_ID>.p8` | `~/.apns/`, or `APNS_KEY_FILE` | `send-test-push.mjs`, `check-apple-push`; the `APNS_KEY` secret | `sabeel/apple/` |
+| Apple Distribution certificate (`distribution.key`, `.cer`, `.p12`, `p12-password`) and the profile `SabeelKanban_AppStore_CI.mobileprovision` | `~/.config/sabeel-lms/ios-distribution/` on the Linux machine | the GitHub secrets below | `sabeel/apple/ios-distribution/` |
+| App Review password for `app-review@oursabeel.com` | nowhere else | App Store Connect → App Review Information | `sabeel/review/kanban-app-review.txt` |
+
+**The upload keystore is never regenerated.** Play knows this key; a new one is
+refused until Play support resets the upload key. A missing keystore or
+`keystore.properties` is restored from the vault.
+
+**The review password** is reset, if it is ever lost, on that account through
+the Admin API (`accounts:update`), then written into the vault and into App
+Store Connect's App Review Information.
+
+### GitHub Actions secrets (`ios.yml`)
+
+`IOS_DIST_P12`, `IOS_DIST_P12_PASSWORD`, `IOS_PROFILE`, `ASC_KEY_P8`,
+`IOS_BUILD_ENV` (`app/.env.sentry-build-plugin`) and `APP_ENV_LOCAL`
+(`app/.env.local`), each set from the files above. The table of sources and
+the `gh secret set` commands are in `docs/IOS-BUILD.md` § Builds on GitHub.
+
+### The vault
+
+`~/.config/secrets-vault/` on Faisal's Linux machine holds a copy of every file
+above, laid out as the last column says, with `sources.tsv` naming each live
+path, and is kept off the machine in secure storage.
+
+```sh
+bash ~/.config/secrets-vault/vault.sh verify    # every copy matches its live file
+bash ~/.config/secrets-vault/vault.sh collect   # copy every live file in again, then verify
+```
+
+Run `collect` after any secret changes, and add a new secret file to
+`sources.tsv` the day it is made.
+
+**A releaser who is not Faisal** gets each file from the vault owner, out of
+band, and puts it at its live path. Nothing here is regenerated to avoid
+asking: Play refuses a new upload key until support resets it, and the
+distribution certificate is shared by three apps under a per-team cap.
+
 ## Reporting is off against the emulators
 
 Both app seams gate on `USE_EMULATORS`, so a DSN in `.env.local` is ignored
@@ -162,9 +215,10 @@ and aborted the suite until this gate was added.
   chunk and the line, and the web bundle is not minified past readability the way
   a Hermes bytecode frame is. Android and iOS *are* wired — see the build-machine
   section above.
-- **Any Cloud Storage credential** — the bucket is reached through the Admin SDK
-  and the client Firebase config, neither of which is a secret. No bucket
-  is provisioned.
+- **Any Cloud Storage credential** — the attachments bucket
+  (`sabeel-institute-kanban.firebasestorage.app`) is reached through the Admin
+  SDK and the client Firebase config, neither of which is a secret, and signed
+  URLs are minted by the functions' own service account.
 
 ## What Sentry is allowed to know
 

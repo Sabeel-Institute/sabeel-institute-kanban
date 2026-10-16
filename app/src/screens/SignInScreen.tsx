@@ -135,7 +135,8 @@ export function SignInScreen() {
             two things that would put this app back inside the stores' account
             creation rule — and with it, a requirement to build in-app account
             deletion. The instruction belongs in the onboarding email, which is
-            out of band and does not count. docs/STORE-RELEASE.md § 2.
+            out of band and does not count. docs/STORE-RELEASE.md § 1, The app
+            never creates an account.
           */}
           <Body>This account isn&rsquo;t set up for the app yet.</Body>
           <Hint>Contact your administrator.</Hint>

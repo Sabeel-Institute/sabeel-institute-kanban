@@ -1,28 +1,61 @@
 # Deploy guide
 
-Everything through Phase 12 runs against the emulators with no real project.
-Deploying is the point where the console steps in `TODO.md` must be done first.
+A release needs the access below, the files in `docs/SECRETS.md`, and the order
+in § Shipping a release. Store decisions — tracks, testers, App Review, listings
+— are in `docs/STORE-RELEASE.md`; the iPhone build is `docs/IOS-BUILD.md`.
+
+## Access
+
+Roles, not people: whoever holds a role today grants it.
+
+| Where | Role | For |
+|---|---|---|
+| Firebase / Google Cloud project `sabeel-institute-kanban` | Owner | `firebase deploy`, `functions:secrets:set`, and the scripts run with `GCLOUD_PROJECT=…` (gcloud ADC) |
+| Google Play Console, the Sabeel developer account | user on this app with **Release apps to testing tracks** and **Manage testing tracks and edit tester lists** | the Testers tab, App content, the app-signing fingerprints |
+| App Store Connect, the Sabeel Institute team | **Admin** or **App Manager** on this app; the **Account Holder** files the unlisted-distribution request | TestFlight testers, App Review submissions |
+| GitHub `faisal-shah/sabeel-institute-kanban` | write; secrets are set by the owner (a personal repository) | `git push`, `gh workflow run ios.yml`, `publish-apk.sh`'s versioned release |
+| GitHub `faisal-shah/faisal-shah.github.io` | write, with a clone at `../faisal-shah.github.io` (or `SK_PAGES_DIR`) | the APK download page |
+| Sentry, the Sabeel org | member of the three Kanban projects | DSNs, the build token, triage |
+| The vault owner | — | every file in `docs/SECRETS.md` § Build and publish credentials |
+
+The Firebase project belongs to a personal Google account, not to an
+`oursabeel.com` Cloud organization (`TODO.md` § C), so project access is granted
+from that account.
 
 ## Prerequisites
 
-1. Complete `TODO.md` sections B, C and D — Firebase project (Blaze), Google
-   sign-in enabled, OAuth consent screen **External and published** (see
-   TODO.md § C for why not Internal), Web and Android apps registered, SHA-1
-   added, `google-services.json` downloaded.
-2. Put the real project id in `.firebaserc`.
-3. Replace the placeholder config in `app/src/firebase-config.ts` with the real
-   web config. **Keep `EMULATOR_PROJECT_ID` as it is** — it is what makes local
-   development point at the emulators.
-4. Optional but recommended: `firebase functions:secrets:set SENTRY_DSN`.
+In place for `sabeel-institute-kanban`; every deploy assumes them:
+
+1. Blaze billing; `.firebaserc` and `app/src/firebase-config.ts` name the
+   project. **`EMULATOR_PROJECT_ID` stays as it is** — it is what points local
+   development at the emulators.
+2. Secret Manager holds **`SENTRY_DSN`** and **`APNS_KEY`**. Every function that
+   sends a push binds `APNS_KEY`, so a functions deploy needs it
+   (`docs/SECRETS.md`).
+3. The project is on **Identity Platform**, with two sign-in providers: Google,
+   and Email/Password for the one review address. The door holds only in this
+   order, on a new project or whenever the provider is switched back on:
+   functions first, so `beforeSignUp` and `beforeSignIn` exist and are
+   registered as the project's blocking triggers (`beforeCreate`,
+   `beforeSignIn`); then the rules; then the Email/Password provider on; then
+   the review account (`docs/STORE-RELEASE.md`). The provider on first leaves a
+   window in which anyone holding the public API key can make an account.
+4. On the deploying machine, `app/.env.local` (`docs/SECRETS.md`): a hosting
+   bundle without its VAPID key cannot register web push, and
+   `npm run check:web-push` refuses it.
+
+A new project instead: the consoles in `TODO.md` § B–D, then § First admin
+below.
 
 ## Deploy
 
 ```sh
 # Indexes FIRST — they take minutes to build, and queries error until they exist.
-firebase deploy --only firestore:indexes
+npx firebase deploy --only firestore:indexes --project sabeel-institute-kanban
 
-# Then rules, functions and the web app.
-firebase deploy --only firestore:rules,storage,functions,hosting
+# Then rules and functions, then the web app (§ Shipping a release has the order).
+npx firebase deploy --only firestore:rules,storage,functions --project sabeel-institute-kanban
+npx firebase deploy --only hosting --project sabeel-institute-kanban
 ```
 
 It is `storage`, **not** `storage:rules`. The `storage` block in `firebase.json`
@@ -69,15 +102,16 @@ From then on, promote everyone else in-app under **People**.
 
 ## Public download page — the developer's pre-release route
 
-Un-retired 2026-08-03. Testers get Android builds from **Play internal
-testing**; this channel exists for one thing Play cannot do for this app —
-letting the developer test a release build *before* the testers see it, from a
-phone, away from the build machine.
+Testers get Android builds from **Play internal testing**; this channel exists
+for one thing Play cannot do for this app — letting the developer test a
+release build *before* the testers see it, from a phone, away from the build
+machine. Play's feature for that, internal app sharing, refuses this app
+(§ Publishing from the command line says why).
 
-Play's feature for exactly that is internal app sharing, and it **refuses this
-app**: it requires the app to have been published, and internal-testing releases
-do not count. The dashboard shows why — "Draft app", internal testing "Active ·
-Not reviewed". For an internal tool that may never change.
+The page is `sabeel-kanban/index.html` in `faisal-shah/faisal-shah.github.io`,
+and the APK is the `kanban-latest` release asset there. `publish-apk.sh` needs
+write access to that repository and a clone at `../faisal-shah.github.io`
+(or `SK_PAGES_DIR`).
 
 ```
 npm run build:apk                 # release-signed, per-ABI
@@ -89,12 +123,8 @@ scripts/publish-apk.sh            # replaces the rolling asset + cuts the releas
 **upload key**; a Play install is signed with **Google's app signing key**.
 Neither can install over the other — Android refuses with a signature mismatch
 and says only "App not installed". Uninstall first; nothing is lost, because all
-state is in Firestore.
-
-That rule is also why this was retired for a day: the frozen asset was the last
-debug-signed build, and replacing it would have stranded everyone who had it.
-The team has since moved to Play, so the only sideload install left is the
-developer's.
+state is in Firestore. The team installs from Play, so the only sideload
+install is the developer's.
 
 
 ## Android releases — Google Play
@@ -102,9 +132,8 @@ developer's.
 ```sh
 npm run build:aab
 # outputs app/android/app/build/outputs/bundle/release/app-release.aab
+npm run publish:play -- --internal
 ```
-
-Then Play Console → Testing → Internal testing → Create new release.
 
 `build-aab.sh` holds the gates the old publish script did: a store-legal version,
 a deploy-log entry that exists **before** the build, and a refusal to proceed on
@@ -112,37 +141,23 @@ a debug signature. Play wants one bundle carrying every ABI and does its own
 per-device splitting, so the `splits` block turns itself off for bundle tasks —
 leaving both on fails with *"Multiple shrunk-resources files found"*.
 
-### Four SHA-1s, because there are four signing identities
+### Three SHA-1s, because there are three signing identities
 
-All four belong in Firebase; each covers a different way the app gets onto a
-device, and a missing one fails only for that route:
+All three are registered in Firebase; each covers a different way the app gets
+onto a device, and a missing one fails only for that route:
 
 | Build | Signed with | Needed for |
 |---|---|---|
 | `npm run dev:android`, `expo run:android` | committed debug keystore | day-to-day development |
-| `npm run build:apk` (sideload) | upload key, `~/keys/…jks` | quick testing of a real release build |
+| `npm run build:apk` (sideload) | upload key, `~/keys/…jks` | the download page's release build |
 | installed from Play | **Google's app signing key** | everyone actually using the app |
-| **Internal app sharing link** | **Play's internal test certificate** | handing a build to a developer without shipping it to the testers |
 
-The last two are the ones that get forgotten, and for the same reason: **Play
-re-signs whatever you upload**, so the key you built with is not the key the
-installed app runs under.
-
-- Play App Signing: Play Console → App integrity → *App signing key
-  certificate*. Miss it and sign-in fails with `DEVELOPER_ERROR` for Play users
-  only, while every build on your own machine works — so it reads as a device
-  problem.
-- **Internal app sharing has its OWN certificate**, separate from both of the
-  above: Play Console → Testing → Internal app sharing → *Internal test
-  certificate*. Enabled 2026-08-03 so a build can go to a developer without
-  becoming an update for the Sabeel testers on the internal testing track. Its
-  SHA-1 must be registered too, or sign-in fails on exactly those builds and
-  nothing else.
-
-**A shared build cannot install over a Play-installed one.** Different signing
-key means Android refuses the update with a signature mismatch — uninstall
-first, and uninstall again to go back. Same package name, so only one at a
-time. (The `.debug` variant is a different package and does sit alongside both.)
+Play's is the one that gets forgotten: **Play re-signs whatever you upload**,
+so the key you built with is not the key the installed app runs under. Its
+fingerprint is under Play Console → App integrity → *App signing key
+certificate*. Miss it and sign-in fails with `DEVELOPER_ERROR` for Play users
+only, while every build on your own machine works — so it reads as a device
+problem.
 
 ### DEVELOPER_ERROR on a Play install — diagnose in this order
 
@@ -163,14 +178,10 @@ cause is almost always the app signing fingerprint, but "registered" and
 
 1. **Is the fingerprint registered?** Google Cloud Console -> APIs & Services ->
    **Credentials** -> OAuth 2.0 Client IDs. There should be one **Android** client
-   per registered SHA-1 — debug, upload key, Play's app signing key, and the
-   internal-app-sharing certificate — each marked "Auto created by Google
-   service", which is Firebase creating them when a fingerprint is added.
-   Several entries for one package is correct, not a duplicate.
-   **Which install is it?** If sign-in fails on a build you got from an internal
-   app sharing LINK but works on one from the internal testing track, it is the
-   internal test certificate that is missing, not the app signing key — they are
-   different certificates and the symptom is identical.
+   per registered SHA-1 — debug, upload key and Play's app signing key — each
+   marked "Auto created by Google service", which is Firebase creating them when
+   a fingerprint is added. Several entries for one package is correct, not a
+   duplicate.
 2. **If it is there, it is propagation.** OAuth client changes take minutes and
    sometimes hours. Force-stop the app and retry; then clear the device's Google
    Play services cache (Settings -> Apps -> Google Play services -> Storage ->
@@ -237,25 +248,17 @@ global rollout, an app sideloaded from a page rather than a store needs its
 signing key registered under Play Console -> Android developer verification.
 Retiring that channel resolves it; so would registering the upload key there.
 
-### What to back up, and what to regenerate instead
+### The signing and publishing files, and where they are kept
 
-Three files sit in `~/keys`. They are not equivalent, and treating them the same
-is how people end up with a backup that cannot sign and a credential copied
-somewhere it did not need to be.
+Three files in `~/keys`, plus `app/android/keystore.properties`; each is copied
+into the vault (`docs/SECRETS.md`).
 
-| File | Back up? | Why |
+| File | Role | If it is missing |
 |---|---|---|
-| `sabeel-kanban-upload.jks` | **Yes** | Cannot be recreated. Losing it is recoverable only through a Play upload-key reset |
-| `app/android/keystore.properties` | **Yes, with it** | The keystore is **useless without these passwords** — this is the half that gets forgotten |
-| `sabeel-play-publisher.json` | **No** | Mint a fresh key in seconds; another copy is only another thing to leak |
-| `upload_certificate.pem` | No | Public certificate, re-exportable from the keystore and downloadable from Play Console |
-
-**The keystore and its passwords travel together or not at all.** Backing up the
-`.jks` alone produces a file nobody can open. Backing up
-`keystore.properties` alone produces passwords for a keystore that no longer
-exists. Whether they live in the same place is a real choice: one folder is
-convenient and means a single compromise yields both; passwords in a password
-manager and the keystore in Drive is the safer split. Pick deliberately.
+| `sabeel-kanban-upload.jks` | Play **upload** key | **Restore it from the vault. Never generate a new one**: Play refuses a new upload key until Play Console support resets it |
+| `app/android/keystore.properties` | its passwords | Restore it with the keystore; one is useless without the other |
+| `sabeel-play-publisher.json` | Play service-account key for `publish:play` | Restore it, or mint a new one (below) |
+| `upload_certificate.pem` | public certificate of the upload key | What Play support asks for in an upload-key reset; re-exportable from the keystore |
 
 **Losing the upload key is friction, not death.** Under Play App Signing, Google
 holds the *app signing* key — the one that actually has to stay constant — so a
@@ -263,14 +266,11 @@ lost upload key is reset through Play Console support and updates resume. The
 app signing key is the one that can never be replaced, and it is not on this
 machine.
 
-**The service-account key is deliberately NOT backed up.** It is regenerable:
-Google Cloud → *IAM & Admin → Service Accounts* → the publisher account → *Keys →
-Add key → JSON*, then delete the old one. That is also the rotation procedure, so
-"lost it" and "might be exposed" have the same one-minute answer. What is worth
-recording instead is the **pointer** — which Google Cloud project and which
-`…iam.gserviceaccount.com` address — because that is the part you would otherwise
-have to go hunting for. It is org-scoped, not app-scoped: one account publishes
-every app, so this is a single note, not one per app.
+**Rotating the service-account key** takes a minute: Google Cloud → *IAM & Admin
+→ Service Accounts* → `sabeel-play-publisher` → *Keys → Add key → JSON*, delete
+the old key, put the new file at `~/keys/sabeel-play-publisher.json`, then
+`bash ~/.config/secrets-vault/vault.sh collect`. It is org-scoped, not
+app-scoped: one account publishes every app on the developer account.
 
 ### Publishing from the command line, without a browser
 
@@ -291,9 +291,7 @@ the track at the new `versionCode` → commit, and a failure discards the edit.
 obvious tool for handing one build to one person, and it refuses this app: it
 requires the app to have been **published**, and internal-testing releases do not
 count. The dashboard shows why — *"Draft app"*, internal testing *"Active · Not
-reviewed"*. For an internal tool that may never change, and publishing would mean
-a real store listing, content rating, data safety and review, plus handing Google
-working credentials for an app restricted to `@oursabeel.com`.
+reviewed"*. That holds until the first production release (`docs/STORE-RELEASE.md`).
 
 The support was written, proved not to work against the live API and by hand in
 the Console, and then deleted — an option that cannot succeed is a trap that
@@ -337,7 +335,7 @@ app that stays readable in history no matter what a later commit removes.
 `.gitignore` carries a name-pattern backstop, but the file should simply never be
 inside the repo.
 
-One-time setup, all of it in consoles:
+Set up already; for a new service account, all of it in consoles:
 
 1. **Google Cloud** → the project already backing Firebase → *APIs & Services* →
    enable **Google Play Android Developer API**.
@@ -346,24 +344,38 @@ One-time setup, all of it in consoles:
    only copy; Google keeps none.
 3. **Play Console → Users and permissions → Invite new user** → the service
    account's `…iam.gserviceaccount.com` address → grant it on **this app only**,
-   with **Release apps to testing tracks**. That single permission covers
-   internal app sharing as well.
-4. `chmod 600 ~/keys/sabeel-play-publisher.json`.
+   with **Release apps to testing tracks**.
+4. `chmod 600 ~/keys/sabeel-play-publisher.json`, then
+   `bash ~/.config/secrets-vault/vault.sh collect`.
 5. `npm run publish:play -- --check`.
 
-**Sign-in on a shared build needs the internal-app-sharing SHA-1**, which is a
-fourth certificate distinct from the upload key and Play's app signing key — see
-the table above. Miss it and Google sign-in fails on exactly those builds and
-nothing else. Registering it is server-side only: no rebuild, no
-`google-services.json` re-download, so it can be done from a phone.
+### Testers: the "Sabeel staff" list
 
-**A shared build cannot install over a Play-installed one** — different signing
-key, so Android refuses it as a signature mismatch. Uninstall first; nothing is
-lost, because all state is in Firestore.
+Internal testing is this app's Play track now, and `publish:play` publishes to
+it alone; public production is the destination, released from Play Console
+(`docs/STORE-RELEASE.md`). Who gets each internal release is an account-wide
+Play Console **email list**, "Sabeel staff", shared by every app on the
+developer account:
+
+1. Play Console → this app → *Testing → Internal testing → **Testers*** → tick
+   **Sabeel staff** → *Save*. A list that exists but is not ticked on the track
+   reaches nobody.
+2. On the same page, copy the **opt-in link** and send it to the team. **Play
+   sends no email**: someone on the list sees nothing until they open that
+   link, signed in to the Google account on the list — the one their phone's
+   Play Store uses — and accept.
+3. A new colleague: add their address to the list, then send them the link.
+
+**"Item not found" right after opting in is normal**: a first download takes a
+while to propagate. If it persists for one person, check in this order: their
+phone is **Android 13 or newer** (`minSdkVersion 33`; Play shows an ineligible
+device as this same screen), the Play Store's ACTIVE account (profile icon) is
+the one that opted in, and the release is rolled out rather than a draft. A
+pre-13 phone cannot install the app; that person uses the web app.
 
 ### Building a sideloadable APK
 
-Still supported and unchanged; it is just no longer published anywhere:
+The per-ABI APKs that `publish-apk.sh` publishes (§ Public download page):
 
 ```sh
 npm run build:apk
@@ -393,10 +405,10 @@ adb exec-out screencap -p > shots/check.png     # then LOOK at it
 
 **Signing.** `signingConfigs.release` reads a gitignored
 `app/android/keystore.properties`; without it the build still works but is
-debug-signed and says so loudly. Everything up to and including v0.7.4 shipped
-that way, signed with the debug keystore committed to this **public** repo, so
-anyone with a clone could sign an update Android would accept as this app. That
-is closed for release builds.
+debug-signed and says so loudly, and `build-aab.sh`, `publish:play` and
+`publish-apk.sh` each refuse a debug-signed artifact. The debug keystore is
+committed to this **public** repo, so a release signed with it could be
+reproduced by anyone with a clone.
 
 The debug keystore is still committed and its SHA-1 still registered, on purpose:
 it is what makes `npm run dev:android` sign in without per-machine setup. The
@@ -431,7 +443,9 @@ A plain Cloud Run "request was not authenticated" 403 means the public-invoker
 binding was never applied. See the trap below.
 
 **3. Sign in end to end** with a real `@oursabeel.com` account, and confirm a
-non-org account is rejected.
+non-org account is rejected. When the sign-in or rules changed, also sign in
+through **Sign in with email** as `app-review@oursabeel.com` (password in the
+vault): it reaches the App Review board and nothing else.
 
 ## Known traps
 
@@ -445,7 +459,8 @@ every call bounces at the Cloud Run layer before your code runs. Fix by forcing
 recreation:
 
 ```sh
-firebase functions:delete setUserAccess removeBoardMember countMemberAssignments \
+firebase functions:delete accountExists setUserAccess removeBoardMember \
+  addBoardMember listAddableUsers countMemberAssignments \
   boardsSolelyOwnedBy countLabelUsage deleteLabel \
   finalizeAttachment deleteAttachment getAttachmentUrl \
   --region us-central1 --force
@@ -487,20 +502,36 @@ emulator-mode bundle must never reach Hosting.
 
 ## Shipping a release
 
-`android/` is committed; there is no EAS. A ship touches **web, the APK download
-page, and Play**, and they go out in one batch after Faisal's go-ahead. (iOS is
-its own runbook, `docs/IOS-BUILD.md`: from the Mac, or from GitHub's `ios.yml`.)
+`android/` is committed; there is no EAS. A ship touches **the backend when it
+changed, web, the APK download page, Play internal testing and TestFlight**, and
+they go out in one batch after Faisal's go-ahead. The iPhone build runs on
+GitHub (`docs/IOS-BUILD.md` § Builds on GitHub).
 
 ```sh
-# 0. app/app.json version + the deploy-log entry in docs/PHASE_STATUS.md
+# 0. In one commit: expo.version in app/app.json; expo.ios.buildNumber above
+#    every build App Store Connect holds (testflight-check.mjs asks Apple); and
+#    the newest deploy-log heading in docs/PHASE_STATUS.md renamed to end
+#    "— vX.Y.Z". build-aab.sh, build-ios.sh and publish:play find the entry by
+#    that suffix, and refuse without it.
 # 1. WRITE THE "What's new" PARAGRAPH on the download page — see below, nothing checks it
 git push origin main            # FIRST — a release attaches to a commit GitHub already has
+# 2. Backend, when functions, rules or indexes changed, BEFORE the clients that
+#    need it. Indexes first; a deploy-log entry that needs another order (such as
+#    functions before rules) states it.
+npx firebase deploy --only firestore:indexes --project sabeel-institute-kanban
+npx firebase deploy --only firestore:rules,storage,functions --project sabeel-institute-kanban
+# 3. The clients
 npm run web:export -w @sabeel/app
 npm run check:web-push      # the VAPID key actually reached the bundle
 npx firebase deploy --only hosting --project sabeel-institute-kanban
-npm run build:apk && scripts/publish-apk.sh          # download page + versioned GitHub release
+npm run build:apk && scripts/publish-apk.sh          # download page + the vX.Y.Z tag and release
 npm run build:aab && npm run publish:play -- --internal   # the team, via Play
+gh workflow run ios.yml -R faisal-shah/sabeel-institute-kanban --ref vX.Y.Z -f testflight=true   # iPhones, via TestFlight
 ```
+
+The iOS run starts on the tag `publish-apk.sh` just cut, so the iPhone build
+carries the same commit as the others. Its upload job stops in seconds if the
+build number is taken; raise `expo.ios.buildNumber`, commit, and run again.
 
 **Push before publishing.** `publish-apk.sh` cuts a GitHub Release, which cannot
 attach to a commit GitHub has not seen — shipping v0.7.0 failed at exactly that
@@ -518,16 +549,12 @@ releases advertising 31 MB and, until v0.7.5, still announced the move to Google
 Play beside a live download button. Write it in
 `../faisal-shah.github.io/sabeel-kanban/index.html` before publishing.
 
-**The rolling GitHub release is script-owned too**, from the same three values.
-Its title and body used to be hand-written: the body said "Current build:
-v0.1.10" for four months while the asset under it was replaced eleven times, and
-GitHub shows the tag's July creation date beside it, so the page read as an
-artefact from another era. Nobody is meant to land there — the download button
-links straight to the asset URL — but it is public. The script now writes both
-and asserts the result, and **refuses to publish if `kanban-latest` carries any
-asset other than the one APK**: it had quietly accumulated a
-`sabeel-kanban-0.7.4.aab`, and a release page offering two files while naming
-the wrong one is worse than one offering none.
+**The rolling GitHub release is script-owned too**, from the same three values:
+the script writes its title and body and asserts the result. Nobody is meant to
+land there — the download button links straight to the asset URL — but it is
+public. It **refuses to publish if `kanban-latest` carries any asset other than
+the one APK**: a release page offering two files while naming the wrong one is
+worse than one offering none.
 
 Before sharing any build:
 
@@ -540,26 +567,27 @@ Before sharing any build:
    stale bundle more than once.
 
 The **deploy-log entry in `docs/PHASE_STATUS.md` is mandatory and comes first** —
-`build-aab.sh` refuses to build without one, the same guarantee `publish-apk.sh`
-used to enforce by reading its release notes from it. It is the only record of
-why a release exists.
+`build-aab.sh`, `build-ios.sh` and `publish:play` refuse without one, and
+`publish-apk.sh` takes the versioned release's notes from it. It is the only
+record of why a release exists.
 
 ### Play specifics
 
 - Uploading is **scripted**: `npm run publish:play -- --internal` does the whole
   edit/upload/track/commit cycle, and `-- --check` proves the gates and the Play
   permission without uploading. The console is only needed for things the API
-  cannot do — permissions, and reading the app-signing fingerprints. Play is
-  deliberately **never deployed from CI** (see `CLAUDE.md`).
-- Internal app sharing is deliberately not supported; see above for why.
+  cannot do — permissions, testers, and reading the app-signing fingerprints.
+  Play is deliberately **never deployed from CI** (see `CLAUDE.md`).
+- Testers: § Testers above. Internal app sharing is not supported; § Publishing
+  from the command line says why.
 - `versionCode` is derived from the semver (`major*1000000 + minor*1000 + patch`),
   so it increases on its own. Play rejects a duplicate outright, which is the
   backstop.
 - Processing takes a few minutes before a build appears on the testing track.
-- Historic note: tagging a GitHub release at a commit whose `.github/workflows`
-  differs from the default branch needs the `workflow` token scope
-  (`gh auth refresh -h github.com -s workflow`). Only relevant if versioned
-  GitHub releases are ever cut again — a normal ship tags HEAD and never hits it.
+- Tagging a GitHub release at a commit whose `.github/workflows` differs from
+  the default branch needs the `workflow` token scope
+  (`gh auth refresh -h github.com -s workflow`). `publish-apk.sh` tags HEAD
+  after the push, so a normal ship never hits it.
 
 ## Rollback
 

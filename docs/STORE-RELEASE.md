@@ -1,68 +1,43 @@
-# Store release: no account creation in the mobile app
+# Kanban on the App Store and Google Play
 
-**Status:** built for Kanban in v0.10.0 (2026-08-18); the other two follow once
-Kanban is through App Review. § 8 is what their agents need.
+Kanban's store answers, its review account and where it stands. The method and
+the decisions every Sabeel app shares, numbered 1–10, are in the
+[`sabeel-app-stores` skill](https://github.com/Sabeel-Institute/brand/blob/main/skills/sabeel-app-stores/SKILL.md).
+When this file and the skill disagree about a shared decision, the skill wins
+and this file is the one to fix. Building and shipping: `docs/DEPLOY.md` and
+`docs/IOS-BUILD.md`.
 
-**First deploy is TestFlight**, not App Review — the refusal path is seen working
-in real use before anything one-way happens. No review account, no App Review
-submission, no unlisted request until then.
+## Where it stands (2026-10-16)
 
-## Who this is for
+**iPhone.** TestFlight internal testing: v0.11.5 builds 11, 12 and 13, all
+VALID, in the group "Sabeel Kanban Internal". The next upload is build 14
+(`expo.ios.buildNumber`). App Store Connect app 6801011482, SKU `sabeel-kanban`,
+bundle id `com.sabeelinstitute.kanban`. **Nothing has been submitted to App
+Review.** Destination: the App Store, unlisted. Kanban goes through App Review
+first and alone, the pilot for the other Sabeel apps (decided 2026-08-18), so a
+correction from Apple costs one app's rework rather than three.
 
-Three apps, three repos, one shape:
+**Android.** Google Play internal testing now: v0.11.4 (versionCode 11004) on
+the track, testers the account-wide "Sabeel staff" email list. Destination:
+Play production, a public listing (decided by Faisal 2026-10-16). The app
+signing key is Google-generated; the repo's key (in the vault) is the upload
+key only. The download page's APK (`docs/DEPLOY.md`) is signed with the upload
+key, so it and a Play install cannot replace each other.
 
-| App | Repo | Surfaces today | Store plan |
-|---|---|---|---|
-| Kanban | `sabeel-institute-kanban` | Android, iOS, web | iOS **unlisted**; Play **closed testing** |
-| Timesheet | `sabeel-institute-time-tracker` | Android, web | Play **closed testing**; iOS later |
-| Class recordings | `sabeel-recording-app` | Android, web | Play **production**; iOS later |
+**Web.** <https://sabeel-institute-kanban.web.app>, v0.11.5 (`67913fa`), serving
+`/privacy`, `/support` and `/get-app` as static pages. The email sign-in's
+server side is live; its link reaches the web with the next hosting deploy.
 
-**Kanban goes first.** It is the only one with a working iOS build, so it proves
-the whole route. The other two adapt this document rather than re-deriving it —
-§ 8 lists exactly what differs per app.
+## How Kanban keeps the shared decisions
 
-If you are the agent for the timesheet or recordings app: read § 1 to § 3 as
-requirements, § 8 for what is different about yours, and treat § 4 to § 7 as the
-release checklist you will need when your turn comes.
+### 1. The app never creates an account
 
----
+Both stores require in-app account deletion only from an app that creates
+accounts or points at somewhere that does; Kanban does neither (skill,
+decision 1). Built 2026-08-18 in v0.10.0.
 
-## 1. The one rule everything else hangs off
-
-> **The mobile app must never cause an account to come into existence.**
-
-Not "must not show a signup screen". Must not *create*. Everything in this
-document follows from that sentence, and one careless line of code destroys it.
-
-### Why it is worth the refactor
-
-Both stores require in-app account deletion **only if the app supports account
-creation**:
-
-- **Apple 5.1.1(v)** — "If your app supports account creation, you must also
-  offer account deletion within the app." There is no clause about directing
-  users elsewhere.
-- **Google Play** — triggers if "a user can complete creating an app account
-  directly in the app **or if the app directs the user to an app account
-  creation flow outside of the app**."
-
-Satisfy neither trigger and the requirement is not engaged. That saves building
-a deletion flow that would have to decide what happens to organisation-owned
-content when a board owner, or a student with a transcript, deletes themselves —
-which is the genuinely hard part, not the button.
-
-**The Workspace account is not the app account.** Play defines an app account as
-"a unique user identity that developers provide". A staff member's
-`@oursabeel.com` login is the *credential*; the app account is the Firebase Auth
-uid plus the `users/{uid}` document your backend creates. Do not confuse
-them —
-"they already had a Google account" is not an argument that survives review.
-
----
-
-## 2. The sign-in refactor
-
-### What breaks it
+**What breaks it.** Signing out afterwards does not unmake the Auth record or
+the `users/` document the create trigger already wrote:
 
 ```ts
 // WRONG. The account exists by the end of line 1.
@@ -71,249 +46,97 @@ const me = await getDoc(doc(db, 'users', auth.currentUser.uid));
 if (me.data()?.status !== 'active') await signOut(auth);
 ```
 
-Signing out afterwards does not unmake the Auth record or the `users/` document
-the create-trigger already wrote. This is account creation in the app.
-
-### What works
-
-Native Google Sign-In is **pure Google OAuth** — it yields an ID token and
-touches nothing in your Firebase project. That is the window the design lives in.
+**What works.** Native Google Sign-In is pure Google OAuth: it yields an ID
+token and touches nothing in the Firebase project. The gate lives in that
+window (`app/src/auth/google.ts`):
 
 ```ts
-const { idToken } = await GoogleSignin.signIn();   // creates nothing
+const { idToken } = await GoogleSignin.signIn();      // creates nothing
 const { exists } = await accountExists({ idToken });  // callable, Admin SDK
-if (!exists) return showRefusal();                 // never reach Firebase Auth
+if (!exists) return showRefusal();                    // never reaches Firebase Auth
 await signInWithCredential(auth, GoogleAuthProvider.credential(idToken));
-// from here, App.tsx routes on status exactly as it does today
 ```
 
-### The `accountExists` callable
+**The `accountExists` callable** (`functions/src/accountExists.ts`):
 
-Implemented in `functions/src/accountExists.ts`. One thing the design above did
-not anticipate: it verifies **Google's** ID token, not Firebase's.
-`getAuth().verifyIdToken()` checks tokens *Firebase* issued, and what arrives
-here comes from `accounts.google.com` because the user has not signed in to
-Firebase yet — which is the entire point. It uses `google-auth-library` (now a
-declared dependency, previously only transitive via `firebase-admin`) and pins
-the audience to `GOOGLE_WEB_CLIENT_ID`, without which a token minted for any
-other OAuth client would pass.
+- Verifies **Google's** ID token, not Firebase's. `getAuth().verifyIdToken()`
+  checks tokens Firebase issued; this one comes from `accounts.google.com`,
+  because the person has not signed in to Firebase yet — the whole point. It
+  uses `google-auth-library` and pins the audience to `GOOGLE_WEB_CLIENT_ID`;
+  without the pin, a token minted for any other OAuth client would pass.
+- Unauthenticated, because there is no session yet; it trusts no email the
+  client sends.
+- Answers **one boolean**: does an account exist. Never role, status or why —
+  that would be an account-enumeration oracle.
 
-- Unauthenticated callable (there is no session yet, by definition).
-- Verifies the Google ID token server-side. Do **not** trust an email sent by the
-  client.
-- Looks the user up with the Admin SDK and returns **one boolean: does an account
-  exist.** Nothing about role, status or why. Never return *why* — that is an
-  account-enumeration oracle, and it is the reason Firebase disabled the
-  client-side check in the first place.
+It deliberately does not check status. Existence is the whole question, because
+signing in to an account that already exists creates nothing:
 
-**It deliberately does not check status.** Existence is the whole compliance
-question, because signing in to an account that already exists creates nothing.
-Everything else is already handled:
-
-| State | Mobile behaviour | Why it is safe |
+| State | In the app | Why it is safe |
 |---|---|---|
-| No account | Refuse; never call `signInWithCredential` | The one case that would create |
-| Pending | Sign in, show the waiting-for-approval screen | Account exists; the screen already updates live on approval |
-| Disabled | Sign in, show the account-disabled screen | Account exists; disabling sets a claim and revokes tokens, it does not set Firebase's own `disabled` flag, so sign-in still succeeds and `App.tsx` routes on the claim |
-| Active | Sign in normally | — |
+| No account | Refused; `signInWithCredential` never called | The one case that would create |
+| Pending | Signs in, waiting-for-approval screen | Account exists; the screen updates live on approval |
+| Disabled | Signs in, account-disabled screen | Account exists; disabling sets a claim and revokes tokens, so sign-in succeeds and `App.tsx` routes on the claim |
+| Active | Signs in | — |
 
-So the status routing in `App.tsx` is untouched. **The entire change is one
-existence gate in front of `signInWithCredential`**, which is worth saying plainly
-because it is far smaller than the compliance argument behind it.
+**It cannot be done on the client.** `fetchSignInMethodsForEmail` returns an
+empty array for every project created after 15 September 2023 (email
+enumeration protection); Firebase's replacement is the Admin SDK behind a
+callable.
 
-**You cannot do this on the client.** `fetchSignInMethodsForEmail` returns an
-empty array for every project created after 15 September 2023 — email enumeration
-protection is on by default and the method is deprecated on all platforms.
-Firebase's documented replacement is exactly this: Admin SDK behind a callable.
+**No server-side backstop** (considered and rejected 2026-08-18). A
+`beforeCreate` refusal of everything would also stop the web app, which keeps
+self-service sign-in, and a blocking function cannot tell web from phone
+(`EventContext` has no client identifier). If the exemption is ever
+challenged, the answer is admin pre-provisioning, not detection — which would
+first need it settled whether a Google sign-in links to a pre-created Auth
+user under the project's one-account-per-email setting.
 
-### No server-side backstop
-
-Considered and rejected (2026-08-18). Nothing in this design detects which
-platform a request came from, and nothing needs to: the mobile app simply never
-calls the code path that creates an account.
-
-A `beforeCreate` blocking function was the alternative, but the web app keeps
-self-service sign-in, so it could not reject everything — it would have to tell
-web from mobile, and `EventContext` has no client identifier. If the exemption is
-ever challenged, the answer is admin pre-provisioning, not detection.
-
-### The refusal copy, which matters more than it looks
-
-The honest instruction — *"sign in on the website first"* — is the exact sentence
-Google's second clause forbids. So the app must not say it:
+**The refusal copy names no website:**
 
 > **This account isn't set up for the app yet.**
 > Contact your administrator.
 
-No URL, no product name, no "web". The real instruction goes in the onboarding
-email, out of band, where it does not count. Accept one support question per new
-person; it is the price of the exemption.
+"Sign in on the website first" is the exact sentence Play's second clause
+forbids. The real instruction goes in the onboarding email, out of band. The
+comments in `SignInScreen.tsx` and `google.ts` say why there is no "Sign up"
+link, and `GET_APP_URL` (which carries that instruction) is linked only on the
+web.
 
-Put a comment in the sign-in code saying why there is no "Sign up" link, or
-somebody adds a helpful one in two years and never connects it to a policy
-declaration made today.
+**What moves to the web, and what stays.** Only creating an account moves: web
+sign-in stays self-service (staff sign in with Google and land pending; an
+admin approves), so the web needed nothing new. Role changes, disable and
+re-enable, membership and every other admin action stay in the app; none
+creates an identity, and an admin can still cut off a departing colleague from
+a phone.
 
----
+**What is proven:**
 
-## 3. What moves, and what does not
+- `accountExists`: 10 emulator tests
+  (`functions/test/integration/accountExists.test.ts`), including that asking
+  about an unknown address creates no user record.
+- The ordering: 6 unit tests (`app/src/auth/googleGate.test.ts`), the
+  load-bearing one that `signInWithCredential` is never reached when no account
+  exists.
+- The web still creates accounts: `web-e2e` green, so the gate did not leak
+  across the platform seam.
+- The public pages: fetched anonymously against the hosting emulator and
+  confirmed static, not the app shell.
+- **The Android round trip, against production (2026-08-18):** a personal
+  Google account with no Kanban account got the refusal; a Workspace account
+  straight after signed in (so `googleSignOut()` ran); and production Auth
+  showed **no new record** and no account outside `oursabeel.com` at all.
+- **iPhone: not yet verified.** Same code path, different platform; it is on
+  the checklist below.
 
-**Moves to the web app:** creating an account. That is all.
+### 2. Sign in with Apple
 
-Because sign-in on web stays self-service (staff sign in with Google and land
-pending; an admin approves), nothing new has to be built there — the existing
-flow already is the creation flow. The change is entirely on the mobile side.
+Not required (skill, decision 2): staff sign in with existing Workspace
+accounts, 4.8's education/enterprise exemption, and the email door is
+first-party. Sign in with Apple is not enabled on the App ID
+(`docs/IOS-BUILD.md`).
 
-**Stays in the mobile app:** role changes, disable and re-enable, membership,
-and every other admin action. None of them creates an identity, and an admin
-should still be able to cut off a departing colleague from a phone. Do not strip
-features you are allowed to keep.
-
----
-
-## 4. What each web app must provide
-
-All three routes must be **served as static pages by Firebase Hosting, outside
-the authenticated SPA**, and must return content to an anonymous fetch. Store
-crawlers and reviewers do not sign in, and a client-side route behind auth looks
-empty to them.
-
-### 4.1 `/privacy` — the privacy policy
-
-Required by Apple in App Store Connect metadata **and inside the app** (5.1.1(i)),
-and by Play in the store listing. It must:
-
-- identify what data is collected, how, and every use of it;
-- name every third party with access — Google (sign-in), Firebase/Google Cloud
-  (hosting, database, storage), Sentry (crash reports) — and confirm they give
-  equal protection;
-- state retention, and **describe how a user requests deletion**.
-
-That last clause is not optional and is not removed by the exemption. The
-exemption removes the *button*, not the *route*.
-
-### 4.2 Deletion by email
-
-No automated delete is required. The policy names an address and states the
-process and the timeframe. Retention is legitimate and should be stated plainly
-rather than hidden: organisation-owned records — cards, timesheets, academic
-records — are retained as institutional records; the account, its credentials and
-personal data are removed.
-
-Address: **`privacy@oursabeel.com`** (decided 2026-08-18), one address across all
-three apps. It does not exist yet — create it as a Workspace group with two
-admins on it, so the policy does not go stale when one person changes role.
-
-### 4.3 `/get-app` — the download page
-
-A durable page linking the Android and iOS builds. Placeholders are fine for now;
-the page must exist and be linked from somewhere permanent in the signed-in web
-UI so people can find it without being sent a link each time.
-
-This direction — web pointing at the app — is unrestricted. Only app-pointing-at-
-web-signup is the problem.
-
-### 4.4 `/support` — support page
-
-App Store Connect requires a support URL. It can be minimal: what the app is, who
-it is for, and the same contact address.
-
----
-
-## 5. What each mobile app must add
-
-- **A privacy policy link, inside the app.** Store metadata alone does not
-  satisfy 5.1.1(i). A row in settings, and on the sign-in screen where a
-  not-yet-signed-in reviewer can reach it.
-- **The refusal path from § 2.**
-- **iOS privacy manifest.** `expo.ios.privacyManifests` in `app.json`; Expo writes
-  `PrivacyInfo.xcprivacy` from it during prebuild. Expect at least
-  `NSPrivacyAccessedAPICategoryUserDefaults` with reason `CA92.1`.
-
-**One accepted residual.** The policy lives on the same domain as the web app, so
-a curious user could edit the URL down to the root and find the sign-in page. The
-rule governs what the *app* directs users to, and a privacy policy link is not an
-account creation flow — so this is fine. Mitigate it anyway: the privacy page
-carries no navigation, no "sign in" link and no app branding beyond the name.
-
----
-
-## 6. iOS release — unlisted
-
-Full App Review, once. Then a direct link, not searchable, **no expiry and no
-install cap** — unlike TestFlight external, where builds die after 90 days.
-
-1. Submit as a normal App Store submission.
-2. In **Review Notes**, state the exemption explicitly (§ 7).
-3. The **Account Holder** files Apple's unlisted request at
-   `developer.apple.com/contact/request/unlisted-app/`. The app must be submitted
-   to review and must not be in a beta/prerelease state when the request is filed.
-
-The Apple Developer account is an **Organization** account under Sabeel Institute,
-so listings show the institute's name and the Account Holder files the request.
-
-### Metadata never filled in, because TestFlight does not ask for it
-
-- App Privacy questionnaire — Contact Info (email), User Content, Identifiers,
-  Diagnostics. All **Linked to You**, none **Used to Track**.
-- Age rating questionnaire.
-- Support URL, privacy policy URL, screenshots at required sizes.
-
-### Third-party SDK manifests
-
-`GoogleSignIn`, `AppAuth`, `GTMAppAuth`, `GTMSessionFetcher` and `GoogleUtilities`
-are all on Apple's required-manifest list and arrive via CocoaPods. Verify in
-`ios/Pods` after a prebuild on the Mac — this cannot be checked from Linux.
-Sentry is **not** on Apple's list. Watch for `ITMS-91053` warning emails after any
-upload.
-
-### Not required
-
-- **Sign in with Apple.** Kanban and the timesheet are exempt under 4.8's
-  education/enterprise carve-out (existing Workspace account). The recordings app
-  needs the two-door split — see § 8.
-- **ATT prompt or consent gate for crash reporting.** Apple's own guidance is
-  explicit that analytics and crash reporting confined to your own app is not
-  tracking. Disclosure in App Privacy is sufficient.
-
----
-
-## 7. Android release
-
-**Internal apps (Kanban, timesheet): closed testing.** Play has no equivalent of
-Apple's unlisted, and production means a public listing. Closed testing stays
-invisible, and membership is a Google Group an admin edits — which works because
-every staff member has a Workspace Google account. Kanban is already on internal
-testing, which is equally unlisted; moving to closed testing buys Google Group
-management and a higher cap, nothing else.
-
-**Recordings app: production.** Student intake is rolling and a student's Play
-account is not the address the institute holds, so allowlisting does not scale.
-The Play developer account is organizational, so production is available directly
-— the 12-testers-for-14-days gate applies only to personal accounts created after
-13 November 2023.
-
-### Data safety form
-
-Answer **No** to account creation, which under this design is true rather than
-arguable, and the account-deletion questions fall away with it. Everything
-declared must match the privacy policy — Google checks consistency.
-
-### Already satisfied, do not regress
-
-- `targetSdk 36` — meets the 31 August 2026 requirement.
-- `minSdk 33`.
-- Both external-storage permissions stripped with `tools:node="remove"`.
-
----
-
-## 8. Per-app adaptation
-
-### Kanban — the pilot
-
-Already has iOS, purpose strings, and a released Play track. Needs: the § 2
-refactor, the § 4 web pages, the § 5 in-app additions, and the § 6 metadata.
-
-#### The review account: an email sign-in, one address, a member
+### 3. The review account
 
 Decided by Faisal on 2026-10-15, in his words:
 
@@ -323,250 +146,337 @@ Decided by Faisal on 2026-10-15, in his words:
   one email. The sign in page shouldn't indicate its a special thing for a
   reviewer."
 - "create a board for app reviewer and add as member there. They won't get to
-  see any of our actual data." — and "That way there's no special code for app
+  see any of our actual data." — "That way there's no special code for app
   reviewer."
 
-So the reviewers get an ordinary member account that signs in with a password,
-and nothing in the app is about reviewers:
+So nothing in the app is about reviewers (skill, decision 3):
 
-- **The door.** The sign-in screen has a plain **Sign in with email** link under
-  Google. Password sign-in is accepted for exactly one address,
-  `PASSWORD_SIGN_IN_EMAIL` in `packages/shared/src/constants.ts`: `beforeSignIn`
-  (functions/src/signUpGate.ts) refuses it for any other, and firestore.rules and
-  storage.rules give a password session for any other address nothing at all.
-  The refusal reads like a wrong password.
-- **Member only, whatever the claims say** (`sessionAccess`, the rules' `role()`,
-  `actorOf` in every callable), and `setUserAccess` refuses to give a
-  password-only account any other role.
+- **The door.** A plain **Sign in with email** link under the Google button.
+  Password sign-in is accepted for one address, `PASSWORD_SIGN_IN_EMAIL` =
+  `app-review@oursabeel.com` in `packages/shared/src/constants.ts`:
+  `beforeSignIn` (`functions/src/signUpGate.ts`) refuses any other, and
+  `firestore.rules` and `storage.rules` give a password session for any other
+  address nothing. The refusal reads like a wrong password.
+- **A member whatever its claims say**: `sessionAccess`, the rules' `role()`
+  and `actorOf` in every callable; `setUserAccess` refuses a password-only
+  account any other role.
 - **No sign-up.** `beforeSignUp` refuses every password sign-up from a client,
-  that address included; the account is made by an admin. The app still makes
-  no account on any surface, so § 1 stands.
+  that address included; the account is made by an admin, so § 1 stands. The
+  blocking functions need Identity Platform, on since 2026-10-15.
 - **The address is public, on purpose.** Rules cannot read a secret, so the
-  literal is in this public repository, and it goes to Apple in the review notes
-  anyway. The account's security is a long generated password and Firebase's
-  rate limiting, and even signed in it is a member of one board of sample cards.
-  Do not hide it behind a claim: that is a second mechanism and an extra admin
-  step for no gain.
+  literal is in this public repository. The account's security is a long
+  generated password and Firebase's rate limiting; signed in, it is a member of
+  one board of sample cards. Do not hide it behind a claim: a second mechanism
+  and an extra admin step for no gain.
 
-**Setting it up, as ordinary admin steps** (the password lives in Faisal's vault,
-never in this repository):
+**The account** was made 2026-10-15 through the Admin API with that address, a
+generated password and a verified email (an admin-made account runs no
+blocking function). `onUserCreate` provisioned it pending; it was approved as a
+member. It belongs only to the **"App Review"** board, whose members are Faisal
+and the account, with five sample cards. Signed in through the public API it
+sees that board alone, and reading another board is refused.
 
-1. Make the account through the Firebase console (Authentication → Add user) or
-   the Admin API, with that address, a generated password, and the address
-   verified (`emailVerified: true` through the API). An admin-made account runs
-   no blocking function; `onUserCreate` provisions it as a pending member, as for
-   anyone.
-2. Approve it in **People**, as a member.
-3. Make a board **App Review** and add the account as its only other member
-   (Board settings → Members). Add a few neutral cards to open, move and comment
-   on. It must be on no other board.
+**The password** lives only in the vault,
+`~/.config/secrets-vault/sabeel/review/kanban-app-review.txt`, and, at
+submission, in App Store Connect's App Review Information sign-in fields and
+Play Console's App access. Never in a repository, a chat or a log.
 
-**Order on the first deploy:** functions (with `beforeSignUp` and
-`beforeSignIn`) first, and both registered as the project's blocking triggers,
-then the Email/Password provider switched on; then the steps above. The other
-way round there is a window with no door.
+**Resetting it:** set a new password on the account with the Admin SDK
+(`getAuth().updateUser(uid, { password })`) or Identity Toolkit
+`accounts:update`, with gcloud ADC on `sabeel-institute-kanban`; then write it
+into the vault (`vault.sh collect`) and both store consoles. Not a reset email:
+the address is not a Workspace user.
 
-### Timesheet
+**Recreating the board, through Kanban's own screens:** an admin makes a board
+named **App Review** (Boards → **New board**), adds the review account with
+Board settings → **Add someone**, and adds a few neutral cards to open, move and
+comment on.
+The account is on no other board. If the account itself is gone: make it again
+as above, then approve it in **People** as a member. On a new project the order
+that keeps the door shut is in `docs/DEPLOY.md` § Prerequisites.
 
-`platforms: ["android", "web"]`. Same refactor and same web pages. iOS is a later
-project — when it happens, § 6 applies unchanged. Its Play track stays unlisted.
+**Keep it alive.** Every update is reviewed too, and a demo account disabled
+after approval is an automatic rejection.
 
-### Sequencing
+**The locks and their tests:**
 
-Kanban ships through App Review **first, alone** (decided 2026-08-18). The other
-two follow once it is through. The pilot exists so that a correction from Apple
-costs one app's rework rather than three — and the exemption argument in § 9 is
-exactly the kind of thing a reviewer might push back on.
+| Lock | Test |
+|---|---|
+| The one address, `refusedSignIn`, `refusedSignUp` | `functions/test/unit/passwordDoor.test.ts` |
+| `beforeSignUp` refuses password and off-domain sign-ups and makes no account; the Admin SDK still can; `beforeSignIn` lets only the one address in | `functions/test/integration/signUpGate.test.ts` |
+| `actorOf` holds the address to a member; no callable reads `auth.token` itself | `functions/test/unit/actor.test.ts` |
+| A member whatever its claims; promotion refused for a password-only account | `functions/test/integration/setUserAccess.test.ts` |
+| Firestore rules: the address as a member, any other password session nothing | `functions/test/integration/rules.test.ts`, `boardRules.test.ts` |
+| Storage rules | `functions/test/integration/attachmentRules.test.ts` |
+| The door end to end, by keyboard: refused for another address and a wrong password in the same words, a member though its claims say organizer | `scripts/web-e2e.mjs` |
 
-### Recordings app — the one that differs
+Each lock was mutation-checked against its own test (deploy log, 2026-10-15).
 
-`platforms: ["android", "web"]`, two populations, and **both doors now exist**
-(updated 2026-09-07; this section previously said the student email/password
-system had not been built).
+### 4. Content: the rules, Report a problem, and @mentions
 
-- **Two labelled doors on the sign-in screen — DONE.** "Staff" (Google
-  Workspace) and "Students" (email and password), as separate headed sections. A
-  reviewer can see the split, and it stops students tapping Google and hitting a
-  wall.
-- **Sign in with Apple is not needed** provided the student door stays
-  first-party. The moment any social login appears on the student side, 4.8
-  triggers and Sign in with Apple becomes mandatory.
-- **Student accounts are created by staff, on the web app only**
-  (`CAN_CREATE_ACCOUNTS`), and the student sets their own password from an
-  emailed link. The student never creates the account, wherever they first sign
-  in.
-- **Only the Google door needed the § 2 gate.** `signInWithEmailAndPassword`
-  cannot bring an account into existence — it fails when there is none — so the
-  student door was never a trigger. `createUserWithEmailAndPassword` is the call
-  that would be, and this app has never had it on any surface. Worth stating
-  because "the mobile refusal applies to both doors" reads as though both needed
-  building, and only one did.
-- **Password reset** exists, and it is a first-party flow — no third-party login
-  service involved, so it changes nothing about 4.8.
-- Retention: academic records are retained. FERPA grants students the right to
-  inspect and amend, never to erase, and transcripts are normally kept
-  permanently.
+What Kanban users post: cards (title and rich-text description), comments with
+links and @mentions, and attachments of any type up to 10 MB. Everything is
+seen only by members of the same board (and admins, who see every board).
 
-**The review account is a STUDENT account, and only a student account** (decided
-2026-08-19). Both stores need working credentials — Apple under 2.1(a), Play
-under *App access* — and the same account serves both.
+Before the first App Store submission or Play production release, whichever
+comes first, Kanban adds the skill's two pieces (decision 4, decided by Faisal
+2026-10-16) — **not built yet**:
 
-Do not hand a reviewer a Google Workspace account. Two-Step Verification an admin
-can exempt; the **login challenge** Google raises on a sign-in from an unusual
-location is separate, and an admin override for it lasts **10 minutes** with no
-permanent per-account disable. An App Review session is exactly an unusual
-location, arriving asynchronously, with the code going to whoever's phone is on
-the account. There is no version of that which works.
+1. **The institute's rules, accepted once**, at first sign-in and before
+   anything can be posted: the skill's text with "Kanban", "staff", "board" and
+   "More".
+2. **Report a problem** in More: the person types what is wrong, and it reaches
+   Kanban's admins, who answer within 24 hours by removing the content or
+   disabling the account.
 
-A student account is sufficient because the student experience *is* the app:
-signing in and reaching your recordings. Apple asks for "credentials for the role
-needed to verify key features", not every role.
+Deliberately not: blocking between members (a colleague blocked on a shared
+board would hide the work the board exists for), a word filter, or automatic
+removal. An admin blocks a user from the service by disabling the account in
+People, which revokes its sessions and leaves it only the account-disabled
+screen. Board owners and admins can already delete any comment.
 
-**What this costs, and it is the only thing to watch:** the store listing must
-describe what a student account can demonstrate. Advertise teacher tooling in the
-description or the screenshots and a reviewer may reasonably ask to see it, which
-is a "Guideline 2.1 — Information Needed" round trip of about a week. Keep the
-listing and the demo account describing the same app.
+**Open, for Faisal, before Play production: @mentions.** Play requires in-app
+blocking for "UGC features that enable 1:1 user interaction with specific users
+(for example, direct messaging, tagging, mentioning)". Kanban has @mentions,
+and a mention notifies the person named. Not decided; the options:
 
-Say the shape out loud in Review Notes anyway — two roles, the teacher role
-restricted to the institution's Workspace accounts, the student account
-demonstrating the reviewable functionality. A reviewer told why up front does not
-ask.
+- argue that a mention can only name a member of the same board
+  (`firestore.rules` holds `mentionUids` to the board's members) and only
+  notifies them, so it is not interaction with strangers;
+- a per-person mute of mention notifications (today a person can turn off all
+  mention notifications in the Alerts settings, or mute a whole board, but not
+  one person);
+- drop @mentions from the Play build.
 
-**And keep the account alive.** Every future update is reviewed too, and a demo
-account disabled after approval is an automatic rejection next time.
+Internal testing is not reviewed against this, and Apple's 1.2 does not name
+mentions.
 
----
+### 5. Adults only
 
-## 9. Review Notes — the text to paste
+Every Kanban user is an adult on the institute's staff (skill, decision 5). The
+privacy policy says the app is not offered to children under 13; the rules
+state no minimum age, which would otherwise force Apple's rating up.
+
+### 6. Privacy
+
+- **`/privacy` and `/support`** are static files (`app/public/`), rewritten in
+  `firebase.json` ahead of the app's catch-all, so an anonymous fetch from a
+  reviewer or a crawler gets the page, not an empty app shell. The privacy page
+  carries no navigation, no sign-in link and no branding beyond the name. The
+  accepted residual: it shares a domain with the app, so someone could edit the
+  URL down to the sign-in page; the rule governs what the app directs people
+  to, and a privacy link is not a sign-up flow.
+- **In the app:** Privacy policy on the sign-in screen's footer, reachable
+  before signing in (5.1.1(i)), and in More. The support page is never linked
+  from the app: it tells newcomers to sign in on the website first, which is
+  the account-creation pointer § 1 forbids. Its URL goes in the store listings
+  only.
+- **Deletion by email** to `privacy@oursabeel.com`, acted on within 30 days.
+  The account, its credentials, profile, contact details and notification
+  settings are removed; cards, comments, attached files and the record of who
+  made them are the institute's and stay.
+- **What is collected** (`app/public/privacy.html`): name, email address and
+  Google profile picture, from the Workspace account at sign-in; the content
+  people enter — cards, comments, attached files; and crash and error
+  diagnostics carrying the internal account id only (`setErrorUser` sends the
+  uid, never a name or email).
+- **Third parties:** Google (sign-in); Google Cloud and Firebase (hosting and
+  data, in the US); Sentry (crash and error diagnostics); and Apple's push
+  service, through which an iPhone notification's title and text are
+  delivered.
+- **Not tracking**: no advertising, no tracking across apps; no App Tracking
+  Transparency prompt.
+- **The iOS privacy manifest** is `expo.ios.privacyManifests` in `app.json`:
+  name, email, photos or videos, other user content, user id and crash data, all
+  linked, none tracking, plus `UserDefaults` with reason `CA92.1`;
+  `npm run check:ios` refuses it empty. Google's sign-in pods (`GoogleSignIn`,
+  `AppAuth`, `GTMAppAuth`, `GTMSessionFetcher`, `GoogleUtilities`) bring their
+  own manifests: check them in the `.ipa` `ios.yml` keeps, and watch for an
+  `ITMS-91053` email after an upload.
+
+### 8. Play signing: a Google-generated key
+
+Kanban took Play's Google-generated app signing key in August 2026; the key in
+the vault is the upload key. The consequences (skill, decision 8):
+
+- Play installs run under Google's key; its SHA-1 is registered in Firebase, or
+  Google sign-in fails with `DEVELOPER_ERROR` for Play users only
+  (`docs/DEPLOY.md`).
+- The download page's APK carries the upload key, so it and a Play install
+  cannot replace each other: uninstall first; nothing is lost, all state is in
+  Firestore.
+- A lost upload key is reset through Play Console support; the signing key,
+  which must never change, is Google's.
+- **Open, for Faisal:** whether Kanban keeps Google's key. Play allows a
+  change until a release reaches open testing or production, but staff who
+  installed Kanban from internal testing run under Google's key, and their
+  copies would need reinstalling after a change. The LMS and the Time Tracker
+  use their own keys so their download-page APKs and Play installs update
+  each other; Kanban's download page is the developer's pre-release route, so
+  that matters less here.
+
+### 9. Distribution
+
+- **iPhone now:** TestFlight, group "Sabeel Kanban Internal", which gets every
+  build; adding a tester is in `docs/IOS-BUILD.md`. Builds expire after 90
+  days.
+- **iPhone next:** the App Store, unlisted. After the app is submitted to App
+  Review, and not as a beta, the **Account Holder** files Apple's request at
+  `developer.apple.com/contact/request/unlisted-app/`. The developer account is
+  an Organization under Sabeel Institute, so the listing carries the
+  institute's name.
+- **Android now:** internal testing, the "Sabeel staff" list ticked on the
+  track; `npm run publish:play -- --internal` publishes; testers join through
+  the opt-in link (`docs/DEPLOY.md` § Testers).
+- **Android next:** production, released from Play Console: `publish:play`
+  publishes to internal testing only, and its service account holds "Release
+  apps to testing tracks", not production.
+
+### 10. Store checks
+
+`ios.config.usesNonExemptEncryption` is false; builds run on GitHub's
+`macos-26` runners (Xcode 26, iOS 26 SDK); `targetSdk` 36 and `minSdk` 33; both
+external-storage permissions removed with `tools:node="remove"`. Play
+registered `com.sabeelinstitute.kanban` for Android developer verification; the
+download-page APK's upload key needs registering by the 2027 rollout
+(`docs/DEPLOY.md`).
+
+## Store answers
+
+**Apple App Privacy** — data linked to the user, none used for tracking, all
+for app functionality. Matches `privacy.html` and the privacy manifest:
+
+| Category | Types |
+|---|---|
+| Contact info | Name, email address |
+| User content | Photos or videos (attachments, the Google profile picture), other user content (cards, comments, attached files) |
+| Identifiers | User ID |
+| Diagnostics | Crash data |
+
+**Apple age rating:** user-generated content **Yes**; messaging and chat **Yes**
+(comments and @mentions); social media **No** (no feed); advertising **No**;
+unrestricted web access **No** (links open the system browser). Keep the rating
+Apple calculates; no age override.
+
+**Play Data safety:** account creation **No** (§ 1), so the deletion questions
+fall away. Collected, not shared, for app functionality: name, email address
+and user IDs (personal info); photos, and files and docs (attachments); other
+user-generated content (cards, comments); crash logs. Encrypted in transit;
+deletion by request to `privacy@oursabeel.com`. Open: Play's "Device or other
+IDs" names the Firebase installation ID, from which a phone's push token comes;
+`privacy.html` does not mention push tokens, and the two must match.
+
+**Play content rating (IARC):** completed 2026-08-29, all ages (`TODO.md` § N);
+the individual answers were not recorded. Before production, confirm the
+user-interaction question is answered **Yes** ("Users Interact").
+
+**Play target audience:** 18 and over only. **Ads:** none.
+
+**Play App access:** `app-review@oursabeel.com` and its password, with: "On the
+sign-in screen, tap Sign in with email under the Google button."
+
+## Review notes
+
+The skill's template, filled in for Kanban. Paste into App Store Connect's App
+Review Information notes, and adapted into Play's App access. The password goes
+in the sign-in fields, never in the notes.
 
 ```text
-This app does not support account creation. Accounts are provisioned by the
-organisation through its web application; the app refuses sign-in for any
-identity that does not already have an account, and no account is created from
-the app under any circumstance. Guideline 5.1.1(v) is therefore not engaged.
+This app is for the staff of Sabeel Institute, a nonprofit adult-education
+institute. Accounts are provisioned by the institute through its web
+application; the app refuses any identity that does not already have an
+account, and no account is created from the app. Guideline 5.1.1(v) is
+therefore not engaged.
 
-Sign-in uses Google with the organisation's existing enterprise accounts, which
-is the education/enterprise exemption under Guideline 4.8.
+Staff sign in with the institute's Google Workspace accounts (the
+education/enterprise exemption under Guideline 4.8).
 
-[Kanban and the timesheet] For review, sign in with "Sign in with email"
-using the account below. It is an ordinary member account made by an
-administrator, the only one that signs in with a password; staff sign in with
-Google. It belongs to one board of sample cards, so that nothing real is shown.
-Email: <the review address>   Password: <from Faisal's vault>
+For review, use "Sign in with email", under the Google button, with the
+account in the sign-in fields. It is an ordinary member account made by an
+administrator, and a member of one board of sample cards, "App Review": open
+a card, move it between columns, comment, @mention, attach a file. Creating
+boards and the administrator roles are granted only to the institute's own
+Workspace accounts.
+Email: app-review@oursabeel.com
 
-[Recordings app only] The sign-in screen has two separate paths. Staff sign in
-with the organisation's Google Workspace accounts. Students use a first-party
-email and password system operated by the institution. No third-party login
-service is offered on the student path.
+All content is visible only to members an administrator has added to the
+same board. Nothing is public, searchable or discoverable, and users cannot
+contact strangers. Guideline 1.2:
+- Terms: every user accepts the institute's rules, which prohibit
+  objectionable content and abusive users, before they can post.
+- Reporting: More > Report a problem. The report goes to the institute's
+  administrators, who act on it within 24 hours by removing the content and
+  disabling the author's account.
+- Blocking abusive users from the service: administrators disable the
+  account, which ends its sessions and shuts it out of every board. Blocking
+  between members is not offered because the app carries shared work:
+  blocking between colleagues on shared work boards would hide the work they
+  share.
+- Contact: https://sabeel-institute-kanban.web.app/support (the privacy
+  policy, linked on the sign-in screen, gives the same address).
 
-Account deletion is requested by email; the privacy policy states the address,
-the process and what is retained. Organisation-owned records — [cards /
-timesheets / academic records] — are retained as institutional business records.
+Account deletion is requested by email; the privacy policy (linked on the
+sign-in screen) states the address, the process and what is retained.
 ```
 
----
+## Before submitting
 
-## 10. Legal position
+**App Store, first and alone:**
 
-Driven by store rules, not statute:
+- [ ] **Build 14 or later**, from a release with its own version and deploy-log
+      entry (`docs/DEPLOY.md` § Shipping a release), carrying the Next and Go
+      keys on the email form (on `main`), the rules screen and Report a problem
+      (§ 4, not built).
+- [ ] **The iPhone refusal round trip** on a TestFlight install: a Google
+      account with no Kanban account is refused, and production Auth shows no
+      new record — the check Android passed on 2026-08-18.
+- [ ] **A production push** on a TestFlight install, including a tap with the
+      app closed (`TODO.md` § D2).
+- [ ] App Privacy and the age rating, as above.
+- [ ] Listing: description, keywords, category, screenshots at the required
+      sizes (from the emulator seed, never a real session), support URL
+      `https://sabeel-institute-kanban.web.app/support`, privacy policy URL
+      `https://sabeel-institute-kanban.web.app/privacy`.
+- [ ] App Review Information: contact, sign-in required with the review
+      account, the notes above.
+- [ ] Version release: manual.
+- [ ] After submitting: the Account Holder files the unlisted request (§ 9).
 
-- **Texas TDPSA** — nonprofits are fully exempt, and small businesses separately.
-- **CCPA** — applies to for-profit businesses. Not applicable.
-- **FERPA** — **does not apply.** Confirmed 2026-08-18: the institute receives no
-  US Department of Education funding. Retention of student records rests on
-  institutional and contractual grounds instead, which is equally solid and is
-  how the policy should word it. Do not cite FERPA.
-- **GDPR** — **out of scope.** Confirmed 2026-08-18: all students are in the US.
-  No erasure-rights section is needed. Revisit if the institute ever enrols
-  someone in the EU or UK, because that single fact brings it back.
-- **COPPA** — not applicable; no under-13 users on any app.
+**Play production:**
 
-So the privacy policy can be short, plain and honest rather than a compliance
-document. Have someone read it who is not the person who wrote it.
+- [ ] The @mentions decision (§ 4) and the signing-key decision (§ 8).
+- [ ] The rules screen and Report a problem (§ 4).
+- [ ] App content: privacy policy URL, App access, ads, content rating (users
+      interact), target audience, Data safety (including the push-token
+      question above).
+- [ ] Store listing: short and full description, icon, feature graphic, phone
+      screenshots, category, contact email.
+- [ ] A production release from Play Console, which Play reviews.
 
----
+**Both:**
 
-## 11. What has shipped, and what is still unverified
+- [ ] Confirm `privacy@oursabeel.com` exists (a Workspace group, two admins).
+- [ ] The privacy policy read by someone who did not write it.
+- [ ] Texas SB 2420: a question for a lawyer before the first public listing
+      (Play production is one; skill, decision 5).
 
-Built 2026-08-18 in v0.10.0. **Two halves are each proven; their join is not.**
+## Legal position
 
-- `accountExists` — 10 emulator tests, including that asking about an unknown
-  address creates no user record.
-- The ordering — 6 unit tests in `app/src/auth/googleGate.test.ts`, the important
-  one being that `signInWithCredential` is never called when no account exists.
-- The web app still creates accounts — `web-e2e` unchanged and green, which is
-  what proves the gate did not leak across the platform seam.
-- The public pages — fetched anonymously against the hosting emulator and checked
-  they are static, not the SPA shell.
-
-**The native round trip is now verified too**, on Android against production
-(2026-08-18), which was the one thing no test on Linux could reach:
-
-- a personal Google account with no Kanban account → the refusal message;
-- signing in with a Workspace account immediately afterwards → works, which also
-  proves `googleSignOut()` ran, since Google would otherwise have silently
-  reused the first account and made switching impossible;
-- and the assertion that matters, checked against production Auth rather than
-  inferred from the screen: **the refused attempt created no account.** Zero new
-  auth records, and zero non-`oursabeel.com` accounts in the directory at all.
-
-Before this release that same attempt created a record and relied on
-`onUserCreate` to delete it again. Now nothing is created, which is the whole
-claim.
-
-**Still unverified: iOS.** Same code path and the same seam, but a different
-platform, and `docs/IOS-BUILD.md`'s handoff prompt asks for the identical check
-on a real iPhone.
-
-### Recordings — built 2026-09-07
-
-The same design, adapted: `functions/src/accountExists.ts` and the gate in
-`app/src/auth/google.ts`, with the refusal copy from § 2 and no URL in it.
-
-- 7 emulator tests on the callable. Every one asserts the **user count**
-  afterwards, not just the boolean — a version answering `exists: false` while
-  quietly minting a record would satisfy a return-value test and fail the only
-  promise that matters. Two cases are about refusing a *real colleague* on the
-  allowed domain whose account does not exist yet, and refusing an unverified
-  address that does match an account.
-- 5 unit tests on the ordering, the load-bearing one being that
-  `signInWithCredential` is never reached when no account exists. Shown to fail
-  with the gate bypassed.
-- Only the Google door was changed, for the reason in § 8.
-
-**Still unverified: the native round trip**, and for a different reason than
-iOS. It needs a personal Google account with no account in the project, signed in
-on a device against production — the check Kanban did on 2026-08-18. Nobody has
-run it here, so the claim currently rests on the callable and the ordering being
-correct, not on having watched a stranger be refused. Do it before submitting.
-
-## 12. Open decisions
-
-- [ ] Create `privacy@oursabeel.com` as a Workspace group and put two admins on
-      it. Decided 2026-08-18; does not exist yet.
-- [ ] Who reviews the privacy policy text. It should be read by somebody who did
-      not write it.
-- [ ] App Store listing copy, screenshots and category, per app.
-- [ ] Whether a Google sign-in links correctly to a pre-created Auth user —
-      depends on the project's one-account-per-email setting. Only matters if the
-      backstop in § 2 is implemented as pre-provisioning.
-- [x] Whether `beforeCreate` fires for Admin SDK `createUser`: it does not, and
-      `functions/test/integration/signUpGate.test.ts` holds that, so
-      `beforeSignUp` refuses every password sign-up from a client and an admin
-      can still make one (2026-10-15).
-
----
+Driven by the store rules, not statute: the skill's decision 7 (Texas TDPSA,
+CCPA, FERPA, GDPR, COPPA). Do not cite FERPA.
 
 ## Sources
 
+- [The `sabeel-app-stores` skill](https://github.com/Sabeel-Institute/brand/blob/main/skills/sabeel-app-stores/SKILL.md)
 - Apple — [Offering account deletion in your app](https://developer.apple.com/support/offering-account-deletion-in-your-app/)
 - Apple — [App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/)
-  (2.1 demo accounts, 4.8 login services, 5.1.1 privacy and deletion)
+  (1.2 user-generated content, 2.1 demo accounts, 4.8 login services, 5.1.1
+  privacy and deletion)
 - Apple — [User Privacy and Data Use](https://developer.apple.com/app-store/user-privacy-and-data-use/)
 - Apple — [Unlisted app distribution](https://developer.apple.com/support/unlisted-app-distribution)
 - Apple — [Third-party SDK requirements](https://developer.apple.com/support/third-party-SDK-requirements/)
 - Google Play — [App account deletion requirements](https://support.google.com/googleplay/android-developer/answer/13327111)
+- Google Play — [User-generated content](https://support.google.com/googleplay/android-developer/answer/9876937)
 - Google Play — [Open, closed and internal tests](https://support.google.com/googleplay/android-developer/answer/9845334)
 - Google Cloud — [Blocking functions](https://docs.cloud.google.com/identity-platform/docs/blocking-functions)
 - Expo — [Privacy manifests](https://docs.expo.dev/guides/apple-privacy/)
