@@ -120,6 +120,14 @@ export const EMULATOR_PROJECT_ID = 'demo-sabeel-kanban';
 export const APP_ID = 'com.sabeelinstitute.kanban';
 
 /**
+ * The app's name, as the stores list it, as the More menu shows it beside the
+ * version, and as the subject of a report's email carries it (`[Sabeel
+ * Kanban] Report from …`), so the institute can tell the three apps' reports
+ * apart in one inbox.
+ */
+export const APP_NAME = 'Sabeel Kanban';
+
+/**
  * The ONE address that may sign in with an email and a password.
  *
  * Decided by Faisal on 2026-10-15: "That sign in with password for kanban and
