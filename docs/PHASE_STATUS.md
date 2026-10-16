@@ -496,6 +496,36 @@ committed, made from `functions/package.json` alone with the versions the
 suites ran against; npm 10 installs from it, and the built bundle loads all 24
 functions on that install. `docs/DEPLOY.md` has how to regenerate it.
 
+**An email sign-in, for one address, as a member (2026-10-15).** For the store
+reviewers' account, decided by Faisal in three steps that day: "sign in thru
+email should never be able to be an admin or manager. Just a member."; "should
+only accept that one email. The sign in page shouldn't indicate its a special
+thing for a reviewer."; and an ordinary board for it, "no special code for app
+reviewer". The sign-in screen gains a plain **Sign in with email** link; the
+project moved to Identity Platform so two blocking functions can hold the door:
+`beforeSignUp` refuses every client sign-up but a colleague's first Google
+sign-in on the domain (a password sign-up always), and `beforeSignIn` refuses a
+password sign-in for any address but `PASSWORD_SIGN_IN_EMAIL`. Behind them,
+firestore.rules and storage.rules give a password session for any other
+address nothing, the one address acts as a member whatever its claims
+(`sessionAccess`, the rules' `role()`, and `actorOf`, now the only reader of the
+token in any callable), and `setUserAccess` refuses another role for a
+password-only account. On the web, a Google sign-up the gate refuses says "Only
+@oursabeel.com accounts can use this app." instead of reporting a fault. The
+account and its board are made by an admin in ordinary ways
+(`docs/STORE-RELEASE.md` § 8); nothing in the code knows about reviewers but the
+address. **Verified:** unit (665), emulator (rules 244, triggers 142, both
+blocking functions running), each lock mutation-checked against its own test
+(the rules address lock, the member lock, the storage lock, `beforeSignIn`,
+`beforeSignUp`, the promotion lock, `actorOf`, the restated literal), and the
+web e2e drives the door: refused for another address and a wrong password in
+the same words, and for the one, signed in and a member though its claims say
+organizer (red with the app's lock removed). The suite's check of an owner's
+"Nobody available to add" now waits for its callable, which it raced and lost
+on the build Mac. **Deploy order:** functions
+with both blocking functions, registered as the project's blocking triggers;
+then rules; then the Email/Password provider switched on; then the account.
+
 ### 2026-09-20 — A Google 503 at sign-in stops paging — v0.11.5
 
 **Two pages, same class, no defect.** `SABEEL-KANBAN-WEB-C`: Google's Firebase

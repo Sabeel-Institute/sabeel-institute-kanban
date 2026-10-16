@@ -111,7 +111,23 @@ too old to know about ownership made a board only an admin can manage" from
 silent and permanent into a loud failure.
 
 **Sign-in is restricted to `@oursabeel.com` AND still needs admin approval.** The
-domain check is server-side — the client `hd` hint is UX, not a boundary.
+domain check is server-side — the client `hd` hint is UX, not a boundary. Since
+2026-10-15 it is held at the door too: the project is on Identity Platform, and
+the blocking `beforeSignUp` refuses every client sign-up but a colleague's first
+Google sign-in on the domain; `onUserCreate` stays as the second lock.
+
+**The password door is ONE address, and that one is a member** (Faisal,
+2026-10-15: "should only accept that one email"; "Just a member."). It exists
+for the store reviewers' account and nothing in the app says so: a plain **Sign
+in with email**. `beforeSignIn` refuses a password sign-in for any other
+address; `isSignedIn()` in firestore.rules and `isActive()` in storage.rules
+give such a session nothing; a password session for the one address acts as a
+member whatever its claims (`sessionAccess`, `role()`, `actorOf` — no callable
+reads `auth.token` itself, `actor.test.ts` scans for it); and `setUserAccess`
+refuses another role for a password-only account. The address is one constant,
+`PASSWORD_SIGN_IN_EMAIL`, restated in both rule files and held to it by
+`passwordDoor.test.ts`. It is public on purpose (`docs/STORE-RELEASE.md` § 8):
+do not hide it behind a claim.
 
 ## Assignees, subscriptions and labels
 

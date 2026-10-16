@@ -313,6 +313,59 @@ declared must match the privacy policy — Google checks consistency.
 Already has iOS, purpose strings, and a released Play track. Needs: the § 2
 refactor, the § 4 web pages, the § 5 in-app additions, and the § 6 metadata.
 
+#### The review account: an email sign-in, one address, a member
+
+Decided by Faisal on 2026-10-15, in his words:
+
+- "sign in thru email should never be able to be an admin or manager. Just a
+  member."
+- "That sign in with password for kanban and timesheet should only accept that
+  one email. The sign in page shouldn't indicate its a special thing for a
+  reviewer."
+- "create a board for app reviewer and add as member there. They won't get to
+  see any of our actual data." — and "That way there's no special code for app
+  reviewer."
+
+So the reviewers get an ordinary member account that signs in with a password,
+and nothing in the app is about reviewers:
+
+- **The door.** The sign-in screen has a plain **Sign in with email** link under
+  Google. Password sign-in is accepted for exactly one address,
+  `PASSWORD_SIGN_IN_EMAIL` in `packages/shared/src/constants.ts`: `beforeSignIn`
+  (functions/src/signUpGate.ts) refuses it for any other, and firestore.rules and
+  storage.rules give a password session for any other address nothing at all.
+  The refusal reads like a wrong password.
+- **Member only, whatever the claims say** (`sessionAccess`, the rules' `role()`,
+  `actorOf` in every callable), and `setUserAccess` refuses to give a
+  password-only account any other role.
+- **No sign-up.** `beforeSignUp` refuses every password sign-up from a client,
+  that address included; the account is made by an admin. The app still makes
+  no account on any surface, so § 1 stands.
+- **The address is public, on purpose.** Rules cannot read a secret, so the
+  literal is in this public repository, and it goes to Apple in the review notes
+  anyway. The account's security is a long generated password and Firebase's
+  rate limiting, and even signed in it is a member of one board of sample cards.
+  Do not hide it behind a claim: that is a second mechanism and an extra admin
+  step for no gain.
+
+**Setting it up, as ordinary admin steps** (the password lives in Faisal's vault,
+never in this repository):
+
+1. Make the account through the Firebase console (Authentication → Add user) or
+   the Admin API, with that address, a generated password, and the address
+   verified (`emailVerified: true` through the API). An admin-made account runs
+   no blocking function; `onUserCreate` provisions it as a pending member, as for
+   anyone.
+2. Approve it in **People**, as a member.
+3. Make a board **App Review** and add the account as its only other member
+   (Board settings → Members). Add a few neutral cards to open, move and comment
+   on. It must be on no other board.
+
+**Order on the first deploy:** functions (with `beforeSignUp` and
+`beforeSignIn`) first, and both registered as the project's blocking triggers,
+then the Email/Password provider switched on; then the steps above. The other
+way round there is a window with no door.
+
 ### Timesheet
 
 `platforms: ["android", "web"]`. Same refactor and same web pages. iOS is a later
@@ -395,6 +448,12 @@ the app under any circumstance. Guideline 5.1.1(v) is therefore not engaged.
 
 Sign-in uses Google with the organisation's existing enterprise accounts, which
 is the education/enterprise exemption under Guideline 4.8.
+
+[Kanban and the timesheet] For review, sign in with "Sign in with email"
+using the account below. It is an ordinary member account made by an
+administrator, the only one that signs in with a password; staff sign in with
+Google. It belongs to one board of sample cards, so that nothing real is shown.
+Email: <the review address>   Password: <from Faisal's vault>
 
 [Recordings app only] The sign-in screen has two separate paths. Staff sign in
 with the organisation's Google Workspace accounts. Students use a first-party
@@ -492,8 +551,10 @@ correct, not on having watched a stranger be refused. Do it before submitting.
 - [ ] Whether a Google sign-in links correctly to a pre-created Auth user —
       depends on the project's one-account-per-email setting. Only matters if the
       backstop in § 2 is implemented as pre-provisioning.
-- [ ] Whether `beforeCreate` fires for Admin SDK `createUser`. If it does not, an
-      unconditional reject makes the backstop airtight.
+- [x] Whether `beforeCreate` fires for Admin SDK `createUser`: it does not, and
+      `functions/test/integration/signUpGate.test.ts` holds that, so
+      `beforeSignUp` refuses every password sign-up from a client and an admin
+      can still make one (2026-10-15).
 
 ---
 

@@ -55,6 +55,13 @@ Locally, `functions/.secret.local` (gitignored) sets it empty so the emulator
 never reports. The emulator still logs one 403 at startup trying to reach real
 Secret Manager — harmless, not silenced, and not a new failure.
 
+**Not a secret, deliberately: `PASSWORD_SIGN_IN_EMAIL`**, the one address that
+may sign in with a password. Rules cannot read a secret, so it is a literal in
+`firestore.rules` and `storage.rules` and in this public repository; the
+account's security is its long generated password (Faisal's vault, never here)
+and Firebase's rate limiting, and signed in it is a member of one board of
+sample cards. `docs/STORE-RELEASE.md` § 8.
+
 ## Build machine — the shell that cuts a RELEASE, on either platform
 
 | Name | Used by | Where to get it |

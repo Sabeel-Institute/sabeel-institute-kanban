@@ -37,6 +37,14 @@ deleting one changes cards on boards the person doing it may not even be able to
 open. Creating one is not gated beyond being active — it happens while somebody
 is looking at a card, it is cheap, and it is reversible by an admin.
 
+**A password sign-in is a member, and only for one address** (Faisal,
+2026-10-15). The role a session acts with depends on how it signed in: through
+Google, the claims' role; with a password, member whatever the claims say. A
+password sign-in is accepted for one address (`PASSWORD_SIGN_IN_EMAIL`), the
+account the store reviewers use; for any other it is refused at sign-in, and a
+session that got past would have no access at all. An admin cannot give a
+password-only account another role. `docs/STORE-RELEASE.md` § 8 has the why.
+
 ## Board ownership
 
 A board carries `boardOwnerUids`. Being in it — **and** being a member of the
@@ -158,6 +166,7 @@ One definition per rule, mirrored rather than duplicated:
 | Curate labels | `isAdmin()` in `firestore.rules`, `canCurateLabels` in `deleteLabel` | `canCurateLabels` |
 | Stats | `isAdmin()` in `firestore.rules` | `canViewStats` |
 | Administer accounts | `checkAccessChange` in `setUserAccess` | `canAdministerUsers` |
+| The role and status a session acts with (the password door) | `isSignedIn()` and `role()` in `firestore.rules`, `isActive()` in `storage.rules`, `sessionAccess` through `actorOf` in every callable, `beforeSignIn` | `sessionAccess` in `session.ts` |
 
 `packages/shared/src/access.ts` holds every client-side predicate, and each has
 its own body even where two agree today — `canCurateLabels` was once an alias for
