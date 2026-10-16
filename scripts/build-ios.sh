@@ -272,10 +272,24 @@ node scripts/gen-build-info.mjs
 
 # 9. Regenerate ios/. ALWAYS --platform ios: a bare prebuild is clean by default
 #    and would delete the committed android/, silently dropping minSdkVersion 33.
-#    --no-install because the next line installs the pods; without it prebuild
+#    --no-install because the pods are installed below; without it prebuild
 #    installed them too, and every build paid for `pod install` twice.
 (cd app && npx expo prebuild --platform ios --no-install)
+
+# 10. The pods this app ships, pinned by the committed app/Podfile.lock. app/ios
+#     is generated, and prebuild is clean, so without a committed lock every
+#     build resolved the third-party pods afresh: two builds of one commit could
+#     ship different native code, and the sibling LMS caught exactly that
+#     (AppCheckCore and GoogleUtilities a patch apart between its Mac and
+#     GitHub). A resolution that differs from the pin stops the build rather
+#     than shipping quietly.
+cp app/Podfile.lock app/ios/Podfile.lock
 (cd app/ios && pod install)
+pods_of() { sed -n '/^PODS:/,/^DEPENDENCIES:/p' "$1"; }
+if [ "$(pods_of app/Podfile.lock)" != "$(pods_of app/ios/Podfile.lock)" ]; then
+  die "pod install resolved other pods than app/Podfile.lock pins (a native dependency changed?).
+If that is intended: cp app/ios/Podfile.lock app/Podfile.lock, commit it, and build again."
+fi
 
 WORKSPACE="$(find app/ios -maxdepth 1 -name '*.xcworkspace' | head -1)"
 [ -n "$WORKSPACE" ] || die "no .xcworkspace under app/ios after prebuild + pod install."
@@ -350,7 +364,7 @@ fi
 # lines up. Bash 4.4 and later expand it to nothing as intended — so the bug
 # cannot be reproduced in any shell newer than the one every Mac actually runs.
 
-# 10. Archive. In automatic mode `-allowProvisioningUpdates` lets Xcode create
+# 11. Archive. In automatic mode `-allowProvisioningUpdates` lets Xcode create
 #    and download the signing assets itself, which is what removes the last
 #    reason to open the UI.
 xcodebuild -workspace "$WORKSPACE" \
@@ -372,7 +386,7 @@ xcodebuild -workspace "$WORKSPACE" \
 [ -d "$ARCHIVE/Products/Applications" ] || die \
   "archive at $ARCHIVE contains no app — scheme '$SCHEME' is not the app's."
 
-# 11. Export, and upload in the same step when asked. `destination: upload` in the
+# 12. Export, and upload in the same step when asked. `destination: upload` in the
 #     options plist is what sends it to App Store Connect without Xcode Organizer
 #     or Transporter.
 PLIST="build/ios/ExportOptions.plist"

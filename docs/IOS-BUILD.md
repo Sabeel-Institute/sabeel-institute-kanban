@@ -502,12 +502,25 @@ signing identity into a keychain of its own, installs the App Store profile,
 and runs `build-ios.sh --no-upload`. It needs no new build number. It then
 asserts the exported `.ipa` — the one place the entitlements a device enforces
 exist (see "The push entitlement survives the prebuild"): `aps-environment`
-`production`, `get-task-allow` `false`, the CI profile embedded, and a build
-stamp equal to the commit with no `+`. Its artifacts, kept 14 days: the `.ipa`,
-and a build record — the JavaScript source map and the `Podfile.lock` it
-resolved, the only record of which pods went in, since `app/ios/` is not
-committed. Both are downloadable by anyone signed in to GitHub; neither holds
-a secret, and an App Store-signed `.ipa` installs only through Apple.
+`production`, `get-task-allow` `false`, the CI profile embedded, and this
+commit's stamp, without a `+`, inside the compiled JavaScript. Its artifacts,
+kept 14 days: the `.ipa`, and a build record — the JavaScript source map and
+the `Podfile.lock` it installed. Both are downloadable by anyone signed in to
+GitHub; neither holds a secret, and an App Store-signed `.ipa` installs only
+through Apple.
+
+**The pods are pinned** by the committed `app/Podfile.lock`, which
+`build-ios.sh` copies into the generated `app/ios/` before `pod install`, on
+the Mac and on GitHub alike. Without it every build resolved the third-party
+pods afresh, because prebuild is clean: v0.11.3 build 10 went out from the Mac
+with AppCheckCore 11.3.1 and GoogleUtilities 8.1.2, and GitHub resolved 11.3.2
+and 8.1.5 seven weeks later, though no npm dependency had changed in between.
+If `pod install` resolves
+anything other than the pin, the build stops. When a native dependency changed
+on purpose (an Expo or React Native upgrade, a new native module):
+`cp app/ios/Podfile.lock app/Podfile.lock`, commit, and build again. The lock
+in a GitHub run's build record is the same file, for a change made without a
+Mac.
 
 **testflight** runs only with `testflight=true`. It asks App Store Connect
 whether the build number is free for the version (`scripts/testflight-check.mjs`
