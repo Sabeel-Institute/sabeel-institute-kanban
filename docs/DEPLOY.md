@@ -460,6 +460,27 @@ then redeploy just the failed functions.
 `tsc --noEmit` plus `node esbuild.config.mjs`; the bundle inlines the private
 `@sabeel/shared` package, which Cloud Build cannot otherwise resolve.
 
+**Functions deploy from `functions/package-lock.json`.** A deploy uploads the
+functions directory alone, and without a lockfile in it the Node buildpack
+generates one; its npm crashes doing that here (`Cannot read properties of null
+(reading 'edgesOut')`, in arborist's peer resolution), so every function without
+a cached build failed. With the lockfile the buildpack runs `npm ci`. When
+`functions/package.json` changes, regenerate it from that file alone, top-level
+versions pinned to what the suites ran against, with npm 11 (npm 10 hits the same
+crash generating it, though it installs from the result fine):
+
+```sh
+mkdir /tmp/fnlock && cp functions/package.json /tmp/fnlock/
+# pin each dependency in /tmp/fnlock/package.json to the version in node_modules
+cd /tmp/fnlock && npm install --package-lock-only --ignore-scripts
+# put functions/package.json's own ranges back in the lock's packages[""] block
+npx -y npm@10 ci --dry-run --omit=dev    # what the buildpack runs; must pass
+```
+
+`functions/test/unit/functionsLockfile.test.ts` fails when the lock's root block
+and `functions/package.json` disagree, which `npm ci` would otherwise reject only
+at deploy time.
+
 **`expo export` must always `--clear`.** Configured in `web:export`. Metro will
 otherwise serve a bundle built with different `EXPO_PUBLIC_*` values, and an
 emulator-mode bundle must never reach Hosting.

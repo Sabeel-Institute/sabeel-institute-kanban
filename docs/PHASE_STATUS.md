@@ -487,6 +487,15 @@ TestFlight build 12 on a phone. **Deploy order:** the `APNS_KEY` secret (set),
 then functions and rules, then build 12; older builds keep working
 throughout, and their iPhone rows are pruned as before.
 
+**The functions deploy needed a lockfile.** The first deploy of this batch
+failed in Cloud Build for every function: with no `functions/package-lock.json`
+the buildpack generates one, and its npm crashes doing so (`reading
+'edgesOut'`, reproduced here with npm 10.9.2). Unchanged functions had been
+restoring a cached build, which is why it had never shown. The lockfile is
+committed, made from `functions/package.json` alone with the versions the
+suites ran against; npm 10 installs from it, and the built bundle loads all 24
+functions on that install. `docs/DEPLOY.md` has how to regenerate it.
+
 ### 2026-09-20 — A Google 503 at sign-in stops paging — v0.11.5
 
 **Two pages, same class, no defect.** `SABEEL-KANBAN-WEB-C`: Google's Firebase
