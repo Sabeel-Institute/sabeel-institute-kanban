@@ -79,20 +79,23 @@ async function portsFromScripts(): Promise<{
  * `adb reverse` cannot redirect it and the port cannot change without rebuilding
  * the native app) and idb.
  *
+ * Other checkouts on the same machine hold them, so `dev.sh` must never free
+ * them: they sit in its `SHARED_PORTS`, which `status` reads and nothing stops.
  * Stated here rather than exported from `scripts/lib/ports.mjs` because no
- * script reads them — they appear only in `dev.sh`'s sweep list — and an export
- * nothing imports is exactly what the dead-code check exists to flag. They are
- * listed so the sweep-list assertion below knows they are deliberate exceptions
- * rather than strays.
+ * script imports them, and an export nothing imports is exactly what the
+ * dead-code check exists to flag.
  */
 const SHARED_PORTS: Record<string, number> = { metro: 8081, idb: 10882 };
 
-/** `dev.sh`'s kill list — a flat set of numbers. */
-function portsFromDevSh(): number[] {
-  const line = read('scripts/dev.sh').match(/^PORTS=\(([^)]*)\)/m)?.[1];
-  if (!line) throw new Error('PORTS=(…) not found in scripts/dev.sh');
+/** A `NAME=(…)` list of numbers in `dev.sh`. */
+function listFromDevSh(name: string): number[] {
+  const line = read('scripts/dev.sh').match(new RegExp(`^${name}=\\(([^)]*)\\)`, 'm'))?.[1];
+  if (!line) throw new Error(`${name}=(…) not found in scripts/dev.sh`);
   return line.trim().split(/\s+/).map(Number);
 }
+
+/** `dev.sh`'s own block: what `stop` verifies and `status` reports. */
+const portsFromDevSh = () => listFromDevSh('PORTS');
 
 /** `e2e.sh`'s web dev-server port, set in shell before Node ever sees it. */
 function webPortFromE2eSh(): number {
@@ -181,16 +184,12 @@ describe('emulator ports agree across every file that states them', () => {
     }
   });
 
-  it('dev.sh frees exactly this checkout’s ports, and nothing else', async () => {
+  it('dev.sh claims exactly this checkout’s ports, and nothing else', async () => {
     const { emulator, web, shared } = await portsFromScripts();
     const listed = portsFromDevSh();
     expect(listed.length).toBeGreaterThan(0);
 
-    const owned = new Set([
-      ...Object.values(emulator),
-      ...Object.values(web),
-      ...Object.values(shared),
-    ]);
+    const owned = new Set([...Object.values(emulator), ...Object.values(web)]);
 
     // Every port we bind must be swept…
     for (const [service, port] of Object.entries({ ...emulator, ...web })) {
@@ -202,6 +201,9 @@ describe('emulator ports agree across every file that states them', () => {
     for (const port of listed) {
       expect(owned.has(port), `dev.sh sweeps ${port}, which this checkout does not own`).toBe(true);
     }
+    // The machine-wide ports are listed apart, for `status` only. Freeing them
+    // killed another checkout's Metro and every session's idb_companion.
+    expect(listFromDevSh('SHARED_PORTS').sort()).toEqual(Object.values(shared).sort());
   });
 
   it('e2e.sh and the scripts agree on the web port', async () => {

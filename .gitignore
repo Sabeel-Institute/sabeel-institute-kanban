@@ -33,6 +33,9 @@ app/.env.sentry-build-plugin
 migration/
 docs/brand/*.tmp
 
+# What scripts/dev.sh started, by process group: what its `stop` stops.
+.dev-pids
+
 # Screenshots from verification runs
 shots/
 e2e-shots/

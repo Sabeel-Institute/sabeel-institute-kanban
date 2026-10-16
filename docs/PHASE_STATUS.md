@@ -545,6 +545,23 @@ hints, focus not moved, no sign-in); on an iOS 26.5 simulator the keyboard
 showed the next key with the Passwords bar, Return moved to the password, Return
 signed in as a member, and iOS offered to save the password.
 
+**The dev scripts stop only what they started (2026-10-16).** `e2e.sh` left
+its web server running after every run: its last line `exec`ed firebase, which
+discarded the EXIT trap. It now records the server's pid, stops it and every
+descendant on exit or on a signal, fails the run if it cannot, and refuses a
+held 61210 instead of killing it. `dev.sh stop` freed Metro 8081 and idb 10882
+by port and ran `pkill -9 -f idb_companion`, killing other sessions' processes
+on the build Mac; it now stops only the process groups it recorded in
+`.dev-pids`, reports anything else on this checkout's ports, and never touches
+the shared ports. One helper file, `scripts/lib/procs.sh`, serves both.
+**Verified** on the build Mac: a failing suite's exit code passes through and
+nothing is left; a TERM to `e2e.sh` mid-suite exits 143 within seconds with its
+whole tree gone; `dev.sh web` then `stop` ended all 19 processes (the detached
+Firestore java included) while another checkout's Metro and idb kept their
+pids; a foreign holder on a checkout port is reported, not killed; `android`
+refuses a held 8081. `devScripts.test.ts` and the port test fail against the
+old scripts.
+
 ### 2026-09-20 — A Google 503 at sign-in stops paging — v0.11.5
 
 **Two pages, same class, no defect.** `SABEEL-KANBAN-WEB-C`: Google's Firebase

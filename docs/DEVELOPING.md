@@ -71,7 +71,7 @@ inspecting Firestore documents and Auth users directly.
 
 ```sh
 scripts/dev.sh status     # what is running, and which process owns each port
-scripts/dev.sh stop       # free every port this project uses, and VERIFY
+scripts/dev.sh stop       # stop what dev.sh started, and VERIFY the ports
 scripts/dev.sh web        # stop, start emulators + web, seed
 scripts/dev.sh android    # stop, start emulators + Metro for the device build
 scripts/dev.sh e2e        # stop, then run the full suite
@@ -83,6 +83,13 @@ Emulator, port taken`, or worse, a dev server that answers on 61210 while servin
 code from a different checkout. `stop` re-checks the ports afterwards rather than
 trusting that a kill worked, because a silently-failed kill is exactly how a
 "cleared" port keeps serving yesterday's bundle.
+
+`stop` stops only what `dev.sh` started: each job runs in a process group of its
+own, recorded in `.dev-pids` (gitignored). Anything else holding one of this
+checkout's ports is reported with its pid and working directory and left
+running: stop it by that pid if it is yours. Metro's 8081 and idb's 10882 are
+shared with every other checkout on the machine, so `stop` never touches them,
+and `android`/`ios` refuse to start Metro while someone else holds 8081.
 
 ### Debugging habits that keep paying off
 

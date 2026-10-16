@@ -153,7 +153,7 @@ Four traps, each of which cost real time:
 ```bash
 scripts/dev.sh ios          # or: npm run dev:ios
 scripts/dev.sh ios --build  # compile and install first
-scripts/dev.sh stop         # free every port, including the idb companion
+scripts/dev.sh stop         # stop what dev.sh started; never Metro or idb
 ```
 
 It stops everything, starts the emulators, the web server and Metro, seeds,
@@ -482,9 +482,9 @@ The emulated functions never send (`functions/src/messaging.ts`), so a card
 assigned in the app does not reach the simulator; step 3 is the delivery.
 
 **On a Mac shared with the sibling apps**, `scripts/dev.sh ios` is the wrong
-tool: it takes port 8081 and the simulator named "iPhone 17 Pro", which the
-other repos use too, and its `stop` frees 8081 and kills every `idb_companion`
-on the machine. Give the test a simulator of its own (`xcrun simctl create`),
+tool: it needs port 8081 and the simulator named "iPhone 17 Pro", which the
+other repos use too (it refuses to start Metro while another holds 8081, and
+its `stop` touches neither Metro nor idb). Give the test a simulator of its own (`xcrun simctl create`),
 build with `xcodebuild … -sdk iphonesimulator -destination id=<udid>`, install
 with `simctl install`, run Metro on a free port
 (`EXPO_PUBLIC_USE_EMULATORS=1 npx expo start --port <port> --clear` in `app/`),
