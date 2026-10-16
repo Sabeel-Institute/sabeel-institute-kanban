@@ -379,12 +379,13 @@ Two things worth reusing next time:
    started on the release commit. `docs/IOS-BUILD.md` § Builds on GitHub.
 4. **Bump `expo.ios.buildNumber` before every re-upload.** Apple requires it to
    increase even for the same version; unlike Android's versionCode it does not
-   derive itself. On App Store Connect so far: builds 1, 2, 4 and 6–10, the last
-   v0.11.3 build 10 (2026-08-29). Builds 3 and 5 were never uploaded — each was
-   bumped past twice — which cost nothing, and is the point: the number need
-   only rise *within* a version, so carrying it across versions is simply the
-   cheapest way never to collide. It is `11` now, unused, ready for the next
-   upload. The GitHub upload job checks it with Apple before uploading.
+   derive itself. On App Store Connect so far: builds 1, 2, 4 and 6–11, the last
+   v0.11.5 build 11 (2026-10-15, the first upload from GitHub). Builds 3 and 5
+   were never uploaded — each was bumped past twice — which cost nothing, and is
+   the point: the number need only rise *within* a version, so carrying it
+   across versions is simply the cheapest way never to collide. It is `12` now,
+   unused, ready for the next upload. The GitHub upload job checks it with
+   Apple before uploading.
 5. **First thing on a real device: confirm a push arrives.** The only proof the
    APNs key was uploaded correctly — nothing on this side distinguishes
    "uploaded" from "uploaded wrong", and a simulator cannot test it because it

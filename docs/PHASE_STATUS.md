@@ -441,8 +441,26 @@ on a wrong, expired or mismatched profile, and a refusal of
 profile expire 2027-10-16 (`TODO.md` D2). **Verified:** shellcheck, actionlint,
 lint and unit; each new gate failing as meant against real profiles on the
 Mac; the manual-signing project edit read back from a copy of the project.
-The workflow's first run is the test of the signing itself, since the
-certificate's key is not on the Mac.
+The first run (38832559073, build only, from `921a5fa`) was green in 14
+minutes: signed by the distribution certificate, every assertion on the `.ipa`
+passed, Sentry received the source map and symbols, and no secret value
+appears in its public log.
+
+**The pods are pinned.** `app/Podfile.lock`, from that run, is copied into the
+generated `app/ios/` before `pod install`, and the build stops if anything
+resolves differently. Unpinned, the Mac had shipped v0.11.3 build 10 with
+AppCheckCore 11.3.1 and GoogleUtilities 8.1.2 while GitHub resolved 11.3.2 and
+8.1.5, with no npm change between: the Mac's local CocoaPods specs index was
+stale, which also made a plain `pod install` fail against the pin. It now runs
+with `--repo-update`. Proved on the Mac: PODS identical to the pin.
+
+**On TestFlight as v0.11.5 build 11 (2026-10-15)**, the first upload from
+GitHub: run 38834302593, from `f0185af`, which carries both fixes above. Web's
+v0.11.5 does not, so this build's label runs ahead of what the version means
+elsewhere until the next release, whose version this heading takes. Apple
+validated it before the upload; App Store Connect reports it VALID and in
+testing for "Sabeel Kanban Internal", with export compliance already answered;
+it expires 2027-01-13. `ios.buildNumber` is 12 for the next upload.
 
 ### 2026-09-20 — A Google 503 at sign-in stops paging — v0.11.5
 
@@ -472,6 +490,9 @@ change and were not rebuilt; Play and the download page stay at v0.11.4. Both
 Sentry issues archived until escalating, with the reason on each. The mobile
 project shows no push-registration failure of any kind in 90 days, so the native
 `registerPush` keeps its default level until one appears.
+
+iOS build 11 (2026-10-15) carries this version's label but was built from
+`f0185af`, with the two fixes of the entry above.
 
 
 ### 2026-09-17 — One icon per push, and a banner in every state — v0.11.4
