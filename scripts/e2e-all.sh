@@ -117,15 +117,21 @@ for name in "${SUITES[@]}"; do
 
   # migration-e2e wants ONLY firestore+auth and does not go through e2e.sh —
   # running it through the web harness fails for reasons unrelated to the code.
+  #
+  # `rc` is the SUITE's status: PIPESTATUS read straight after the pipeline,
+  # with nothing between. A `|| true` on the pipeline used to sit there, and
+  # under pipefail a failing suite made the pipeline fail, so `true` ran and
+  # PIPESTATUS held ITS status — every failed suite was reported as passed.
+  # No `set -e` here, so a failing pipeline needs no guard.
   if [ "$name" = "migration" ]; then
     # shellcheck source=scripts/jdk21.sh
     . scripts/jdk21.sh
     npm run build -w @sabeel/shared >/dev/null 2>&1
     firebase emulators:exec --project demo-sabeel-kanban \
-      --only firestore,auth "node $suite" 2>&1 | grep -E "checks passed|FAIL|Error" || true
+      --only firestore,auth "node $suite" 2>&1 | grep -E "checks passed|FAIL|Error|aborted"
     rc=${PIPESTATUS[0]}
   else
-    bash scripts/e2e.sh "$suite" 2>&1 | grep -E "checks passed|FAIL|Error:" || true
+    bash scripts/e2e.sh "$suite" 2>&1 | grep -E "checks passed|FAIL|Error:|aborted"
     rc=${PIPESTATUS[0]}
   fi
 
