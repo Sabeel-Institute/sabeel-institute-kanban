@@ -283,8 +283,15 @@ node scripts/gen-build-info.mjs
 #     (AppCheckCore and GoogleUtilities a patch apart between its Mac and
 #     GitHub). A resolution that differs from the pin stops the build rather
 #     than shipping quietly.
+#
+#     --repo-update, because a machine's local copy of the specs index goes
+#     stale: the Mac's knew no GoogleUtilities newer than 8.1.2, so with the pin
+#     at 8.1.5 a plain `pod install` failed outright. Unpinned, that same stale
+#     index is how the Mac had been resolving older pods than GitHub. It costs
+#     the Mac under a minute and a fresh runner nothing, and it cannot move a
+#     version: the lock decides those.
 cp app/Podfile.lock app/ios/Podfile.lock
-(cd app/ios && pod install)
+(cd app/ios && pod install --repo-update)
 pods_of() { sed -n '/^PODS:/,/^DEPENDENCIES:/p' "$1"; }
 if [ "$(pods_of app/Podfile.lock)" != "$(pods_of app/ios/Podfile.lock)" ]; then
   die "pod install resolved other pods than app/Podfile.lock pins (a native dependency changed?).

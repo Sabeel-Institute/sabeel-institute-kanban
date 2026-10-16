@@ -515,6 +515,8 @@ the Mac and on GitHub alike. Without it every build resolved the third-party
 pods afresh, because prebuild is clean: v0.11.3 build 10 went out from the Mac
 with AppCheckCore 11.3.1 and GoogleUtilities 8.1.2, and GitHub resolved 11.3.2
 and 8.1.5 seven weeks later, though no npm dependency had changed in between.
+The Mac's local copy of the specs index was stale and knew nothing newer, so
+`pod install` runs with `--repo-update`; the lock still decides every version.
 If `pod install` resolves
 anything other than the pin, the build stops. When a native dependency changed
 on purpose (an Expo or React Native upgrade, a new native module):
