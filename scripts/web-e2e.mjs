@@ -554,19 +554,22 @@ try {
    * and the message she now gets is one only a SUCCESSFUL directory query can
    * produce. A non-admin owner actually adding someone is covered against a real
    * candidate in functions/test/integration/boardOwnership.test.ts.
+   *
+   * WAITED for, not sampled: the panel says nothing until the callable
+   * answers, so a single isVisible() raced it and failed on a slow machine —
+   * and the apology check, sampled in that same silence, passed whatever the
+   * answer was going to be. The answer comes first; both read it.
    */
+  const emptyState = await sara
+    .getByText(/Nobody available to add/i)
+    .waitFor({ timeout: 15000 })
+    .then(() => true, () => false);
+  check('she gets the real empty state instead, which only a successful lookup gives', emptyState);
   const adminOnlyApology = await sara
     .getByText(/Only admins can browse the full directory/i)
     .isVisible()
     .catch(() => false);
   check('an owner is no longer told the directory is admins-only', !adminOnlyApology);
-  check(
-    'she gets the real empty state instead, which only a successful lookup gives',
-    await sara
-      .getByText(/Nobody available to add/i)
-      .isVisible()
-      .catch(() => false),
-  );
 
   await sara.getByRole('button', { name: 'Back' }).first().click();
   await sara.getByText('To Do').first().waitFor({ timeout: 15000 });
