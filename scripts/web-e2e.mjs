@@ -17,6 +17,7 @@
 import { chromium } from 'playwright';
 // The app's own org-timezone date, so this script cannot drift from ORG_TIMEZONE.
 import { todayInOrgTz } from '../packages/shared/lib/due.js';
+import { PASSWORD_SIGN_IN_EMAIL } from '../packages/shared/lib/constants.js';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { readFile, mkdir } from 'node:fs/promises';
@@ -84,6 +85,39 @@ function grantAdmin(email) {
         stdio: 'pipe',
       },
     );
+    let out = '';
+    child.stdout.on('data', (d) => (out += d));
+    child.stderr.on('data', (d) => (out += d));
+    child.on('exit', (code) => (code === 0 ? res(out) : rej(new Error(out))));
+  });
+}
+
+/**
+ * Run a few lines of Admin SDK code against the emulators, as an admin would
+ * act in the console: `auth` and `db` are in scope. From the repository root,
+ * so firebase-admin resolves as it does for grant-admin.mjs.
+ */
+function adminRun(body) {
+  const code = `
+    import { initializeApp } from 'firebase-admin/app';
+    import { getAuth } from 'firebase-admin/auth';
+    import { getFirestore } from 'firebase-admin/firestore';
+    initializeApp({ projectId: 'demo-sabeel-kanban' });
+    const auth = getAuth();
+    const db = getFirestore();
+    ${body}
+  `;
+  return new Promise((res, rej) => {
+    const child = spawn('node', ['--input-type=module', '-e', code], {
+      cwd: resolve(import.meta.dirname, '..'),
+      env: {
+        ...process.env,
+        GCLOUD_PROJECT: 'demo-sabeel-kanban',
+        FIRESTORE_EMULATOR_HOST: `127.0.0.1:${EMULATOR_PORTS.firestore}`,
+        FIREBASE_AUTH_EMULATOR_HOST: `127.0.0.1:${EMULATOR_PORTS.auth}`,
+      },
+      stdio: 'pipe',
+    });
     let out = '';
     child.stdout.on('data', (d) => (out += d));
     child.stderr.on('data', (d) => (out += d));
@@ -2165,6 +2199,80 @@ try {
     .catch(() => false);
   check('a rejected account never reaches the approval queue', !reachedAGate);
   await bad.screenshot({ path: join(SHOTS, 'p1-wrong-domain-light.png'), fullPage: true });
+
+  // ---- The email door: one address, a member (Faisal, 2026-10-15) ----------
+  // "should only accept that one email" and "Just a member", and "The sign in
+  // page shouldn't indicate its a special thing for a reviewer". Both accounts
+  // are made the way an admin makes one, through the Admin SDK — no blocking
+  // function runs for that — and approved as members. The one address may sign
+  // in; the other is refused at the door, and says so exactly like a wrong
+  // password. The one address is given ORGANIZER claims, which only the Admin
+  // SDK can do (setUserAccess refuses it), so "no New board" below is the
+  // member lock holding and not merely what its claims say.
+  const DOOR_PASSWORD = 'correct-horse-battery-staple';
+  await adminRun(`
+    const make = async (email, role) => {
+      const u = await auth.createUser({ email, password: ${JSON.stringify(DOOR_PASSWORD)}, emailVerified: true, displayName: email.split('@')[0] });
+      for (let i = 0; i < 80 && !(await db.doc('users/' + u.uid).get()).exists; i++) await new Promise((r) => setTimeout(r, 250));
+      await auth.setCustomUserClaims(u.uid, { role, status: 'active' });
+      await db.doc('users/' + u.uid).update({ role, status: 'active' });
+    };
+    await make(${JSON.stringify(PASSWORD_SIGN_IN_EMAIL)}, 'organizer');
+    await make('door-other@oursabeel.com', 'member');
+  `);
+
+  const doorTry = async (email, password) => {
+    const { ctx, page } = await newApp(browser);
+    await page.getByText('Sign in with Google').waitFor({ timeout: 40000 });
+    await page.getByRole('button', { name: 'Sign in with email' }).click();
+    await page.getByPlaceholder('Email').fill(email);
+    await page.getByPlaceholder('Password').fill(password);
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    return { ctx, page };
+  };
+  const NO_MATCH = 'That email and password do not match an account.';
+
+  {
+    const { ctx, page } = await newApp(browser);
+    await page.getByText('Sign in with Google').waitFor({ timeout: 40000 });
+    const said = await page.locator('body').innerText();
+    check('the sign-in page offers a plain email sign-in', await page.getByRole('button', { name: 'Sign in with email' }).isVisible());
+    check('and nothing on it speaks of reviewers', !/review/i.test(said), said.match(/.{0,30}review.{0,30}/i)?.[0] ?? '');
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await doorTry('door-other@oursabeel.com', DOOR_PASSWORD);
+    const refused = await page.getByText(NO_MATCH).waitFor({ timeout: 30000 }).then(() => true, () => false);
+    check('a password account at any other address is refused, in the words of a wrong password', refused);
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await doorTry(PASSWORD_SIGN_IN_EMAIL, 'not-the-password');
+    const refused = await page.getByText(NO_MATCH).waitFor({ timeout: 30000 }).then(() => true, () => false);
+    check('the one address with a wrong password is refused the same way', refused);
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await doorTry(PASSWORD_SIGN_IN_EMAIL, DOOR_PASSWORD);
+    // Read off the LOADED Boards screen: its empty state, which is drawn in the
+    // same render as New board and from the same session, and words itself by
+    // role. Not the word "Boards" — the nav rail says it while the screen is
+    // still a spinner, and a New board check there passes for an organizer too.
+    const MEMBER_EMPTY = 'You are not on any boards yet.';
+    const settled = await page
+      .getByText(/^(No boards yet\.|You are not on any boards yet\.)/)
+      .waitFor({ timeout: 40000 })
+      .then(() => true, () => false);
+    check(
+      'the one address signs in with its password',
+      settled && !(await page.getByText('Sign in with Google').isVisible().catch(() => false)),
+    );
+    const asMember = await page.getByText(MEMBER_EMPTY, { exact: false }).isVisible().catch(() => false);
+    const canCreate = await page.getByRole('button', { name: 'New board' }).isVisible().catch(() => false);
+    check('and is a member whatever its claims say: no New board', settled && asMember && !canCreate);
+    await page.screenshot({ path: join(SHOTS, 'p1-email-door-member.png'), fullPage: true });
+    await ctx.close();
+  }
 
   // ---- Archived boards can be found and restored (Phase 2) ---------------
   // Archiving is the SAFE alternative to deleting, so it must be reversible.

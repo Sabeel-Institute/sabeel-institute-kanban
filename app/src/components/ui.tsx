@@ -730,6 +730,25 @@ export function PickerList({ children }: { children: ReactNode }) {
   );
 }
 
+const KIND_PROPS: Record<'email' | 'password', Partial<TextInputProps>> = {
+  email: {
+    autoCapitalize: 'none',
+    autoCorrect: false,
+    keyboardType: 'email-address',
+    autoComplete: 'email',
+    // `username`, not `emailAddress`: iOS pairs a password with the field
+    // marked as its username, and that is what offers saved passwords.
+    textContentType: 'username',
+  },
+  password: {
+    autoCapitalize: 'none',
+    autoCorrect: false,
+    secureTextEntry: true,
+    autoComplete: 'current-password',
+    textContentType: 'password',
+  },
+};
+
 export const TextField = forwardRef<TextInput, {
   value: string;
   onChangeText: (v: string) => void;
@@ -751,6 +770,11 @@ export const TextField = forwardRef<TextInput, {
    *  @mention list, which has to disappear when you look away. */
   onFocus?: TextInputProps['onFocus'];
   onBlur?: TextInputProps['onBlur'];
+  /**
+   * An address or a password: no capitals or corrections, the right keyboard,
+   * the password hidden, and the platform's password autofill offered.
+   */
+  kind?: 'email' | 'password';
 }>(function TextField(
   {
     value,
@@ -764,12 +788,14 @@ export const TextField = forwardRef<TextInput, {
     onKeyPress,
     onFocus,
     onBlur,
+    kind,
   },
   ref,
 ) {
   const t = useTheme();
   return (
     <TextInput
+      {...(kind ? KIND_PROPS[kind] : null)}
       // Forwarded so callers can restore focus — picking a mention from the
       // autocomplete blurs this field, and without refocusing you cannot carry
       // on typing.

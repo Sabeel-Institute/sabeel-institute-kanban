@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Image, Linking, Pressable, StyleSheet, View } from 'react-native';
-import { ALLOWED_EMAIL_DOMAIN, PRIVACY_URL } from '@sabeel/shared';
+import { Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ALLOWED_EMAIL_DOMAIN, PRIVACY_URL, SIGN_UP_REFUSED } from '@sabeel/shared';
 import {
   signInWithGoogle,
   signInWithGoogleRedirect,
@@ -8,8 +8,9 @@ import {
   PopupBlockedError,
 } from '../auth/google';
 import { DEV_ACCOUNTS, devSignIn, devSignInAvailable } from '../auth/devSignIn';
-import { Body, Button, Caption, Card, Hint, Row, Screen, Title } from '../components/ui';
-import { radius, space } from '../theme';
+import { EMAIL_SIGN_IN_MESSAGES, signInWithEmail, type EmailSignInRefusal } from '../auth/email';
+import { Body, Button, Caption, Card, Hint, Row, Screen, TextField, Title } from '../components/ui';
+import { radius, space, useTheme } from '../theme';
 import sabeelLogo from '../../assets/brand/sabeel-logo.png';
 import { toUserMessage } from '../errors';
 import { BUILD_INFO } from '../build-info';
@@ -49,7 +50,13 @@ export function SignInScreen() {
       if ((await fn()) === 'no-account') setNoAccount(true);
     } catch (e) {
       if (e instanceof PopupBlockedError) setPopupBlocked(true);
-      else setError(toUserMessage(e, 'signIn'));
+      // The server refused to make the account (functions/src/signUpGate.ts):
+      // an address off the org domain, on the web. Expected, so said in a
+      // sentence and not reported. It arrives as an internal error carrying
+      // the marker.
+      else if (e instanceof Error && e.message.includes(SIGN_UP_REFUSED)) {
+        setError(`Only @${ALLOWED_EMAIL_DOMAIN} accounts can use this app.`);
+      } else setError(toUserMessage(e, 'signIn'));
     } finally {
       setBusy(false);
     }
@@ -116,6 +123,8 @@ export function SignInScreen() {
         </Hint>
       </Card>
 
+      <EmailSignIn busy={busy} run={run} />
+
 
       {noAccount ? (
         <Card>
@@ -160,7 +169,7 @@ export function SignInScreen() {
           </Row>
           <Hint>
             &ldquo;intruder@gmail.com&rdquo; is deliberately outside the org
-            domain — the server deletes it on sight.
+            domain — the server refuses it before any account exists.
           </Hint>
         </Card>
       ) : null}
@@ -191,6 +200,10 @@ export function SignInScreen() {
 }
 
 const styles = StyleSheet.create({
+  // The link treatment PushNudge's "Not now" uses: accent and underline, in a
+  // real 44pt box rather than hitSlop, centred under the card above it.
+  emailLink: { alignSelf: 'center', minHeight: 44, paddingHorizontal: space.xs, justifyContent: 'center' },
+  emailLinkText: { fontSize: 14, textDecorationLine: 'underline' },
   blocked: { gap: space.sm, marginTop: space.sm },
   pane: { width: '100%', maxWidth: 460, alignSelf: 'center', gap: space.sm },
   header: { gap: space.xs, marginBottom: space.md, alignItems: 'center' },
@@ -205,3 +218,57 @@ const styles = StyleSheet.create({
   wrap: { flexWrap: 'wrap' },
   build: { marginTop: space.lg, alignItems: 'center', gap: space.xs },
 });
+
+/**
+ * The email door: a password sign-in for an account an administrator made
+ * (auth/email.ts). It acts as a member, whatever its claims say.
+ *
+ * A link until asked for, and below Google: the team signs in with Google, and
+ * a second form beside that button would ask everyone which one is theirs.
+ *
+ * The drafts live HERE, not on the screen — the field's own component owns its
+ * text (CLAUDE.md, State) — and `run`/`busy` come from the screen, so this and
+ * Google share one busy state and one error card. A refusal a person caused
+ * (a wrong password) is said here, in a sentence, and not reported.
+ */
+function EmailSignIn({ busy, run }: { busy: boolean; run: (fn: () => Promise<unknown>) => Promise<void> }) {
+  const t = useTheme();
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [refusal, setRefusal] = useState<EmailSignInRefusal | null>(null);
+
+  if (!open) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Sign in with email"
+        onPress={() => setOpen(true)}
+        disabled={busy}
+        style={styles.emailLink}
+      >
+        <Text style={[styles.emailLinkText, { color: t.text.accent, opacity: busy ? 0.45 : 1 }]}>
+          Sign in with email
+        </Text>
+      </Pressable>
+    );
+  }
+
+  const ready = email.trim().length > 0 && password.length > 0;
+  const submit = () => {
+    if (!ready || busy) return;
+    void run(async () => {
+      setRefusal(null);
+      setRefusal(await signInWithEmail(email, password));
+    });
+  };
+
+  return (
+    <Card>
+      <TextField kind="email" label="Email" placeholder="Email" value={email} onChangeText={setEmail} autoFocus />
+      <TextField kind="password" label="Password" placeholder="Password" value={password} onChangeText={setPassword} onSubmit={submit} />
+      <Button label="Sign in" onPress={submit} busy={busy} disabled={!ready} block />
+      {refusal ? <Body>{EMAIL_SIGN_IN_MESSAGES[refusal]}</Body> : null}
+    </Card>
+  );
+}
