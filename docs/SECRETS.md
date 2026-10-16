@@ -34,6 +34,16 @@ they must be non-secret: anyone with the app has them.
 | Name | Used by | Set with |
 |---|---|---|
 | `SENTRY_DSN` | `functions/src/sentry.ts` | `firebase functions:secrets:set SENTRY_DSN` |
+| `APNS_KEY` | `functions/src/messaging.ts`: the team's APNs `.p8`, which signs every push to an iPhone | `firebase functions:secrets:set APNS_KEY --data-file AuthKey_<id>.p8` |
+
+`APNS_KEY` is an **APNs authentication key** (developer portal → Keys), NOT
+the App Store Connect API key (`docs/IOS-BUILD.md`, "The two `.p8` keys").
+Its id and the team id are not secret, and sit beside it as parameters in
+`functions/.env.sabeel-institute-kanban`. Every function that sends a push binds
+it through `secrets: [sentryDsn, ...PUSH_SECRETS]`, and
+`functions/test/unit/pushSecrets.test.ts` finds those functions and fails on one
+that does not: unbound, a secret reads as empty, and iPhones hear nothing.
+`npm run check:apple-push` asks Apple whether it accepts the key for this app.
 
 Bind it on any function whose failures matter, via `secrets: [sentryDsn]`.
 **Every v2 function carries it** — the list here used to name three and was four

@@ -462,6 +462,31 @@ validated it before the upload; App Store Connect reports it VALID and in
 testing for "Sabeel Kanban Internal", with export compliance already answered;
 it expires 2027-01-13. `ios.buildNumber` is 12 for the next upload.
 
+**iPhones get notifications (2026-10-15).** They never had: the app filed
+Apple's own device token as an Android one (`platform: 'android'`), the
+functions sent it through FCM, and FCM refused it with `invalid-argument`,
+which is deliberately not a prune code, so the dead rows were never cleaned up
+either. Now an iPhone files `{ platform: 'ios', apnsEnvironment }`, the Apple
+service read from its provisioning profile, and `functions/src/messaging.ts`
+sends iPhones straight to Apple (`apns.ts`, HTTP/2 with the team's APNs key,
+the `APNS_KEY` secret) and everything else through FCM as before. The tap data
+travels in Apple's `body` dictionary, the one place expo-notifications reads it
+on iOS. An old 'android' row holding a hex token is pruned unsent; the same
+phone files itself correctly on its next start, overwriting the row in place
+when the token is unchanged. Sending never throws: `notify` writes the inbox
+first, and a retried trigger would duplicate it. The rules admit exactly the
+two row shapes, both of which every older client already writes.
+**Verified:** unit (632, with mutation checks on each guarantee), emulator
+(rules 240, triggers 132; the shape test fails against the old open rule);
+Apple accepts the key for this app on both services
+(`npm run check:apple-push`); and on the simulator a debug build filed its row
+through the rules, a real sandbox push from `scripts/send-test-push.mjs`
+showed a banner, and tapping it opened the card. Not verifiable here: a
+production delivery, and a tap with the app in the background or closed —
+TestFlight build 12 on a phone. **Deploy order:** the `APNS_KEY` secret (set),
+then functions and rules, then build 12; older builds keep working
+throughout, and their iPhone rows are pruned as before.
+
 ### 2026-09-20 — A Google 503 at sign-in stops paging — v0.11.5
 
 **Two pages, same class, no defect.** `SABEEL-KANBAN-WEB-C`: Google's Firebase

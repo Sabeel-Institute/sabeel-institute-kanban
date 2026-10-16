@@ -451,12 +451,55 @@ Sign-in **can** be exercised on the simulator: Google Sign-In opens a web sessio
 and comes back through the URL scheme, which is precisely the thing most likely
 to be misconfigured.
 
-**Push cannot.** A simulator gets no real APNs token, so FCM has nothing to send
-to — `xcrun simctl push` fakes a payload locally and proves only that the app
-renders a notification, not that the APNs key, the Firebase upload or the token
-registration work. End-to-end push is verifiable only on a physical iPhone, which
-means through TestFlight. Treat "push works on iOS" as unverified until it has
-been seen on a real device, and do not let a green simulator run stand in for it.
+**Push mostly can** — see "Push on the simulator" below. What it cannot do is
+a tap from OUTSIDE the app: a headless simulator's SpringBoard drops synthetic
+taps on a home-screen banner or a Notification Center entry, so a tap with the
+app in the background or closed, and a cold start from a tap, need a phone.
+They reach the same listener as a foreground tap.
+
+### Push on the simulator
+
+An Apple-silicon simulator receives REAL pushes from Apple's sandbox, and a
+debug build registers against the emulators like any device, so the iPhone half
+of push is provable here, end to end but for the outside tap above:
+
+1. A debug build (`EXPO_PUBLIC_USE_EMULATORS=1`), signed in, and **Enable
+   notifications** on the Boards screen, then Allow. It files
+   `users/<uid>/pushTokens/<token>` as
+   `{ platform: 'ios', apnsEnvironment: 'development', updatedAt }` — through
+   the rules, which admit only that shape for an iPhone.
+2. Read the token back from the Firestore emulator: it is the row's id, 160 hex
+   characters on an iOS 26 simulator.
+3. `node scripts/send-test-push.mjs --apple development <token> <boardId> <cardId>`
+   with the APNs key at `~/.apns/AuthKey_<APNS_KEY_ID>.p8` (or `APNS_KEY_FILE`).
+   It sends exactly what a notification sends, built by the functions' own code.
+4. With the app open: a banner. Tap it: the card opens.
+
+Done this way on 2026-10-15: the row filed as above, Apple's sandbox accepted
+both sends, the banner showed, and tapping it opened the named card.
+
+The emulated functions never send (`functions/src/messaging.ts`), so a card
+assigned in the app does not reach the simulator; step 3 is the delivery.
+
+**On a Mac shared with the sibling apps**, `scripts/dev.sh ios` is the wrong
+tool: it takes port 8081 and the simulator named "iPhone 17 Pro", which the
+other repos use too, and its `stop` frees 8081 and kills every `idb_companion`
+on the machine. Give the test a simulator of its own (`xcrun simctl create`),
+build with `xcodebuild … -sdk iphonesimulator -destination id=<udid>`, install
+with `simctl install`, run Metro on a free port
+(`EXPO_PUBLIC_USE_EMULATORS=1 npx expo start --port <port> --clear` in `app/`),
+and point the debug app at it before launching:
+`xcrun simctl spawn <udid> defaults write com.sabeelinstitute.kanban RCT_jsLocation 127.0.0.1:<port>`.
+Confirm which Metro the app reached — its own TCP connections
+(`lsof -a -p <app pid> -iTCP`) and that Metro's `iOS Bundled … app/index.ts`
+line — before trusting anything it shows: a Kanban shell running another
+project's bundle looks like a working app.
+`npm run check:apple-push` asks Apple whether it accepts the production key for
+this app, with a token that cannot exist, and needs no device at all.
+
+`xcrun simctl push` is a different and weaker check: it fakes a payload on the
+simulator, proving the app renders and routes one, but not the key, the token or
+the service.
 
 ## Builds on GitHub
 
@@ -668,8 +711,8 @@ They are both `.p8` files, both download exactly once, and both are real secrets
 | | APNs authentication key | App Store Connect API key |
 |---|---|---|
 | Made in | Apple Developer portal → Certificates, Identifiers & Profiles → **Keys**, with *Apple Push Notifications service (APNs)* enabled | App Store Connect → **Users and Access → Integrations → App Store Connect API** |
-| Used by | **Firebase**, to deliver push to iOS devices | build tooling, to **upload** builds (fastlane, `xcrun`, CI) |
-| Installed at | Firebase console → Project settings → Cloud Messaging → iOS app (needs the key, its Key ID, and the Team ID) | wherever the upload runs |
+| Used by | **the functions**, to send to iPhones directly (`functions/src/apns.ts`) | build tooling, to **upload** builds (fastlane, `xcrun`, CI) |
+| Installed at | Secret Manager as `APNS_KEY`; its Key ID and the Team ID in `functions/.env.sabeel-institute-kanban` (`docs/SECRETS.md`) | wherever the upload runs |
 | Without it | push silently never arrives on iOS | you cannot upload a build |
 
 Neither belongs in this repo. The App Store Connect key is on the Mac in
@@ -860,15 +903,11 @@ keyboard, on a real device.
 
 ## Things that are genuinely open
 
-- **Proof that the APNs key works.** The key itself is created and uploaded to
-  Firebase (2026-08-04) — that part is done. What is open is *verification*:
-  Firebase exposes no API for reading APNs configuration back, so nothing here
-  can tell "uploaded" from "uploaded wrong". The only proof is a push arriving on
-  a real device, which is why it is the first thing to check on the first build.
-  A push that does not arrive does not by itself indict the key: the app stores
-  what `getDevicePushTokenAsync()` returns, which on iOS is Apple's device token
-  rather than an FCM token, and the functions send every stored token through
-  FCM.
+- **A push seen on a real iPhone.** Apple accepts the key for this app
+  (`npm run check:apple-push`), and the sandbox path has been seen end to end on
+  the simulator ("Push on the simulator"). What only a phone can show is a
+  production delivery from a TestFlight install, and a tap with the app in the
+  background or closed.
 - **iPad.** `supportsTablet` is `false`. If that changes, the phone-first layout
   needs a look at iPad widths — the breakpoint work in `scripts/screens-e2e.mjs`
   covers 320-500px only.

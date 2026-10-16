@@ -363,6 +363,17 @@ itself is deliberately NOT darkened — that would collapse it into
   `scripts/check-version.mjs` already holds the version to Apple's `X.Y.Z` shape.
   `ios.buildNumber` is separate and must increase on every upload.
 - Firebase **JS SDK on all surfaces** (not react-native-firebase — no web support).
+- **Push goes through two services, and an iPhone's token is never FCM's.** The
+  JS SDK has no messaging on a phone, so an iPhone registers Apple's own device
+  token, and `functions/src/messaging.ts` sends it straight to Apple
+  (`apns.ts`, the `APNS_KEY` secret); Android and the web go through FCM. A
+  device's row is `PushTokenDoc`, exactly two shapes, rules-enforced, and an
+  iPhone's names the Apple service that issued its token. Every function that
+  sends binds `PUSH_SECRETS` (`pushSecrets.test.ts` finds them). Sending never
+  throws: `notify` writes the inbox first with generated ids, so a retried
+  trigger would duplicate every entry, and a lost push is recoverable from
+  Alerts while a doubled inbox is not. `docs/IOS-BUILD.md` § Push on the
+  simulator is how to prove it without a phone.
 - Backend: Cloud Functions (TS, nodejs22, us-central1) + Firestore + **Cloud
   Storage** (card attachments). The bucket must be a modern
   `*.firebasestorage.app` one in us-central1/us-west1/us-east1 — only those get

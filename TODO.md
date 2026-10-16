@@ -386,11 +386,12 @@ Two things worth reusing next time:
    across versions is simply the cheapest way never to collide. It is `12` now,
    unused, ready for the next upload. The GitHub upload job checks it with
    Apple before uploading.
-5. **First thing on a real device: confirm a push arrives.** The only proof the
-   APNs key was uploaded correctly — nothing on this side distinguishes
-   "uploaded" from "uploaded wrong", and a simulator cannot test it because it
-   gets no real APNs token. A push that does NOT arrive does not by itself
-   indict the key: see `docs/IOS-BUILD.md` § Things that are genuinely open.
+5. **First thing on a TestFlight install: confirm a push arrives, and that
+   tapping it with the app closed opens the card.** Apple accepts the key
+   (`npm run check:apple-push`) and the sandbox path works on the simulator;
+   the production service, and a tap from outside the app, only a phone can
+   show. Assign yourself a card from another account, or have someone mention
+   you, with the app in the background.
 6. **Before 16 October 2027: renew the iOS distribution certificate and both App
    Store profiles** (this app's and the LMS's — they share the certificate),
    then set `IOS_DIST_P12`, `IOS_DIST_P12_PASSWORD` and `IOS_PROFILE` again in
