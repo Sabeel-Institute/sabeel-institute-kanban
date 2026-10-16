@@ -60,6 +60,11 @@ again.
 
 ![Waiting for approval](manual/img/pending.png)
 
+The very first sign-in sets your account up, which shows **"Setting up your
+account…"** for a moment. If it takes longer than usual you'll see **"Still
+setting up your account"** with **Try again**: nothing is wrong with your
+account, the server is just slow. Try again in a minute.
+
 New accounts land on a **"Waiting for approval"** screen. An administrator has to
 approve your account before you can see any boards — this is deliberate, and it
 takes them one tap. Leave the page open: it lets you in by itself the moment they
@@ -944,7 +949,8 @@ stay.
 | "Before you continue" after approval | The institute's rules, which every account accepts once | Read them and tap **I agree**; it does not come back |
 | "Your report was saved but the email did not go out" | Your report is kept, but its email failed | Nothing to do: the administrators will still see it |
 | "You have sent 5 reports in the last hour" | Five reports an hour is the most one account can send | Wait a while; or tell an administrator directly |
-| You can't sign in at all | Only @oursabeel.com Google accounts are allowed | Use your work account, not a personal one |
+| You can't sign in at all, or see "Wrong account" | Only @oursabeel.com Google accounts are allowed | Use your work account, not a personal one |
+| "Still setting up your account" on a first sign-in | The server is taking longer than usual to set up a new account | Tap **Try again** in a minute; your account is fine |
 | A card's due date is red | The card is overdue | Open it and update the date, or get the work done |
 | "This card is unavailable" from a shared link | You're not a member of its board, or the card was deleted | Ask one of that board's owners to add you |
 | A column won't delete | It still has cards in it | Move or archive its cards first, then delete the column |

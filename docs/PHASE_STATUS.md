@@ -403,6 +403,44 @@ the team.
 
 ## Deploy log
 
+### 2026-10-16 — A slow first sign-in is "still setting up", never Wrong account — unreleased
+
+**Not released.** On branch `signin-race`; clients only, no backend change.
+It goes out with the next release.
+
+**A genuine colleague could be told "Wrong account".** The app waited ten
+seconds for the profile `onUserCreate` writes on a first sign-in and then
+concluded the server had refused the account. A cold start of that trigger can
+take longer in production. And on the Firestore emulator the profile can be
+missed outright, which is what failed `web-e2e` in 3 of 5 runs on clean
+`main`: measured with a script that starts the emulators cold for each sign-in
+and logs the listen channel against the document's server-side create time,
+21 of 48 first sign-ins lost the write, and every loss had the profile written
+while the client's listen for it was still being registered (between the
+listen request and its answer). The listener answered "does not exist" and
+never heard of the write. The stale answer sticks to the listen TARGET, which
+the web's persistent cache keeps with its resume token: listening again, a
+direct read from the server, a token refresh and a plain page reload all kept
+it (4 of 4 reloads stuck); a new target, from an emptied cache, heard the
+server every time (4 of 4).
+
+**Now:** time refuses nobody. While the profile is missing, the app asks Auth
+whether the account still exists (`accounts:lookup`, at 3 s and every 5 s;
+`app/src/auth/accountLookup.ts`, the same as the time tracker's), and only
+Auth answering "not found", which is how `onUserCreate` refuses an outside
+address, shows **Wrong account**. Past 15 s the screen says **"Still setting
+up your account"** with **Try again** and Sign out. Try again is a fresh
+connection (`app/src/freshConnection*.ts`): on the web the Firestore cache
+emptied, once no write is waiting to be sent, and the page reloaded; on a
+phone the connection closed and reopened. Every browser suite and the dev seed
+settle a first sign-in through that Try again (`scripts/lib/signin.mjs`) and
+print how many needed it.
+
+**The rules' wording** (same branch, its own commit): "post only what belongs
+to your work, post nothing abusive, harassing, hateful, sexual or otherwise
+objectionable, and never abuse another member. The institute tolerates
+neither." `RULES_VERSION` stays 1: the meaning is the same.
+
 ### 2026-10-16 — The institute's rules, and Report a problem — unreleased
 
 **Not released.** On branch `rules-and-report`; it goes out with the next
