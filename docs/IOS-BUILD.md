@@ -557,7 +557,9 @@ mistake to expect at renewal — a new certificate with the old profile.
 | `APP_ENV_LOCAL` | `app/.env.local` | the Mac's copy, `NAME=value` lines only |
 
 `app/GoogleService-Info.plist` is committed, so it needs no secret. Everything
-in the table is also in Faisal's vault, `~/.config/secrets-vault/sabeel/apple/`.
+in the table is also in Faisal's vault, `~/.config/secrets-vault/`: the signing
+files and the key under `sabeel/apple/`, the two env files under
+`sabeel/kanban/env/`.
 
 Set one with `gh secret set NAME -R faisal-shah/sabeel-institute-kanban < file`
 (`base64 -w0 file | gh secret set NAME …` for the two binary ones). **Keep
