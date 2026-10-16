@@ -21,7 +21,10 @@ const OUTCOMES = {
  *
  * The report goes to the reportProblem callable, which keeps it and emails it
  * to the institute's administrators with Reply-To the reporter; their name and
- * email address go with it, and the screen says so before they send.
+ * email address go with it, and the screen says so before they send. It also
+ * says what an administrator can do about it, up to removing someone from the
+ * app entirely: blocking is all or nothing here, there is no per-person block
+ * (docs/STORE-RELEASE.md § 4, @mentions).
  *
  * The text lives in `reportDraft`, not here, so Back and coming back find it
  * as it was left. It clears only once the server has kept the report.
@@ -59,7 +62,8 @@ export function ReportScreen() {
       </Row>
       <Body>
         Your report goes by email to the institute&rsquo;s administrators, with your
-        name and email address so they can reply.
+        name and email address so they can reply. They can take a post down, or
+        remove someone from the app entirely.
       </Body>
       <Hint>{FIELD_LABEL}</Hint>
       <TextField
