@@ -30,8 +30,10 @@ export interface ComposedMessage {
   to: string;
   replyTo: Mailbox;
   subject: string;
-  /** The plain-text body, before transfer encoding. */
-  body: string;
+  /** The text/plain part, before transfer encoding: one line per paragraph or detail. */
+  text: string;
+  /** The text/html part, the same facts, every interpolated value escaped. */
+  html: string;
   /** The whole RFC 5322 message, CRLF line ends, as Gmail's `raw` takes it once base64url-encoded. */
   raw: string;
 }
@@ -116,6 +118,32 @@ function base64Lines(text: string): string {
   );
 }
 
+const HTML_ESCAPES: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+};
+
+/** Text as HTML text: the five characters that could open a tag, an entity or an attribute. */
+export function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
+}
+
+/**
+ * The report as an email: multipart/alternative, a text/plain part and a
+ * text/html part carrying the same facts.
+ *
+ * Both, because plain text alone reads ragged on a phone: a mail app breaks
+ * it at its own fixed width. So the plain part carries no line breaks of ours
+ * inside a sentence (one line per paragraph, one per detail), and the HTML
+ * part lets the reader's mail app flow it: short paragraphs, the details as a
+ * plain table, the person's words with their line breaks as `<br>`. No style,
+ * no image, and no link but `mailto:` the reporter. Everything interpolated
+ * into the HTML is escaped, the person's text above all, so what they typed
+ * can never become markup in an administrator's inbox.
+ */
 export function composeReportMessage(
   report: ReportForMail,
   { from, to }: { from: Mailbox; to: string },
@@ -124,33 +152,77 @@ export function composeReportMessage(
   const replyTo: Mailbox = { name, address: report.email };
   const subject = `[${report.appName}] Report from ${name}`;
 
-  const app = [
-    report.appName,
-    report.appVersion ? report.appVersion : null,
-    report.platform ? `on ${PLATFORM_NAMES[report.platform]}` : null,
-  ]
-    .filter(Boolean)
-    .join(' ');
+  const app =
+    [
+      report.appName,
+      report.appVersion ? report.appVersion : null,
+      report.platform ? `on ${PLATFORM_NAMES[report.platform]}` : null,
+    ]
+      .filter(Boolean)
+      .join(' ') + (report.platform || report.appVersion ? '' : ' (version and platform not sent)');
+  const when = `${institutionalTime(report.filedAt)} (${ORG_TIMEZONE})`;
+  const said = report.text.replace(/\r\n?/g, '\n');
+  const intro = `${name} reported a problem in ${report.appName}.`;
+  const question = 'What or who are you reporting, and what is wrong?';
+  const footer =
+    'Reply to this email to answer the reporter: it goes to them, not to the app. The institute answers reports within 24 hours.';
 
-  const body = [
-    `${name} reported a problem in ${report.appName}.`,
+  /** The details, once, so the two parts cannot disagree about them. */
+  const details: [string, string][] = [
+    ['Who', `${name} <${report.email}>`],
+    ['Role', report.role],
+    ['Uid', report.uid],
+    ['When', when],
+    ['App', app],
+    ['Report', `reports/${report.reportId}`],
+  ];
+
+  const text = [
+    intro,
     '',
-    `Who:    ${name} <${report.email}>`,
-    `Role:   ${report.role}`,
-    `Uid:    ${report.uid}`,
-    `When:   ${institutionalTime(report.filedAt)} (${ORG_TIMEZONE})`,
-    `App:    ${app}${report.platform || report.appVersion ? '' : ' (version and platform not sent)'}`,
-    `Report: reports/${report.reportId}`,
+    ...details.map(([label, value]) => `${`${label}:`.padEnd(8)}${value}`),
     '',
-    'What or who are you reporting, and what is wrong?',
+    question,
     '',
-    report.text,
+    said,
     '',
     '--',
-    'Reply to this email to answer the reporter: it goes to them, not to the app.',
-    'The institute answers reports within 24 hours.',
+    footer,
     '',
   ].join('\n');
+
+  const cell = (label: string, value: string) =>
+    label === 'Who'
+      ? `${escapeHtml(name)} &lt;<a href="mailto:${escapeHtml(encodeURI(report.email))}">${escapeHtml(report.email)}</a>&gt;`
+      : escapeHtml(value);
+  const html = [
+    '<!DOCTYPE html>',
+    '<html><head><meta charset="utf-8"></head><body>',
+    `<p>${escapeHtml(intro)}</p>`,
+    '<table>',
+    ...details.map(([label, value]) => `<tr><th align="left">${label}</th><td>${cell(label, value)}</td></tr>`),
+    '</table>',
+    `<p><b>${escapeHtml(question)}</b></p>`,
+    `<p>${said.split('\n').map(escapeHtml).join('<br>\n')}</p>`,
+    '<hr>',
+    `<p>${escapeHtml(footer)}</p>`,
+    '</body></html>',
+    '',
+  ].join('\n');
+
+  /**
+   * Starts with `=_`, which no base64 line can contain, so the boundary
+   * cannot occur inside either part.
+   */
+  const boundary = `=_sabeel_report_${report.reportId}`;
+  const part = (type: string, content: string) =>
+    [
+      `--${boundary}`,
+      `Content-Type: ${type}; charset=UTF-8`,
+      'Content-Transfer-Encoding: base64',
+      '',
+      base64Lines(content.replace(/\r?\n/g, '\r\n')),
+    ].join('\r\n');
 
   const headers = [
     `From: ${formatMailbox(from)}`,
@@ -158,10 +230,18 @@ export function composeReportMessage(
     `Reply-To: ${formatMailbox(replyTo)}`,
     `Subject: ${headerText(subject)}`,
     'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset=UTF-8',
-    'Content-Transfer-Encoding: base64',
+    // Folded onto a second line: with a twenty-character report id, one line
+    // would run past the 78 characters a header line should keep to.
+    `Content-Type: multipart/alternative;\r\n boundary="${boundary}"`,
   ];
-  const raw = `${headers.join('\r\n')}\r\n\r\n${base64Lines(body.replace(/\r?\n/g, '\r\n'))}\r\n`;
+  const raw = [
+    headers.join('\r\n'),
+    '',
+    part('text/plain', text),
+    part('text/html', html),
+    `--${boundary}--`,
+    '',
+  ].join('\r\n');
 
-  return { to, replyTo, subject, body, raw };
+  return { to, replyTo, subject, text, html, raw };
 }

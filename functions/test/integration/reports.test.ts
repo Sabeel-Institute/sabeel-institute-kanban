@@ -193,7 +193,8 @@ describe('the send, counted (fileReport in process)', () => {
     expect(sent[0].to).toBe(REPORT_TO);
     expect(sent[0].replyTo).toEqual({ name: 'Dina Direct', address: 'rp_direct@oursabeel.com' });
     expect(sent[0].subject).toBe(`[${APP_NAME}] Report from Dina Direct`);
-    expect(sent[0].body).toContain('Please look at the Budget board.');
+    expect(sent[0].text).toContain('Please look at the Budget board.');
+    expect(sent[0].html).toContain('Please look at the Budget board.');
 
     const docs = await reportsOf(DIRECT);
     expect(docs).toHaveLength(1);

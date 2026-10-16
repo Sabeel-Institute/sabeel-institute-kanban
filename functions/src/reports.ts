@@ -185,7 +185,7 @@ const emulatorSender: ReportSender = async (message) => {
     to: message.to,
     replyTo: message.replyTo,
     subject: message.subject,
-    body: message.body,
+    text: message.text,
   });
   return { status: 'skipped' };
 };
