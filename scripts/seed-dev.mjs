@@ -50,15 +50,25 @@ async function open(browser) {
 
 const browser = await chromium.launch();
 
-/** Did this account land on the approval gate, or is it already through? */
+/**
+ * Did this account land on the approval gate, or is it already through?
+ *
+ * A first sign-in can stop on the app's "Still setting up your account" (a
+ * profile write the emulator's listener missed; lib/signin.mjs), and is then
+ * answered with the app's own Try again, as a person would.
+ */
 async function signIn(page, who) {
   await page.getByRole('button', { name: who, exact: true }).click();
   const gate = page.getByText('Waiting for approval');
   const through = page.getByText('Boards', { exact: true });
-  await Promise.race([
-    gate.waitFor({ timeout: 40000 }).catch(() => {}),
-    through.waitFor({ timeout: 40000 }).catch(() => {}),
-  ]);
+  const slow = page.getByText('Still setting up your account', { exact: true });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await gate.or(through).or(slow).first().waitFor({ timeout: 60000 }).catch(() => {});
+    if (!(await slow.isVisible().catch(() => false))) break;
+    console.log(`  ${who}: "Still setting up your account" — pressing the app's Try again`);
+    await page.getByRole('button', { name: 'Try again', exact: true }).click();
+    await slow.waitFor({ state: 'detached', timeout: 30000 }).catch(() => {});
+  }
   return gate.isVisible().catch(() => false);
 }
 

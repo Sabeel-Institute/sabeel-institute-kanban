@@ -24,7 +24,11 @@ import { spawn } from 'node:child_process';
 import { readFile, mkdir } from 'node:fs/promises';
 import { extname, join, resolve } from 'node:path';
 import { EMULATOR_PORTS, WEB_PORTS } from './lib/ports.mjs';
+import { settle, tryAgainTally } from './lib/signin.mjs';
 import { RULES_TITLE, agreeToRules } from './lib/rules.mjs';
+
+/** First sign-ins that took the app's Try again (lib/signin.mjs), printed with the results. */
+const tally = tryAgainTally();
 
 const SHOTS = resolve(import.meta.dirname, '..', 'shots');
 // The Expo web DEV server, started by e2e.sh. It must be the dev server rather
@@ -337,7 +341,7 @@ try {
 
   // ---- Sign in → pending gate --------------------------------------------
   await admin.getByRole('button', { name: 'faisal', exact: true }).click();
-  await admin.getByText('Waiting for approval').waitFor({ timeout: 25000 });
+  tally.note('faisal', await settle(admin, admin.getByText('Waiting for approval')));
   check('a brand-new org account lands on the pending gate', true);
   await admin.screenshot({ path: join(SHOTS, 'p1-pending-light.png'), fullPage: true });
 
@@ -390,7 +394,7 @@ try {
   const { ctx: saraCtx, page: sara } = await newApp(browser);
   pages.set('sara', sara);
   await sara.getByRole('button', { name: 'sara', exact: true }).click();
-  await sara.getByText('Waiting for approval').waitFor({ timeout: 25000 });
+  tally.note('sara', await settle(sara, sara.getByText('Waiting for approval')));
   check('second account also lands pending', true);
 
   // ---- Admin sees and approves her ----------------------------------------
@@ -2217,6 +2221,70 @@ try {
   await saraCtx.close();
   pages.delete('sara');
 
+  // ---- A late profile is "still setting up", never Wrong account ----------
+  // A genuine account whose profile the server has not written — a cold
+  // trigger in production, or a write the listener missed, as the emulator was
+  // measured doing — must hear "still setting up", with Try again, and get in
+  // once the profile is there. The profile is taken away from an account that
+  // exists, which is exactly that state: signed in, genuine, no profile.
+  {
+    const { ctx, page } = await newApp(browser);
+    pages.set('late', page);
+    await page.getByRole('button', { name: 'omar', exact: true }).click();
+    tally.note('omar', await settle(page, page.getByText('Waiting for approval')));
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await page.getByText('Sign in with Google').waitFor({ timeout: 20000 });
+    const omar = await adminJson(`
+      const u = await auth.getUserByEmail('omar@oursabeel.com');
+      const ref = db.doc('users/' + u.uid);
+      const profile = (await ref.get()).data();
+      await ref.delete();
+      console.log(JSON.stringify({ uid: u.uid, profile }));
+    `);
+    await page.getByRole('button', { name: 'omar', exact: true }).click();
+    const slow = await page
+      .getByText('Still setting up your account')
+      .waitFor({ timeout: 30000 })
+      .then(() => true, () => false);
+    check('a genuine account whose profile is late hears "still setting up", with Try again', slow &&
+      (await page.getByRole('button', { name: 'Try again' }).isVisible()));
+    // Past two of the app's own checks, and still not a refusal.
+    await page.waitForTimeout(12000);
+    check(
+      'and is never told Wrong account while it waits',
+      !(await page.getByText('Wrong account').isVisible().catch(() => false)) &&
+        (await page.getByText('Still setting up your account').isVisible().catch(() => false)),
+    );
+    await page.screenshot({ path: join(SHOTS, 'p1-still-setting-up-light.png'), fullPage: true });
+    // The profile written: the app hears it, or finds it at its next check,
+    // without anyone pressing anything. (Try again's own effect is
+    // app/src/session.test.ts: here the listener would beat any press.)
+    await adminRun(`await db.doc('users/${omar.uid}').set(${JSON.stringify(omar.profile)});`);
+    const inOnceThere = await page
+      .getByText('Waiting for approval')
+      .waitFor({ timeout: 20000 })
+      .then(() => true, () => false);
+    check('once the profile is there, it gets in by itself', inOnceThere);
+
+    // And the one refusal left: the server deletes the account while it waits
+    // for its profile, as onUserCreate does to an address outside the
+    // institute. Auth then says the account is gone, and only that is
+    // "Wrong account".
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await page.getByText('Sign in with Google').waitFor({ timeout: 20000 });
+    await adminRun(`await db.doc('users/${omar.uid}').delete();`);
+    await page.getByRole('button', { name: 'omar', exact: true }).click();
+    await page.getByText(/Setting up your account|Still setting up your account/).first().waitFor({ timeout: 20000 });
+    await adminRun(`await auth.deleteUser('${omar.uid}');`);
+    const refused = await page
+      .getByText('Wrong account')
+      .waitFor({ timeout: 30000 })
+      .then(() => true, () => false);
+    check('an account the server deleted while it waited is told Wrong account', refused);
+    await ctx.close();
+    pages.delete('late');
+  }
+
   const { ctx: badCtx, page: bad } = await newApp(browser);
   // Give it room to boot before interacting: a click that races the first render
   // reads as a mystery failure rather than a slow start.
@@ -2621,6 +2689,7 @@ try {
 }
 
 const failed = results.filter((r) => !r.ok);
+console.log(`  ${tally.summary()}`);
 console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
 if (failed.length) {
   console.error('FAILED:', failed.map((f) => f.name).join(', '));

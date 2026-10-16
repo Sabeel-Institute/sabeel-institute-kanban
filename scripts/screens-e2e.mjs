@@ -50,7 +50,11 @@ import { initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { RULES_VERSION } from '../packages/shared/lib/report.js';
 import { EMULATOR_PORTS, WEB_PORTS } from './lib/ports.mjs';
+import { settle, tryAgainTally } from './lib/signin.mjs';
 import { RULES_TITLE, agreeToRules } from './lib/rules.mjs';
+
+/** First sign-ins that took the app's Try again (lib/signin.mjs), printed with the results. */
+const tally = tryAgainTally();
 
 const BASE = process.env.E2E_BASE ?? `http://127.0.0.1:${WEB_PORTS.e2e}/`;
 const ROOT = resolve(import.meta.dirname, '..');
@@ -134,7 +138,7 @@ const browser = await chromium.launch();
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.getByText('Dev sign-in (emulator only)').waitFor({ timeout: 20000 });
   await page.getByRole('button', { name: 'faisal', exact: true }).click();
-  await page.getByText('Waiting for approval').waitFor({ timeout: 25000 });
+  tally.note('faisal', await settle(page, page.getByText('Waiting for approval')));
   await grantAdmin('faisal@oursabeel.com');
   await agreeToRules(page);
   await page.getByRole('button', { name: 'New board' }).waitFor({ timeout: 25000 });
@@ -160,7 +164,7 @@ async function provision(who, email) {
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.getByText('Dev sign-in (emulator only)').waitFor({ timeout: 20000 });
   await page.getByRole('button', { name: who, exact: true }).click();
-  await page.getByText('Waiting for approval').waitFor({ timeout: 25000 });
+  tally.note(who, await settle(page, page.getByText('Waiting for approval')));
   await ctx.close();
   const snap = await db.collection('users').where('email', '==', email).get();
   if (snap.empty) throw new Error(`${who} was never provisioned`);
@@ -1184,6 +1188,7 @@ try {
 }
 
 const failed = results.filter((r) => !r.ok);
+console.log(`  ${tally.summary()}`);
 console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
 console.log(`shots/screens/ — ${WIDTHS.length + PROFILES.length} viewports x ${SCREENS} screens`);
 if (!FULL) console.log('SWEEP_FULL=1 adds real device profiles (DPR, touch, UA).');

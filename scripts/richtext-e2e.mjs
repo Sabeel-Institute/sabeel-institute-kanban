@@ -24,7 +24,11 @@ import { resolve } from 'node:path';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { EMULATOR_PORTS, WEB_PORTS } from './lib/ports.mjs';
+import { settle, tryAgainTally } from './lib/signin.mjs';
 import { agreeToRules } from './lib/rules.mjs';
+
+/** First sign-ins that took the app's Try again (lib/signin.mjs), printed with the results. */
+const tally = tryAgainTally();
 
 const BASE = process.env.E2E_BASE ?? `http://127.0.0.1:${WEB_PORTS.e2e}/`;
 const ROOT = resolve(import.meta.dirname, '..');
@@ -55,7 +59,7 @@ async function provision(who, email) {
   await p.goto(BASE, { waitUntil: 'networkidle' });
   await p.getByText('Dev sign-in (emulator only)').waitFor({ timeout: 20000 });
   await p.getByRole('button', { name: who, exact: true }).click();
-  await p.getByText('Waiting for approval').waitFor({ timeout: 25000 });
+  tally.note(who, await settle(p, p.getByText('Waiting for approval')));
   await grant(email);
   await agreeToRules(p);
   await ctx.close();
@@ -591,6 +595,7 @@ await page.screenshot({ path: 'shots/richtext-e2e.png', fullPage: true });
 await browser.close();
 
 const failed = results.filter((r) => !r.ok);
+console.log(`  ${tally.summary()}`);
 console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
 if (failed.length) {
   console.error(`FAILED: ${failed.map((f) => f.name).join('; ')}`);
