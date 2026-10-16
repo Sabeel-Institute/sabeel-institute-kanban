@@ -1,21 +1,37 @@
-import { Linking } from 'react-native';
+import { Linking, Platform } from 'react-native';
+import {
+  ApplicationReleaseType,
+  getIosApplicationReleaseTypeAsync,
+  getIosPushNotificationServiceEnvironmentAsync,
+} from 'expo-application';
 import * as Notifications from 'expo-notifications';
 import { deleteDoc, doc, setDoc } from 'firebase/firestore';
-import { PUSH_CHANNEL_ID, PUSH_CHANNEL_NAME } from '@sabeel/shared';
+import {
+  PUSH_CHANNEL_ID,
+  PUSH_CHANNEL_NAME,
+  type ApnsEnvironment,
+  type PushTokenDoc,
+} from '@sabeel/shared';
 import { db } from './firebase';
 import { USE_EMULATORS } from './env';
 import { captureError } from './sentry';
 
-/** Watches for FCM rotating the device token. One at a time, per signed-in uid. */
+/** Watches for the platform rotating the device token. One at a time, per signed-in uid. */
 let tokenListener: { remove: () => void } | null = null;
 
 /**
  * Push registration — NATIVE (web sibling: notify.web.ts).
  *
- * Asks permission, takes the device's FCM token, and files it under
+ * Asks permission, takes the device's own push token, and files it under
  * `users/{uid}/pushTokens/{token}` so the notification functions can reach this
  * device. Until this existed the server sent to an empty token list every time:
  * the whole push path was built and unreachable.
+ *
+ * The token is the PLATFORM's: FCM's on Android, Apple's (hex) on an iPhone,
+ * where nothing registers with FCM. The row says which (`deviceRow`), because
+ * the server sends the two through different services — and every iPhone
+ * filed itself as 'android' until v0.11.5 build 11, so FCM refused its token
+ * and iPhones heard nothing.
  *
  * A document per token, not an array on the user doc — two devices registering
  * at once cannot collide, and firestore.rules can scope write access to a
@@ -136,6 +152,46 @@ export async function registerPush(uid: string): Promise<boolean> {
  * web sibling's function of the same name does the same job.
  */
 async function claimToken(uid: string): Promise<boolean> {
+  if (Platform.OS === 'android') await androidChannels();
+
+  // Against the emulators a token is filed only where something here can
+  // deliver to it. FCM has no emulator, so an Android token is withheld —
+  // and BELOW the channel setup, not on the first line of `registerPush`,
+  // which is the point: with the gate there a local build could never once
+  // raise the Android dialog or create the channel, so the one native surface
+  // a browser cannot reach was unreachable from the only build this project
+  // can put on a device. An iPhone simulator's token comes from Apple's
+  // sandbox, which `scripts/send-test-push.mjs` reaches, so it is filed: that
+  // is how a local build proves the whole path, rules included. The emulated
+  // functions never send either way (functions/src/messaging.ts).
+  if (tokenless()) return false;
+
+  // getDevicePushTokenAsync gives the platform's own token, which is what the
+  // server sends to. getExpoPushTokenAsync would return an Expo token and
+  // route through Expo's service instead — a different delivery path that the
+  // functions do not use.
+  const { data: token } = await Notifications.getDevicePushTokenAsync();
+  if (typeof token !== 'string' || !token) return false;
+
+  await storeToken(uid, token);
+
+  // The platform rotates a token on its own schedule — a restore to a new
+  // device, an app-data clear, a long enough gap. When it does, the stored one
+  // is dead: the server prunes it on the next send and that person silently
+  // stops getting notifications until they happen to sign out and back in.
+  // Nothing else would ever tell us, because registration only runs at sign-in.
+  if (!tokenListener) {
+    tokenListener = Notifications.addPushTokenListener((next) => {
+      if (typeof next.data === 'string' && next.data) {
+        void storeToken(uid, next.data).catch(() => undefined);
+      }
+    });
+  }
+  return true;
+}
+
+/** Android's notification channel; iOS has none. */
+async function androidChannels(): Promise<void> {
   // The channel the server addresses by id — see PUSH_CHANNEL_ID for why the
   // two must agree and why the importance has to be right the first time.
   await Notifications.setNotificationChannelAsync(PUSH_CHANNEL_ID, {
@@ -147,48 +203,42 @@ async function claimToken(uid: string): Promise<boolean> {
   // as a second, permanently silent "Default" that people would reasonably
   // try to configure.
   await Notifications.deleteNotificationChannelAsync('default').catch(() => {});
+}
 
-  // FCM has no emulator. A token minted here could never be delivered to and
-  // would make local runs non-deterministic — so registration stops at the
-  // token, exactly where the web sibling stops it.
-  //
-  // BELOW the channel setup, not above the whole function, and that placement
-  // is the point: with the gate on the first line of `registerPush` a local
-  // build could never once raise the Android dialog or create the channel, so
-  // the one native surface a browser cannot reach was unreachable from the only
-  // build this project can put on a device. Everything above this line is real
-  // on a local run now; only the token is withheld.
-  if (USE_EMULATORS) return false;
-
-  // getDevicePushTokenAsync gives the native FCM token, which is what the
-  // Admin SDK sends to. getExpoPushTokenAsync would return an Expo token and
-  // route through Expo's service instead — a different delivery path that the
-  // functions do not use.
-  const { data: token } = await Notifications.getDevicePushTokenAsync();
-  if (typeof token !== 'string' || !token) return false;
-
-  await storeToken(uid, token);
-
-  // FCM rotates a token on its own schedule — a restore to a new device, an
-  // app-data clear, a long enough gap. When it does, the stored one is dead:
-  // the server prunes it on the next send and that person silently stops
-  // getting notifications until they happen to sign out and back in. Nothing
-  // else would ever tell us, because registration only runs at sign-in.
-  if (!tokenListener) {
-    tokenListener = Notifications.addPushTokenListener((next) => {
-      if (typeof next.data === 'string' && next.data) {
-        void storeToken(uid, next.data).catch(() => undefined);
-      }
-    });
-  }
-  return true;
+/** See `claimToken`: an Android build against the emulators files no token. */
+function tokenless(): boolean {
+  return USE_EMULATORS && Platform.OS !== 'ios';
 }
 
 async function storeToken(uid: string, token: string): Promise<void> {
-  await setDoc(doc(db, 'users', uid, 'pushTokens', token), {
-    platform: 'android',
-    updatedAt: Date.now(),
-  });
+  await setDoc(doc(db, 'users', uid, 'pushTokens', token), await deviceRow(Date.now()));
+}
+
+/**
+ * The row this device files under its token (`PushTokenDoc`; firestore.rules
+ * admits exactly its two shapes).
+ *
+ * An iPhone's also says WHICH of Apple's two push services issued the token,
+ * because each refuses the other's and the server must ask the right one.
+ */
+async function deviceRow(updatedAt: number): Promise<PushTokenDoc> {
+  if (Platform.OS !== 'ios') return { platform: 'android', updatedAt };
+  return { platform: 'ios', apnsEnvironment: await apnsEnvironment(), updatedAt };
+}
+
+/**
+ * The service is fixed by the build that minted the token, and the build's
+ * provisioning profile says which: development (an Xcode build on a phone) or
+ * production. Only two installs carry no profile, and they are the two ends:
+ * the SIMULATOR, whose tokens come from Apple's sandbox, and an install from
+ * TestFlight or the App Store, which Apple delivers without one and which
+ * always uses production.
+ */
+async function apnsEnvironment(): Promise<ApnsEnvironment> {
+  const fromProfile = await getIosPushNotificationServiceEnvironmentAsync();
+  if (fromProfile === 'development' || fromProfile === 'production') return fromProfile;
+  const release = await getIosApplicationReleaseTypeAsync();
+  return release === ApplicationReleaseType.SIMULATOR ? 'development' : 'production';
 }
 
 /**
@@ -197,7 +247,7 @@ async function storeToken(uid: string, token: string): Promise<void> {
  * notifications — which is a disclosure, not just an annoyance.
  */
 export async function unregisterPush(uid: string): Promise<void> {
-  if (USE_EMULATORS) return;
+  if (tokenless()) return;
   // Stop watching for rotations first: the listener closes over the uid that is
   // signing out, so a rotation arriving mid-sign-out would file the new token
   // straight back under the account we are in the middle of detaching.

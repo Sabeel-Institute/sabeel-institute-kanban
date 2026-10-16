@@ -8,8 +8,11 @@
  * convenient way to test is with the app already open in the background, which
  * is precisely the case that works either way.
  *
- * What comes back is the FCM `data` payload the notification functions send
- * (`{ type, boardId, cardId }`), untouched. Turning that into a screen is
+ * What comes back is the routing data the notification functions send
+ * (`{ type, boardId, cardId, notifId }`), untouched: FCM's `data` on Android,
+ * and on an iPhone the `body` dictionary of Apple's payload, which is all
+ * expo-notifications hands over as a remote notification's data there
+ * (functions/src/apns.ts). Turning that into a screen is
  * `routeForNotification`'s job, shared with the in-app Alerts list.
  */
 import * as Notifications from 'expo-notifications';

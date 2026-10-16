@@ -19,7 +19,16 @@ vi.mock('expo-notifications', () => ({
   addPushTokenListener: vi.fn(() => ({ remove: vi.fn() })),
   AndroidImportance: { HIGH: 4, DEFAULT: 3 },
 }));
-vi.mock('react-native', () => ({ Linking: { openSettings: vi.fn(() => Promise.resolve()) } }));
+const platform = vi.hoisted(() => ({ OS: 'android' as 'android' | 'ios' }));
+vi.mock('react-native', () => ({
+  Linking: { openSettings: vi.fn(() => Promise.resolve()) },
+  Platform: platform,
+}));
+vi.mock('expo-application', () => ({
+  ApplicationReleaseType: { UNKNOWN: 0, SIMULATOR: 1, ENTERPRISE: 2, DEVELOPMENT: 3, AD_HOC: 4, APP_STORE: 5 },
+  getIosPushNotificationServiceEnvironmentAsync: vi.fn(),
+  getIosApplicationReleaseTypeAsync: vi.fn(),
+}));
 vi.mock('firebase/firestore', () => ({
   doc: vi.fn(() => ({})),
   setDoc: vi.fn(() => Promise.resolve()),
@@ -29,6 +38,7 @@ vi.mock('./firebase', () => ({ db: {} }));
 vi.mock('./env', () => ({ USE_EMULATORS: false }));
 vi.mock('./sentry', () => ({ captureError: vi.fn() }));
 
+import * as Application from 'expo-application';
 import * as Notifications from 'expo-notifications';
 import { setDoc } from 'firebase/firestore';
 import { enablePush, pushPromptState, registerPush } from './notify';
@@ -44,7 +54,20 @@ function device(opts: { granted: boolean; canAskAgain?: boolean; token?: string 
   });
 }
 
-beforeEach(() => vi.clearAllMocks());
+/** An iPhone, of the given build: what its profile says, and how it was installed. */
+function iphone(profile: string | null, release: number) {
+  platform.OS = 'ios';
+  asMock(Application.getIosPushNotificationServiceEnvironmentAsync).mockResolvedValue(profile);
+  asMock(Application.getIosApplicationReleaseTypeAsync).mockResolvedValue(release);
+}
+
+/** What the last registration filed. */
+const filed = () => asMock(setDoc).mock.calls.at(-1)?.[1];
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  platform.OS = 'android';
+});
 
 describe('registerPush', () => {
   it('reports the token landing, not merely the permission', async () => {
@@ -63,6 +86,43 @@ describe('registerPush', () => {
     device({ granted: false });
     await expect(registerPush('user-1')).resolves.toBe(false);
     expect(setDoc).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * WHAT A DEVICE FILES, which decides which service the server sends it
+ * through. Every iPhone filed itself as 'android' until v0.11.5 build 11, so
+ * FCM was handed Apple's token, refused it, and iPhones heard nothing. The
+ * rules admit exactly these shapes (functions/test/integration/rules.test.ts).
+ */
+describe('the row a device files', () => {
+  it("an Android phone's: its platform, nothing else", async () => {
+    device({ granted: true });
+    await registerPush('user-1');
+    expect(filed()).toEqual({ platform: 'android', updatedAt: expect.any(Number) });
+    expect(Notifications.setNotificationChannelAsync).toHaveBeenCalled();
+  });
+
+  const builds: [string, string | null, number, 'development' | 'production'][] = [
+    ['a debug build on the simulator (no profile; Apple sandbox)', null, 1, 'development'],
+    ['a TestFlight or App Store install (no profile; production)', null, 5, 'production'],
+    ['an Xcode build on a phone (a development profile)', 'development', 3, 'development'],
+    ['an ad hoc build (a production profile)', 'production', 4, 'production'],
+  ];
+
+  it.each(builds)("an iPhone's, from %s: the Apple service that issued its token", async (_what, profile, release, env) => {
+    device({ granted: true, token: 'ab'.repeat(32) });
+    iphone(profile, release);
+    await expect(registerPush('user-1')).resolves.toBe(true);
+    expect(filed()).toEqual({ platform: 'ios', apnsEnvironment: env, updatedAt: expect.any(Number) });
+  });
+
+  it('an iPhone has no Android channel to make', async () => {
+    device({ granted: true, token: 'ab'.repeat(32) });
+    iphone(null, 1);
+    await registerPush('user-1');
+    expect(Notifications.setNotificationChannelAsync).not.toHaveBeenCalled();
+    expect(Notifications.deleteNotificationChannelAsync).not.toHaveBeenCalled();
   });
 });
 
@@ -113,11 +173,24 @@ describe('against the emulators', () => {
     await expect(state()).resolves.toBe('default');
   });
 
-  it('files no token there is no emulator to deliver to', async () => {
+  it('an Android build files no token: FCM has no emulator to deliver it', async () => {
     device({ granted: true });
     const { registerPush: reg } = await loadWithEmulators();
     await expect(reg('user-1')).resolves.toBe(false);
     expect(setDoc).not.toHaveBeenCalled();
+  });
+
+  /**
+   * An iPhone simulator's token comes from Apple's sandbox, which
+   * scripts/send-test-push.mjs reaches, so a local build files it: that is how
+   * the registration path — rules included — is proved without a phone.
+   */
+  it("an iPhone simulator files its sandbox token, since Apple's sandbox can deliver it", async () => {
+    device({ granted: true, token: 'ab'.repeat(32) });
+    iphone(null, 1);
+    const { registerPush: reg } = await loadWithEmulators();
+    await expect(reg('user-1')).resolves.toBe(true);
+    expect(filed()).toEqual({ platform: 'ios', apnsEnvironment: 'development', updatedAt: expect.any(Number) });
   });
 
   /**
