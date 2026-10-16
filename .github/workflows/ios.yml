@@ -167,6 +167,23 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+      # What the bundle was made from: the JavaScript source map, and the pod
+      # versions this build resolved (app/ios is generated, so no Podfile.lock
+      # is committed). For comparing two builds, and reading a crash.
+      - name: Build record
+        run: |
+          mkdir -p "$RUNNER_TEMP/record"
+          cp app/ios/Podfile.lock "$RUNNER_TEMP/record/"
+          find "$HOME/Library/Developer/Xcode/DerivedData" -name main.jsbundle.map -path '*Release-iphoneos*' \
+            -exec cp {} "$RUNNER_TEMP/record/" \; -quit
+          ls -la "$RUNNER_TEMP/record"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-record
+          path: ${{ runner.temp }}/record
+          retention-days: 14
+
       - name: Remove the keychain
         if: always()
         run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
