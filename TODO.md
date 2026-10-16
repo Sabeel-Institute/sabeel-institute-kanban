@@ -395,10 +395,10 @@ Play internal testing now; public production is the destination
       only.
 - [x] **Android verified end to end (2026-08-03):** installed from the internal
       testing track, signed in, and push received on the device.
-- [ ] **Tick "Sabeel staff" on the track**, once the list exists. Play Console → Kanban → *Testing →
-      Internal testing → Testers* → tick the **Sabeel staff** email list → Save.
-      Then copy the **opt-in link** from that page and send it to the team —
-      Play sends no email (`docs/DEPLOY.md` § Testers).
+- [x] **"Sabeel staff" ticked on the track** (2026-10-16); the opt-in link
+      is live on Play Console → Kanban → *Testing → Internal testing →
+      Testers*. Send it to the team: Play sends no email (`docs/DEPLOY.md`
+      § Testers).
 - [ ] **Hand the opt-in link to Claude**, to replace "Link coming shortly" on
       the Android button of `app/public/get-app.html`.
 
