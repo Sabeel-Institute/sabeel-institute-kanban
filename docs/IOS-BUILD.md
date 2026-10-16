@@ -776,7 +776,7 @@ build.
 
 ### The review account
 
-A reviewer signs in through **Sign in with email** as `app-review@oursabeel.com`,
+A reviewer signs in through **Sign in with email** as `apps-reviewer@oursabeel.com`,
 an ordinary member of one board of sample cards — never through a Google
 Workspace sign-in, whose login challenge a reviewer cannot pass. Its password is in the
 vault and goes into App Store Connect's App Review Information

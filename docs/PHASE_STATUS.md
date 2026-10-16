@@ -36,7 +36,7 @@ testing, and on iPhones through TestFlight:
 - Google sign-in restricted to `@oursabeel.com`, enforced server-side, with
   admin approval that un-gates the app live. A rejected account is told why
   rather than left spinning. One more address, the store reviewers'
-  `app-review@oursabeel.com`, signs in with a password and is always a member
+  `apps-reviewer@oursabeel.com`, signs in with a password and is always a member
   (iPhone build 13 on; the web from its next release).
 - Admin people-management: approve, reject, disable, change roles.
 - **Authority is two independent things** — an org role (member / organizer /

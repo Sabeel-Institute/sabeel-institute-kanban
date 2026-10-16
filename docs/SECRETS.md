@@ -164,7 +164,7 @@ Each lives at its path on the machine that uses it and is copied into the vault
 | App Store Connect API key `AuthKey_<ASC_KEY_ID>.p8` (Admin) | `~/.appstoreconnect/private_keys/` | `build:ios`, `testflight-check.mjs`, the `ASC_KEY_P8` secret | `sabeel/apple/` |
 | APNs key `AuthKey_<APNS_KEY_ID>.p8` | `~/.apns/`, or `APNS_KEY_FILE` | `send-test-push.mjs`, `check-apple-push`; the `APNS_KEY` secret | `sabeel/apple/` |
 | Apple Distribution certificate (`distribution.key`, `.cer`, `.p12`, `p12-password`) and the profile `SabeelKanban_AppStore_CI.mobileprovision` | `~/.config/sabeel-lms/ios-distribution/` on the Linux machine | the GitHub secrets below | `sabeel/apple/ios-distribution/` |
-| App Review password for `app-review@oursabeel.com` | nowhere else | App Store Connect → App Review Information | `sabeel/review/kanban-app-review.txt` |
+| App Review password for `apps-reviewer@oursabeel.com` | nowhere else | App Store Connect → App Review Information | `sabeel/review/kanban-app-review.txt` |
 
 **The upload keystore is never regenerated.** Play knows this key; a new one is
 refused until Play support resets the upload key. A missing keystore or

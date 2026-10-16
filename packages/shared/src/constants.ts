@@ -131,7 +131,7 @@ export const APP_ID = 'com.sabeelinstitute.kanban';
  * functions/test/unit/passwordDoor.test.ts holds them to it) or any callable
  * (`sessionAccess`). Compared exactly: Firebase keeps an address lower-case.
  */
-export const PASSWORD_SIGN_IN_EMAIL = 'app-review@oursabeel.com';
+export const PASSWORD_SIGN_IN_EMAIL = 'apps-reviewer@oursabeel.com';
 
 /**
  * Cloud Storage buckets, stated explicitly on every surface.

@@ -211,7 +211,7 @@ creation**.
       `~/.config/sabeel-lms/ios-distribution/` and in the vault. The Mac signs
       automatically instead (cloud-managed), so no distribution identity is ever
       in its keychain.
-- [x] **Review account** (2026-10-15): `app-review@oursabeel.com`, through the
+- [x] **Review account** (2026-10-15): `apps-reviewer@oursabeel.com`, through the
       password door, a member of the App Review board and nothing else. Its
       password is in the vault (`sabeel/review/kanban-app-review.txt`), never
       here. `docs/STORE-RELEASE.md`.

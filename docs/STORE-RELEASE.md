@@ -153,7 +153,7 @@ So nothing in the app is about reviewers (skill, decision 3):
 
 - **The door.** A plain **Sign in with email** link under the Google button.
   Password sign-in is accepted for one address, `PASSWORD_SIGN_IN_EMAIL` =
-  `app-review@oursabeel.com` in `packages/shared/src/constants.ts`:
+  `apps-reviewer@oursabeel.com` in `packages/shared/src/constants.ts`:
   `beforeSignIn` (`functions/src/signUpGate.ts`) refuses any other, and
   `firestore.rules` and `storage.rules` give a password session for any other
   address nothing. The refusal reads like a wrong password.
@@ -372,7 +372,7 @@ user-interaction question is answered **Yes** ("Users Interact").
 
 **Play target audience:** 18 and over only. **Ads:** none.
 
-**Play App access:** `app-review@oursabeel.com` and its password, with: "On the
+**Play App access:** `apps-reviewer@oursabeel.com` and its password, with: "On the
 sign-in screen, tap Sign in with email under the Google button."
 
 ## Review notes
@@ -397,7 +397,7 @@ administrator, and a member of one board of sample cards, "App Review": open
 a card, move it between columns, comment, @mention, attach a file. Creating
 boards and the administrator roles are granted only to the institute's own
 Workspace accounts.
-Email: app-review@oursabeel.com
+Email: apps-reviewer@oursabeel.com
 
 All content is visible only to members an administrator has added to the
 same board. Nothing is public, searchable or discoverable, and users cannot

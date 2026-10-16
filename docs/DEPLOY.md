@@ -444,7 +444,7 @@ binding was never applied. See the trap below.
 
 **3. Sign in end to end** with a real `@oursabeel.com` account, and confirm a
 non-org account is rejected. When the sign-in or rules changed, also sign in
-through **Sign in with email** as `app-review@oursabeel.com` (password in the
+through **Sign in with email** as `apps-reviewer@oursabeel.com` (password in the
 vault): it reaches the App Review board and nothing else.
 
 ## Known traps

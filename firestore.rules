@@ -20,7 +20,7 @@ service cloud.firestore {
      */
     function isSignedIn() {
       return request.auth != null
-        && (!isPasswordSession() || request.auth.token.get('email', '') == 'app-review@oursabeel.com');
+        && (!isPasswordSession() || request.auth.token.get('email', '') == 'apps-reviewer@oursabeel.com');
     }
     // `.get` with defaults: a token without the `firebase` map must not make
     // every rule an error.

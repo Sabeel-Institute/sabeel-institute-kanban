@@ -24,7 +24,7 @@ service firebase.storage {
       return request.auth != null
         && request.auth.token.get('status', '') == 'active'
         && (request.auth.token.get('firebase', {}).get('sign_in_provider', '') != 'password'
-          || request.auth.token.get('email', '') == 'app-review@oursabeel.com');
+          || request.auth.token.get('email', '') == 'apps-reviewer@oursabeel.com');
     }
 
     match /cards/{cardId}/attachments/{attachmentId} {
