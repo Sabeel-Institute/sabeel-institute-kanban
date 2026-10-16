@@ -3,8 +3,8 @@ import { onCall, HttpsError, type CallableRequest } from 'firebase-functions/v2/
 import { guarded, sentryDsn } from './sentry';
 import { logger } from 'firebase-functions/v2';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import type { Role, UserStatus } from '@sabeel/shared';
 import { canCurateLabels } from '@sabeel/shared';
+import { actorOf } from './actor';
 
 /**
  * Deleting an org-wide label.
@@ -32,10 +32,7 @@ const BATCH_LIMIT = 400;
 function requireCurator(request: CallableRequest<unknown>): { uid: string } {
   const auth = request.auth;
   if (!auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  const actor = {
-    role: (auth.token.role ?? 'member') as Role,
-    status: (auth.token.status ?? 'pending') as UserStatus,
-  };
+  const actor = actorOf(auth);
   // ADMIN-only since board authority became per-board. Deleting a label strips
   // it from every card on every board, including boards the deleter is not on —
   // an org-wide effect, so an org-wide authority. Owning a board grants no part

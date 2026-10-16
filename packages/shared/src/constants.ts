@@ -120,6 +120,20 @@ export const EMULATOR_PROJECT_ID = 'demo-sabeel-kanban';
 export const APP_ID = 'com.sabeelinstitute.kanban';
 
 /**
+ * The ONE address that may sign in with an email and a password.
+ *
+ * Decided by Faisal on 2026-10-15: "That sign in with password for kanban and
+ * timesheet should only accept that one email." Every other account signs in
+ * with Google. The password door exists for one administrator-made account,
+ * and a session through it for any other address has no access at all:
+ * refused at sign-in (functions/src/signUpGate.ts `beforeSignIn`), and given
+ * nothing by firestore.rules, storage.rules (which restate this literal;
+ * functions/test/unit/passwordDoor.test.ts holds them to it) or any callable
+ * (`sessionAccess`). Compared exactly: Firebase keeps an address lower-case.
+ */
+export const PASSWORD_SIGN_IN_EMAIL = 'app-review@oursabeel.com';
+
+/**
  * Cloud Storage buckets, stated explicitly on every surface.
  *
  * Neither side can be trusted to work one out for itself. The Admin SDK throws

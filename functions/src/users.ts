@@ -4,8 +4,29 @@ import { guarded, sentryDsn } from './sentry';
 import { logger } from 'firebase-functions/v2';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import { ACCESS_CHANGE_MESSAGES, checkAccessChange } from '@sabeel/shared';
-import type { Role, UserStatus } from '@sabeel/shared';
+import {
+  ACCESS_CHANGE_MESSAGES,
+  PASSWORD_PROVIDER,
+  canAdministerUsers,
+  checkAccessChange,
+} from '@sabeel/shared';
+import { actorOf } from './actor';
+
+/**
+ * Does this account sign in with an email and password and nothing else?
+ * Such an account is a member, always (`sessionAccess`). Fails CLOSED: only
+ * "no such account" answers no — the user-doc check below then says not-found
+ * — and any other failure to ask is thrown rather than read as permission.
+ */
+async function signsInWithPasswordOnly(uid: string): Promise<boolean> {
+  try {
+    const { providerData } = await getAuth().getUser(uid);
+    return providerData.length > 0 && providerData.every((p) => p.providerId === PASSWORD_PROVIDER);
+  } catch (e) {
+    if ((e as { code?: string }).code === 'auth/user-not-found') return false;
+    throw e;
+  }
+}
 
 /**
  * The ONLY way role or status ever changes. Clients cannot write these fields —
@@ -21,13 +42,7 @@ export const setUserAccess = onCall({ secrets: [sentryDsn] }, guarded(async (req
     throw new HttpsError('unauthenticated', 'Sign in first.');
   }
 
-  const actor = {
-    uid: auth.uid,
-    // Read from the TOKEN, never from the user doc — the doc is a mirror and a
-    // stale or tampered mirror must not be able to grant anything.
-    role: (auth.token.role ?? 'member') as Role,
-    status: (auth.token.status ?? 'pending') as UserStatus,
-  };
+  const actor = actorOf(auth);
 
   const targetUid = request.data?.uid;
   const nextRole = request.data?.role;
@@ -37,7 +52,11 @@ export const setUserAccess = onCall({ secrets: [sentryDsn] }, guarded(async (req
     throw new HttpsError('invalid-argument', 'A target uid is required.');
   }
 
-  const verdict = checkAccessChange({ actor, targetUid, nextRole, nextStatus });
+  // Only an admin's request can get past checkAccessChange, so only theirs pays
+  // for the lookup.
+  const targetPasswordOnly = canAdministerUsers(actor) && (await signsInWithPasswordOnly(targetUid));
+
+  const verdict = checkAccessChange({ actor, targetUid, targetPasswordOnly, nextRole, nextStatus });
   if (!verdict.ok) {
     logger.warn('Rejected setUserAccess', {
       actorUid: actor.uid,

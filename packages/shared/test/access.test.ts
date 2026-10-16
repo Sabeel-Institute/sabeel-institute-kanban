@@ -13,9 +13,11 @@ import {
   canUseApp,
   canViewStats,
   checkAccessChange,
+  sessionAccess,
   isRole,
   isUserStatus,
 } from '../src/access';
+import { PASSWORD_SIGN_IN_EMAIL } from '../src/constants';
 import type { Role, UserStatus } from '../src/types';
 
 describe('new user defaults', () => {
@@ -242,6 +244,7 @@ describe('checkAccessChange', () => {
       checkAccessChange({
         actor: admin,
         targetUid: 'someone',
+        targetPasswordOnly: false,
         nextRole: 'member',
         nextStatus: 'active',
       }),
@@ -253,6 +256,7 @@ describe('checkAccessChange', () => {
       checkAccessChange({
         actor: admin,
         targetUid: 'someone',
+        targetPasswordOnly: false,
         nextRole: 'admin',
         nextStatus: 'active',
       }).ok,
@@ -264,6 +268,7 @@ describe('checkAccessChange', () => {
       checkAccessChange({
         actor: { uid: 'u1', role: 'member', status: 'active' },
         targetUid: 'u2',
+        targetPasswordOnly: false,
         nextRole: 'admin',
         nextStatus: 'active',
       }),
@@ -276,6 +281,7 @@ describe('checkAccessChange', () => {
       checkAccessChange({
         actor: { uid: 'o1', role: 'organizer', status: 'active' },
         targetUid: 'u2',
+        targetPasswordOnly: false,
         nextRole: 'member',
         nextStatus: 'active',
       }),
@@ -287,6 +293,7 @@ describe('checkAccessChange', () => {
       checkAccessChange({
         actor: { uid: 'a1', role: 'admin', status: 'pending' },
         targetUid: 'u2',
+        targetPasswordOnly: false,
         nextRole: 'member',
         nextStatus: 'active',
       }),
@@ -300,6 +307,7 @@ describe('checkAccessChange', () => {
       checkAccessChange({
         actor: admin,
         targetUid: admin.uid,
+        targetPasswordOnly: false,
         nextRole: 'member',
         nextStatus: 'disabled',
       }),
@@ -311,6 +319,7 @@ describe('checkAccessChange', () => {
       checkAccessChange({
         actor: admin,
         targetUid: 'u2',
+        targetPasswordOnly: false,
         nextRole: 'superadmin',
         nextStatus: 'active',
       }),
@@ -320,6 +329,7 @@ describe('checkAccessChange', () => {
       checkAccessChange({
         actor: admin,
         targetUid: 'u2',
+        targetPasswordOnly: false,
         nextRole: 'member',
         nextStatus: 'approved',
       }),
@@ -332,6 +342,7 @@ describe('checkAccessChange', () => {
         checkAccessChange({
           actor: admin,
           targetUid: 'u2',
+          targetPasswordOnly: false,
           nextRole: junk,
           nextStatus: 'active',
         }).ok,
@@ -359,5 +370,64 @@ describe('type guards', () => {
    */
   it('does not recognise the retired role', () => {
     expect(isRole('manager')).toBe(false);
+  });
+});
+
+/**
+ * THE PASSWORD DOOR (Faisal, 2026-10-15): one address only — "should only
+ * accept that one email" — and that one a member — "never be able to be an
+ * admin or manager. Just a member." firestore.rules, storage.rules and every
+ * callable apply this same rule.
+ */
+describe('sessionAccess', () => {
+  const claims = { role: 'admin', status: 'active' };
+
+  it('takes the claims of any session that did not use a password', () => {
+    for (const signInProvider of ['google.com', 'custom', undefined]) {
+      expect(sessionAccess(claims, { signInProvider, email: 'someone@oursabeel.com' })).toEqual(claims);
+    }
+  });
+
+  it('holds the one password address to a member, whatever its claims say', () => {
+    expect(sessionAccess(claims, { signInProvider: 'password', email: PASSWORD_SIGN_IN_EMAIL })).toEqual({
+      role: 'member',
+      status: 'active',
+    });
+    expect(sessionAccess({ role: 'organizer', status: 'pending' }, { signInProvider: 'password', email: PASSWORD_SIGN_IN_EMAIL })).toEqual({
+      role: 'member',
+      status: 'pending',
+    });
+  });
+
+  it('gives a password session for any other address no access at all', () => {
+    for (const email of ['someone@oursabeel.com', 'APP-REVIEW@oursabeel.com', '', null, undefined]) {
+      expect(sessionAccess(claims, { signInProvider: 'password', email })).toEqual({ role: 'member', status: 'disabled' });
+    }
+  });
+
+  it('reads an unknown claim as a member, and an unknown status as pending', () => {
+    expect(sessionAccess({ role: 'owner', status: 'fine' }, { signInProvider: 'google.com', email: 'x@oursabeel.com' })).toEqual({
+      role: 'member',
+      status: 'pending',
+    });
+  });
+
+  it('is a real address, not an undefined import', () => {
+    expect(PASSWORD_SIGN_IN_EMAIL).toMatch(/^[^@\s]+@oursabeel\.com$/);
+  });
+});
+
+describe('checkAccessChange, for an account that signs in with a password only', () => {
+  const admin = { uid: 'admin', role: 'admin' as Role, status: 'active' as UserStatus };
+  const change = (nextRole: string) =>
+    checkAccessChange({ actor: admin, targetUid: 'pw', targetPasswordOnly: true, nextRole, nextStatus: 'active' });
+
+  it('refuses every role but member', () => {
+    expect(change('organizer')).toEqual({ ok: false, reason: 'password-member-only' });
+    expect(change('admin')).toEqual({ ok: false, reason: 'password-member-only' });
+  });
+
+  it('approves it as a member', () => {
+    expect(change('member')).toEqual({ ok: true, role: 'member', status: 'active' });
   });
 });

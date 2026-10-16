@@ -16,10 +16,15 @@ service firebase.storage {
   match /b/{bucket}/o {
 
     // Claims are what these rules trust, exactly as in firestore.rules. A
-    // default of '' means a claimless token fails every check.
+    // default of '' means a claimless token fails every check. And, as there,
+    // a password session for any address but the one has no access at all
+    // (`PASSWORD_SIGN_IN_EMAIL` in shared; passwordDoor.test.ts holds this
+    // literal to it).
     function isActive() {
       return request.auth != null
-        && request.auth.token.get('status', '') == 'active';
+        && request.auth.token.get('status', '') == 'active'
+        && (request.auth.token.get('firebase', {}).get('sign_in_provider', '') != 'password'
+          || request.auth.token.get('email', '') == 'app-review@oursabeel.com');
     }
 
     match /cards/{cardId}/attachments/{attachmentId} {

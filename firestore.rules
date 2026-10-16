@@ -9,16 +9,37 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    /**
+     * Signed in, and not through the password door for any address but the
+     * one (Faisal, 2026-10-15: "should only accept that one email"). Every
+     * other check is built on this, so a password session for another address
+     * has no access at all. The literal is `PASSWORD_SIGN_IN_EMAIL` in shared,
+     * restated because rules cannot import it; passwordDoor.test.ts holds the
+     * two together. `beforeSignIn` refuses such a session before it exists;
+     * this is the lock behind that door.
+     */
     function isSignedIn() {
-      return request.auth != null;
+      return request.auth != null
+        && (!isPasswordSession() || request.auth.token.get('email', '') == 'app-review@oursabeel.com');
+    }
+    // `.get` with defaults: a token without the `firebase` map must not make
+    // every rule an error.
+    function isPasswordSession() {
+      return request.auth.token.get('firebase', {}).get('sign_in_provider', '') == 'password';
     }
     // Domain membership alone grants NOTHING — an admin must approve the account
     // (see docs/PRODUCT_BRIEF.md, "Domain restriction is a server-side check").
     function isActive() {
       return isSignedIn() && request.auth.token.get('status', '') == 'active';
     }
+    /**
+     * The SESSION's role. A password sign-in is a member whatever its claims
+     * say (Faisal, 2026-10-15: "sign in thru email should never be able to be
+     * an admin or manager. Just a member."), the same rule as `sessionAccess`
+     * in shared and `actorOf` in functions.
+     */
     function role() {
-      return request.auth.token.get('role', 'member');
+      return isPasswordSession() ? 'member' : request.auth.token.get('role', 'member');
     }
     /**
      * ORGANIZERS start boards. That is the whole of what the role grants.

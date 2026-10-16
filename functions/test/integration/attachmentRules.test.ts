@@ -257,6 +257,23 @@ describe('storage: the attachment object', () => {
     await assertSucceeds(uploadBytes(ref(st('member1', 'member'), path), bytes()));
   });
 
+  it('refuses an upload from a password session for any address but the one; through Google it is fine', async () => {
+    // storage.rules can only ask "is this an active account"; a password
+    // session for another address is not one (Faisal, 2026-10-15).
+    const as = (sign_in_provider: 'password' | 'google.com') =>
+      env
+        .authenticatedContext('member1', {
+          email: 'member1@oursabeel.com',
+          email_verified: true,
+          role: 'member',
+          status: 'active',
+          firebase: { sign_in_provider },
+        })
+        .storage();
+    await assertFails(uploadBytes(ref(as('password'), attachmentStoragePath(CARD, 'obj_pw')), bytes()));
+    await assertSucceeds(uploadBytes(ref(as('google.com'), attachmentStoragePath(CARD, 'obj_google')), bytes()));
+  });
+
   it('is WRITE-ONCE — a second upload to the same path is refused', async () => {
     // This is also why a retry must mint a NEW attachment id.
     const path = attachmentStoragePath(CARD, 'obj_twice');

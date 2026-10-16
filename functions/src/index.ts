@@ -5,6 +5,7 @@
  * Later phases append triggers here — see docs/PHASE_STATUS.md.
  */
 export { onUserCreate } from './auth';
+export { beforeSignIn, beforeSignUp } from './signUpGate';
 export { accountExists } from './accountExists';
 export { setUserAccess } from './users';
 export {

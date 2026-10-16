@@ -145,6 +145,26 @@ export async function idTokenFor(uid: string): Promise<string> {
   return payload.idToken;
 }
 
+/**
+ * An ID token from an email-and-password sign-in, the session the email door
+ * makes: its `firebase.sign_in_provider` is 'password', which is what holds it
+ * to a member whatever its claims say.
+ */
+export async function passwordIdToken(email: string, password: string): Promise<string> {
+  const res = await fetch(
+    `http://${authHost()}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-api-key`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, returnSecureToken: true }),
+    },
+  );
+  if (!res.ok) throw new Error(`password sign-in failed: ${await res.text()}`);
+  const payload = (await res.json()) as { idToken?: string };
+  if (!payload.idToken) throw new Error('password sign-in returned no idToken');
+  return payload.idToken;
+}
+
 export interface CallResult {
   status: number;
   body: { result?: unknown; error?: { status?: string; message?: string } };
@@ -184,12 +204,15 @@ export async function makeUser(opts: {
   role?: string;
   status?: string;
   displayName?: string;
+  /** An email-and-password account, as an admin makes one for the email door. */
+  password?: string;
 }): Promise<void> {
   await adminAuth().createUser({
     uid: opts.uid,
     email: opts.email,
     emailVerified: true,
     displayName: opts.displayName ?? opts.uid,
+    ...(opts.password ? { password: opts.password } : {}),
   });
 
   await waitFor(`provisioning of ${opts.uid}`, async () => {

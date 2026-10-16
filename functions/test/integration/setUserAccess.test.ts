@@ -5,8 +5,10 @@ import {
   callFunction,
   idTokenFor,
   makeUser,
+  passwordIdToken,
   shutdown,
 } from './emulatorClient';
+import { PASSWORD_SIGN_IN_EMAIL } from '@sabeel/shared';
 
 /**
  * The real setUserAccess callable, invoked over HTTP with real ID tokens.
@@ -257,5 +259,56 @@ describe('a valid admin change', () => {
     );
 
     expect(await revokedAtMs('pending1')).toBe(before);
+  });
+});
+
+/**
+ * THE EMAIL DOOR IS A MEMBER'S DOOR (Faisal, 2026-10-15: "sign in thru email
+ * should never be able to be an admin or manager. Just a member."). Two locks:
+ * a password SESSION acts as a member whatever its claims say, and a
+ * password-only ACCOUNT can be given no other role.
+ */
+describe('an email-and-password account', () => {
+  const PASSWORD = 'correct-horse-battery-staple';
+
+  it('acts as a member when it signs in with its password, whatever its claims say', async () => {
+    // The one address the password door admits, so only the member lock is tested.
+    await makeUser({ uid: 'pwadmin', email: PASSWORD_SIGN_IN_EMAIL, password: PASSWORD, role: 'admin', status: 'active' });
+    const asPassword = await callFunction(
+      'setUserAccess',
+      { uid: 'pending1', role: 'member', status: 'active' },
+      await passwordIdToken(PASSWORD_SIGN_IN_EMAIL, PASSWORD),
+    );
+    expect(asPassword.body.error?.status).toBe('PERMISSION_DENIED');
+    expect(asPassword.body.error?.message).toBe('Only an admin can change who has access.');
+
+    // The control: the same account, the same claims, any other kind of session.
+    const asOther = await callFunction(
+      'setUserAccess',
+      { uid: 'pending1', role: 'member', status: 'active' },
+      await idTokenFor('pwadmin'),
+    );
+    expect(asOther.body.error).toBeUndefined();
+  });
+
+  it('cannot be given any role but member, and can be approved as one', async () => {
+    await makeUser({ uid: 'pwonly', email: 'pwonly@oursabeel.com', password: PASSWORD });
+    const admin = await idTokenFor('admin1');
+    for (const role of ['organizer', 'admin']) {
+      const r = await callFunction('setUserAccess', { uid: 'pwonly', role, status: 'active' }, admin);
+      expect(r.body.error?.status).toBe('PERMISSION_DENIED');
+      expect(r.body.error?.message).toBe('An account that signs in with an email and password can only be a member.');
+    }
+    expect((await adminAuth().getUser('pwonly')).customClaims).toMatchObject({ role: 'member', status: 'pending' });
+
+    const approved = await callFunction('setUserAccess', { uid: 'pwonly', role: 'member', status: 'active' }, admin);
+    expect(approved.body.error).toBeUndefined();
+    expect((await adminAuth().getUser('pwonly')).customClaims).toMatchObject({ role: 'member', status: 'active' });
+  });
+
+  it('an account without a password may still be promoted: the lock is on password-ONLY accounts', async () => {
+    // Its password sessions would still act as a member (the test above).
+    const r = await callFunction('setUserAccess', { uid: 'member1', role: 'organizer', status: 'active' }, await idTokenFor('admin1'));
+    expect(r.body.error).toBeUndefined();
   });
 });

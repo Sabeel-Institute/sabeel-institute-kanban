@@ -19,21 +19,14 @@ import { decideProvision } from './provision';
  *    created. Pending grants nothing; an admin must approve. The doc exists so
  *    admins can see who is waiting, with a name and address to judge by.
  *
- * Gen-1 auth trigger: `beforeUserCreated` (a blocking function) would reject
- * before the auth user is ever created, but it requires upgrading the project to
- * Identity Platform.
- *
- * That trade-off was originally justified by the consent screen being Internal,
- * so Google rejected outsiders first. It is NOT any more (2026-07-19: External,
- * because Internal needs a Cloud organization). The upgrade is now a genuine
- * improvement rather than a redundant one, and is worth doing if stray sign-ups
- * become a nuisance.
- *
- * It is not urgent, because the window it closes is not exploitable: between the
- * auth user being created and this trigger deleting it, that account has no
- * custom claims, and every rule in firestore.rules gates on
- * `status == 'active'` with a default of '' — so a claimless token can read
- * nothing.
+ * The SECOND lock. The first is `beforeSignUp` (signUpGate.ts), a blocking
+ * function that refuses the same sign-ups before the account exists — the
+ * project is on Identity Platform since 2026-10-15, which blocking functions
+ * need. This trigger stays behind it for anything that gets past, and for
+ * accounts an admin makes: those run no blocking function, so this is where
+ * they are provisioned. A just-made account it deletes held no claims in the
+ * meantime, and every rule in firestore.rules gates on `status == 'active'`
+ * with a default of '', so a claimless token can read nothing.
  */
 export const onUserCreate = functionsV1
   .region('us-central1')

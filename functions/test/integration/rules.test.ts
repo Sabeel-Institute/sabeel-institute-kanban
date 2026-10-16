@@ -15,6 +15,7 @@ import {
   updateDoc,
   deleteDoc,
 } from 'firebase/firestore';
+import { PASSWORD_SIGN_IN_EMAIL } from '@sabeel/shared';
 import { firestoreHostPort } from './emulatorHosts';
 
 let env: RulesTestEnvironment;
@@ -142,6 +143,32 @@ describe('reading OTHER user docs', () => {
   it('refuses the user list to organizers and members', async () => {
     await assertFails(getDocs(collection(ctx('org1', 'organizer', 'active'), 'users')));
     await assertFails(getDocs(collection(ctx('member1', 'member', 'active'), 'users')));
+  });
+
+  /*
+   * THE PASSWORD DOOR (Faisal, 2026-10-15): one address, and that one a member.
+   * Each test isolates one lock: the member lock on the one address, the
+   * address lock on any other. The controls are the same claims through Google.
+   */
+  const session = (uid: string, email: string, role: string, sign_in_provider: 'password' | 'google.com') =>
+    env
+      .authenticatedContext(uid, { email, email_verified: true, role, status: 'active', firebase: { sign_in_provider } })
+      .firestore();
+
+  it('refuses the user list to the one password address holding admin claims; through Google they may', async () => {
+    await assertFails(getDocs(collection(session('admin1', PASSWORD_SIGN_IN_EMAIL, 'admin', 'password'), 'users')));
+    await assertSucceeds(getDocs(collection(session('admin1', PASSWORD_SIGN_IN_EMAIL, 'admin', 'google.com'), 'users')));
+  });
+
+  it('gives a password session for any other address nothing, not even its own document', async () => {
+    const other = session('member1', 'member1@oursabeel.com', 'member', 'password');
+    await assertFails(getDoc(doc(other, 'users/member1')));
+    await assertFails(setDoc(doc(other, 'users/member1/pushTokens/t-other'), { platform: 'web', updatedAt: 1 }));
+    const viaGoogle = session('member1', 'member1@oursabeel.com', 'member', 'google.com');
+    await assertSucceeds(getDoc(doc(viaGoogle, 'users/member1')));
+    await assertSucceeds(setDoc(doc(viaGoogle, 'users/member1/pushTokens/t-other'), { platform: 'web', updatedAt: 1 }));
+    // And the one address, as a member, reads its own document.
+    await assertSucceeds(getDoc(doc(session('member1', PASSWORD_SIGN_IN_EMAIL, 'member', 'password'), 'users/member1')));
   });
 
   it('refuses the user list to an admin who is not active', async () => {

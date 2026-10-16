@@ -17,6 +17,7 @@ import {
   updateDoc,
   deleteDoc,
 } from 'firebase/firestore';
+import { PASSWORD_SIGN_IN_EMAIL } from '@sabeel/shared';
 import { firestoreHostPort } from './emulatorHosts';
 
 /**
@@ -205,6 +206,27 @@ describe('creating a board', () => {
     await assertSucceeds(
       setDoc(doc(ctx('org1', 'organizer'), 'boards/new1'), newBoard()),
     );
+  });
+
+  /*
+   * A PASSWORD SESSION IS A MEMBER, whatever its claims say (Faisal,
+   * 2026-10-15). The control is the same claims through Google: only the way
+   * the session signed in differs.
+   */
+  it('an organizer signed in with a password cannot, and the same organizer through Google can', async () => {
+    // The one address the password door admits, so only the member lock is tested.
+    const as = (sign_in_provider: 'password' | 'google.com') =>
+      env
+        .authenticatedContext('org1', {
+          email: PASSWORD_SIGN_IN_EMAIL,
+          email_verified: true,
+          role: 'organizer',
+          status: 'active',
+          firebase: { sign_in_provider },
+        })
+        .firestore();
+    await assertFails(setDoc(doc(as('password'), 'boards/new_pw'), newBoard()));
+    await assertSucceeds(setDoc(doc(as('google.com'), 'boards/new_pw'), newBoard()));
   });
 
   it('a member cannot create one', async () => {

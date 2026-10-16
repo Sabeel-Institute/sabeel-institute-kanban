@@ -20,12 +20,11 @@ import {
   type AttachmentDoc,
   type BoardDoc,
   type CardDoc,
-  type Role,
-  type UserStatus,
 } from '@sabeel/shared';
 import { guarded, guardedEvent, sentryDsn } from './sentry';
 import { isEmulatorProject } from './env';
 import { recordStat } from './stats';
+import { actorOf } from './actor';
 
 /**
  * Card attachments: the three things a client cannot do for itself.
@@ -95,11 +94,7 @@ async function requireCardAccess(
   const board = await db().doc(`boards/${boardId}`).get();
   if (!board.exists) throw new HttpsError('not-found', 'No such board.');
 
-  const actor = {
-    uid: auth.uid,
-    role: (auth.token.role ?? 'member') as Role,
-    status: (auth.token.status ?? 'pending') as UserStatus,
-  };
+  const actor = actorOf(auth);
   if (!canAccessBoard(actor, board.data() as BoardDoc)) {
     throw new HttpsError('permission-denied', 'You are not on this board.');
   }

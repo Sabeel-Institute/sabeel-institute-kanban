@@ -28,6 +28,7 @@ import {
   canCreateBoards,
   canUseApp,
   canViewStats,
+  sessionAccess,
 } from '@sabeel/shared';
 import type { Role, UserStatus } from '@sabeel/shared';
 import { auth, db } from './firebase';
@@ -139,10 +140,13 @@ async function readClaims(
       return { role: 'member', status: 'pending' };
     }
   }
-  return {
-    role: (token.claims.role as Role) ?? 'member',
-    status: (token.claims.status as UserStatus) ?? 'pending',
-  };
+  // As the SESSION allows, the rule the rules and the callables apply
+  // (sessionAccess): a password sign-in is a member, and for any address but
+  // the one, has no access at all.
+  return sessionAccess(
+    { role: token.claims.role, status: token.claims.status },
+    { signInProvider: token.signInProvider, email: fbUser.email },
+  );
 }
 
 async function handleUserSnapshot(fbUser: User, snap: DocumentSnapshot): Promise<void> {

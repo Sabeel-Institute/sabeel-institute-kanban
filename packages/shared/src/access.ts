@@ -1,3 +1,4 @@
+import { PASSWORD_SIGN_IN_EMAIL } from './constants';
 import type { Role, UserStatus } from './types';
 
 /**
@@ -25,6 +26,38 @@ export function isUserStatus(value: unknown): value is UserStatus {
   return (
     typeof value === 'string' && (USER_STATUSES as readonly string[]).includes(value)
   );
+}
+
+/** Firebase's name for an email-and-password sign-in, in a token and in providerData. */
+export const PASSWORD_PROVIDER = 'password';
+
+/**
+ * What a SESSION may do, from its token: its claims, as the way it signed in
+ * allows. firestore.rules (`isSignedIn`, `role()`), storage.rules (`isActive`)
+ * and every callable (`actorOf` in functions) apply this same rule, and the
+ * app uses it so its controls match.
+ *
+ * A password sign-in (Faisal, 2026-10-15) is accepted for ONE address,
+ * `PASSWORD_SIGN_IN_EMAIL`; any other has no access at all, here as status
+ * `disabled`. The one it is accepted for is a member whatever its claims say:
+ * "sign in thru email should never be able to be an admin or manager. Just a
+ * member." A password is the weaker credential — no Workspace second factor,
+ * no Google login challenge — so the session decides, not the account, and
+ * `checkAccessChange` refuses to give a password-only account another role.
+ * An unknown claim is a member, an unknown status pending.
+ */
+export function sessionAccess(
+  claims: { role?: unknown; status?: unknown },
+  session: { signInProvider?: string | null; email?: string | null },
+): { role: Role; status: UserStatus } {
+  if (session.signInProvider === PASSWORD_PROVIDER) {
+    if (session.email !== PASSWORD_SIGN_IN_EMAIL) return { role: 'member', status: 'disabled' };
+    return { role: 'member', status: isUserStatus(claims.status) ? claims.status : 'pending' };
+  }
+  return {
+    role: isRole(claims.role) ? claims.role : 'member',
+    status: isUserStatus(claims.status) ? claims.status : 'pending',
+  };
 }
 
 /** What a brand-new account gets. Never active — an admin must approve. */
@@ -192,7 +225,8 @@ export type AccessChangeRejection =
   | 'not-admin'
   | 'self-change'
   | 'invalid-role'
-  | 'invalid-status';
+  | 'invalid-status'
+  | 'password-member-only';
 
 /**
  * May `actor` set `target`'s role/status to the requested values?
@@ -205,17 +239,22 @@ export type AccessChangeRejection =
 export function checkAccessChange(params: {
   actor: { uid: string; role: Role; status: UserStatus };
   targetUid: string;
+  /** The target signs in ONLY with an email and password (see `sessionAccess`). */
+  targetPasswordOnly: boolean;
   nextRole: unknown;
   nextStatus: unknown;
 }):
   | { ok: true; role: Role; status: UserStatus }
   | { ok: false; reason: AccessChangeRejection } {
-  const { actor, targetUid, nextRole, nextStatus } = params;
+  const { actor, targetUid, targetPasswordOnly, nextRole, nextStatus } = params;
 
   if (!canAdministerUsers(actor)) return { ok: false, reason: 'not-admin' };
   if (actor.uid === targetUid) return { ok: false, reason: 'self-change' };
   if (!isRole(nextRole)) return { ok: false, reason: 'invalid-role' };
   if (!isUserStatus(nextStatus)) return { ok: false, reason: 'invalid-status' };
+  // Its sessions would act as a member anyway; refusing the claim too keeps
+  // the People screen from showing a role the account can never use.
+  if (targetPasswordOnly && nextRole !== 'member') return { ok: false, reason: 'password-member-only' };
 
   // The NARROWED values come back with the verdict, so the caller writes what was
   // actually checked. `setUserAccess` used to re-narrow `nextRole` itself, which
@@ -231,4 +270,5 @@ export const ACCESS_CHANGE_MESSAGES: Record<AccessChangeRejection, string> = {
     'You cannot change your own role or status. Ask another admin.',
   'invalid-role': 'Unknown role.',
   'invalid-status': 'Unknown status.',
+  'password-member-only': 'An account that signs in with an email and password can only be a member.',
 };

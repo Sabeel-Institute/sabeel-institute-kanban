@@ -3,8 +3,9 @@ import { onCall, HttpsError, type CallableRequest } from 'firebase-functions/v2/
 import { guarded, sentryDsn } from './sentry';
 import { logger } from 'firebase-functions/v2';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import type { BoardDoc, Role, UserStatus } from '@sabeel/shared';
+import type { BoardDoc } from '@sabeel/shared';
 import { canAdministerUsers, canManageBoard, canUnseatCreator } from '@sabeel/shared';
+import { actorOf } from './actor';
 
 /**
  * Removing someone from a board is a CALLABLE, not a plain client write.
@@ -22,11 +23,7 @@ export const removeBoardMember = onCall({ secrets: [sentryDsn] }, guarded(async 
   const auth = request.auth;
   if (!auth) throw new HttpsError('unauthenticated', 'Sign in first.');
 
-  const actor = {
-    uid: auth.uid,
-    role: (auth.token.role ?? 'member') as Role,
-    status: (auth.token.status ?? 'pending') as UserStatus,
-  };
+  const actor = actorOf(auth);
 
   const boardId = request.data?.boardId;
   const uid = request.data?.uid;
@@ -156,11 +153,7 @@ export const countMemberAssignments = onCall({ secrets: [sentryDsn] }, guarded(a
   const auth = request.auth;
   if (!auth) throw new HttpsError('unauthenticated', 'Sign in first.');
 
-  const actor = {
-    uid: auth.uid,
-    role: (auth.token.role ?? 'member') as Role,
-    status: (auth.token.status ?? 'pending') as UserStatus,
-  };
+  const actor = actorOf(auth);
 
   const boardId = request.data?.boardId;
   const uid = request.data?.uid;
@@ -208,10 +201,7 @@ export const boardsSolelyOwnedBy = onCall({ secrets: [sentryDsn] }, guarded(asyn
   const auth = request.auth;
   if (!auth) throw new HttpsError('unauthenticated', 'Sign in first.');
 
-  const actor = {
-    role: (auth.token.role ?? 'member') as Role,
-    status: (auth.token.status ?? 'pending') as UserStatus,
-  };
+  const actor = actorOf(auth);
   // Admin-only because it is asked from the People screen, and because it lists
   // boards the caller may well not be on.
   if (!canAdministerUsers(actor)) {
@@ -267,11 +257,7 @@ export const listAddableUsers = onCall({ secrets: [sentryDsn] }, guarded(async (
   const auth = request.auth;
   if (!auth) throw new HttpsError('unauthenticated', 'Sign in first.');
 
-  const actor = {
-    uid: auth.uid,
-    role: (auth.token.role ?? 'member') as Role,
-    status: (auth.token.status ?? 'pending') as UserStatus,
-  };
+  const actor = actorOf(auth);
 
   const boardId = request.data?.boardId;
   if (typeof boardId !== 'string' || !boardId) {
@@ -318,11 +304,7 @@ export const addBoardMember = onCall({ secrets: [sentryDsn] }, guarded(async (re
   const auth = request.auth;
   if (!auth) throw new HttpsError('unauthenticated', 'Sign in first.');
 
-  const actor = {
-    uid: auth.uid,
-    role: (auth.token.role ?? 'member') as Role,
-    status: (auth.token.status ?? 'pending') as UserStatus,
-  };
+  const actor = actorOf(auth);
 
   const boardId = request.data?.boardId;
   const uid = request.data?.uid;
