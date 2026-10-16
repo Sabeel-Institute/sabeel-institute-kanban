@@ -194,14 +194,13 @@ function Routes() {
     case 'signed-out':
       return <SignInScreen />;
 
-    // Signed in, but the auth-create trigger has not finished (or has just
-    // deleted a non-org account, in which case auth state flips to signed-out
-    // on its own).
+    // Signed in, but the profile the auth-create trigger writes is not here
+    // yet. Slow is still setting up, with Try again: never a refusal.
     case 'provisioning':
-      return <ProvisioningScreen />;
+      return <ProvisioningScreen slow={session.slow} />;
 
-    // Provisioning never completed: almost always a non-org address that the
-    // auth-create trigger rejected and deleted. Say so, instead of spinning.
+    // The server refused the account: the auth-create trigger deleted it (a
+    // non-org address), which Auth confirms (`lookUpAccount`). Say so.
     case 'not-provisioned':
       return <WrongDomainScreen />;
 

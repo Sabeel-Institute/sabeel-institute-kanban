@@ -18,6 +18,8 @@
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, signOut as fbSignOut, type User } from 'firebase/auth';
 import { googleSignOut } from './auth/google';
+import { lookUpAccount } from './auth/accountLookup';
+import { freshConnection } from './freshConnection';
 import { registerPush, unregisterPush } from './notify';
 import { doc, onSnapshot, type DocumentSnapshot } from 'firebase/firestore';
 import { clearLiveResultCache } from './liveQuery';
@@ -55,13 +57,19 @@ export interface SessionUser {
 export type Session =
   | { state: 'loading' }
   | { state: 'signed-out' }
-  /** Signed in, but the user doc/claims have not arrived yet. */
-  | { state: 'provisioning'; uid: string }
   /**
-   * Provisioning never completed. Overwhelmingly this means the auth-create
-   * trigger REJECTED the account and deleted it — a non-org address. The
-   * client's ID token stays valid until it refreshes, so nothing would tell the
-   * person anything without this state; they would watch a spinner forever.
+   * Signed in, but the user doc has not arrived yet. `slow` once it has been
+   * missing for PROVISIONING_PATIENCE_MS on an account Auth says exists: never
+   * a refusal, the screen says "still setting up" and offers Try again
+   * (`retryProvisioning`, a fresh connection), and the listener and Auth
+   * keep being asked meanwhile.
+   */
+  | { state: 'provisioning'; uid: string; slow: boolean }
+  /**
+   * The server REFUSED the account: the auth-create trigger deleted it (a
+   * non-org address), which Auth itself confirms (`lookUpAccount`). Only that
+   * answer leads here — never a profile that is merely late, which is
+   * `provisioning` with `slow`.
    */
   | { state: 'not-provisioned'; uid: string }
   | { state: 'signed-in'; user: SessionUser };
@@ -81,14 +89,37 @@ let lastClaimsStamp: number | null = null;
 let provisioningTimer: ReturnType<typeof setTimeout> | null = null;
 /** Which uid this device has already registered a push token for. */
 let pushRegisteredFor: string | null = null;
+/** When the current wait for a profile began; it starts over on Try again. */
+let waitStartedAt = 0;
+/** An Auth lookup in flight, so two cannot overlap. */
+let looking = false;
 
 /**
- * How long to wait for the auth-create trigger before concluding it is not
- * coming. Provisioning normally takes well under a second; ten is generous
- * enough to survive a cold function start without leaving a rejected user
- * staring at a spinner.
+ * The wait for a new account's profile, which the auth-create trigger writes.
+ *
+ * Until 2026-10-16 a timeout meant "refused": ten seconds without the user doc
+ * showed **Wrong account**. Two things made that wrong for genuine accounts. A
+ * cold start of the trigger can take longer than that in production. And the
+ * listener can miss the profile altogether: measured against the Firestore
+ * emulator (21 of 48 cold first sign-ins, 2026-10-16), when the trigger writes
+ * the doc while the client's listen for it is still being registered, the
+ * listener answers "does not exist" and never hears of the write. Listening
+ * again, a direct read from the server, a token refresh and a plain page
+ * reload all kept the stale answer, which sticks to the listen target the
+ * web's persistent cache keeps; a new target, from an emptied cache, hears
+ * the server.
+ *
+ * So time alone refuses nobody. Auth is asked whether the account still
+ * exists (`lookUpAccount`), first after FIRST_LOOK_MS and then every
+ * LOOK_EVERY_MS: the trigger deletes an account it refuses, and only Auth
+ * saying so is **Wrong account**. Past PROVISIONING_PATIENCE_MS the screen
+ * says "still setting up" with Try again, a fresh connection
+ * (`freshConnection`: on the web the cache emptied and the page reloaded). The
+ * same design as the sibling time tracker's.
  */
-const PROVISIONING_TIMEOUT_MS = 10_000;
+const FIRST_LOOK_MS = 3_000;
+const LOOK_EVERY_MS = 5_000;
+export const PROVISIONING_PATIENCE_MS = 15_000;
 
 function stopWatchingUserDoc() {
   unsubUserDoc?.();
@@ -100,13 +131,70 @@ function stopWatchingUserDoc() {
   }
 }
 
-function armProvisioningTimeout(uid: string) {
-  if (provisioningTimer) clearTimeout(provisioningTimer);
+/** Still waiting for this account's profile, keeping whether it is already slow. */
+function emitProvisioning(uid: string) {
+  const slow = current.state === 'provisioning' && current.uid === uid && current.slow;
+  emit({ state: 'provisioning', uid, slow });
+}
+
+/** The next look at Auth, unless one is already due or under way. */
+function armProvisioningLook(uid: string, delay = LOOK_EVERY_MS) {
+  if (provisioningTimer || looking) return;
   provisioningTimer = setTimeout(() => {
-    if (current.state === 'provisioning') {
-      emit({ state: 'not-provisioned', uid });
-    }
-  }, PROVISIONING_TIMEOUT_MS);
+    provisioningTimer = null;
+    void lookAtAccount(uid);
+  }, delay);
+}
+
+/** Begin (or begin again) the wait for this account's profile. */
+function startProvisioningWait(uid: string) {
+  waitStartedAt = Date.now();
+  emit({ state: 'provisioning', uid, slow: false });
+  armProvisioningLook(uid, FIRST_LOOK_MS);
+}
+
+/**
+ * One look: does the account still exist? Deleted is the refusal; otherwise
+ * keep waiting, saying "still setting up" once the wait has run past
+ * PROVISIONING_PATIENCE_MS. An answer Auth could not give is never a refusal.
+ */
+async function lookAtAccount(uid: string): Promise<void> {
+  const fbUser = auth.currentUser;
+  if (!fbUser || fbUser.uid !== uid || current.state !== 'provisioning' || current.uid !== uid) return;
+  looking = true;
+  let account: Awaited<ReturnType<typeof lookUpAccount>>;
+  try {
+    account = await withTimeout(lookUpAccount(fbUser), 8000, 'account lookup').catch(() => 'unknown' as const);
+  } finally {
+    looking = false;
+  }
+  // Settled while asking: the profile arrived, or the person signed out.
+  if (current.state !== 'provisioning' || current.uid !== uid) return;
+  if (account === 'deleted') {
+    stopWatchingUserDoc();
+    emit({ state: 'not-provisioned', uid });
+    return;
+  }
+  if (!current.slow && Date.now() - waitStartedAt >= PROVISIONING_PATIENCE_MS) {
+    emit({ state: 'provisioning', uid, slow: true });
+  }
+  armProvisioningLook(uid);
+}
+
+/**
+ * Try again, from "Still setting up your account": the wait over again, on a
+ * fresh connection to the database (`freshConnection`: the cache emptied and
+ * the page reloaded on the web, the connection closed and reopened on a
+ * phone), so whatever held the profile back does not carry over.
+ */
+export async function retryProvisioning(): Promise<void> {
+  const fbUser = auth.currentUser;
+  if (!fbUser || current.state !== 'provisioning') return;
+  stopWatchingUserDoc();
+  startProvisioningWait(fbUser.uid);
+  await freshConnection();
+  if (auth.currentUser !== fbUser) return;
+  watchUserDoc(fbUser);
 }
 
 /**
@@ -171,9 +259,10 @@ async function handleUserSnapshot(fbUser: User, snap: DocumentSnapshot): Promise
   }
   if (!snap.exists()) {
     // The auth-create trigger has not finished yet, or it rejected the account
-    // and is about to delete it. The timer below decides which.
-    emit({ state: 'provisioning', uid: fbUser.uid });
-    armProvisioningTimeout(fbUser.uid);
+    // and is about to delete it — or the listener missed the write. The looks
+    // at Auth tell a refusal from a wait; Try again cures a missed write.
+    emitProvisioning(fbUser.uid);
+    armProvisioningLook(fbUser.uid, FIRST_LOOK_MS);
     return;
   }
 
@@ -242,13 +331,16 @@ function watchUserDoc(fbUser: User) {
       // `provisioning` with no error surfaced anywhere.
       void handleUserSnapshot(fbUser, snap).catch((e) => {
         console.warn('user snapshot handler failed', e);
-        emit({ state: 'provisioning', uid: fbUser.uid });
+        emitProvisioning(fbUser.uid);
+        armProvisioningLook(fbUser.uid, FIRST_LOOK_MS);
       });
     },
     (e) => {
       // A signed-in user can always read their own doc, so this is unexpected.
+      // Try again subscribes afresh, so a dead listener is not the end of it.
       console.warn('user doc listener', e.code ?? e.message);
-      emit({ state: 'provisioning', uid: fbUser.uid });
+      emitProvisioning(fbUser.uid);
+      armProvisioningLook(fbUser.uid, FIRST_LOOK_MS);
     },
   );
 }
@@ -285,10 +377,14 @@ onAuthStateChanged(auth, (fbUser) => {
     clearStatsCache();
   }
   cachedFor = fbUser.uid;
-  emit({ state: 'provisioning', uid: fbUser.uid });
   watchUserDoc(fbUser);
-  armProvisioningTimeout(fbUser.uid);
+  startProvisioningWait(fbUser.uid);
 });
+
+/** The session now, without subscribing: for non-React readers and for tests. */
+export function sessionNow(): Session {
+  return current;
+}
 
 export function useSession(): Session {
   const [s, setS] = useState<Session>(current);

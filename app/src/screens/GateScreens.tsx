@@ -9,15 +9,37 @@
 import { StyleSheet, Text } from 'react-native';
 import { ALLOWED_EMAIL_DOMAIN } from '@sabeel/shared';
 import type { SessionUser } from '../session';
-import { signOut } from '../session';
+import { retryProvisioning, signOut } from '../session';
 import { acceptRules } from '../reports';
 import { useAction } from '../useAction';
 import { Body, Button, Card, Screen, Spinner, Title } from '../components/ui';
 
-export function ProvisioningScreen() {
+/**
+ * Signed in, waiting for the profile the server writes on a first sign-in.
+ *
+ * Usually a second. Past session.ts's PROVISIONING_PATIENCE_MS, `slow` says
+ * so and offers Try again, a fresh connection (on the web, the cache emptied
+ * and the page reloaded): a late profile is a slow server or a missed write,
+ * never a refused account, so this screen never says "wrong account". Sign
+ * out is here too, so nobody is stuck.
+ */
+export function ProvisioningScreen({ slow }: { slow: boolean }) {
+  const { run, busy } = useAction('retryProvisioning');
+  if (!slow) {
+    return (
+      <Screen scroll={false} width="read">
+        <Spinner label="Setting up your account…" />
+      </Screen>
+    );
+  }
   return (
-    <Screen scroll={false} width="read">
-      <Spinner label="Setting up your account…" />
+    <Screen width="read">
+      <Title>Still setting up your account</Title>
+      <Card>
+        <Body>This is taking longer than usual. Try again in a minute.</Body>
+      </Card>
+      <Button label="Try again" busy={busy} onPress={() => void run(retryProvisioning)} />
+      <Button label="Sign out" variant="secondary" disabled={busy} onPress={signOut} />
     </Screen>
   );
 }
