@@ -2253,7 +2253,24 @@ try {
     await ctx.close();
   }
   {
-    const { ctx, page } = await doorTry(PASSWORD_SIGN_IN_EMAIL, DOOR_PASSWORD);
+    // By keyboard alone, as on a phone, where the keyboard covers Sign in:
+    // the address field has focus on opening, Return moves to the password,
+    // and Return there signs in.
+    const { ctx, page } = await newApp(browser);
+    await page.getByText('Sign in with Google').waitFor({ timeout: 40000 });
+    await page.getByRole('button', { name: 'Sign in with email' }).click();
+    const emailField = page.getByPlaceholder('Email');
+    const passwordField = page.getByPlaceholder('Password');
+    await passwordField.waitFor({ timeout: 20000 });
+    const hints = `${await emailField.getAttribute('enterkeyhint')} / ${await passwordField.getAttribute('enterkeyhint')}`;
+    check('the address field offers Next and the password Go', hints === 'next / go', hints);
+    const focused = (field) => field.evaluate((el) => el === document.activeElement);
+    check('the address field has focus on opening', await focused(emailField));
+    await page.keyboard.type(PASSWORD_SIGN_IN_EMAIL);
+    await page.keyboard.press('Enter');
+    check('Return in the address field moves to the password', await focused(passwordField));
+    await page.keyboard.type(DOOR_PASSWORD);
+    await page.keyboard.press('Enter');
     // Read off the LOADED Boards screen: its empty state, which is drawn in the
     // same render as New board and from the same session, and words itself by
     // role. Not the word "Boards" — the nav rail says it while the screen is
@@ -2264,7 +2281,7 @@ try {
       .waitFor({ timeout: 40000 })
       .then(() => true, () => false);
     check(
-      'the one address signs in with its password',
+      'the one address signs in with its password, Return in the password submitting',
       settled && !(await page.getByText('Sign in with Google').isVisible().catch(() => false)),
     );
     const asMember = await page.getByText(MEMBER_EMPTY, { exact: false }).isVisible().catch(() => false);

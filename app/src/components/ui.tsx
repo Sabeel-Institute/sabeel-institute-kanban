@@ -775,6 +775,14 @@ export const TextField = forwardRef<TextInput, {
    * the password hidden, and the platform's password autofill offered.
    */
   kind?: 'email' | 'password';
+  /**
+   * What the keyboard's Return key says, and so what it does: `next` moves on
+   * (the caller's `onSubmit` focuses the next field, and on a phone the
+   * keyboard stays up rather than dropping between the two), `go` submits.
+   * `enterKeyHint`, not the deprecated `returnKeyType`: react-native maps it on
+   * both phones and react-native-web renders it as the input's attribute.
+   */
+  enterKeyHint?: 'next' | 'go';
 }>(function TextField(
   {
     value,
@@ -789,6 +797,7 @@ export const TextField = forwardRef<TextInput, {
     onFocus,
     onBlur,
     kind,
+    enterKeyHint,
   },
   ref,
 ) {
@@ -805,6 +814,8 @@ export const TextField = forwardRef<TextInput, {
       placeholder={placeholder}
       placeholderTextColor={t.text.muted}
       onSubmitEditing={onSubmit}
+      enterKeyHint={enterKeyHint}
+      submitBehavior={enterKeyHint === 'next' ? 'submit' : undefined}
       multiline={multiline}
       autoFocus={autoFocus}
       maxLength={maxLength}

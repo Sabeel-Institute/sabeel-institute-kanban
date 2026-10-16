@@ -535,6 +535,16 @@ sample cards; signed in through the public API it sees that board alone, and
 reading another board is refused. The web sign-in screen goes live with the next
 hosting deploy; iPhones get it in build 13.
 
+**Return keys on the email form (2026-10-16).** On a phone the keyboard covers
+**Sign in** while the address field has focus, so the form is now driven by its
+Return key: **next** in the address field moves to the password, **go** there
+signs in. `TextField` takes `enterKeyHint`, which react-native maps on both
+phones and react-native-web renders as the input's attribute. **Verified:** the
+web e2e signs the one address in by keyboard alone (red before the change: no
+hints, focus not moved, no sign-in); on an iOS 26.5 simulator the keyboard
+showed the next key with the Passwords bar, Return moved to the password, Return
+signed in as a member, and iOS offered to save the password.
+
 ### 2026-09-20 — A Google 503 at sign-in stops paging — v0.11.5
 
 **Two pages, same class, no defect.** `SABEEL-KANBAN-WEB-C`: Google's Firebase

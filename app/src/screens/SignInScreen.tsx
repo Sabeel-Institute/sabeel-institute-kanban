@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Image, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ALLOWED_EMAIL_DOMAIN, PRIVACY_URL, SIGN_UP_REFUSED } from '@sabeel/shared';
 import {
   signInWithGoogle,
@@ -237,6 +237,7 @@ function EmailSignIn({ busy, run }: { busy: boolean; run: (fn: () => Promise<unk
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [refusal, setRefusal] = useState<EmailSignInRefusal | null>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   if (!open) {
     return (
@@ -265,8 +266,28 @@ function EmailSignIn({ busy, run }: { busy: boolean; run: (fn: () => Promise<unk
 
   return (
     <Card>
-      <TextField kind="email" label="Email" placeholder="Email" value={email} onChangeText={setEmail} autoFocus />
-      <TextField kind="password" label="Password" placeholder="Password" value={password} onChangeText={setPassword} onSubmit={submit} />
+      {/* Return moves from the address to the password, and signs in from
+          there: on a phone the keyboard covers the button. */}
+      <TextField
+        kind="email"
+        label="Email"
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
+        autoFocus
+        enterKeyHint="next"
+        onSubmit={() => passwordRef.current?.focus()}
+      />
+      <TextField
+        ref={passwordRef}
+        kind="password"
+        label="Password"
+        placeholder="Password"
+        value={password}
+        onChangeText={setPassword}
+        enterKeyHint="go"
+        onSubmit={submit}
+      />
       <Button label="Sign in" onPress={submit} busy={busy} disabled={!ready} block />
       {refusal ? <Body>{EMAIL_SIGN_IN_MESSAGES[refusal]}</Body> : null}
     </Card>
