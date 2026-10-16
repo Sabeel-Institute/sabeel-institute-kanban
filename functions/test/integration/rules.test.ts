@@ -14,8 +14,11 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  query,
+  serverTimestamp,
+  where,
 } from 'firebase/firestore';
-import { PASSWORD_SIGN_IN_EMAIL } from '@sabeel/shared';
+import { PASSWORD_SIGN_IN_EMAIL, RULES_VERSION } from '@sabeel/shared';
 import { firestoreHostPort } from './emulatorHosts';
 
 let env: RulesTestEnvironment;
@@ -222,6 +225,27 @@ describe('writes to user docs are impossible from any client', () => {
   it('blocks tampering with the server audit trail', async () => {
     const db = ctx('member1', 'member', 'active');
     await assertFails(updateDoc(doc(db, 'users/member1'), { accessChangedBy: 'me' }));
+  });
+
+  it('blocks recording acceptance of the institute rules — only the acceptRules callable may', async () => {
+    // The rules screen stands in front of every board until these two are set,
+    // so a client that could write them would skip the screen and be recorded
+    // as agreeing to text it never saw.
+    const db = ctx('member1', 'member', 'active');
+    await assertFails(updateDoc(doc(db, 'users/member1'), { rulesVersion: RULES_VERSION }));
+    await assertFails(updateDoc(doc(db, 'users/member1'), { rulesAcceptedAt: serverTimestamp() }));
+    await assertFails(
+      updateDoc(doc(db, 'users/member1'), {
+        favoriteBoardIds: ['b1'],
+        rulesVersion: RULES_VERSION,
+        rulesAcceptedAt: serverTimestamp(),
+      }),
+    );
+    // An admin is no different: acceptance is the person's own act.
+    await assertFails(updateDoc(doc(ctx('admin1', 'admin', 'active'), 'users/admin1'), { rulesVersion: RULES_VERSION }));
+    // The same person's preference write lands, so the refusals above are about
+    // the two fields and not about writing at all.
+    await assertSucceeds(updateDoc(doc(db, 'users/member1'), { favoriteBoardIds: ['b1'] }));
   });
 
   it('blocks smuggling role alongside a legitimate preference change', async () => {
@@ -467,6 +491,76 @@ describe('operator state (meta/*)', () => {
       await assertFails(getDoc(doc(db, 'meta/health')));
       await assertFails(setDoc(doc(db, 'meta/health'), { counts: { cards: 0 } }));
     }
+  });
+});
+
+describe('reports', () => {
+  // Report a problem stores every report at `reports/{id}`, written by the
+  // reportProblem callable through the Admin SDK and read by nobody in the
+  // app. A client that could read one would see who reported whom; one that
+  // could write one would file reports in somebody else's name, or past the
+  // hourly limit the callable counts from these documents.
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (c) => {
+      await setDoc(doc(c.firestore(), 'reports/r1'), {
+        app: 'Sabeel Kanban',
+        uid: 'member1',
+        displayName: 'Member One',
+        email: 'member1@oursabeel.com',
+        role: 'member',
+        text: 'Something on the board is wrong.',
+        createdAt: 1,
+        mail: { status: 'sent', messageId: 'm1' },
+      });
+    });
+  });
+
+  const report = {
+    app: 'Sabeel Kanban',
+    uid: 'member1',
+    displayName: 'Member One',
+    email: 'member1@oursabeel.com',
+    role: 'member',
+    text: 'Filed from a client.',
+    createdAt: 1,
+  };
+
+  it('no active account, at any role, may read, list, create, update or delete one', async () => {
+    for (const role of ROLES) {
+      const uid = { member: 'member1', organizer: 'org1', admin: 'admin1' }[role];
+      const db = ctx(uid, role, 'active');
+      await assertFails(getDoc(doc(db, 'reports/r1')));
+      await assertFails(getDocs(collection(db, 'reports')));
+      await assertFails(setDoc(doc(db, 'reports/mine'), report));
+      await assertFails(updateDoc(doc(db, 'reports/r1'), { mail: { status: 'sent' } }));
+      await assertFails(deleteDoc(doc(db, 'reports/r1')));
+    }
+  });
+
+  it('not even the reporter may read their own report back, or query for it', async () => {
+    const db = ctx('member1', 'member', 'active');
+    await assertFails(getDoc(doc(db, 'reports/r1')));
+    await assertFails(getDocs(query(collection(db, 'reports'), where('uid', '==', 'member1'))));
+  });
+
+  it('the review account through the password door gets nothing either', async () => {
+    const db = env
+      .authenticatedContext('reviewer', {
+        email: PASSWORD_SIGN_IN_EMAIL,
+        email_verified: true,
+        role: 'member',
+        status: 'active',
+        firebase: { sign_in_provider: 'password' },
+      })
+      .firestore();
+    await assertFails(getDoc(doc(db, 'reports/r1')));
+    await assertFails(setDoc(doc(db, 'reports/reviewer'), { ...report, uid: 'reviewer' }));
+  });
+
+  it('a signed-out client gets nothing', async () => {
+    const db = env.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(db, 'reports/r1')));
+    await assertFails(setDoc(doc(db, 'reports/anon'), report));
   });
 });
 

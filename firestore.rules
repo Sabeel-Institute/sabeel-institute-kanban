@@ -106,7 +106,9 @@ service cloud.firestore {
       // admin. `role`, `status`, `email` and `displayName` are deliberately
       // absent (the first two are claims, the last two come from Google), as are
       // `claimsUpdatedAt` and `accessChangedBy`, which are the server's audit
-      // trail.
+      // trail, and `rulesVersion` and `rulesAcceptedAt`, which the acceptRules
+      // callable alone writes: a client that could set them would mark itself as
+      // having agreed to rules it was never shown.
       function selfWritableOnly() {
         return request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['favoriteBoardIds', 'recentBoardIds', 'mutedBoardIds',
@@ -842,6 +844,18 @@ service cloud.firestore {
         allow get, list: if isAdmin();
         allow create, update, delete: if false;
       }
+    }
+
+    // ---- Reports (Report a problem) ----
+    // Written by the reportProblem callable alone and read by nobody in the
+    // app: a report is emailed to the institute's administrators, and this is
+    // the record that it was made. A client that could read it would see who
+    // reported whom; one that could write it could file reports in someone
+    // else's name, or past the hourly limit the callable counts from here.
+    // Stated rather than left to the catch-all, so the denial is a decision on
+    // the page and not an absence.
+    match /reports/{reportId} {
+      allow read, write: if false;
     }
 
     // ---- Everything else ----

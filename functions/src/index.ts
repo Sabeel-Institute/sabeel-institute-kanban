@@ -7,6 +7,8 @@
 export { onUserCreate } from './auth';
 export { beforeSignIn, beforeSignUp } from './signUpGate';
 export { accountExists } from './accountExists';
+export { acceptRules } from './acceptRules';
+export { reportProblem } from './reports';
 export { setUserAccess } from './users';
 export {
   removeBoardMember,
