@@ -403,6 +403,47 @@ the team.
 
 ## Deploy log
 
+### 2026-10-17 — Android stops waiting minutes on a dead connection — v0.12.1
+
+Clients only, no backend change. The fix is native, so Android needs this
+build; web and iPhone get the two smaller changes.
+
+**A label delete on Android sat 2.5 minutes, then reported
+`deadline-exceeded`, then happened anyway.** The Cloud Run logs showed no
+request from the phone for that whole window, then every tap at once, each
+answered in 1 to 6 s. Firestore kept working meanwhile. React Native builds
+its OkHttp client with every timeout at 0 and no HTTP/2 ping, so a connection
+that dies silently holds every call to that host until Android's TCP stack
+gives up; once five are stuck, OkHttp queues the rest behind them. The
+Functions SDK's 70 s deadline is a `Promise.race` that cancels nothing, so the
+abandoned delete still ran when the connection broke.
+
+**Now:** `app/android/.../NetworkClient.kt` gives that client a 30 s HTTP/2
+ping and a 10 s connect timeout. Reproduced with OkHttp 4.9.2 against an h2
+server and a proxy that silently kills a connection: the stock client was
+still hanging at 200 s; with the ping the call is retried on a fresh
+connection and succeeds at 58 s, inside the deadline. On the AVD, with new
+connections to the functions emulator dropped, the label count gives up at
+the connect timeout instead of hanging.
+
+**Cloud Storage is exempt from the ping**, through a sibling client with its
+own pool. A ping queues behind upload bytes already sent, and Google's servers
+allow 1 MiB in flight (measured: `INITIAL_WINDOW_SIZE` 1048576 on Storage,
+Functions and Firestore alike). Below about 280 kbit/s a healthy upload
+connection would be declared dead: a 2 MiB upload at 200 kbit/s failed at
+60 s with the ping and succeeded in 85 s without, and Storage does not retry a
+failed chunk. Through the exemption it succeeds in 85 s, the same as before.
+React Native's cancel-by-tag still reaches the handed-off call.
+
+**Also:**
+
+- A label count or assignment count that FAILS says "Could not check how many
+  cards…" instead of "No cards use it" or "not assigned to any cards", which
+  called a delete harmless when the app did not know.
+- Deleting a label that is already gone counts as done instead of an error.
+  The label list trails the server, so a quick second tap names a label
+  deleted a moment ago. The server still answers `not-found`.
+
 ### 2026-10-16 — The institute's rules, Report a problem, and a patient first sign-in — v0.12.0
 
 The three entries below, released together: web, the download page, Play
