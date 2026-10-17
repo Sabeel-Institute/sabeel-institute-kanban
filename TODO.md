@@ -399,8 +399,8 @@ Play internal testing now; public production is the destination
       is live on Play Console → Kanban → *Testing → Internal testing →
       Testers*. Send it to the team: Play sends no email (`docs/DEPLOY.md`
       § Testers).
-- [ ] **Hand the opt-in link to Claude**, to replace "Link coming shortly" on
-      the Android button of `app/public/get-app.html`.
+- [x] **The opt-in link is on `app/public/get-app.html`** (2026-10-16):
+      `https://play.google.com/apps/internaltest/4701475909888991410`.
 
 **Target API level.** Play enforces a minimum `targetSdkVersion` and raises it
 annually; ours comes from `rootProject.ext.targetSdkVersion` (Expo's default for
