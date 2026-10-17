@@ -304,6 +304,13 @@ itself is deliberately NOT darkened — that would collapse it into
 - Live Firestore reads in `app/src` go through a single `useLiveQuery`/`useLiveDoc`
   module — never hand-roll `onSnapshot` state in a hook (lint-enforced). See
   `docs/INHERITED-STACK.md` for why this is non-negotiable.
+- **Live reads are timed to the SERVER's answer, not the first snapshot**
+  (`slowReads.ts`, wired in `liveQuery.ts`), and reported at warning past 5 s,
+  like slow writes; a read abandoned unanswered past 5 s too. A cached partial
+  answer is what made a list look loaded while it was not. The timing is a
+  second listener with `includeMetadataChanges`, which shares the target and
+  costs no reads; do not fold it into the hook's own listener, which would then
+  re-render every screen on every metadata flip.
 - **Every active filter must be visible and removable, even a broken one.** An id
   can outlive what it points at (a deleted label, an archived board), and building
   chips by filtering a live list down to chosen ids makes a dead id vanish from

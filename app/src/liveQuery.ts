@@ -18,12 +18,15 @@
  *     screen plus a visible error beats silently-wrong data that never corrects.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import {
   onSnapshot,
   type DocumentReference,
   type Query,
+  type Unsubscribe,
 } from 'firebase/firestore';
 import { captureError } from './sentry';
+import { startReadTimer } from './slowReads';
 
 /**
  * A document as handed to a mapper. `path` matters for collection-group queries,
@@ -159,6 +162,56 @@ export function useListenerError(): string | null {
 }
 
 /**
+ * Time a subscription to the server's answer, and report it if slow (see
+ * slowReads.ts). Returns the cleanup, which ends the timer.
+ *
+ * A SECOND listener rather than the hook's own. Without `includeMetadataChanges`
+ * Firestore raises no snapshot when the server merely confirms what the cache
+ * showed, so the hook's listener cannot see the answer; turning it on there would
+ * re-render every screen on every metadata flip. Both listen to one target,
+ * which Firestore shares, so this costs no reads. It detaches once answered.
+ */
+function timeServerAnswer(
+  label: string,
+  listen: (next: (fromCache: boolean) => void, error: () => void) => Unsubscribe,
+): () => void {
+  // Started while the app is not on screen (a notification tap restoring
+  // state): the wait until it is says nothing about the read.
+  if (AppState.currentState === 'background') return () => undefined;
+  const timer = startReadTimer(label);
+  let stopped = false;
+  // Optional for the reason foreground.ts gives: react-native-web returns
+  // nothing when document visibility is unavailable.
+  const sub = AppState.addEventListener('change', (state) => {
+    if (state !== 'background') return;
+    timer.backgrounded();
+    stop();
+  });
+  function stop() {
+    if (stopped) return;
+    stopped = true;
+    unsub();
+    sub?.remove();
+  }
+  // Firestore never calls back synchronously, so `unsub` exists by the time
+  // either callback can reach `stop`.
+  const unsub = listen(
+    (fromCache) => {
+      timer.snapshot(fromCache);
+      if (!fromCache) stop();
+    },
+    () => {
+      timer.failed();
+      stop();
+    },
+  );
+  return () => {
+    timer.ended();
+    stop();
+  };
+}
+
+/**
  * Subscribe to a query. `deps` identify the subscription: when they change the
  * state resets, so stale results can never be shown under new inputs.
  *
@@ -185,6 +238,9 @@ export function useLiveQuery<T>(
     setState(cachedState<T>(key));
     if (!query) return;
 
+    const untime = timeServerAnswer(label, (next, error) =>
+      onSnapshot(query, { includeMetadataChanges: true }, (s) => next(s.metadata.fromCache), error),
+    );
     const unsub = onSnapshot(
       query,
       (snap) => {
@@ -214,6 +270,7 @@ export function useLiveQuery<T>(
     // whole app until the next sign-out.
     return () => {
       unsub();
+      untime();
       if (raised.current) publishSuccess(label);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -241,6 +298,9 @@ export function useLiveDoc<T>(
     setState(cachedState<T>(key));
     if (!ref) return;
 
+    const untime = timeServerAnswer(label, (next, error) =>
+      onSnapshot(ref, { includeMetadataChanges: true }, (s) => next(s.metadata.fromCache), error),
+    );
     const unsub = onSnapshot(
       ref,
       (snap) => {
@@ -267,6 +327,7 @@ export function useLiveDoc<T>(
     // with it, or it outlives the screen that could explain it.
     return () => {
       unsub();
+      untime();
       if (raised.current) publishSuccess(label);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
