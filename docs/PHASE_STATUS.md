@@ -443,6 +443,15 @@ React Native's cancel-by-tag still reaches the handed-off call.
 - Deleting a label that is already gone counts as done instead of an error.
   The label list trails the server, so a quick second tap names a label
   deleted a moment ago. The server still answers `not-found`.
+- **Slow reads are reported**, like slow writes: a live list or document
+  that takes 5 s or more to hear from the server, or is left unanswered that
+  long, goes to Sentry as `Slow read: LABEL took Nms` at warning, with
+  `cacheShownFirst` and `alsoWaiting` (other reads still waiting: several
+  point at the connection, one alone at that query). The People list once took
+  5-10 s, the admin's own row first, and reads leave no server log. On the AVD
+  with the Firestore emulator blocked, People showed only the cached row and
+  then reported `Slow read: users took 17773ms`, `cacheShownFirst: true`; the
+  browser e2e suite raised none.
 
 ### 2026-10-16 — The institute's rules, Report a problem, and a patient first sign-in — v0.12.0
 
