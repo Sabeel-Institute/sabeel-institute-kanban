@@ -107,8 +107,19 @@ const deleteLabelFn = httpsCallable<
  * A callable, not a client delete: the label has to come off every card that
  * carries it, and only the server can do that completely and still record WHO
  * did it. `firestore.rules` denies the direct delete outright.
+ *
+ * `not-found` is success HERE, though the server reports it on purpose: the
+ * label list trails the server, so a quick second tap names a label that was
+ * deleted a moment ago, and what the person asked for is already true. The
+ * server deletes the document only after the sweep, so it cannot be missing
+ * while cards still carry it.
  */
 export async function deleteLabel(labelId: string): Promise<number> {
-  const res = await deleteLabelFn({ labelId });
-  return res.data.strippedFromCards;
+  try {
+    const res = await deleteLabelFn({ labelId });
+    return res.data.strippedFromCards;
+  } catch (e) {
+    if ((e as { code?: unknown }).code === 'functions/not-found') return 0;
+    throw e;
+  }
 }

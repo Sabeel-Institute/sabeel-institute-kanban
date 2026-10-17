@@ -128,16 +128,21 @@ export function BoardSettingsScreen({
 
   const { run, busy, error, setError } = useAction('boardSettings');
   // The pending remove/leave confirmation. `cards` is looked up in the
-  // background for removing SOMEONE ELSE (null = still counting); self-leave
-  // never counts, so the dialog can open instantly with no round-trip.
+  // background for removing SOMEONE ELSE (null = still counting, 'unknown' = the
+  // count failed); self-leave never counts, so the dialog can open instantly
+  // with no round-trip.
   const [pending, setPending] = useState<{ uid: string; self: boolean } | null>(
     null,
   );
-  const [pendingCards, setPendingCards] = useState<number | null>(null);
+  const [pendingCards, setPendingCards] = useState<number | 'unknown' | null>(null);
   /** The label awaiting a delete confirmation, and how many cards carry it
-   *  (null = still counting, exactly like the member removal above). */
+   *  (null and 'unknown' exactly as for the member removal above). A failed
+   *  count is NOT zero: "No cards use it" would call harmless a delete that
+   *  may strip the label from dozens. */
   const [pendingLabel, setPendingLabel] = useState<Label | null>(null);
-  const [pendingLabelCards, setPendingLabelCards] = useState<LabelUsage | null>(null);
+  const [pendingLabelCards, setPendingLabelCards] = useState<LabelUsage | 'unknown' | null>(
+    null,
+  );
   /** Which label is being renamed inline, and the text so far. */
   const [renamingLabel, setRenamingLabel] = useState<string | null>(null);
   const labelCountReq = useRef(0);
@@ -258,7 +263,7 @@ export function BoardSettingsScreen({
         if (labelCountReq.current === req) setPendingLabelCards(n);
       })
       .catch(() => {
-        if (labelCountReq.current === req) setPendingLabelCards({ active: 0, archived: 0 });
+        if (labelCountReq.current === req) setPendingLabelCards('unknown');
       });
   }
 
@@ -290,7 +295,7 @@ export function BoardSettingsScreen({
           if (countReq.current === req) setPendingCards(n);
         })
         .catch(() => {
-          if (countReq.current === req) setPendingCards(0);
+          if (countReq.current === req) setPendingCards('unknown');
         });
     }
   }
@@ -465,7 +470,9 @@ export function BoardSettingsScreen({
               <Body>
                 {pendingLabelCards === null
                   ? `Delete “${pendingLabel.name}”? Checking how many cards use it…`
-                  : `Delete “${pendingLabel.name}”? ${describeLabelUsage(pendingLabelCards)}${
+                  : pendingLabelCards === 'unknown'
+                    ? `Delete “${pendingLabel.name}”? Could not check how many cards use it. It will be removed from all of them, across every board. This cannot be undone.`
+                    : `Delete “${pendingLabel.name}”? ${describeLabelUsage(pendingLabelCards)}${
                       pendingLabelCards.active + pendingLabelCards.archived > 0
                         ? ' It will be removed from all of them, across every board. This cannot be undone.'
                         : ''
@@ -686,7 +693,9 @@ export function BoardSettingsScreen({
               ? 'Leave this board? Any cards assigned to you on this board will be unassigned.'
               : pendingCards === null
                 ? 'Remove this person from the board? Checking how many cards they are assigned to…'
-                : pendingCards > 0
+                : pendingCards === 'unknown'
+                  ? 'Remove this person from the board? Could not check how many cards they are assigned to. They will be unassigned from all of them.'
+                  : pendingCards > 0
                   ? `Remove this person from the board? They are assigned to ${
                       pendingCards
                     } card${
