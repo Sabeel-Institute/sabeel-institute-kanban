@@ -18,7 +18,7 @@ function fixture() {
     writeFileSync(join(root, path), content, { mode });
   };
   put('scripts/publish-apk.sh', '');
-  copyFileSync(resolve(import.meta.dirname, '../../../scripts/publish-apk.sh'), join(root, 'scripts/publish-apk.sh'));
+  copyFileSync(resolve(__dirname, '../../../scripts/publish-apk.sh'), join(root, 'scripts/publish-apk.sh'));
   put('bin/node', '#!/usr/bin/env bash\nif [ "$1" = -p ]; then echo 1.2.3; elif [[ "$1" = *deploy-notes.mjs ]]; then echo "Release notes"; fi\n', 0o755);
   put('bin/gh', '#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$GH_TEST_LOG"\nif [ "$2" = view ]; then exit 1; fi\n', 0o755);
   put('sdk/build-tools/test/apksigner', '#!/usr/bin/env bash\necho "Signer #1 certificate DN: ${TEST_SIGNER:-CN=Sabeel Institute}"\n', 0o755);
