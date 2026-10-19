@@ -24,7 +24,7 @@
     "@react-native-google-signin/google-signin": "^16.1.2",
     "@sabeel/shared": "*",
     "@sentry/react": "^10.66.0",
-    "@sentry/react-native": "~7.11.0",
+    "@sentry/react-native": "~8.31.0",
     "expo": "~57.0.4",
     "expo-application": "~57.0.2",
     "expo-build-properties": "^57.0.10",
