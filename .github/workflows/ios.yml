@@ -7,7 +7,7 @@ name: iOS
 #   gh workflow run ios.yml -f testflight=true      # build, then upload to TestFlight
 #
 # or the Actions tab -> iOS -> Run workflow, or the REST API:
-#   POST /repos/faisal-shah/sabeel-institute-kanban/actions/workflows/ios.yml/dispatches
+#   POST /repos/Sabeel-Institute/sabeel-institute-kanban/actions/workflows/ios.yml/dispatches
 #   {"ref": "main", "inputs": {"testflight": "true"}}
 #
 # An upload is a release: it needs Faisal's go-ahead like any other (CLAUDE.md).

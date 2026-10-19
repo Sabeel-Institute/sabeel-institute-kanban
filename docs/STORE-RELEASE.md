@@ -21,7 +21,7 @@ correction from Apple costs one app's rework rather than three.
 the track, testers the account-wide "Sabeel staff" email list. Destination:
 Play production, a public listing (decided by Faisal 2026-10-16). The app
 signing key is Google-generated; the repo's key (in the vault) is the upload
-key only. The download page's APK (`docs/DEPLOY.md`) is signed with the upload
+key only. A locally built APK (`docs/DEPLOY.md`) is signed with the upload
 key, so it and a Play install cannot replace each other.
 
 **Web.** <https://sabeel-institute-kanban.web.app>, v0.11.5 (`67913fa`), serving
@@ -360,7 +360,7 @@ the vault is the upload key. The consequences (skill, decision 8):
 - Play installs run under Google's key; its SHA-1 is registered in Firebase, or
   Google sign-in fails with `DEVELOPER_ERROR` for Play users only
   (`docs/DEPLOY.md`).
-- The download page's APK carries the upload key, so it and a Play install
+- A locally built APK carries the upload key, so it and a Play install
   cannot replace each other: uninstall first; nothing is lost, all state is in
   Firestore.
 - A lost upload key is reset through Play Console support; the signing key,
@@ -369,9 +369,9 @@ the vault is the upload key. The consequences (skill, decision 8):
   change until a release reaches open testing or production, but staff who
   installed Kanban from internal testing run under Google's key, and their
   copies would need reinstalling after a change. The LMS and the Time Tracker
-  use their own keys so their download-page APKs and Play installs update
-  each other; Kanban's download page is the developer's pre-release route, so
-  that matters less here.
+  use their own keys so their locally built APKs and Play installs update
+  each other. Kanban testers install through Play internal testing; developer
+  verification can use locally built APKs.
 
 ### 9. Distribution
 

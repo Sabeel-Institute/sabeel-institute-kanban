@@ -8,21 +8,7 @@
  * The destination must be NAMED. Publishing is a release to the whole tester
  * list, so a bare invocation prints help and refuses rather than guessing.
  *
- * INTERNAL APP SHARING IS NOT AN OPTION HERE, deliberately. It is the obvious
- * way to hand one build to one person, and it refuses this app: it requires the
- * app to have been PUBLISHED, and internal-testing releases do not count — the
- * app is a Draft, and for an internal tool it may always be. The support for it
- * was written, proved not to work, and removed rather than left as a flag that
- * fails. `docs/DEPLOY.md` keeps the reasoning so nobody re-derives it; the
- * developer's pre-release route is the APK download page.
- *
- * The flow is edit -> upload -> point the track at the new versionCode -> commit.
- *
- * CREDENTIALS LIVE OUTSIDE THE REPO, like the keystore. This repo is public: a
- * service-account key committed here would be a publish credential for the app,
- * readable by anyone, forever, whatever a later commit removes.
- *
- * The service account needs Play Console's "Release apps to testing tracks".
+ * Use the internal testing track for Android distribution.
  */
 import { createRequire } from 'node:module';
 import { readFile, stat } from 'node:fs/promises';

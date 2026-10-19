@@ -8,7 +8,7 @@
 #
 #   bash scripts/build-aab.sh
 #
-# The gates are the ones publish-apk.sh holds for the download page's APK: a
+# The gates are the ones publish-apk.sh holds for the versioned release APK: a
 # store-legal version, a deploy-log entry, and a signature that is not the
 # debug key.
 set -euo pipefail

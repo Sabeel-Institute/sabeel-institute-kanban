@@ -12,7 +12,7 @@ route, that file is the reasoning.
 ## The prompt
 
 > You are cutting the **iOS** release of Sabeel Kanban from the cloud Mac.
-> The other three surfaces (web hosting, the APK download page, Play internal
+> The other three surfaces (web hosting, versioned GitHub APK releases, Play internal
 > testing) are already shipped from `main`; iOS is its own runbook and is the
 > only surface left.
 >
@@ -153,7 +153,7 @@ route, that file is the reasoning.
 - `expo.ios.buildNumber` must be bumped *before* handing this over if the current
   number has already been uploaded. `TODO.md` § Play publishing tracks what has
   shipped so far.
-- iOS is deliberately absent from the download page — that page carries
+- iOS is deliberately absent through Play internal testing — that page carries
   "There is no iPhone version." Update it only once iOS is out of TestFlight and
   actually available to the team.
 - The distribution certificate's private key lives in the build Mac's keychain

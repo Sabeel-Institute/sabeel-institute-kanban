@@ -13,14 +13,24 @@ Roles, not people: whoever holds a role today grants it.
 | Firebase / Google Cloud project `sabeel-institute-kanban` | Owner | `firebase deploy`, `functions:secrets:set`, and the scripts run with `GCLOUD_PROJECT=…` (gcloud ADC) |
 | Google Play Console, the Sabeel developer account | user on this app with **Release apps to testing tracks** and **Manage testing tracks and edit tester lists** | the Testers tab, App content, the app-signing fingerprints |
 | App Store Connect, the Sabeel Institute team | **Admin** or **App Manager** on this app; the **Account Holder** files the unlisted-distribution request | TestFlight testers, App Review submissions |
-| GitHub `faisal-shah/sabeel-institute-kanban` | write; secrets are set by the owner (a personal repository) | `git push`, `gh workflow run ios.yml`, `publish-apk.sh`'s versioned release |
-| GitHub `faisal-shah/faisal-shah.github.io` | write, with a clone at `../faisal-shah.github.io` (or `SK_PAGES_DIR`) | the APK download page |
+| GitHub `Sabeel-Institute/sabeel-institute-kanban` | write; repository administrators manage Actions secrets | `git push`, `gh workflow run ios.yml`, `publish-apk.sh`'s versioned release |
 | Sentry, the Sabeel org | member of the three Kanban projects | DSNs, the build token, triage |
 | The vault owner | — | every file in `docs/SECRETS.md` § Build and publish credentials |
 
-The Firebase project belongs to a personal Google account, not to an
-`oursabeel.com` Cloud organization (`TODO.md` § C), so project access is granted
-from that account.
+The Firebase project belongs to Sabeel Institute's `oursabeel.com` Cloud
+organization (`833557915874`), with `faisal.shah@oursabeel.com` as Owner
+and Institute billing. Authenticate Firebase CLI, gcloud and Application Default
+Credentials separately as the Institute account.
+
+Domain-restricted IAM sharing applies. Existing public callable endpoints are
+reachable; new public invoker bindings may require an approved policy exception.
+OAuth consent is External and published.
+
+Repository: `Sabeel-Institute/sabeel-institute-kanban`. Local clone:
+`/home/faisal/repos/Sabeel-Institute/sabeel-institute-kanban`. Secrets are backed up
+in `~/.config/secrets-vault/`, with live paths in `sources.tsv`. Copy and
+verify secrets when setting up a clone; deleting originals requires express
+approval.
 
 ## Prerequisites
 
@@ -125,32 +135,20 @@ lying around is a thing someone later has to reason about.
 
 From then on, promote everyone else in-app under **People**.
 
-## Public download page — the developer's pre-release route
+## Android distribution
 
-Testers get Android builds from **Play internal testing**; this channel exists
-for one thing Play cannot do for this app — letting the developer test a
-release build *before* the testers see it, from a phone, away from the build
-machine. Play's feature for that, internal app sharing, refuses this app
-(§ Publishing from the command line says why).
+Testers install through Play internal testing:
+https://play.google.com/apps/internaltest/4701475909888991410
 
-The page is `sabeel-kanban/index.html` in `faisal-shah/faisal-shah.github.io`,
-and the APK is the `kanban-latest` release asset there. `publish-apk.sh` needs
-write access to that repository and a clone at `../faisal-shah.github.io`
-(or `SK_PAGES_DIR`).
+`npm run build:apk` builds the release APKs.
+`scripts/publish-apk.sh --check` validates version, signing, ABI splits and
+manual freshness without publishing. `scripts/publish-apk.sh` creates or
+updates the versioned release in `Sabeel-Institute/sabeel-institute-kanban`
+with its APKs and manual. No personal website or Pages clone is involved.
 
-```
-npm run build:apk                 # release-signed, per-ABI
-SK_CHECK=1 scripts/publish-apk.sh # dry run: every gate, uploads nothing
-scripts/publish-apk.sh            # replaces the rolling asset + cuts the release
-```
-
-**The signature rule is permanent.** An APK from here is signed with the
-**upload key**; a Play install is signed with **Google's app signing key**.
-Neither can install over the other — Android refuses with a signature mismatch
-and says only "App not installed". Uninstall first; nothing is lost, because all
-state is in Firestore. The team installs from Play, so the only sideload
-install is the developer's.
-
+Play distribution uses `npm run build:aab` and
+`npm run publish:play -- --internal`. Sideloaded APKs use the upload key;
+Play installs use Google's app signing key and cannot replace those APKs.
 
 ## Android releases — Google Play
 
@@ -174,7 +172,7 @@ onto a device, and a missing one fails only for that route:
 | Build | Signed with | Needed for |
 |---|---|---|
 | `npm run dev:android`, `expo run:android` | committed debug keystore | day-to-day development |
-| `npm run build:apk` (sideload) | upload key, `~/keys/…jks` | the download page's release build |
+| `npm run build:apk` (sideload) | upload key, `~/keys/…jks` | a locally installed release build |
 | installed from Play | **Google's app signing key** | everyone actually using the app |
 
 Play's is the one that gets forgotten: **Play re-signs whatever you upload**,
@@ -312,16 +310,8 @@ the whole tester list, so a bare invocation prints help and refuses rather than
 guessing; unrecognised flags are refused too. The flow is edit → upload → point
 the track at the new `versionCode` → commit, and a failure discards the edit.
 
-**Internal app sharing was removed, not left as a broken flag.** It is the
-obvious tool for handing one build to one person, and it refuses this app: it
-requires the app to have been **published**, and internal-testing releases do not
-count. The dashboard shows why — *"Draft app"*, internal testing *"Active · Not
-reviewed"*. That holds until the first production release (`docs/STORE-RELEASE.md`).
-
-The support was written, proved not to work against the live API and by hand in
-the Console, and then deleted — an option that cannot succeed is a trap that
-costs somebody an evening. The reasoning is kept here so it is not re-derived.
-**The developer's pre-release route is the APK download page**, above.
+Internal app sharing is not supported. Use Play internal testing for testers
+and a locally installed release APK for developer verification.
 
 **Gates, before anything leaves the machine.**
 
@@ -400,7 +390,7 @@ pre-13 phone cannot install the app; that person uses the web app.
 
 ### Building a sideloadable APK
 
-The per-ABI APKs that `publish-apk.sh` publishes (§ Public download page):
+The per-ABI APKs attached to the versioned Institute release:
 
 ```sh
 npm run build:apk
@@ -537,7 +527,7 @@ emulator-mode bundle must never reach Hosting.
 ## Shipping a release
 
 `android/` is committed; there is no EAS. A ship touches **the backend when it
-changed, web, the APK download page, Play internal testing and TestFlight**, and
+changed, web, versioned GitHub release assets, Play internal testing and TestFlight**, and
 they go out in one batch after Faisal's go-ahead. The iPhone build runs on
 GitHub (`docs/IOS-BUILD.md` § Builds on GitHub).
 
@@ -547,7 +537,6 @@ GitHub (`docs/IOS-BUILD.md` § Builds on GitHub).
 #    the newest deploy-log heading in docs/PHASE_STATUS.md renamed to end
 #    "— vX.Y.Z". build-aab.sh, build-ios.sh and publish:play find the entry by
 #    that suffix, and refuse without it.
-# 1. WRITE THE "What's new" PARAGRAPH on the download page — see below, nothing checks it
 git push origin main            # FIRST — a release attaches to a commit GitHub already has
 # 2. Backend, when functions, rules or indexes changed, BEFORE the clients that
 #    need it. Indexes first; a deploy-log entry that needs another order (such as
@@ -558,9 +547,9 @@ npx firebase deploy --only firestore:rules,storage,functions --project sabeel-in
 npm run web:export -w @sabeel/app
 npm run check:web-push      # the VAPID key actually reached the bundle
 npx firebase deploy --only hosting --project sabeel-institute-kanban
-npm run build:apk && scripts/publish-apk.sh          # download page + the vX.Y.Z tag and release
+npm run build:apk && scripts/publish-apk.sh          # Institute vX.Y.Z release assets
 npm run build:aab && npm run publish:play -- --internal   # the team, via Play
-gh workflow run ios.yml -R faisal-shah/sabeel-institute-kanban --ref vX.Y.Z -f testflight=true   # iPhones, via TestFlight
+gh workflow run ios.yml -R Sabeel-Institute/sabeel-institute-kanban --ref vX.Y.Z -f testflight=true   # iPhones, via TestFlight
 ```
 
 The iOS run starts on the tag `publish-apk.sh` just cut, so the iPhone build
@@ -575,20 +564,6 @@ step with `target_commitish is invalid`.
 stamp the running commit onto the sign-in screen. An artifact built earlier
 carries a superseded hash, so rebuild if anything landed since — the version
 gate will not catch it, because the version is still right.
-
-**The download page's "What's new" paragraph is hand-written and nothing checks
-it.** The script owns the version, the timestamp and the download size, and
-asserts all three. The prose it sits beside does not update itself: it spent four
-releases advertising 31 MB and, until v0.7.5, still announced the move to Google
-Play beside a live download button. Write it in
-`../faisal-shah.github.io/sabeel-kanban/index.html` before publishing.
-
-**The rolling GitHub release is script-owned too**, from the same three values:
-the script writes its title and body and asserts the result. Nobody is meant to
-land there — the download button links straight to the asset URL — but it is
-public. It **refuses to publish if `kanban-latest` carries any asset other than
-the one APK**: a release page offering two files while naming the wrong one is
-worse than one offering none.
 
 Before sharing any build:
 

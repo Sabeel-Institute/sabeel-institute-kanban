@@ -509,13 +509,13 @@ free and unlimited because this repo is public. It runs **only when started**,
 never on a push:
 
 ```bash
-gh workflow run ios.yml -R faisal-shah/sabeel-institute-kanban                    # build a signed .ipa
-gh workflow run ios.yml -R faisal-shah/sabeel-institute-kanban -f testflight=true # build it, then upload it
-gh run watch <run id> -R faisal-shah/sabeel-institute-kanban
+gh workflow run ios.yml -R Sabeel-Institute/sabeel-institute-kanban                    # build a signed .ipa
+gh workflow run ios.yml -R Sabeel-Institute/sabeel-institute-kanban -f testflight=true # build it, then upload it
+gh run watch <run id> -R Sabeel-Institute/sabeel-institute-kanban
 ```
 
 or Actions → iOS → Run workflow, or the REST API:
-`POST /repos/faisal-shah/sabeel-institute-kanban/actions/workflows/ios.yml/dispatches`
+`POST /repos/Sabeel-Institute/sabeel-institute-kanban/actions/workflows/ios.yml/dispatches`
 with `{"ref": "main", "inputs": {"testflight": "true"}}`.
 
 **A build is free to run at any time. An upload is a release** and needs
@@ -620,7 +620,7 @@ in the table is also in Faisal's vault, `~/.config/secrets-vault/`: the signing
 files and the key under `sabeel/apple/`, the two env files under
 `sabeel/kanban/env/`.
 
-Set one with `gh secret set NAME -R faisal-shah/sabeel-institute-kanban < file`
+Set one with `gh secret set NAME -R Sabeel-Institute/sabeel-institute-kanban < file`
 (`base64 -w0 file | gh secret set NAME …` for the two binary ones). **Keep
 comment lines out of the two env secrets**: GitHub masks a multi-line secret
 line by line, so a line of `#` turns every `#` in the log into `***`. A line
@@ -630,8 +630,8 @@ value by itself before anything runs. The logs are public.
 ### Renewal, before 16 October 2027
 
 One Apple Distribution certificate signs the GitHub builds of three apps:
-`faisal-shah/sabeel-institute-kanban`, `Sabeel-Institute/lms` and
-`faisal-shah/sabeel-institute-time-tracker`. It and each app's App Store
+`Sabeel-Institute/sabeel-institute-kanban`, `Sabeel-Institute/lms` and
+`Sabeel-Institute/sabeel-institute-time-tracker`. It and each app's App Store
 profile expire on **16 October 2027**; from then the gates in `build-ios.sh`
 stop every GitHub build in seconds with "expired". The Mac signs
 automatically and is unaffected.

@@ -15,7 +15,7 @@ ClickUp.
 - `docs/DEVELOPING.md` — the dev loops: emulators, tests, screenshots, the screen
   sweep.
 - `docs/DEPLOY.md` — the access a releaser needs, deploying, shipping a release
-  (web, Play, the APK download page, TestFlight), rollback.
+  (web, Play, versioned GitHub APK releases, TestFlight), rollback.
 - `docs/IOS-BUILD.md` — the iPhone app: builds on GitHub, TestFlight testers,
   signing and its renewal.
 - `docs/STORE-RELEASE.md` — Kanban on the App Store and Google Play: where it

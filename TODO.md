@@ -60,7 +60,7 @@ below is console work; the script is already written (`npm run publish:play`).
 ## A. GitHub — done
 
 - [x] Repo created and pushed (2026-07-19):
-      https://github.com/faisal-shah/sabeel-institute-kanban
+      https://github.com/Sabeel-Institute/sabeel-institute-kanban
 - [x] **It is PUBLIC** (confirmed 2026-07-29). Audited on that date: no secret
       file, DSN, service-account key or token has ever been committed, in the
       working tree or anywhere in history; no ClickUp export; no APK or large
@@ -114,37 +114,15 @@ below is console work; the script is already written (`npm run publish:play`).
 
 ## C. Google Cloud — OAuth consent
 
-**Decided 2026-07-19: External, published.** Not Internal.
+**OAuth consent: External, In production.**
 
-- [x] **User type: `External`, publishing status `In production`.**
-      Internal was the original plan and is the stronger setting — Google itself
-      refuses non-Workspace accounts before our code runs. It turned out to be
-      unavailable: **Internal requires the Cloud project to belong to a Google
-      Cloud organization**, and the project is deliberately under a personal
-      Google account, which has none. "Make internal" is greyed out for that
-      reason, not because anything is misconfigured.
-- [x] **Publish the app.** While status is `Testing`, ONLY explicitly-listed test
-      users can sign in — staff would be locked out. Publishing is required, not
-      optional.
-- [ ] Confirm scopes are only `email`, `profile`, `openid`. If you ever see a
-      request for more, stop and tell Claude — nothing in this app needs it.
-      These are non-sensitive scopes, which is why no Google verification review
-      and no 100-user cap apply.
+- [x] **Institute ownership:** `oursabeel.com` Cloud organization,
+  `faisal.shah@oursabeel.com` as Owner, Institute billing.
+- [x] **Published consent:** staff are not restricted to an OAuth test-user list.
+- [ ] Confirm scopes are only `email`, `profile`, `openid`.
 
-**What this costs us, stated plainly.** The domain restriction rests on the
-server: `beforeSignUp` refuses a sign-up that is not a verified
-`@oursabeel.com` Google account before any account exists, `onUserCreate`
-deletes any that gets past it, and firestore.rules grant nothing without an
-admin-set `status == 'active'` claim. But the outer wall is gone: anyone with
-any Google account can reach the consent screen.
-
-**If Sabeel ever wants this properly:** move the project into an `oursabeel.com`
-Cloud organization (keeps the project id and all data), then set Internal. That
-also fixes the larger issue that the nonprofit's production system currently
-lives in a personal Google account — a continuity risk independent of OAuth.
-
-> The app's own admin-approval gate is separate and applies to every
-> `@oursabeel.com` account.
+Server-side verified-domain and approval gates control access. OAuth consent
+and the app's admin-approval gate are separate.
 
 ---
 
@@ -286,7 +264,7 @@ Two more worth reusing:
    ID**: an App Store Connect API key has one (a UUID), an APNs key never does.
 2. **Testers**: `docs/IOS-BUILD.md` § Adding a tester.
 3. **A build:**
-   `gh workflow run ios.yml -R faisal-shah/sabeel-institute-kanban --ref vX.Y.Z -f testflight=true`,
+   `gh workflow run ios.yml -R Sabeel-Institute/sabeel-institute-kanban --ref vX.Y.Z -f testflight=true`,
    started on the release tag. From the Mac instead:
    ```bash
    git pull && npm ci

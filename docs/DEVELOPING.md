@@ -412,7 +412,7 @@ With the emulators running and the app open:
 - `docs/PHASE_STATUS.md` — what's built, and the **deploy log**: what shipped,
   when, and what it broke.
 - `docs/USER-MANUAL.md` — the guide the team reads; `USER-MANUAL.pdf` beside it.
-- `docs/DEPLOY.md` — deploying, the release APK, the download page, rollback.
+- `docs/DEPLOY.md` — deploying, the release APK, Google Play, rollback.
 - `docs/BRAND.md` — the colour authority. Read before any design decision.
 - `docs/INHERITED-STACK.md` — what the sibling time-tracker already paid for.
 - `docs/STACK-GOTCHAS.md` — a stub; the traps live in the public

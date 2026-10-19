@@ -45,7 +45,5 @@ an earlier draft of this document, in code that had already shipped here.
 
 ## Sibling projects
 
-The time-tracker is aligned: same shape check, same `versionCode` formula, same
-pinned `TZ=America/Chicago` timestamp and wording on its download page. Confirmed
-against their `49c447f`. If you change any of the three here, tell them — the two
-download pages sit on one site and are read side by side.
+Time Tracker uses the same version shape and Android version-code formula.
+Keep those rules aligned when changing shared release conventions.

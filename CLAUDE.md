@@ -706,17 +706,11 @@ factory rather than being silently dropped.
   Console → App integrity → *App signing key certificate*, NOT the upload key's.
   Both belong in Firebase; miss the former and sign-in fails with
   `DEVELOPER_ERROR` for Play users only, while local builds work.
-- **The GitHub-release APK is the DEVELOPER'S pre-release route.** Testers get
-  builds from Play internal testing; this channel exists because Faisal must
-  test a release build *before* they see it, from a phone, away from the
-  machine — and Play's one feature for that, internal app sharing, refuses this
-  app (`docs/DEPLOY.md` says why). **The signature rule is permanent**: an APK from here is signed with the UPLOAD key, a Play install with
-  GOOGLE'S app signing key, and neither can replace the other — uninstall first,
-  nothing is lost because all state is in Firestore.
-- **Never `git add` a binary** to any repo: committing per-release APKs bloated
-  the pages history (~31 MB each) and had to be rewritten out. `*.apk` is
-  gitignored in the pages repo as the backstop, and that rule still holds in the
-  sibling time-tracker.
-- **Any script whose first act after its checks is a public upload needs a dry
-  run.** `publish-apk.sh --check` exists because running it to *test* a new gate
-  published a build. If a check is worth writing, exercising it must be free.
+- **Android distribution:** testers install through Play internal testing.
+  `publish-apk.sh` attaches APKs and the manual to the versioned Institute
+  repository release, never to a personal website. Sideloaded APKs use the
+  upload key; Play installs use Google's app signing key and cannot replace
+  those APKs.
+- **Never `git add` a binary.** APKs belong in GitHub Release assets.
+- **Publisher checks must not upload.** Use `publish-apk.sh --check` when
+  verifying the publishing gates.
