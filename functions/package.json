@@ -26,6 +26,6 @@
     "esbuild": "^0.28.2",
     "firebase": "^12.15.0",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   }
 }

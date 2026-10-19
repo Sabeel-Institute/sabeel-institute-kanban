@@ -20,8 +20,8 @@
     "@lexical/react": "^0.52.0",
     "@lexical/utils": "^0.52.0",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "@react-native-community/datetimepicker": "^9.2.1",
-    "@react-native-google-signin/google-signin": "^16.1.5",
+    "@react-native-community/datetimepicker": "^9.1.0",
+    "@react-native-google-signin/google-signin": "^16.1.2",
     "@sabeel/shared": "*",
     "@sentry/react": "^10.66.0",
     "@sentry/react-native": "~7.11.0",
@@ -37,18 +37,18 @@
     "expo-status-bar": "~57.0.0",
     "firebase": "^12.15.0",
     "lexical": "^0.52.0",
-    "react": "19.3.1",
-    "react-dom": "19.3.1",
-    "react-native": "0.88.0",
-    "react-native-enriched-html": "^1.1.1",
-    "react-native-keyboard-controller": "^1.22.7",
-    "react-native-reanimated": "~4.7.1",
-    "react-native-safe-area-context": "~5.10.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.0",
+    "react-native-enriched-html": "^1.1.0",
+    "react-native-keyboard-controller": "^1.21.9",
+    "react-native-reanimated": "~4.5.2",
+    "react-native-safe-area-context": "~5.7.0",
     "react-native-web": "^0.21.4"
   },
   "devDependencies": {
-    "@types/react": "~19.3.0",
+    "@types/react": "~19.2.2",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   }
 }
