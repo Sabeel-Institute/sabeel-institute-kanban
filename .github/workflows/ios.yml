@@ -1,7 +1,6 @@
 name: iOS
 
 # The iPhone app, built on GitHub's macOS runners (free for a public repo).
-# Started by hand only, never by a push:
 #
 #   gh workflow run ios.yml                         # build an .ipa
 #   gh workflow run ios.yml -f testflight=true      # build, then upload to TestFlight
@@ -27,6 +26,8 @@ name: iOS
 # in the two env-file secrets is masked on its own before anything can print it.
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       testflight:
@@ -43,6 +44,7 @@ permissions:
 
 jobs:
   build:
+    if: github.repository_owner == 'Sabeel-Institute'
     runs-on: macos-26
     timeout-minutes: 120
     outputs:
@@ -192,7 +194,7 @@ jobs:
 
   testflight:
     needs: build
-    if: inputs.testflight
+    if: github.event_name == 'workflow_dispatch' && inputs.testflight
     runs-on: macos-26
     # Apple's validation takes a minute or two, and on a bad day twenty-five;
     # the upload after it needs room too.

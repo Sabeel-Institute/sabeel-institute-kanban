@@ -505,8 +505,8 @@ the service.
 ## Builds on GitHub
 
 `.github/workflows/ios.yml` builds the app on GitHub's macOS runners, which are
-free and unlimited because this repo is public. It runs **only when started**,
-never on a push:
+free and unlimited because this repo is public. Builds run automatically on main pushes. To build manually or upload to
+TestFlight:
 
 ```bash
 gh workflow run ios.yml -R Sabeel-Institute/sabeel-institute-kanban                    # build a signed .ipa

@@ -1,24 +1,22 @@
 name: CI
 
-# Exactly ONE run per change. An unfiltered `push:` produced two, twice over:
-#
-#   - Publishing a release pushes the vX.Y.Z TAG, and a tag push matched too —
-#     so every release re-ran the whole suite, both e2e flows included, against
-#     a commit main had already tested. It also made a flake look like a branch
-#     difference: the same SHA failed on main and passed on the tag.
-#   - `push` and `pull_request` both match a branch that has a PR open, so any
-#     PR would double up as well.
-#
-# Restricting push to main leaves pull_request as the sole trigger for branch
-# work, which is where review happens anyway.
 on:
-  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build-test:
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

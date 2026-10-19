@@ -70,3 +70,4 @@ app/android/keystore.properties
 
 # Metro transform cache, kept in-repo (see app/metro.config.js)
 app/.metro-cache/
+gha-creds-*.json

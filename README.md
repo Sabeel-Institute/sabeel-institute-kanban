@@ -1,5 +1,8 @@
 # Sabeel Institute Kanban
 
+Automatic platform builds and manual release controls are documented in
+[GitHub Actions](docs/GITHUB-ACTIONS.md).
+
 Access-controlled kanban boards for Sabeel Institute — Android and iPhone apps
 and a responsive website from one Expo codebase, on a Firebase backend. Replaces
 ClickUp.

@@ -1,5 +1,8 @@
 # Deploy guide
 
+Automatic platform builds and manual release controls are documented in
+[GitHub Actions](GITHUB-ACTIONS.md).
+
 A release needs the access below, the files in `docs/SECRETS.md`, and the order
 in § Shipping a release. Store decisions — tracks, testers, App Review, listings
 — are in `docs/STORE-RELEASE.md`; the iPhone build is `docs/IOS-BUILD.md`.
