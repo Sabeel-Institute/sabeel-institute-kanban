@@ -12,6 +12,7 @@ name: CI
 # Restricting push to main leaves pull_request as the sole trigger for branch
 # work, which is where review happens anyway.
 on:
+  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
