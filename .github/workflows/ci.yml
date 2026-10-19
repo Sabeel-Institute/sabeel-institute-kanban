@@ -15,104 +15,142 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  build-test:
+  workflow-validation:
     if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate workflows and embedded shell
+        run: |
+          curl -fsSLo "$RUNNER_TEMP/actionlint.tgz" https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tgz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/actionlint.tgz" -C "$RUNNER_TEMP" actionlint
+          shellcheck --version
+          "$RUNNER_TEMP/actionlint" -color
 
+  quality:
+    if: github.event.pull_request.draft != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Web export
+        run: npm run web:export -w @sabeel/app
 
-      - name: Set up JDK 21 (Firebase emulators require Java 21+)
-        uses: actions/setup-java@v4
+  integration:
+    if: github.event.pull_request.draft != true
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
-
       - name: Install Firebase CLI
-        run: npm install -g firebase-tools@^15
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Unit tests
-        run: npm test
-
-      # A build-only break (a bad import, a bundler-config slip) passes lint,
-      # typecheck and tests but fails the web export — which otherwise only
-      # surfaces at deploy time. Exporting here catches it in CI.
-      - name: Web export (catch build-only breaks)
-        run: npm run web:export -w @sabeel/app
-
+        run: npm install --global firebase-tools@^15
       - name: Emulator integration tests
         run: npm run test:emulator
 
-      # BOTH end-to-end suites, through the real web build.
-      #
-      # CI ran lint, typecheck, unit and emulator tests but never an e2e, which
-      # is exactly why `web-e2e.mjs` rotted from check 5 to unusable without
-      # anyone noticing: every control it clicked had been renamed by the move to
-      # icon actions and the nav shell, and nothing failed until someone ran it
-      # by hand. Both suites are green now, and both run on every push so that
-      # cannot happen again. They are worth the minutes.
-      - name: Install Playwright browser
+  browser:
+    if: github.event.pull_request.draft != true
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        suite:
+          - scripts/attachments-e2e.mjs
+          - scripts/web-e2e.mjs
+          - scripts/stats-e2e.mjs
+          - scripts/screens-e2e.mjs
+          - scripts/richtext-e2e.mjs
+          - scripts/typing-perf-e2e.mjs
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install Firebase CLI
+        run: npm install --global firebase-tools@^15
+      - name: Install Chromium
         run: npx playwright install --with-deps chromium
+      - name: Browser regression
+        env:
+          E2E_SUITE: ${{ matrix.suite }}
+        run: bash scripts/e2e.sh "$E2E_SUITE"
 
-      - name: Attachments end-to-end (web)
-        run: bash scripts/e2e.sh scripts/attachments-e2e.mjs
-
-      - name: Access and board flow end-to-end (web)
-        run: bash scripts/e2e.sh scripts/web-e2e.mjs
-
-      # Added after it was found NOT to be running: 271 checks across nine
-      # viewport widths, green locally and invisible to CI, which is the same
-      # failure the comment above describes. `scripts/suite-coverage` now fails
-      # if a new e2e script is ever left out of this list.
-      - name: Stats chart end-to-end (web)
-        run: bash scripts/e2e.sh scripts/stats-e2e.mjs
-
-      # Every authenticated screen at five widths straddling the breakpoint.
-      # Replaces four hand-run screenshot scripts that could not fail; the one it
-      # most directly supersedes sat inside a try/catch that logged and continued.
-      # Its first working run found Stats had shipped with no Back button and no
-      # tab bar — a dead end on a phone browser.
-      - name: Every screen, every width (web)
-        run: bash scripts/e2e.sh scripts/screens-e2e.mjs
-
-      # Rich text end to end: the editor, and what actually reaches Firestore.
-      # The load-bearing check is three cycles of byte equality — a converter
-      # that loses something loses it on cycle two, here rather than in
-      # somebody's notes.
-      - name: Rich text end-to-end (web)
-        run: bash scripts/e2e.sh scripts/richtext-e2e.mjs
-
-      # Typing must not get slower as a screen gets busier. Asserts a RATIO
-      # between a busy screen and an empty one, never a stopwatch reading:
-      # absolute ms/char on a shared runner moves more than 3x between runs, so
-      # an absolute threshold would be either useless or flaky, and a check
-      # people learn to ignore is worse than none. Guards the draft-ownership
-      # rule in CLAUDE.md — the bug it replaces shipped and was reported from a
-      # phone as "unusable on Android, like a slide show on web".
-      - name: Typing stays fast as screens fill up (web)
-        run: bash scripts/e2e.sh scripts/typing-perf-e2e.mjs
-
-      # The four board-ownership migration scripts, driven as real subprocesses
-      # against seeded awkward data — a board whose creator left it, an account
-      # whose claims and mirror disagree, a board with no author at all — with
-      # both inverses proving the round trip. They are run by hand a handful of
-      # times against PRODUCTION and nothing else exercises them; three of their
-      # gates are exit codes, which only a subprocess can check. Needs no web
-      # build, so it does not go through e2e.sh.
+  migration:
+    if: github.event.pull_request.draft != true
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install Firebase CLI
+        run: npm install --global firebase-tools@^15
       - name: Migration scripts end-to-end
         run: |
           firebase emulators:exec --project demo-sabeel-kanban \
             --only firestore,auth "node scripts/migration-e2e.mjs"
+
+  build-test:
+    if: always() && github.event.pull_request.draft != true
+    needs: [workflow-validation, quality, integration, browser, migration]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every CI job
+        env:
+          JOB_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          node -e 'const jobs = Object.values(JSON.parse(process.env.JOB_RESULTS)); if (!jobs.length || jobs.some(job => job.result !== "success")) process.exit(1);'
