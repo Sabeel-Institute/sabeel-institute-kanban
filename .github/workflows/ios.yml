@@ -52,9 +52,9 @@ jobs:
       version: ${{ steps.ipa.outputs.version }}
       build: ${{ steps.ipa.outputs.build }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -164,7 +164,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "### Built v$VERSION ($BUILD) from \`$COMMIT\`, signed with \"$IOS_PROFILE_NAME\"" >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ios-ipa
           path: build/ios/export/*.ipa
@@ -182,7 +182,7 @@ jobs:
             -exec cp {} "$RUNNER_TEMP/record/" \; -quit
           ls -la "$RUNNER_TEMP/record"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ios-build-record
           path: ${{ runner.temp }}/record
@@ -204,9 +204,9 @@ jobs:
       VERSION: ${{ needs.build.outputs.version }}
       BUILD: ${{ needs.build.outputs.build }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: ios-ipa
           path: ipa
