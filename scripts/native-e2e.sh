@@ -81,17 +81,18 @@ wait_for() { # wait_for <url> <label> <tries>
   return 1
 }
 
-firebase emulators:start --project demo-sabeel-kanban --only firestore,auth,functions,storage \
+# NO_COLOR: in CI the CLI colours its log, which splits the lines grepped below.
+NO_COLOR=1 firebase emulators:start --project demo-sabeel-kanban --only firestore,auth,functions,storage \
   >"$LOGS/emulators.log" 2>&1 &
 FB_PID=$!
 wait_for http://127.0.0.1:61200/ firestore 60
 # Seeding before onUserCreate is registered strands an account with no profile
 # (scripts/dev.sh, wait_for_auth_trigger).
 for _ in $(seq 1 60); do
-  grep -q 'onUserCreate.*auth function initialized' "$LOGS/emulators.log" && break
+  grep -q 'onUserCreate.*initialized' "$LOGS/emulators.log" && break
   sleep 3
 done
-grep -q 'onUserCreate.*auth function initialized' "$LOGS/emulators.log" \
+grep -q 'onUserCreate.*initialized' "$LOGS/emulators.log" \
   || { echo "native-e2e.sh: the auth trigger never registered" >&2; exit 1; }
 
 # The seed drives the web app, so the web server runs for the seed alone.
