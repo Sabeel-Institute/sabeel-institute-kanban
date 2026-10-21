@@ -1,0 +1,70 @@
+# The board on Android: sign-in, the column pager and its swipe, a card, the
+# native rich-text editor, the tabs and long-press selection. Seeded by
+# scripts/seed-dev.mjs; run by scripts/native-e2e.sh.
+appId: com.sabeelinstitute.kanban.debug
+name: Board, card, rich text and gestures
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Dev sign-in \\(emulator only\\)"
+    timeout: 180000
+- tapOn: "faisal"
+- runFlow: common/dismiss-dev-warnings.yaml
+- extendedWaitUntil:
+    visible: "Fundraising 2026"
+    timeout: 60000
+- takeScreenshot: 01-boards
+
+# The column pager: the arrow and the swipe.
+- tapOn: "Fundraising 2026"
+- extendedWaitUntil:
+    visible: "To Do"
+    timeout: 30000
+- tapOn: "Next column"
+- assertVisible: "In Progress"
+- swipe:
+    direction: LEFT
+- assertVisible: "Done"
+- takeScreenshot: 02-board-swiped
+- tapOn: "Previous column"
+- tapOn: "Previous column"
+- assertVisible: "To Do"
+
+# A card, and the native editor: type, bold, save.
+- tapOn: "Draft the donor letter"
+- assertVisible: "Attachments \\(1\\)"
+- tapOn: "Edit description"
+- tapOn:
+    below: "Bold"
+- inputText: "Native flow line"
+- tapOn: "Bold"
+- inputText: " bold"
+- hideKeyboard
+- tapOn: "Save"
+- extendedWaitUntil:
+    visible: "Native flow line bold"
+    timeout: 15000
+- takeScreenshot: 03-card-description
+- tapOn: "Back"
+
+# Long-press starts a selection.
+- longPressOn: "Book the venue"
+- assertVisible: "1 selected"
+- takeScreenshot: 04-selection
+- tapOn: "Back"
+
+# Every tab answers, each with something only its own screen shows.
+- runFlow: common/dismiss-dev-warnings.yaml
+- tapOn: "My Work"
+- assertVisible: "Nothing is assigned to you right now\\."
+- runFlow: common/dismiss-dev-warnings.yaml
+- tapOn: "Search"
+- assertVisible: "Search cards across your boards"
+- runFlow: common/dismiss-dev-warnings.yaml
+- tapOn: "Alerts.*"
+- assertVisible: "Mark all read"
+- runFlow: common/dismiss-dev-warnings.yaml
+- tapOn: "More"
+- assertVisible: "Report a problem"
+- takeScreenshot: 05-more
