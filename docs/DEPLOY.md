@@ -16,7 +16,7 @@ Roles, not people: whoever holds a role today grants it.
 | Firebase / Google Cloud project `sabeel-institute-kanban` | Owner | `firebase deploy`, `functions:secrets:set`, and the scripts run with `GCLOUD_PROJECT=…` (gcloud ADC) |
 | Google Play Console, the Sabeel developer account | user on this app with **Release apps to testing tracks** and **Manage testing tracks and edit tester lists** | the Testers tab, App content, the app-signing fingerprints |
 | App Store Connect, the Sabeel Institute team | **Admin** or **App Manager** on this app; the **Account Holder** files the unlisted-distribution request | TestFlight testers, App Review submissions |
-| GitHub `Sabeel-Institute/sabeel-institute-kanban` | write; repository administrators manage Actions secrets | `git push`, `gh workflow run ios.yml`, `publish-apk.sh`'s versioned release |
+| GitHub `Sabeel-Institute/sabeel-institute-kanban` | write; repository administrators manage Actions secrets | pushing branches (only the organization owner merges into `main`), `gh workflow run ios.yml`, `publish-apk.sh`'s versioned release |
 | Sentry, the Sabeel org | member of the three Kanban projects | DSNs, the build token, triage |
 | The vault owner | — | every file in `docs/SECRETS.md` § Build and publish credentials |
 
@@ -540,7 +540,8 @@ GitHub (`docs/IOS-BUILD.md` § Builds on GitHub).
 #    the newest deploy-log heading in docs/PHASE_STATUS.md renamed to end
 #    "— vX.Y.Z". build-aab.sh, build-ios.sh and publish:play find the entry by
 #    that suffix, and refuse without it.
-git push origin main            # FIRST — a release attaches to a commit GitHub already has
+# 1. Merge that commit into main by pull request FIRST (main takes no direct
+#    pushes) — a release attaches to a commit GitHub already has.
 # 2. Backend, when functions, rules or indexes changed, BEFORE the clients that
 #    need it. Indexes first; a deploy-log entry that needs another order (such as
 #    functions before rules) states it.

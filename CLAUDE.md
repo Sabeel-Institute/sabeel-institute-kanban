@@ -677,8 +677,8 @@ factory rather than being silently dropped.
   exists because a release is only reversible *forwards*, through another release.
   The surfaces are **the backend when it changed, web hosting, the APK download
   page, Play internal testing and TestFlight** — `docs/DEPLOY.md` § Shipping a
-  release has the order, and the order matters: **push `main` first** (a GitHub
-  Release cannot attach to an unpushed commit), and **build the artifacts after
+  release has the order, and the order matters: **merge into `main` first**,
+  by pull request (a GitHub Release cannot attach to an unmerged commit), and **build the artifacts after
   the last commit** or they stamp a superseded hash onto the sign-in screen.
   Store decisions — tracks, testers, App Review — are `docs/STORE-RELEASE.md`.
 - **Android ships through Google Play** (decided 2026-08-02), release-signed:
