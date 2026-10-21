@@ -1,0 +1,62 @@
+name: Native
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    paths:
+      - maestro/**
+      - scripts/native-e2e.sh
+      - scripts/ci-avd.sh
+      - scripts/install-maestro.sh
+      - .github/workflows/native.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SENTRY_DISABLE_AUTO_UPLOAD: "true"
+
+jobs:
+  android:
+    if: github.repository_owner == 'Sabeel-Institute'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Firebase CLI
+        run: npm install --global firebase-tools@^15
+      - name: Install Chromium for the seed
+        run: npx playwright install --with-deps chromium
+      - name: Boot an Android emulator
+        run: bash scripts/ci-avd.sh
+      - name: Install Maestro
+        run: bash scripts/install-maestro.sh
+      - name: Native flows
+        run: bash scripts/native-e2e.sh
+      - name: Screens, Maestro's report and logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-${{ github.sha }}
+          path: shots/native/
+          retention-days: 14

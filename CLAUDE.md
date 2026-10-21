@@ -484,6 +484,9 @@ a new machine.
   `EXPO_PUBLIC_USE_EMULATORS=1`. Bare `npx expo start --web` in `app/` does NOT,
   and points at **production Firebase**; nothing in the UI says which backend you
   are on.
+- Native flows: `bash scripts/native-e2e.sh` — the Maestro flows in `maestro/`
+  on the emulator against the debug build, the same command the Native workflow
+  runs on main pushes and release tags. `docs/DEVELOPING.md`.
 - Android: `scripts/emulator.sh headless` (AVD `tb_emu`), then
   `npm run android -w @sabeel/app`. Firebase emulators from the AVD = `10.0.2.2`.
   There are NO physical devices. **Check `emulator -accel-check` first** — see
@@ -615,7 +618,9 @@ opens while the editor reports focus, so it never appeared, and that is a
 property of the harness rather than evidence about the feature. Verifying
 anything behind the editor's focus or IME needs a real keyboard: a device, or an
 accelerated emulator you can type into. Screenshot the RESULT, do not infer it
-from an `input text` that appeared to succeed.
+from an `input text` that appeared to succeed. On an accelerated emulator,
+`maestro/board.yaml` does type into the editor on its first focus, bold a word
+and save it, and checks the saved text; the mention popover is still unverified.
 
 Two checks worth running before reaching for a device at all, since they catch
 the native failures that otherwise only show up there:

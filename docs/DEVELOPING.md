@@ -371,6 +371,31 @@ trip through both undo scripts leaves membership untouched.
 
 Run both. Neither substitutes for the other.
 
+### Native flows on the Android emulator
+
+`bash scripts/native-e2e.sh` runs the Maestro flows in `maestro/` against the
+debug build: it builds and installs the APK, starts the emulators, seeds them
+through the web app (`npm run seed`), serves the JavaScript from Metro on 8081
+with `EXPO_PUBLIC_USE_EMULATORS=1`, and runs every flow, or the one you name
+(`bash scripts/native-e2e.sh maestro/board.yaml`). It needs one booted emulator
+(`scripts/emulator.sh headless`) and installs the pinned Maestro itself
+(`scripts/install-maestro.sh`). Screenshots, Maestro's JUnit report and the
+emulator, web, Metro and device logs land in `shots/native/`. It refuses a held
+8081 or 61210 and stops only what it started.
+
+`maestro/board.yaml` signs in, pages and swipes the columns, opens a card, types
+into the native rich-text editor, bolds a word and saves, long-presses to select,
+and opens every tab, each checked by text only that screen shows. A debug build
+puts "Open debugger to view warnings" over the tab bar whenever the app logs a
+warning, and the toast takes the taps meant for the tabs, so the runner starts
+Metro with `EXPO_PUBLIC_E2E=1` and `app/index.ts` then tells LogBox to ignore
+warnings; they still reach `logs/metro.log`.
+
+The **Native** workflow runs the same command on GitHub's emulator
+(`scripts/ci-avd.sh`) on every main push, every release tag, every pull request
+that changes the flows or their scripts, and by hand, and keeps `shots/native/`
+as the `native-<sha>` artifact.
+
 ### Screenshots for the user manual
 
 Different job, different script. `screens-e2e.mjs` asserts; this one only
