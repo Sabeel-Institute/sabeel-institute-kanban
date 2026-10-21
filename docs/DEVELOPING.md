@@ -374,8 +374,9 @@ touching the tab bar. Shared steps live in `maestro/common/`, which Maestro does
 not run as flows of their own.
 
 The **Native** workflow runs the same command on GitHub's emulator
-(`scripts/ci-avd.sh`) on every main push, every release tag and by hand, and
-keeps `shots/native/` as the `native-<sha>` artifact.
+(`scripts/ci-avd.sh`) on every main push, every release tag, every pull request
+that changes the flows or their scripts, and by hand, and keeps `shots/native/`
+as the `native-<sha>` artifact.
 
 ### Screenshots for the user manual
 

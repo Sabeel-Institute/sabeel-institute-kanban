@@ -4,6 +4,13 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+  pull_request:
+    paths:
+      - maestro/**
+      - scripts/native-e2e.sh
+      - scripts/ci-avd.sh
+      - scripts/install-maestro.sh
+      - .github/workflows/native.yml
   workflow_dispatch:
 
 permissions:
