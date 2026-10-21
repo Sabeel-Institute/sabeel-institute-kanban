@@ -21,7 +21,11 @@
   Green checks validate compilation and tested behavior, not every possible
   runtime behavior or a dependency vendor's privacy defaults.
 - **CI** runs lint, type checks, unit tests, Firebase-emulator integration tests
-  and browser regressions on main pushes and pull requests. New PR pushes cancel
+  and browser regressions on main pushes and pull requests. Every sweep, pass or fail, leaves a `screens-report` artifact: a
+  page of every screen at every width with the failed checks beside them and
+  what changed against main's latest sweep, before / after / difference. The
+  run page's summary lists the failed checks and changed screens and the
+  `gh run download` command for the page (`docs/DEVELOPING.md`). New PR pushes cancel
   superseded CI runs. No production deployment credentials are used.
 - **Android**, **Web** and **iOS** build automatically on main pushes and can
   also be started manually. They do not run on untrusted pull requests.
