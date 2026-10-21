@@ -44,7 +44,8 @@
  */
 import { chromium, devices } from 'playwright';
 import { spawn } from 'node:child_process';
-import { mkdir, readFile } from 'node:fs/promises';
+import { writeFileSync } from 'node:fs';
+import { mkdir, readFile, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
@@ -68,7 +69,7 @@ process.env.GCLOUD_PROJECT = PROJECT;
 
 const results = [];
 function check(name, ok, detail = '') {
-  results.push({ name, ok });
+  results.push({ name, ok, ...(ok ? {} : { detail }) });
   // Detail describes the FAILURE, so it is printed only when there is one.
   // Appending it to a passing line produced `ok ... — no Back and no tab bar`,
   // which reads as the opposite of what happened.
@@ -126,7 +127,11 @@ const PROFILES = FULL
   ? [['iphone-se', devices['iPhone SE']], ['pixel-7', devices['Pixel 7']], ['ipad-mini', devices['iPad Mini']]]
   : [];
 
+// A clean folder, so the report (scripts/screens-report.mjs) shows this run's
+// screens and no other's, and the checks beside them however the run ends.
+await rm(SHOTS, { recursive: true, force: true });
 await mkdir(SHOTS, { recursive: true });
+process.on('exit', () => writeFileSync(join(SHOTS, 'results.json'), JSON.stringify(results, null, 1)));
 initializeApp({ projectId: PROJECT });
 const db = getFirestore();
 const browser = await chromium.launch();

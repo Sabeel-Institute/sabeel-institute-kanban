@@ -285,6 +285,25 @@ SWEEP_WIDTHS=320 bash scripts/e2e.sh scripts/screens-e2e.mjs  # one width, while
 
 → `shots/screens/<width>-<screen>.png`, one per screen per viewport.
 
+**Review a sweep in its report.** The sweep also writes every check
+(`results.json`) to `shots/screens/`, which is emptied at the start of each run;
+`scripts/screens-report.mjs` turns them into one page: every screen at every
+width side by side, the failed checks beside the screenshot they are about,
+and what changed against a baseline sweep as before / after / difference. A
+filter narrows it to a screen or a width, or to what failed or changed.
+`manifest.json` beside the page holds the same data for an agent.
+
+```sh
+node scripts/screens-report.mjs shots/screens --baseline-from-main   # → shots/screens-report/index.html
+node scripts/screens-report.mjs shots/screens --baseline <dir of screenshots>
+```
+
+`--baseline-from-main` compares with the report of the latest successful CI
+run on main (it needs `gh`). CI builds the report on every sweep, pass or
+fail, and keeps it for 30 days as the run's `screens-report` artifact; the run
+page's summary lists the failed checks and the changed screens and gives the
+command that downloads the page: `gh run download <run id> -n screens-report`.
+
 What it asserts, and the bug each one is there for:
 
 | Check | Caught in the wild |
