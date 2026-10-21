@@ -403,6 +403,23 @@ the team.
 
 ## Deploy log
 
+### 2026-10-21 — Dependency and security maintenance — v0.12.2
+
+No feature change. The backend (functions only; rules and indexes unchanged)
+and the web went out earlier the same day from `b7d03d1`; this release brings
+the phones to the same dependencies.
+
+- Routine dependency updates within the supported Expo SDK: Lexical 0.52 (the
+  web editor), React Native Web 0.21.4, Vitest 4.1.11, and the grouped patch
+  updates from Dependabot. Native modules are unchanged.
+- CI builds every pull request for Android, iOS and the web without
+  credentials, installs the backend alone from its lockfile and loads it, and
+  main now takes changes only through pull requests that Faisal merges.
+- Checked before release on the AVD with a debug build against the
+  emulators: sign-in, board paging and swipe, opening a card, a rich-text
+  description saved with bold, My Work, Search, Alerts, More, and long-press
+  selection; no crash or error in logcat.
+
 ### 2026-10-17 — Android stops waiting minutes on a dead connection — v0.12.1
 
 Clients only, no backend change. The fix is native, so Android needs this
