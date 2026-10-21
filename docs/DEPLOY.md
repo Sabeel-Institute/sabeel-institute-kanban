@@ -96,6 +96,19 @@ npx firebase deploy --only firestore:rules,storage,functions --project sabeel-in
 npx firebase deploy --only hosting --project sabeel-institute-kanban
 ```
 
+Functions deploy from GitHub too, and that is the usual way: **Deploy
+Functions** (`functions-deploy.yml`, `docs/GITHUB-ACTIONS.md`) deploys main
+after CI has passed on it, refuses a deploy that would delete a live function,
+and afterwards checks every callable and the error logs. It needs no local
+Google login. The same guards run here:
+
+```sh
+export FIREBASE_PROJECT_ID=sabeel-institute-kanban
+node scripts/ci-functions.mjs require-ci && node scripts/ci-functions.mjs plan
+npx firebase deploy --only functions --project sabeel-institute-kanban
+node scripts/ci-functions.mjs verify --since <the time the deploy started, ISO>
+```
+
 It is `storage`, **not** `storage:rules`. The `storage` block in `firebase.json`
 is a single unnamed config, so a named target does not exist and `storage:rules`
 errors with "Could not find rules for the following storage targets: rules".
