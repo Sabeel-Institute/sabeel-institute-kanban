@@ -35,7 +35,8 @@
     "publish:play": "node scripts/publish-play.mjs",
     "build:ios": "bash scripts/build-ios.sh",
     "check:web-push": "node scripts/check-web-push.mjs",
-    "check:apple-push": "node scripts/check-apple-push.mjs"
+    "check:apple-push": "node scripts/check-apple-push.mjs",
+    "check:release": "node scripts/check-release.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

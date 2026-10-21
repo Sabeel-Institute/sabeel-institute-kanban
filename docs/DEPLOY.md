@@ -571,10 +571,12 @@ gate will not catch it, because the version is still right.
 
 Before sharing any build:
 
-1. **Install it and screenshot the sign-in screen** — the dev sign-in row must be
-   absent, and the version/commit stamp must be the build you just cut. The e2e
-   suite asserts this for the web bundle on every run; a store build deserves the
-   same one-off check, read off the running app rather than inferred.
+1. **Install it and check the sign-in screen**: `npm run check:release --
+   <apk or aab>` installs it on the AVD (booting it if none is attached),
+   cold-starts it five times and fails unless the dev sign-in row is absent,
+   the version/commit stamp is the build you just cut, and the device log
+   shows no crash. The Android workflow runs the same check on every bundle it
+   builds, and the e2e suite asserts the same for the web bundle on every run.
 2. **Read the version back from the artifact, not from your notes.** Web: load the
    live site and read the stamp. Android: install and look. This has caught a
    stale bundle more than once.
