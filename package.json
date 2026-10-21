@@ -2,7 +2,7 @@
   "name": "sabeel-institute-kanban",
   "version": "0.0.0",
   "private": true,
-  "description": "Sabeel Institute Kanban \u2014 access-controlled kanban boards for a small nonprofit (Android + web from one Expo codebase, Firebase backend)",
+  "description": "Sabeel Institute Kanban — access-controlled kanban boards for a small nonprofit (Android + web from one Expo codebase, Firebase backend)",
   "workspaces": [
     "packages/*",
     "functions",
@@ -46,7 +46,9 @@
     "globals": "^16.5.0",
     "google-auth-library": "^11.3.1",
     "knip": "^5.88.1",
+    "pixelmatch": "^8.0.0",
     "playwright": "^1.64.1",
+    "pngjs": "^7.0.0",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.71.2"
   }
