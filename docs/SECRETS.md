@@ -178,8 +178,10 @@ Store Connect's App Review Information.
 
 `IOS_DIST_P12`, `IOS_DIST_P12_PASSWORD`, `IOS_PROFILE`, `ASC_KEY_P8`,
 `IOS_BUILD_ENV` (`app/.env.sentry-build-plugin`) and `APP_ENV_LOCAL`
-(`app/.env.local`), each set from the files above. The table of sources and
-the `gh secret set` commands are in `docs/IOS-BUILD.md` § Builds on GitHub.
+(`app/.env.local`), each set from the files above as secrets of the
+`release-build` environment, which only main and `v*` tags may enter. The table
+of sources and the `gh secret set` commands are in `docs/IOS-BUILD.md` § Builds
+on GitHub.
 
 ### The vault
 
