@@ -123,7 +123,11 @@ The provider accepts only this repository's `functions-deploy.yml` on main,
 started by hand by the organization owner's GitHub account, so a collaborator
 who can start the workflow still gets no credentials. The identity can deploy
 and read functions, schedules, triggers and logs in this project, and act as
-the functions' runtime accounts; it cannot change data, rules or Hosting. The
+the functions' runtime accounts; it cannot change data, rules or Hosting. It
+also reads the Firestore database's metadata through a custom role,
+`firestoreDatabaseMetadataViewer` (only `datastore.databases.getMetadata`, which
+the deploy checks for its Firestore triggers; no document reads), and the list
+of Firebase Extensions (`roles/firebaseextensions.viewer`). The
 `functions` environment permits main only.
 
 The `play-internal` environment also permits main only and holds the encrypted
