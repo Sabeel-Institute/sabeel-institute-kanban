@@ -387,10 +387,9 @@ emulator, web, Metro and device logs land in `shots/native/`. It refuses a held
 into the native rich-text editor, bolds a word and saves, long-presses to select,
 and opens every tab, each checked by text only that screen shows. A debug build
 puts "Open debugger to view warnings" over the tab bar whenever the app logs a
-warning, and the toast takes the taps meant for the tabs:
-`maestro/common/dismiss-dev-warnings.yaml` closes it, and a flow runs it before
-touching the tab bar. Shared steps live in `maestro/common/`, which Maestro does
-not run as flows of their own.
+warning, and the toast takes the taps meant for the tabs, so the runner starts
+Metro with `EXPO_PUBLIC_E2E=1` and `app/index.ts` then tells LogBox to ignore
+warnings; they still reach `logs/metro.log`.
 
 The **Native** workflow runs the same command on GitHub's emulator
 (`scripts/ci-avd.sh`) on every main push, every release tag, every pull request

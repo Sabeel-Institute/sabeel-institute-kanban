@@ -10,7 +10,6 @@ name: Board, card, rich text and gestures
     visible: "Dev sign-in \\(emulator only\\)"
     timeout: 180000
 - tapOn: "faisal"
-- runFlow: common/dismiss-dev-warnings.yaml
 - extendedWaitUntil:
     visible: "Fundraising 2026"
     timeout: 60000
@@ -55,16 +54,12 @@ name: Board, card, rich text and gestures
 - tapOn: "Back"
 
 # Every tab answers, each with something only its own screen shows.
-- runFlow: common/dismiss-dev-warnings.yaml
 - tapOn: "My Work"
 - assertVisible: "Nothing is assigned to you right now\\."
-- runFlow: common/dismiss-dev-warnings.yaml
 - tapOn: "Search"
 - assertVisible: "Search cards across your boards"
-- runFlow: common/dismiss-dev-warnings.yaml
 - tapOn: "Alerts.*"
 - assertVisible: "Mark all read"
-- runFlow: common/dismiss-dev-warnings.yaml
 - tapOn: "More"
 - assertVisible: "Report a problem"
 - takeScreenshot: 05-more
