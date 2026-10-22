@@ -81,7 +81,6 @@ export const alertsView = createViewStore<{ unreadOnly: boolean }>({
  */
 export function useInbox(user: SessionUser, unreadOnly = false) {
   return useLiveQuery<InboxItem[]>(
-    'inbox',
     () =>
       unreadOnly
         ? query(
@@ -91,6 +90,8 @@ export function useInbox(user: SessionUser, unreadOnly = false) {
             limit(50),
           )
         : query(inboxRef(user.uid), orderBy('at', 'desc'), limit(50)),
+    [user.uid, unreadOnly],
+    'inbox',
     (docs) =>
       docs.map((d) => ({
         id: d.id,
@@ -102,17 +103,16 @@ export function useInbox(user: SessionUser, unreadOnly = false) {
         read: Boolean(d.data.read),
         at: (d.data.at as number) ?? 0,
       })),
-    [user.uid, unreadOnly],
   );
 }
 
 /** The unread badge. Maintained by the trigger; read straight off the user doc. */
 export function useUnreadCount(user: SessionUser) {
   return useLiveDoc<number>(
-    'unread-count',
     () => doc(db, 'users', user.uid),
-    (d) => (d?.data.unreadNotifCount as number) ?? 0,
     [user.uid],
+    'unread-count',
+    (d) => (d?.data.unreadNotifCount as number) ?? 0,
   );
 }
 
@@ -251,13 +251,13 @@ export function useNotifyPrefs(user: SessionUser) {
     prefs: Partial<Record<NotifyEvent, boolean>>;
     mutedBoardIds: string[];
   }>(
-    'notify-prefs',
     () => doc(db, 'users', user.uid),
+    [user.uid],
+    'notify-prefs',
     (d) => ({
       prefs: (d?.data.notifyPrefs as Partial<Record<NotifyEvent, boolean>>) ?? {},
       mutedBoardIds: (d?.data.mutedBoardIds as string[]) ?? [],
     }),
-    [user.uid],
   );
 }
 

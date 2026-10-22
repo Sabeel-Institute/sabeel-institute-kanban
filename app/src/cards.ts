@@ -88,7 +88,6 @@ const cardRef = (cardId: string) => doc(db, 'cards', cardId);
 /** Live cards for a board, already in rank order. */
 export function useBoardCards(boardId: string) {
   return useLiveQuery<Card[]>(
-    'cards',
     () =>
       query(
         cardsRef(),
@@ -96,8 +95,9 @@ export function useBoardCards(boardId: string) {
         where('archived', '==', false),
         orderBy('rank'),
       ),
-    (docs) => docs.map((d) => toCard(d.id, d.data)).sort(compareRank),
     [boardId],
+    'cards',
+    (docs) => docs.map((d) => toCard(d.id, d.data)).sort(compareRank),
   );
 }
 
@@ -111,7 +111,6 @@ export function useBoardCards(boardId: string) {
  */
 export function useArchivedBoardCards(boardId: string) {
   return useLiveQuery<Card[]>(
-    'archivedCards',
     () =>
       query(
         cardsRef(),
@@ -119,6 +118,8 @@ export function useArchivedBoardCards(boardId: string) {
         where('archived', '==', true),
         orderBy('rank'),
       ),
+    [boardId],
+    'archivedCards',
     // Ordered NEWEST-ARCHIVED FIRST, in memory. The query keeps orderBy('rank')
     // so it reuses the existing (boardId, archived, rank) index, but rank is a
     // board-position and means nothing once a card is off the board — what you
@@ -135,16 +136,15 @@ export function useArchivedBoardCards(boardId: string) {
         return compareRank(a, bb);
       });
     },
-    [boardId],
   );
 }
 
 export function useCard(cardId: string) {
   return useLiveDoc<Card | null>(
-    'card',
     () => cardRef(cardId),
-    (d) => (d ? toCard(d.id, d.data) : null),
     [cardId],
+    'card',
+    (d) => (d ? toCard(d.id, d.data) : null),
   );
 }
 

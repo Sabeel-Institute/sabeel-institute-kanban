@@ -61,11 +61,11 @@ function toMyWorkCards(docs: { id: string; data: Record<string, unknown> }[]): M
  */
 export function useMyWork(user: SessionUser) {
   return useLiveQuery<MyWorkCard[]>(
-    'my-work',
     () =>
       query(collection(db, 'cards'), where('assigneeUids', 'array-contains', user.uid)),
-    toMyWorkCards,
     [user.uid],
+    'my-work',
+    toMyWorkCards,
   );
 }
 
@@ -83,11 +83,11 @@ export function useMyWork(user: SessionUser) {
  */
 export function useMySubscriptions(user: SessionUser) {
   return useLiveQuery<MyWorkCard[]>(
-    'my-subscriptions',
     () =>
       query(collection(db, 'cards'), where('subscriberUids', 'array-contains', user.uid)),
-    toMyWorkCards,
     [user.uid],
+    'my-subscriptions',
+    toMyWorkCards,
   );
 }
 

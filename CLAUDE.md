@@ -313,7 +313,9 @@ itself is deliberately NOT darkened — that would collapse it into
   a figure someone might act on, branch on `status` explicitly.
 - Live Firestore reads in `app/src` go through a single `useLiveQuery`/`useLiveDoc`
   module — never hand-roll `onSnapshot` state in a hook (lint-enforced). See
-  `docs/INHERITED-STACK.md` for why this is non-negotiable.
+  `docs/INHERITED-STACK.md` for why this is non-negotiable. Both take the
+  query builder FIRST and its `deps` SECOND, the only shape
+  `react-hooks/exhaustive-deps` (an error here) can check; keep that order.
 - **Live reads are timed to the SERVER's answer, not the first snapshot**
   (`slowReads.ts`, wired in `liveQuery.ts`), and reported at warning past 5 s,
   like slow writes; a read abandoned unanswered past 5 s too. A cached partial

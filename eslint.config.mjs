@@ -79,9 +79,13 @@ export default tseslint.config(
       },
     },
     rules: {
+      // `args: 'all'`, not the default `after-used`, which reports a parameter
+      // only when nothing AFTER it is used, so a dead argument threaded through
+      // the middle of a signature stays invisible. Prefix a deliberately unused
+      // parameter with `_`. The same setting as the LMS's.
       '@typescript-eslint/no-unused-vars': [
         'error',
-        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+        { args: 'all', argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
     },
   },
@@ -114,12 +118,26 @@ export default tseslint.config(
     // Hooks correctness matters more than usual here: useLiveQuery's whole
     // safety property is that its state resets when its dependencies change, so
     // a wrong dependency array reintroduces exactly the stale-data bug the
-    // module exists to prevent.
+    // module exists to prevent, and nothing in TypeScript can see it: a live
+    // row and a stale one are the same type. So exhaustive-deps is an ERROR —
+    // a warning does not fail CI, and a check that cannot fail is decoration.
+    //
+    // Deliberately NOT the plugin's `recommended` preset: v7 bundles the React
+    // Compiler rule family, which this app is not built for. Adopt it, if ever,
+    // as one deliberate migration, as in the LMS.
     files: ['app/**/*.{ts,tsx}'],
     plugins: { 'react-hooks': reactHooks },
     rules: {
       'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
+      // The live-data hooks, so every subscription's `deps` are checked
+      // against what its query reads. The rule finds the callback at argument
+      // 0 and the deps at argument 1 only, which is why both hooks take them
+      // in that order (liveQuery.ts); with any other shape it reports
+      // "dependencies are unknown" and checks nothing.
+      'react-hooks/exhaustive-deps': [
+        'error',
+        { additionalHooks: '(useLiveQuery|useLiveDoc)' },
+      ],
     },
   },
   {
@@ -148,12 +166,14 @@ export default tseslint.config(
     },
   },
   {
-    // Colour tokens everywhere in app/src except the module that defines them,
+    // Colour tokens everywhere in the app except the module that defines them,
     // and — for the files that actually run on a device — the scroller rule.
-    // Both selector sets are listed together because flat config REPLACES a
-    // rule rather than merging it; see the note at the top of this file.
-    files: ['app/src/**/*.{ts,tsx}'],
-    ignores: ['app/src/theme/**', 'app/src/**/*.web.tsx'],
+    // app/**, not app/src/**: App.tsx sits at the app's root and draws on a
+    // device too. Both selector sets are listed together because flat config
+    // REPLACES a rule rather than merging it; see the note at the top of this
+    // file.
+    files: ['app/**/*.{ts,tsx}'],
+    ignores: ['app/src/theme/**', 'app/**/*.web.tsx'],
     rules: {
       'no-restricted-syntax': [
         'error',
@@ -166,7 +186,7 @@ export default tseslint.config(
     // Web-only siblings: colour still applies; the scroller rule does not,
     // because `keyboardShouldPersistTaps` does nothing in a browser and an
     // inert prop is its own kind of debt.
-    files: ['app/src/**/*.web.{ts,tsx}'],
+    files: ['app/**/*.web.{ts,tsx}'],
     ignores: ['app/src/theme/**'],
     rules: {
       'no-restricted-syntax': ['error', ...NO_HARDCODED_COLOR],

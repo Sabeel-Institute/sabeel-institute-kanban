@@ -61,13 +61,14 @@ export function ActivityLog({
   const t = useTheme();
 
   const log = useLiveQuery<Entry[]>(
-    'activity',
     () =>
       query(
         collection(db, 'cards', cardId, 'activity'),
         orderBy('at', 'desc'),
         limit(50),
       ),
+    [cardId],
+    'activity',
     (docs) =>
       docs.map((d) => ({
         id: d.id,
@@ -77,7 +78,6 @@ export function ActivityLog({
         from: d.data.from as string | undefined,
         to: d.data.to as string | undefined,
       })),
-    [cardId],
   );
 
   const nameFor = useMemo(() => {

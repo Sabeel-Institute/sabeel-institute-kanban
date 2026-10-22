@@ -102,13 +102,13 @@ function toBoard(id: string, data: Record<string, unknown>): BoardListItem {
 export function useMyBoards(user: SessionUser) {
   const seesAll = canSeeEveryBoard(user);
   return useLiveQuery<BoardListItem[]>(
-    'boards',
     () =>
       seesAll
         ? collection(db, 'boards')
         : query(collection(db, 'boards'), where('memberUids', 'array-contains', user.uid)),
-    (docs) => docs.map((d) => toBoard(d.id, d.data)).filter((b) => !b.archived),
     [user.uid, seesAll],
+    'boards',
+    (docs) => docs.map((d) => toBoard(d.id, d.data)).filter((b) => !b.archived),
   );
 }
 
@@ -116,22 +116,22 @@ export function useMyBoards(user: SessionUser) {
 export function useArchivedBoards(user: SessionUser) {
   const seesAll = canSeeEveryBoard(user);
   return useLiveQuery<BoardListItem[]>(
-    'archived-boards',
     () =>
       seesAll
         ? collection(db, 'boards')
         : query(collection(db, 'boards'), where('memberUids', 'array-contains', user.uid)),
-    (docs) => docs.map((d) => toBoard(d.id, d.data)).filter((b) => b.archived),
     [user.uid, seesAll],
+    'archived-boards',
+    (docs) => docs.map((d) => toBoard(d.id, d.data)).filter((b) => b.archived),
   );
 }
 
 export function useBoard(boardId: string) {
   return useLiveDoc<BoardListItem | null>(
-    'board',
     () => doc(db, 'boards', boardId),
-    (d) => (d ? toBoard(d.id, d.data) : null),
     [boardId],
+    'board',
+    (d) => (d ? toBoard(d.id, d.data) : null),
   );
 }
 
@@ -305,13 +305,13 @@ export async function noteBoardOpened(
 /** The signed-in user's own list preferences, live. */
 export function useMyBoardPrefs(user: SessionUser) {
   return useLiveDoc<{ favourites: string[]; recents: string[] }>(
-    'board-prefs',
     () => doc(db, 'users', user.uid),
+    [user.uid],
+    'board-prefs',
     (d) => ({
       favourites: (d?.data.favoriteBoardIds as string[]) ?? [],
       recents: (d?.data.recentBoardIds as string[]) ?? [],
     }),
-    [user.uid],
   );
 }
 
