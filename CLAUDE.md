@@ -655,7 +655,11 @@ anything behind the editor's focus or IME needs a real keyboard: a device, or an
 accelerated emulator you can type into. Screenshot the RESULT, do not infer it
 from an `input text` that appeared to succeed. On an accelerated emulator,
 `maestro/board.yaml` does type into the editor on its first focus, bold a word
-and save it, and checks the saved text; the mention popover is still unverified.
+and save it, and checks the saved text. It also types `@Sa` into a comment,
+picks Sara from the mention popover, and checks the posted comment reads
+`@sara` and names her as mentioned: the check `app/src/mentionSeam.test.ts`
+asks for when `react-native-enriched-html` moves, run by the Native workflow on
+the Android emulator and the iPhone simulator for every pull request.
 
 Two checks worth running before reaching for a device at all, since they catch
 the native failures that otherwise only show up there:

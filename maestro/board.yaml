@@ -1,6 +1,7 @@
 # The board on Android: sign-in, the column pager and its swipe, a card, the
-# native rich-text editor, the tabs and long-press selection. Seeded by
-# scripts/seed-emulators.mjs; run by `npx sabeel-ci native-e2e`.
+# native rich-text editor and a mention through it, the tabs and long-press
+# selection. Seeded by scripts/seed-emulators.mjs; run by `npx sabeel-ci
+# native-e2e`.
 appId: ${APP_ID}
 name: Board, card, rich text and gestures
 ---
@@ -67,6 +68,32 @@ name: Board, card, rich text and gestures
     visible: "[\\s\\S]*Native flow line bold[\\s\\S]*"
     timeout: 15000
 - takeScreenshot: 03-card-description
+
+# A mention, through the native editor's own output. The editor writes a
+# picked mention as <mention text="sara" indicator="@">, a shape it does not
+# document, and the HTML seam turns that back into "@sara"; the comment names
+# Sara as mentioned only if both still hold (app/src/mentionSeam.test.ts).
+- scrollUntilVisible:
+    element: "Add a comment[\\s\\S]*"
+- tapOn: "Add a comment[\\s\\S]*"
+- inputText: "Over to @Sa"
+- tapOn: "Mention Sara"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- scrollUntilVisible:
+    element: "Comment"
+- tapOn: "Comment"
+- extendedWaitUntil:
+    visible: "mentioned Sara"
+    timeout: 15000
+- assertVisible: "[\\s\\S]*@sara[\\s\\S]*"
+- takeScreenshot: 04-card-mention
+- scrollUntilVisible:
+    element: "Back"
+    direction: UP
 - tapOn: "Back"
 
 # Long-press starts a selection. The board must be back and settled first: a
@@ -83,7 +110,7 @@ name: Board, card, rich text and gestures
       - extendedWaitUntil:
           visible: "1 selected[\\s\\S]*"
           timeout: 10000
-- takeScreenshot: 04-selection
+- takeScreenshot: 05-selection
 - tapOn: "Back"
 
 # Every tab answers, each with something only its own screen shows.
@@ -95,4 +122,4 @@ name: Board, card, rich text and gestures
 - assertVisible: "Mark all read"
 - tapOn: "More"
 - assertVisible: "Report a problem"
-- takeScreenshot: 05-more
+- takeScreenshot: 06-more
