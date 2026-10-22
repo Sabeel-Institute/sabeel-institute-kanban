@@ -25,7 +25,9 @@ import { resolve } from 'node:path';
  * So this test couples to the library's own source instead. It is deliberately
  * a coarse instrument: it fails on an upgrade, and a failure means "go and
  * re-verify the shape on a device, then update the converter AND the tests" —
- * not "edit this file until it passes".
+ * not "edit this file until it passes". The device check is
+ * `maestro/board.yaml`'s mention, which the Native workflow runs on the
+ * Android emulator and the iPhone simulator for the upgrade's pull request.
  *
  * Lives in `app/` because that workspace runs plain `.ts` unit tests and this
  * asserts about an installed dependency rather than about our own code.
@@ -51,7 +53,8 @@ describe('the native mention serialisation contract', () => {
       `react-native-enriched-html moved from ${VERIFIED_VERSION} to ${version}. ` +
         'Its <mention> serialisation is undocumented and our HTML seam depends ' +
         'on it. Re-verify on a device that picking a mention still stores ' +
-        '"@handle", then update VERIFIED_VERSION here.',
+        '"@handle" (maestro/board.yaml does, in the pull request\'s Native ' +
+        'run), then update VERIFIED_VERSION here.',
     ).toBe(VERIFIED_VERSION);
   });
 

@@ -478,8 +478,11 @@ emulator, web, Metro and device logs land in `shots/native/`. It refuses a held
 8081 or web port and stops only what it started.
 
 `maestro/board.yaml` signs in, pages and swipes the columns, opens a card, types
-into the native rich-text editor, bolds a word and saves, long-presses to select,
-and opens every tab, each checked by text only that screen shows. A debug build
+into the native rich-text editor, bolds a word and saves, mentions Sara in a
+comment through the editor's popover (the comment must read `@sara` and name
+her as mentioned, the check `app/src/mentionSeam.test.ts` asks for when the
+editor library moves), long-presses to select, and opens every tab, each
+checked by text only that screen shows. A debug build
 puts "Open debugger to view warnings" over the tab bar whenever the app logs a
 warning, and the toast takes the taps meant for the tabs, so the runner starts
 Metro with `EXPO_PUBLIC_E2E=1` and `app/index.ts` then tells LogBox to ignore
