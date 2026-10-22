@@ -55,6 +55,13 @@ updates:
       - dependency-name: "@sentry/browser"
         update-types: ["version-update:semver-major"]
     groups:
+      # The editor's <mention> output is undocumented and
+      # app/src/mentionSeam.test.ts holds the version a device verified, so
+      # its updates come on their own, to wait for that check, rather than
+      # holding every routine update back. A dependency joins the first
+      # group it matches.
+      enriched-html:
+        patterns: ["react-native-enriched-html"]
       routine:
         patterns: ["*"]
         update-types: [minor, patch]
