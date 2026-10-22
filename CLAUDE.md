@@ -432,7 +432,10 @@ itself is deliberately NOT darkened — that would collapse it into
 - Backend: Cloud Functions (TS, nodejs22, us-central1) + Firestore + **Cloud
   Storage** (card attachments). The bucket must be a modern
   `*.firebasestorage.app` one in us-central1/us-west1/us-east1 — only those get
-  the no-cost quotas. Sentry on web/native/functions.
+  the no-cost quotas. Sentry on web/native/functions, set up as ci-tools'
+  README "Sentry" says: the org and projects in `ci-tools.json`, the DSNs in
+  `app/.env.local`, the token in `app/.env.sentry-build-plugin`
+  (`docs/SECRETS.md`).
 - Monorepo (npm workspaces): `app`, `functions`, `packages/shared`. Shared types
   and any cross-surface pure logic live in `@sabeel/shared` — the app and
   functions must never each hold their own copy of a rule.
@@ -676,9 +679,10 @@ factory rather than being silently dropped.
 - NEVER ask for, accept, or echo real API keys/DSNs/tokens in chat; never hardcode
   them. Server secrets: output the exact `firebase functions:secrets:set NAME`
   command for Faisal to run.
-- Client-side non-secrets (Firebase web config, `WEB_CLIENT_ID`,
-  `google-services.json`, `firestore.rules`) are committed **by design** — rules
-  are enforced server-side, so this is security by design, not obscurity.
+- Client-side non-secrets (Firebase web config, `WEB_CLIENT_ID`, the web push
+  public key, `google-services.json`, `firestore.rules`) are committed **by
+  design** — rules are enforced server-side, so this is security by design,
+  not obscurity.
 - Client DSNs go in gitignored `.env.local` (key names only in docs).
 
 ## Division of labor
@@ -753,9 +757,10 @@ factory rather than being silently dropped.
   tasks — both on at once fails with *"Multiple shrunk-resources files found"*.
   `sabeel-ci build-aab` holds every gate: store-legal version, a deploy-log
   entry that exists *before* the build, the native Sentry DSN
-  (`EXPO_PUBLIC_SENTRY_DSN_NATIVE` in `app/.env.local`), and a signature that
-  is not the debug key; `publish-play` completes a release only once Play signs
-  the installed APKs with `ci-tools.json`'s `release.appSigningCertificate`.
+  (`EXPO_PUBLIC_SENTRY_DSN_NATIVE` in `app/.env.local`) and token
+  (`app/.env.sentry-build-plugin`), and a signature that is not the debug
+  key; `publish-play` completes a release only once Play signs the installed
+  APKs with `ci-tools.json`'s `release.appSigningCertificate`.
 - **Signing: the upload key lives outside the repo**, with a copy in the vault;
   a missing one is restored from there, never generated (`docs/SECRETS.md`).
   `signingConfigs.release` reads `~/.config/sabeel-kanban/keystore.properties`,
