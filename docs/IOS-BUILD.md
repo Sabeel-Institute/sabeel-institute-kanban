@@ -620,7 +620,7 @@ in the table is also in Faisal's vault, `~/.config/secrets-vault/`: the signing
 files and the key under `sabeel/apple/`, the two env files under
 `sabeel/kanban/env/`.
 
-Set one with `gh secret set NAME -R Sabeel-Institute/sabeel-institute-kanban < file`
+Set one with `gh secret set NAME --env release-build -R Sabeel-Institute/sabeel-institute-kanban < file`
 (`base64 -w0 file | gh secret set NAME …` for the two binary ones). **Keep
 comment lines out of the two env secrets**: GitHub masks a multi-line secret
 line by line, so a line of `#` turns every `#` in the log into `***`. A line
@@ -656,7 +656,7 @@ there, and all of them in the vault under `sabeel/apple/ios-distribution/`.
    under a new password.
 4. In **each of the three repos**: `IOS_DIST_P12` (base64 of the `.p12`),
    `IOS_DIST_P12_PASSWORD`, and that app's `IOS_PROFILE` (base64), with
-   `gh secret set NAME -R <repo>` as in § Secrets.
+   `gh secret set NAME --env release-build -R <repo>` as in § Secrets.
 5. Replace the files in `~/.config/sabeel-lms/ios-distribution/`, then
    `bash ~/.config/secrets-vault/vault.sh collect`.
 6. A build-only run of each repo's `ios.yml`. Its gates check that the profile

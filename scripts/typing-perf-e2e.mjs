@@ -52,6 +52,8 @@ process.env.GCLOUD_PROJECT = PROJECT;
 const MAX_RATIO = 2.5;
 /** Long enough to average out one slow frame, short enough to stay cheap. */
 const SAMPLE = 'the quick brown fox jumps over it';
+/** Samples per arm; the median is the arm's cost (see `msPerChar`). */
+const ROUNDS = 5;
 
 const results = [];
 function check(name, ok, detail = '') {
@@ -166,19 +168,32 @@ async function openCard(boardName, title) {
 }
 
 /**
- * Cost of one character, in milliseconds.
+ * Cost of one character, in milliseconds: the median of ROUNDS samples typed
+ * one after another into the same field.
  *
  * A warm-up pass is typed and thrown away first: the very first keystroke into
  * a freshly mounted editor pays for lazy work that has nothing to do with the
  * property being measured, and on the light arm — where the total is small —
  * that one-off is large enough to flatter the ratio.
+ *
+ * ONE SAMPLE WAS A COIN TOSS on a busy screen. Typing begins while the busy
+ * card is still drawing its comments, and whether the one sample overlapped
+ * that decided the run: on 2026-10-21 the same commit measured the description
+ * arm at a ratio of 0.74 and of 3.75, and CI runs split between ~0.8 and 2.4-3.8
+ * with nothing between. The median of five puts a settling screen in one
+ * outlier rather than in the verdict; a draft hoisted back into the screen
+ * slows every sample, so it still fails.
  */
 async function msPerChar(locator) {
   await locator.click();
   await page.keyboard.type('warm', { delay: 0 });
-  const started = Date.now();
-  await page.keyboard.type(SAMPLE, { delay: 0 });
-  return (Date.now() - started) / SAMPLE.length;
+  const samples = [];
+  for (let round = 0; round < ROUNDS; round += 1) {
+    const started = Date.now();
+    await page.keyboard.type(SAMPLE, { delay: 0 });
+    samples.push((Date.now() - started) / SAMPLE.length);
+  }
+  return samples.sort((a, b) => a - b)[Math.floor(ROUNDS / 2)];
 }
 
 function report(arm, heavy, light) {
