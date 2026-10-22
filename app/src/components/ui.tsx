@@ -361,13 +361,16 @@ export function AssigneeChip({ name }: { name: string }) {
 export function Card({
   children,
   style,
+  testID,
 }: {
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
+  testID?: string;
 }) {
   const t = useTheme();
   return (
     <View
+      testID={testID}
       style={[
         styles.card,
         { backgroundColor: t.bg.surface, borderColor: t.border.subtle },
