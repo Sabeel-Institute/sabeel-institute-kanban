@@ -486,7 +486,8 @@ a new machine.
   are on.
 - Native flows: `bash scripts/native-e2e.sh` — the Maestro flows in `maestro/`
   on the emulator against the debug build, the same command the Native workflow
-  runs on main pushes and release tags. `docs/DEVELOPING.md`.
+  runs on main pushes and release tags; `--ios` runs them on an iPhone simulator
+  (macOS). `docs/DEVELOPING.md`.
 - Android: `scripts/emulator.sh headless` (AVD `tb_emu`), then
   `npm run android -w @sabeel/app`. Firebase emulators from the AVD = `10.0.2.2`.
   There are NO physical devices. **Check `emulator -accel-check` first** — see

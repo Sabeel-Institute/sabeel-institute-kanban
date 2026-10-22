@@ -1,7 +1,7 @@
 # The board on Android: sign-in, the column pager and its swipe, a card, the
 # native rich-text editor, the tabs and long-press selection. Seeded by
 # scripts/seed-dev.mjs; run by scripts/native-e2e.sh.
-appId: com.sabeelinstitute.kanban.debug
+appId: ${APP_ID}
 name: Board, card, rich text and gestures
 ---
 - launchApp:
@@ -10,13 +10,21 @@ name: Board, card, rich text and gestures
     visible: "Dev sign-in \\(emulator only\\)"
     timeout: 180000
 - tapOn: "faisal"
+# A card's texts are one accessibility label on iOS ("Fundraising 2026, 14
+# cards · 3 members"), and Maestro matches the whole label, so names here are
+# prefixes.
 - extendedWaitUntil:
-    visible: "Fundraising 2026"
+    visible: "Fundraising 2026[\\s\\S]*"
     timeout: 60000
+- runFlow:
+    when:
+      visible: "Not now"
+    commands:
+      - tapOn: "Not now"
 - takeScreenshot: 01-boards
 
 # The column pager: the arrow and the swipe.
-- tapOn: "Fundraising 2026"
+- tapOn: "Fundraising 2026[\\s\\S]*"
 - extendedWaitUntil:
     visible: "To Do"
     timeout: 30000
@@ -31,7 +39,7 @@ name: Board, card, rich text and gestures
 - assertVisible: "To Do"
 
 # A card, and the native editor: type, bold, save.
-- tapOn: "Draft the donor letter"
+- tapOn: "Draft the donor letter[\\s\\S]*"
 - assertVisible: "Attachments \\(1\\)"
 - tapOn: "Edit description"
 - tapOn:
@@ -39,17 +47,23 @@ name: Board, card, rich text and gestures
 - inputText: "Native flow line"
 - tapOn: "Bold"
 - inputText: " bold"
-- hideKeyboard
+# Android's keyboard covers Save. iOS leaves it in view, and Maestro cannot
+# dismiss the native editor's keyboard there.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
 - tapOn: "Save"
 - extendedWaitUntil:
-    visible: "Native flow line bold"
+    visible: "[\\s\\S]*Native flow line bold[\\s\\S]*"
     timeout: 15000
 - takeScreenshot: 03-card-description
 - tapOn: "Back"
 
 # Long-press starts a selection.
-- longPressOn: "Book the venue"
-- assertVisible: "1 selected"
+- longPressOn: "Book the venue[\\s\\S]*"
+- assertVisible: "1 selected[\\s\\S]*"
 - takeScreenshot: 04-selection
 - tapOn: "Back"
 
@@ -58,7 +72,7 @@ name: Board, card, rich text and gestures
 - assertVisible: "Nothing is assigned to you right now\\."
 - tapOn: "Search"
 - assertVisible: "Search cards across your boards"
-- tapOn: "Alerts.*"
+- tapOn: "Alerts[\\s\\S]*"
 - assertVisible: "Mark all read"
 - tapOn: "More"
 - assertVisible: "Report a problem"

@@ -391,10 +391,29 @@ warning, and the toast takes the taps meant for the tabs, so the runner starts
 Metro with `EXPO_PUBLIC_E2E=1` and `app/index.ts` then tells LogBox to ignore
 warnings; they still reach `logs/metro.log`.
 
+**On the iOS simulator**: `bash scripts/native-e2e.sh --ios` (macOS) builds the
+debug app for the simulator with `scripts/ios-sim-build.sh` (a prebuild scoped
+to iOS, the committed `Podfile.lock`, `xcodebuild` for `iphonesimulator`),
+installs it on a booted iPhone simulator, and runs the same flows. Each flow
+takes the installed app's id as `${APP_ID}`, since the Android and iOS builds
+differ. On iOS a pressable card's texts are one accessibility label and
+Maestro matches a label whole, so texts inside a card or a row are matched as
+part of one (`"Fundraising 2026[\s\S]*"`).
+
+**Two narrow retries**, each logged loudly: a debug build sometimes dies in
+React Native's `MountingCoordinator::pullTransaction` as it loads from Metro
+(never a release build), and Maestro's iOS driver sometimes loses an element it
+is snapshotting and reports the device unreachable. When the device log or the
+report shows exactly that, the flows run once more and the first try's log is
+kept; any other failure stands. A failed run also keeps Maestro's view of the
+screen (`logs/hierarchy-at-failure.json`), the labels to match against.
+
 The **Native** workflow runs the same command on GitHub's emulator
-(`scripts/ci-avd.sh`) on every main push, every release tag, every pull request
-that changes the flows or their scripts, and by hand, and keeps `shots/native/`
-as the `native-<sha>` artifact.
+(`scripts/ci-avd.sh`) on every main push, every release tag, every pull
+request that changes the flows or their scripts, and by hand, and keeps
+`shots/native/` as the `native-<sha>` artifact. Its `ios` job runs `--ios` on a
+macOS runner for release tags, by hand and for pull requests that change
+the flows, and keeps the same folder as `native-ios-<sha>`.
 
 ### Screenshots for the user manual
 

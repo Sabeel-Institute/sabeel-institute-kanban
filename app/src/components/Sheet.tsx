@@ -77,11 +77,19 @@ export function Sheet({
         sheet has a real Cancel button, and `onRequestClose` handles Escape on
         web and Back on Android, which are the routes keyboards and assistive
         tech actually use.
+
+        Nor is it, or the panel, an accessibility element (`accessible={false}`).
+        A Pressable is one by default, and on iOS an accessibility element
+        swallows everything under it: the iOS accessibility tree held the whole
+        sheet as ONE element labelled with all its text, so VoiceOver had no
+        control to move to and Maestro could not tap one. react-native-web does not forward the
+        prop, so the web DOM is unchanged.
       */}
       <Pressable
         style={[styles.backdrop, { backgroundColor: t.effect.overlay }]}
         onPress={onClose}
         focusable={false}
+        accessible={false}
       >
         {/* Absorbs taps so a press inside does not dismiss via the backdrop. */}
         <Pressable
@@ -90,6 +98,7 @@ export function Sheet({
             { backgroundColor: t.bg.raised, borderColor: t.border.strong },
           ]}
           onPress={() => {}}
+          accessible={false}
         >
           <Body>{title}</Body>
           {/*
