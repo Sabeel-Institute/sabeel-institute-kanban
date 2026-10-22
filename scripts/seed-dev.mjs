@@ -7,10 +7,10 @@
 // Usage: npm run seed  (emulators + `npm run dev:web` must already be running)
 import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
-import { WEB_PORTS } from './lib/ports.mjs';
+import { PORTS } from './lib/emulators.mjs';
 import { RULES_TITLE } from './lib/rules.mjs';
 
-const BASE = process.env.E2E_BASE ?? `http://127.0.0.1:${WEB_PORTS.e2e}/`;
+const BASE = process.env.E2E_BASE ?? `http://127.0.0.1:${PORTS.web}/`;
 
 // Seed the shapes that BREAK layouts, not just tidy ones. Every phone-layout bug
 // filmed so far needed one of these two and the seed had neither, so the board

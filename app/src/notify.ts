@@ -161,7 +161,7 @@ async function claimToken(uid: string): Promise<boolean> {
   // raise the Android dialog or create the channel, so the one native surface
   // a browser cannot reach was unreachable from the only build this project
   // can put on a device. An iPhone simulator's token comes from Apple's
-  // sandbox, which `scripts/send-test-push.mjs` reaches, so it is filed: that
+  // sandbox, which `npx sabeel-ci send-test-push --apple` reaches, so it is filed: that
   // is how a local build proves the whole path, rules included. The emulated
   // functions never send either way (functions/src/messaging.ts).
   if (tokenless()) return false;

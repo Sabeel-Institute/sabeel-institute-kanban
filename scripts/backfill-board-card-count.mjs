@@ -4,7 +4,7 @@
 // re-run. Reads/writes via the Admin SDK.
 //
 //   # emulators
-//   FIRESTORE_EMULATOR_HOST=127.0.0.1:61200 GCLOUD_PROJECT=demo-sabeel-kanban \
+//   FIRESTORE_EMULATOR_HOST=127.0.0.1:$(npx sabeel-ci ports firestore) GCLOUD_PROJECT=demo-sabeel-kanban \
 //     node scripts/backfill-board-card-count.mjs
 //   # production (gcloud ADC)
 //   GCLOUD_PROJECT=<prod-project-id> node scripts/backfill-board-card-count.mjs

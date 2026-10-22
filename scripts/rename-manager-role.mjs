@@ -24,7 +24,7 @@
 // DRY RUN BY DEFAULT. `--apply` writes.
 //
 //   # emulators
-//   FIRESTORE_EMULATOR_HOST=127.0.0.1:61200 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:61202 \
+//   FIRESTORE_EMULATOR_HOST=127.0.0.1:$(npx sabeel-ci ports firestore) FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:$(npx sabeel-ci ports auth) \
 //     GCLOUD_PROJECT=demo-sabeel-kanban node scripts/rename-manager-role.mjs --apply
 //   # production
 //   GCLOUD_PROJECT=sabeel-institute-kanban node scripts/rename-manager-role.mjs --apply

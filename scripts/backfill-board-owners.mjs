@@ -24,7 +24,7 @@
 // project covers both.
 //
 //   # emulators
-//   FIRESTORE_EMULATOR_HOST=127.0.0.1:61200 GCLOUD_PROJECT=demo-sabeel-kanban \
+//   FIRESTORE_EMULATOR_HOST=127.0.0.1:$(npx sabeel-ci ports firestore) GCLOUD_PROJECT=demo-sabeel-kanban \
 //     node scripts/backfill-board-owners.mjs
 //   # production, one board first
 //   GCLOUD_PROJECT=sabeel-institute-kanban node scripts/backfill-board-owners.mjs --only <boardId> --apply

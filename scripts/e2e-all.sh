@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
-# Run EVERY end-to-end suite, sequentially, with the port hygiene each one needs.
+# Run EVERY browser suite, sequentially, with the port hygiene each one needs.
 #
 #   scripts/e2e-all.sh              # all suites, stop at the first failure
 #   scripts/e2e-all.sh --keep-going # run them all, report failures at the end
 #   scripts/e2e-all.sh richtext web # just these, by short name
+#
+# The suites are CI's: the npm scripts ci-tools.json lists in
+# `ci.browserSuites`, each `bash scripts/e2e.sh <suite>`. A short name is the
+# script's last word: `screens` is `test:screens`, `web` is `test:e2e`, and any
+# other `<name>` is `test:e2e:<name>`. The board-ownership migration rehearsal
+# is not one of them: it runs inside `npm run test:emulator`.
 #
 # WHY THIS EXISTS. `e2e.sh` runs ONE suite; CI invokes it once per suite, which
 # is right for CI. Locally that left everyone hand-rolling a chain, and the
@@ -24,7 +30,7 @@
 # launcher with a timeout — an agent's background command, a CI step budget, an
 # ssh session that drops — will be killed long before that, and the `e2e.sh` it
 # started is NOT killed with it: it is orphaned, reparented to `systemd --user`,
-# and carries on holding port 61210 and the emulator block. The next run then
+# and carries on holding the web port and the emulator block. The next run then
 # fails on a held port, which looks like a broken test and is not. Observed
 # repeatedly in one session before the mechanism was understood.
 #
@@ -44,7 +50,16 @@
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
-PORTS=(61200 61201 61202 61203 61204 61205 61206 61207 61210 8081)
+# Every port of this checkout's block, from ci-tools (`sabeel-ci ports` prints
+# one "<port> <name>" per line), and Metro's 8081, which every React Native
+# checkout on the machine shares.
+PORTS=()
+while read -r port _; do PORTS+=("$port"); done < <(npx --no sabeel-ci ports)
+if [ "${#PORTS[@]}" -eq 0 ]; then
+  echo "e2e-all.sh: sabeel-ci ports gave no ports (npm ci first?)" >&2
+  exit 1
+fi
+PORTS+=(8081)
 
 KEEP_GOING=0
 SUITES=()
@@ -56,18 +71,20 @@ for arg in "$@"; do
   esac
 done
 
-# Default to every suite on disk, so a new one is picked up without editing this
-# file — the same reasoning as `ciCoverage.test.ts`, which fails when CI misses
-# one. A glob that matches nothing must not read as "all suites passed".
+# Default to CI's list, so a suite CI runs is run here without editing this
+# file; `ciCoverage.test.ts` fails when a suite on disk is missing from it. An
+# empty list must not read as "all suites passed".
 if [ ${#SUITES[@]} -eq 0 ]; then
-  for f in scripts/*-e2e.mjs; do
-    [ -e "$f" ] || continue
-    name=$(basename "$f" -e2e.mjs)
-    SUITES+=("$name")
-  done
+  while read -r script; do
+    case "$script" in
+      test:screens) SUITES+=(screens) ;;
+      test:e2e) SUITES+=(web) ;;
+      *) SUITES+=("${script#test:e2e:}") ;;
+    esac
+  done < <(node -p "require('./ci-tools.json').ci.browserSuites.join('\n')")
 fi
 if [ ${#SUITES[@]} -eq 0 ]; then
-  echo "no e2e suites found in scripts/ — refusing to report success" >&2
+  echo "no browser suites in ci-tools.json — refusing to report success" >&2
   exit 1
 fi
 
@@ -102,9 +119,13 @@ require_clear_ports() {
 
 failed=()
 for name in "${SUITES[@]}"; do
-  suite="scripts/${name}-e2e.mjs"
-  if [ ! -f "$suite" ]; then
-    echo "no such suite: $suite" >&2
+  case "$name" in
+    screens) script=test:screens ;;
+    web) script=test:e2e ;;
+    *) script="test:e2e:$name" ;;
+  esac
+  if ! node -e "process.exit(require('./package.json').scripts[process.argv[1]] ? 0 : 1)" "$script"; then
+    echo "no such suite: npm run $script" >&2
     failed+=("$name(missing)")
     [ "$KEEP_GOING" = 1 ] && continue || exit 1
   fi
@@ -115,25 +136,13 @@ for name in "${SUITES[@]}"; do
     [ "$KEEP_GOING" = 1 ] && continue || exit 1
   fi
 
-  # migration-e2e wants ONLY firestore+auth and does not go through e2e.sh —
-  # running it through the web harness fails for reasons unrelated to the code.
-  #
   # `rc` is the SUITE's status: PIPESTATUS read straight after the pipeline,
-  # with nothing between. A `|| true` on the pipeline used to sit there, and
+  # with nothing between. A `|| true` on the pipeline would sit there, and
   # under pipefail a failing suite made the pipeline fail, so `true` ran and
   # PIPESTATUS held ITS status — every failed suite was reported as passed.
   # No `set -e` here, so a failing pipeline needs no guard.
-  if [ "$name" = "migration" ]; then
-    # shellcheck source=scripts/jdk21.sh
-    . scripts/jdk21.sh
-    npm run build -w @sabeel/shared >/dev/null 2>&1
-    firebase emulators:exec --project demo-sabeel-kanban \
-      --only firestore,auth "node $suite" 2>&1 | grep -E "checks passed|FAIL|Error|aborted"
-    rc=${PIPESTATUS[0]}
-  else
-    bash scripts/e2e.sh "$suite" 2>&1 | grep -E "checks passed|FAIL|Error:|aborted"
-    rc=${PIPESTATUS[0]}
-  fi
+  npm run "$script" 2>&1 | grep -E "checks passed|FAIL|Error:|aborted"
+  rc=${PIPESTATUS[0]}
 
   if [ "$rc" != 0 ]; then
     echo "  $name FAILED (exit $rc)" >&2

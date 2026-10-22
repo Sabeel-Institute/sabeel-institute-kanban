@@ -182,7 +182,7 @@ describe('against the emulators', () => {
 
   /**
    * An iPhone simulator's token comes from Apple's sandbox, which
-   * scripts/send-test-push.mjs reaches, so a local build files it: that is how
+   * `npx sabeel-ci send-test-push --apple` reaches, so a local build files it: that is how
    * the registration path — rules included — is proved without a phone.
    */
   it("an iPhone simulator files its sandbox token, since Apple's sandbox can deliver it", async () => {

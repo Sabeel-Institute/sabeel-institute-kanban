@@ -27,7 +27,7 @@
 //   GCLOUD_PROJECT=<project-id> node scripts/restore-auth.mjs --apply
 //
 //   # Against the emulators:
-//   FIRESTORE_EMULATOR_HOST=127.0.0.1:61200 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:61202 \
+//   FIRESTORE_EMULATOR_HOST=127.0.0.1:$(npx sabeel-ci ports firestore) FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:$(npx sabeel-ci ports auth) \
 //     GCLOUD_PROJECT=demo-sabeel-kanban node scripts/restore-auth.mjs --apply
 //
 // Writing is OPT-IN and GCLOUD_PROJECT must be explicit, so this can never fall

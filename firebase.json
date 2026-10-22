@@ -98,6 +98,12 @@
     },
     "logging": {
       "port": 61206
+    },
+    "tasks": {
+      "port": 61208
+    },
+    "eventarc": {
+      "port": 61209
     }
   }
 }

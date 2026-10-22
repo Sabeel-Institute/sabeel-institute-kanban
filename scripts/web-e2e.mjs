@@ -23,7 +23,7 @@ import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { readFile, mkdir } from 'node:fs/promises';
 import { extname, join, resolve } from 'node:path';
-import { EMULATOR_PORTS, WEB_PORTS } from './lib/ports.mjs';
+import { PORTS, PROJECT } from './lib/emulators.mjs';
 import { settle, tryAgainTally } from './lib/signin.mjs';
 import { RULES_TITLE, agreeToRules } from './lib/rules.mjs';
 
@@ -35,7 +35,7 @@ const SHOTS = resolve(import.meta.dirname, '..', 'shots');
 // than an exported bundle: `expo export` sets __DEV__ to false, which correctly
 // strips the emulator dev sign-in — the very control this flow needs to drive.
 // That the export strips it is asserted separately at the end.
-const BASE = process.env.E2E_BASE ?? `http://127.0.0.1:${WEB_PORTS.e2e}/`;
+const BASE = process.env.E2E_BASE ?? `http://127.0.0.1:${PORTS.web}/`;
 const PROD_BUNDLE = resolve(import.meta.dirname, '..', 'app', 'dist-web');
 const PROD_PORT = 4181;
 
@@ -84,9 +84,9 @@ function grantAdmin(email) {
       {
         env: {
           ...process.env,
-          GCLOUD_PROJECT: 'demo-sabeel-kanban',
-          FIRESTORE_EMULATOR_HOST: `127.0.0.1:${EMULATOR_PORTS.firestore}`,
-          FIREBASE_AUTH_EMULATOR_HOST: `127.0.0.1:${EMULATOR_PORTS.auth}`,
+          GCLOUD_PROJECT: PROJECT,
+          FIRESTORE_EMULATOR_HOST: `127.0.0.1:${PORTS.firestore}`,
+          FIREBASE_AUTH_EMULATOR_HOST: `127.0.0.1:${PORTS.auth}`,
         },
         stdio: 'pipe',
       },
@@ -108,7 +108,7 @@ function adminRun(body) {
     import { initializeApp } from 'firebase-admin/app';
     import { getAuth } from 'firebase-admin/auth';
     import { FieldValue, getFirestore } from 'firebase-admin/firestore';
-    initializeApp({ projectId: 'demo-sabeel-kanban' });
+    initializeApp({ projectId: process.env.GCLOUD_PROJECT });
     const auth = getAuth();
     const db = getFirestore();
     ${body}
@@ -118,9 +118,9 @@ function adminRun(body) {
       cwd: resolve(import.meta.dirname, '..'),
       env: {
         ...process.env,
-        GCLOUD_PROJECT: 'demo-sabeel-kanban',
-        FIRESTORE_EMULATOR_HOST: `127.0.0.1:${EMULATOR_PORTS.firestore}`,
-        FIREBASE_AUTH_EMULATOR_HOST: `127.0.0.1:${EMULATOR_PORTS.auth}`,
+        GCLOUD_PROJECT: PROJECT,
+        FIRESTORE_EMULATOR_HOST: `127.0.0.1:${PORTS.firestore}`,
+        FIREBASE_AUTH_EMULATOR_HOST: `127.0.0.1:${PORTS.auth}`,
       },
       stdio: 'pipe',
     });

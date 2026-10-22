@@ -50,21 +50,20 @@ import { join, resolve } from 'node:path';
 import { initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { RULES_VERSION } from '../packages/shared/lib/report.js';
-import { EMULATOR_PORTS, WEB_PORTS } from './lib/ports.mjs';
+import { PORTS, PROJECT } from './lib/emulators.mjs';
 import { settle, tryAgainTally } from './lib/signin.mjs';
 import { RULES_TITLE, agreeToRules } from './lib/rules.mjs';
 
 /** First sign-ins that took the app's Try again (lib/signin.mjs), printed with the results. */
 const tally = tryAgainTally();
 
-const BASE = process.env.E2E_BASE ?? `http://127.0.0.1:${WEB_PORTS.e2e}/`;
+const BASE = process.env.E2E_BASE ?? `http://127.0.0.1:${PORTS.web}/`;
 const ROOT = resolve(import.meta.dirname, '..');
 const SHOTS = resolve(ROOT, 'shots', 'screens');
-const PROJECT = 'demo-sabeel-kanban';
 const FULL = process.env.SWEEP_FULL === '1';
 
-process.env.FIRESTORE_EMULATOR_HOST ??= `127.0.0.1:${EMULATOR_PORTS.firestore}`;
-process.env.FIREBASE_AUTH_EMULATOR_HOST ??= `127.0.0.1:${EMULATOR_PORTS.auth}`;
+process.env.FIRESTORE_EMULATOR_HOST ??= `127.0.0.1:${PORTS.firestore}`;
+process.env.FIREBASE_AUTH_EMULATOR_HOST ??= `127.0.0.1:${PORTS.auth}`;
 process.env.GCLOUD_PROJECT = PROJECT;
 
 const results = [];
@@ -127,7 +126,7 @@ const PROFILES = FULL
   ? [['iphone-se', devices['iPhone SE']], ['pixel-7', devices['Pixel 7']], ['ipad-mini', devices['iPad Mini']]]
   : [];
 
-// A clean folder, so the report (scripts/screens-report.mjs) shows this run's
+// A clean folder, so the report (`sabeel-ci screens-report`) shows this run's
 // screens and no other's, and the checks beside them however the run ends.
 await rm(SHOTS, { recursive: true, force: true });
 await mkdir(SHOTS, { recursive: true });

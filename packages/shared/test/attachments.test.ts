@@ -287,7 +287,7 @@ describe('joinAttachmentName', () => {
    * character, non-ASCII, and lengths straddling the cap.
    */
   it('round-trips for every name a fuzz can build', () => {
-    const ALPHABET = [...'ab.  /\\"\';ملف', 'x'.repeat(40)];
+    const ALPHABET = [...'ab.  /\\"\';\u0007ملف', 'x'.repeat(40)];
     // xorshift32: deterministic, and no dependency.
     let seed = 0x5abee1;
     const next = () => {

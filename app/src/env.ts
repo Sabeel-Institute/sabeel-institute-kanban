@@ -14,6 +14,12 @@ export const USE_EMULATORS = process.env.EXPO_PUBLIC_USE_EMULATORS === '1';
  */
 export const EMULATOR_HOST = Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1';
 
+/**
+ * This checkout's emulator ports: its block in ci-tools (`emulators.base` in
+ * ci-tools.json), which scripts read through `sabeel-ci ports`. Literals,
+ * because they are inlined into the client bundle; `sabeel-ci check-app` holds
+ * them and `firebase.json` in step with ci-tools.json.
+ */
 export const EMULATOR_PORTS = {
   auth: 61202,
   firestore: 61200,
