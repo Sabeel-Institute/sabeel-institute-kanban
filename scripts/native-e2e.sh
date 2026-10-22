@@ -134,13 +134,35 @@ curl -sf -o /dev/null --max-time 600 \
   "http://127.0.0.1:${METRO_PORT}/.expo/.virtual-metro-entry.bundle?platform=${PLATFORM}&dev=true&minify=false" \
   || { echo "native-e2e.sh: Metro could not bundle the app; see $LOGS/metro.log" >&2; exit 1; }
 
-maestro ${DEVICE:+--device "$DEVICE"} test "$FLOWS" -e APP_ID="$APP_ID" \
-  --format junit --output "$OUT/report.xml" --test-output-dir "$OUT" &
-MAESTRO_PID=$!
+run_flows() {
+  maestro ${DEVICE:+--device "$DEVICE"} test "$FLOWS" -e APP_ID="$APP_ID" \
+    --format junit --output "$OUT/report.xml" --test-output-dir "$OUT" &
+  MAESTRO_PID=$!
+  local status=0
+  wait "$MAESTRO_PID" || status=$?
+  MAESTRO_PID=
+  return "$status"
+}
+
 rc=0
-wait "$MAESTRO_PID" || rc=$?
+[ "$PLATFORM" = ios ] || adb logcat -c
+run_flows || rc=$?
 if [ "$PLATFORM" = android ]; then
   adb logcat -d >"$LOGS/logcat.txt" 2>&1 || true
+  # Debug builds only: React Native's renderer sometimes dies in
+  # MountingCoordinator::pullTransaction as the app loads from Metro (three
+  # times across the apps on 2026-10-21; never in a release build, which
+  # check-release.mjs cold-starts on every build). When that is the failure,
+  # the flows run once more and the first try's log is kept. Any other failure
+  # stands.
+  if [ "$rc" -ne 0 ] && grep -q 'MountingCoordinator::pullTransaction' "$LOGS/logcat.txt"; then
+    echo "native-e2e.sh: the debug build hit React Native's pullTransaction crash; running the flows once more" >&2
+    mv "$LOGS/logcat.txt" "$LOGS/logcat-first-try.txt"
+    adb logcat -c
+    rc=0
+    run_flows || rc=$?
+    adb logcat -d >"$LOGS/logcat.txt" 2>&1 || true
+  fi
 else
   xcrun simctl spawn "$DEVICE" log show --last 30m --style compact 2>/dev/null | tail -n 20000 >"$LOGS/device.txt" || true
 fi
