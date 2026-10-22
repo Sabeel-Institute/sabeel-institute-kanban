@@ -10,7 +10,7 @@
 // at 03:15 and then normalises.
 //
 //   FIRESTORE_EMULATOR_HOST=127.0.0.1:$(npx sabeel-ci ports firestore) FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:$(npx sabeel-ci ports auth) \
-//     GCLOUD_PROJECT=demo-sabeel-kanban node scripts/verify-board-owners.mjs
+//     GCLOUD_PROJECT=$(npx sabeel-ci ports --project) node scripts/verify-board-owners.mjs
 //   GCLOUD_PROJECT=sabeel-institute-kanban node scripts/verify-board-owners.mjs --expect-boards 9
 //
 // Exits non-zero if anything failed, so it can gate the next migration step.
@@ -31,8 +31,8 @@ if (expectIdx >= 0 && !Number.isInteger(EXPECT_BOARDS)) {
 const projectId = process.env.GCLOUD_PROJECT;
 if (!projectId) {
   console.error(
-    'Refusing to run without GCLOUD_PROJECT. Use demo-sabeel-kanban for the ' +
-      'emulators, or the real project id for production.',
+    'Refusing to run without GCLOUD_PROJECT. Use $(npx sabeel-ci ports --project) ' +
+      'for the emulators, or the real project id for production.',
   );
   process.exit(1);
 }

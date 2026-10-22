@@ -13,10 +13,10 @@
  * existed; `search-*` was a release behind again after the Search redesign,
  * because only six of the twenty were covered. So now all of them are.
  *
- * SIZES ARE PART OF THE LAYOUT. The manual pairs a `wide` figure with a
- * `narrow` one, and `render-manual.py` prints them at 116 mm and 46 mm. 1280x900
- * and 390x844 are the capture sizes; 1280 is wide enough to stay sharp at
- * 116 mm on paper. Do not "tidy" them.
+ * SIZES ARE PART OF THE LAYOUT. The manual pairs a phone figure (`ph`) with a
+ * computer one (`wd`), and `npx sabeel-ci render-manual` prints them one above
+ * the other at 56 mm and 165 mm. 390x844 and 1280x900 are the capture sizes;
+ * 1280 is wide enough to stay sharp at 165 mm on paper. Do not "tidy" them.
  *
  * NOTE: it drives the real UI, so every click must be aimed precisely. On the
  * WIDE board each card row carries its own Archive button right beside the

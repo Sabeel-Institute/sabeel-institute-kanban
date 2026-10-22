@@ -6,7 +6,7 @@
 // scripts, in the real order, over it.
 //
 //   JAVA_HOME=$(npx sabeel-ci jdk21) firebase emulators:exec \
-//     --project demo-sabeel-kanban --only firestore,auth \
+//     --project $(npx sabeel-ci ports --project) --only firestore,auth \
 //     "node scripts/migration-e2e.mjs --shape migration/shape-<project>.json"
 //
 // WHAT THIS ANSWERS, that the hand-written fixtures do not: whether the sequence

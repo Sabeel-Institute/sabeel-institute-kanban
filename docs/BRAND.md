@@ -128,8 +128,9 @@ and shifts no layout.
 
 ## The logo
 
-Source: `docs/brand/sabeel-logo.png` (also copied to
-`app/assets/brand/sabeel-logo.png`, which is what the app bundles).
+Source: `docs/brand/sabeel-logo.png`, copied to `app/assets/logo.png`, which
+is what the app bundles and what `npx sabeel-ci render-manual` puts on the
+manual's cover (the path every Sabeel app uses).
 
 Arabic calligraphy reading *Sabeel* with gold accent strokes, alongside the
 wordmark. One rule follows from its construction:

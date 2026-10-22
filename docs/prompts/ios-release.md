@@ -56,9 +56,10 @@ route, that file is the reasoning.
 >   build *succeeds* and ships with crash reporting silently off.
 >   `EXPO_PUBLIC_*` is inlined at bundle time, so it must exist **before** the
 >   build, not be added after. The build script gates on this.
-> - **`app/.env.sentry-build-plugin`** — `IOS_TEAM_ID`, `SENTRY_ORG`,
->   `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN`, `ASC_KEY_ID`, `ASC_ISSUER_ID` (and
->   optionally `ASC_KEY_PATH`). `npm run build:ios` loads it.
+> - **`app/.env.sentry-build-plugin`** — `IOS_TEAM_ID`, `SENTRY_AUTH_TOKEN`,
+>   `ASC_KEY_ID`, `ASC_ISSUER_ID` (and optionally `ASC_KEY_PATH`).
+>   `npm run build:ios` loads it, and takes the Sentry org and project from
+>   `ci-tools.json`.
 >
 > And the App Store Connect API key itself:
 > `~/.appstoreconnect/private_keys/AuthKey_<ASC_KEY_ID>.p8`. It is **not** the

@@ -205,27 +205,26 @@ creation**.
       password is in the vault (`sabeel/review/kanban-app-review.txt`), never
       here. `docs/STORE-RELEASE.md`.
 
-- [x] **Symbolication wired for BOTH platforms (2026-08-12), at parity.**
-      `SENTRY_ORG`, `SENTRY_PROJECT` and `SENTRY_AUTH_TOKEN` in the gitignored
-      `app/.env.sentry-build-plugin`, one set of names for iOS and Android, and
-      both report to the same Sentry project because both read
-      `EXPO_PUBLIC_SENTRY_DSN_NATIVE`.
+- [x] **Symbolication wired for every surface, at parity.** The org and the
+      projects are `ci-tools.json`'s `sentry`, committed; the one secret is
+      `SENTRY_AUTH_TOKEN` in the gitignored `app/.env.sentry-build-plugin`
+      (`BUILD_ENV` on GitHub). Android and iOS report to the same Sentry
+      project because both read `EXPO_PUBLIC_SENTRY_DSN_NATIVE`.
       iOS: `@sentry/react-native/expo` registered **bare** in `app/app.json` —
       options would be written verbatim into `ios/sentry.properties` and this
       repo is public; `sabeel-ci build-ios` loads the file. Android:
       `app/android/app/build.gradle` applies `sentry.gradle` when the file
-      exists (or `SENTRY_AUTH_TOKEN` is in the environment), since a config
-      plugin runs at prebuild and that folder is never prebuilt.
+      exists, since a config plugin runs at prebuild and that folder is never
+      prebuilt. Web: Deploy Web uploads the build's source maps before it
+      publishes the site.
       **The file must be on the machine that builds a release, on either
-      platform.** Without it each build succeeds and uploads nothing.
-      `npm run check:ios` and the Android release build both warn; neither
-      fails, because unlike a missing DSN this degrades reports rather than
-      losing them. Without the file and the token Gradle applies no Sentry
-      tasks, so CI and a fresh clone are unaffected.
+      platform:** `sabeel-ci build-aab` and `build-ios` refuse to build without
+      the token. Without the file Gradle applies no Sentry tasks, so
+      pull-request builds and a fresh clone are unaffected.
       **You already have a token and it works here unchanged.**
-      `sabeel-apk-sourcemaps`, an ORGANIZATION token with scope `org:ci`, used by
-      the sibling time-tracker. Organization tokens reach **every project in the
-      org**, so one token serves every Sabeel app; only `SENTRY_PROJECT` differs.
+      `sabeel-apk-sourcemaps`, an ORGANIZATION token with scope `org:ci`.
+      Organization tokens reach **every project in the org**, so one token
+      serves every Sabeel app.
       Confirmed against the API: releases endpoints answer 200, while org and
       project-list endpoints answer 403 — `org:ci` grants exactly the CI/release
       permissions and nothing more, which is the right shape for a build secret.
@@ -422,7 +421,7 @@ would update rather than duplicate.
 
 Push is wired on all three surfaces: Android and the web through FCM, iPhones
 through Apple (`APNS_KEY`; § D2 item 5 is the iPhone check). The web push VAPID
-key is deployed.
+public key is committed (`VAPID_PUBLIC_KEY` in `app/src/firebase-config.ts`).
 
 - [x] **Verify a push actually arrives.** Done, on your phone, 2026-09-16:
       two mention pushes minutes apart. What the screenshot ALSO showed was the
@@ -456,10 +455,8 @@ key is deployed.
 - [ ] **Web push — confirm a push actually ARRIVES.** The configuration half is
       done and verified against the live site, so this is now one question, not
       three. Confirmed by reading the deployed bundle and the deployed origin:
-      the VAPID key is present and non-empty (the minifier folded the
-      `!VAPID_KEY` guard away, which it can only do for a truthy literal),
-      `USE_EMULATORS` compiles to `false`, and `/firebase-messaging-sw.js`
-      returns HTTP 200.
+      the VAPID key is present, `USE_EMULATORS` compiles to `false`, and
+      `/firebase-messaging-sw.js` returns HTTP 200.
 
       A browser honours a permission request only straight from a click, so the
       ask is on a button.
@@ -500,18 +497,18 @@ key is deployed.
       signs each push. Android needs none of this because FCM reaches Play
       services on the device directly.
 
-      The key already exists and is already deployed — nothing to generate. It
-      lives in `app/.env.local` as `EXPO_PUBLIC_FCM_VAPID_KEY` and reaches the
-      bundle from the environment that runs `expo export`. If it is ever lost or
-      rotated: Firebase console → **Project settings** → **Cloud Messaging** →
-      *Web configuration* → **Web Push certificates**. Console-only — there is
-      no `firebase` CLI command and no REST endpoint for it (checked, not
-      assumed).
+      The key already exists — nothing to generate. Its public half is
+      `VAPID_PUBLIC_KEY` in `app/src/firebase-config.ts`, committed like the
+      rest of the web config. If it is ever rotated: Firebase console →
+      **Project settings** → **Cloud Messaging** → *Web configuration* →
+      **Web Push certificates**, then replace the constant. Console-only —
+      there is no `firebase` CLI command and no REST endpoint for it (checked,
+      not assumed).
 
-      `npm run check:web-push` now reads the exported bundle and refuses when
-      the key is missing or the wrong shape, so a keyless deploy — which would
-      silently make every device report that it cannot receive notifications —
-      cannot go out unnoticed. Run it between `web:export` and the deploy.
+      `npm run check:web-push` reads the exported bundle and refuses when the
+      key is missing or the wrong shape, and every web release build runs it,
+      so a keyless deploy — which would silently make every device report that
+      it cannot receive notifications — cannot go out unnoticed.
 
 - [x] **Functions Sentry verified 2026-07-20.** Marker
       `functions-sentry-check 2026-07-20T16:01:17.471Z` arrived in

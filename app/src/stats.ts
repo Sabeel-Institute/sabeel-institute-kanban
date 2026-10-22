@@ -44,24 +44,26 @@ export function useStatsMonths(
   to: string,
 ): LiveState<StatsMonthDoc[]> {
   const months = monthKeysBetween(from, to);
+  const first = months[0];
+  const last = months[months.length - 1];
   return useLiveQuery<StatsMonthDoc[]>(
-    'stats months',
     () =>
       query(
         collection(db, `stats/${scope}/months`),
         // A document-id range, so no composite index is needed and `days` stays
         // exempt from indexing entirely (firestore.indexes.json).
-        where(documentId(), '>=', months[0]),
-        where(documentId(), '<=', months[months.length - 1]),
+        where(documentId(), '>=', first),
+        where(documentId(), '<=', last),
         orderBy(documentId()),
       ),
+    [scope, first, last],
+    'stats months',
     (docs) =>
       docs.map((d) => ({
         scope,
         month: d.id,
         days: (d.data.days as StatsMonthDoc['days']) ?? {},
       })),
-    [scope, months[0], months[months.length - 1]],
   );
 }
 
@@ -74,13 +76,13 @@ export function useStatsMonths(
  */
 export function useStoredTotals(): LiveState<StatsRootDoc> {
   return useLiveDoc<StatsRootDoc>(
-    'stats totals',
     () => doc(db, `stats/${STATS_ALL_SCOPE}`),
+    [],
+    'stats totals',
     (d) => ({
       bytesStored: (d?.data.bytesStored as number) ?? 0,
       filesStored: (d?.data.filesStored as number) ?? 0,
     }),
-    [],
   );
 }
 

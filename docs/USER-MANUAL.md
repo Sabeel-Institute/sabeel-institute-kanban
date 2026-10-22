@@ -12,7 +12,7 @@ The app works the same on the website
 (https://sabeel-institute-kanban.web.app) and the Android app — same account,
 same data, live everywhere. It is **phone-first**: the mobile layout is its own
 thing, not a squeezed desktop board. Throughout this guide, where the phone and
-browser layouts differ, you'll see them side by side.
+browser layouts differ, you'll see both: the phone first, then the browser.
 
 ---
 
@@ -92,8 +92,8 @@ A slim navigation bar is always in reach — **along the bottom on a phone**, an
 **down the left side in a browser**. It carries the places you move between:
 
 <div class="pair">
-  <figure><img class="wide" src="manual/img/boards-wide.png" alt="Boards in a browser, with the left navigation rail"><figcaption>In a browser — a rail down the left</figcaption></figure>
-  <figure><img class="narrow" src="manual/img/boards-phone.png" alt="Boards on a phone, with the bottom navigation bar"><figcaption>On a phone — a bar along the bottom</figcaption></figure>
+  <figure class="ph"><img src="manual/img/boards-phone.png" alt="Boards on a phone, with the bottom navigation bar"><figcaption>On a phone — a bar along the bottom</figcaption></figure>
+  <figure class="wd"><img src="manual/img/boards-wide.png" alt="Boards in a browser, with the left navigation rail"><figcaption>In a browser — a rail down the left</figcaption></figure>
 </div>
 
 - **Boards** — your board list, the home screen.
@@ -122,8 +122,8 @@ on a phone. If your account can create boards, **New board** is at the top (see
 ## 1.4 Inside a board
 
 <div class="pair">
-  <figure><img class="wide" src="manual/img/board-wide.png" alt="A board in a browser"><figcaption>In a browser — every column at once</figcaption></figure>
-  <figure><img class="narrow" src="manual/img/board-phone.png" alt="A board on a phone"><figcaption>On a phone — one column, swipe between</figcaption></figure>
+  <figure class="ph"><img src="manual/img/board-phone.png" alt="A board on a phone"><figcaption>On a phone — one column, swipe between</figcaption></figure>
+  <figure class="wd"><img src="manual/img/board-wide.png" alt="A board in a browser"><figcaption>In a browser — every column at once</figcaption></figure>
 </div>
 
 A board is columns of cards. **In a browser** you see every column at once. **On a
@@ -148,8 +148,8 @@ there rather than in the header so the board's name has the top row to itself.
 Tap any card to open the full view.
 
 <div class="pair">
-  <figure><img class="wide" src="manual/img/card-wide.png" alt="A card in a browser"><figcaption>In a browser</figcaption></figure>
-  <figure><img class="narrow" src="manual/img/card-phone.png" alt="A card on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="ph"><img src="manual/img/card-phone.png" alt="A card on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="wd"><img src="manual/img/card-wide.png" alt="A card in a browser"><figcaption>In a browser</figcaption></figure>
 </div>
 
 - **Title** — shown in full as the card's heading, however long it is. Tap the
@@ -230,8 +230,8 @@ has a **←** in its top right; it never appears as the word "Back".
 ### The formatting buttons
 
 <div class="pair">
-  <figure><img class="wide" src="manual/img/format-wide.png" alt="Editing a card description in a browser, with the formatting row above the box"><figcaption>In a browser</figcaption></figure>
-  <figure><img class="narrow" src="manual/img/format-phone.png" alt="Editing a card description on a phone, with the formatting row above the box"><figcaption>On a phone</figcaption></figure>
+  <figure class="ph"><img src="manual/img/format-phone.png" alt="Editing a card description on a phone, with the formatting row above the box"><figcaption>On a phone</figcaption></figure>
+  <figure class="wd"><img src="manual/img/format-wide.png" alt="Editing a card description in a browser, with the formatting row above the box"><figcaption>In a browser</figcaption></figure>
 </div>
 
 The same five buttons sit above the description and above the comment box, on a
@@ -252,8 +252,8 @@ from: **Choose a file**, **Photo library**, or **Take a photo** — so a receipt
 a whiteboard can go straight onto the card without saving it anywhere first.
 
 <div class="pair">
-  <figure><img class="wide" src="manual/img/attach-wide.png" alt="Naming a file before it uploads"><figcaption>Naming a file before it uploads</figcaption></figure>
-  <figure><img class="narrow" src="manual/img/attach-phone.png" alt="Naming a file before it uploads, on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="ph"><img src="manual/img/attach-phone.png" alt="Naming a file before it uploads, on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="wd"><img src="manual/img/attach-wide.png" alt="Naming a file before it uploads"><figcaption>Naming a file before it uploads</figcaption></figure>
 </div>
 
 **Then you get to name it.** Before the upload starts, a box shows the file's
@@ -341,8 +341,8 @@ swipes between columns, where a drag would be ambiguous.
 ## 1.6 Doing several cards at once
 
 <div class="pair">
-  <figure><img class="wide" src="manual/img/bulk-wide.png" alt="Selecting several cards in a browser"><figcaption>In a browser — tick the boxes</figcaption></figure>
-  <figure><img class="narrow" src="manual/img/bulk-phone.png" alt="Selecting several cards on a phone"><figcaption>On a phone — long-press, then tap</figcaption></figure>
+  <figure class="ph"><img src="manual/img/bulk-phone.png" alt="Selecting several cards on a phone"><figcaption>On a phone — long-press, then tap</figcaption></figure>
+  <figure class="wd"><img src="manual/img/bulk-wide.png" alt="Selecting several cards in a browser"><figcaption>In a browser — tick the boxes</figcaption></figure>
 </div>
 
 Select several cards — **tick the boxes** in a browser (hold **Shift** for a
@@ -367,8 +367,8 @@ unassigned**, though; the sheet tells you before you confirm.
 ## 1.7 My Work
 
 <div class="pair">
-  <figure><img class="wide" src="manual/img/mywork-wide.png" alt="My Work in a browser"><figcaption>In a browser</figcaption></figure>
-  <figure><img class="narrow" src="manual/img/mywork-phone.png" alt="My Work on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="ph"><img src="manual/img/mywork-phone.png" alt="My Work on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="wd"><img src="manual/img/mywork-wide.png" alt="My Work in a browser"><figcaption>In a browser</figcaption></figure>
 </div>
 
 Everything assigned to you, across every board, grouped by urgency: **overdue**
@@ -379,8 +379,8 @@ open it.
 ## 1.8 Search
 
 <div class="pair">
-  <figure><img class="wide" src="manual/img/search-wide.png" alt="Search in a browser"><figcaption>In a browser</figcaption></figure>
-  <figure><img class="narrow" src="manual/img/search-phone.png" alt="Search on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="ph"><img src="manual/img/search-phone.png" alt="Search on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="wd"><img src="manual/img/search-wide.png" alt="Search in a browser"><figcaption>In a browser</figcaption></figure>
 </div>
 
 Search lists **every card on every board you're on**, newest first — you don't
@@ -398,8 +398,8 @@ sort control:
 - **Sort** — see below.
 
 <div class="pair">
-  <figure><img class="wide" src="manual/img/searchFilters-wide.png" alt="The Filters panel in a browser"><figcaption>The Filters panel</figcaption></figure>
-  <figure><img class="narrow" src="manual/img/searchFilters-phone.png" alt="The Filters panel on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="ph"><img src="manual/img/searchFilters-phone.png" alt="The Filters panel on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="wd"><img src="manual/img/searchFilters-wide.png" alt="The Filters panel in a browser"><figcaption>The Filters panel</figcaption></figure>
 </div>
 
 The second row starts with **Filters**, which opens a panel holding everything
@@ -460,8 +460,8 @@ cutting the list short. Tap a result to open the card.
 ## 1.9 Notifications
 
 <div class="pair">
-  <figure><img class="wide" src="manual/img/alerts-wide.png" alt="Alerts in a browser"><figcaption>In a browser</figcaption></figure>
-  <figure><img class="narrow" src="manual/img/alerts-phone.png" alt="Alerts on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="ph"><img src="manual/img/alerts-phone.png" alt="Alerts on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="wd"><img src="manual/img/alerts-wide.png" alt="Alerts in a browser"><figcaption>In a browser</figcaption></figure>
 </div>
 
 **Alerts** shows everything you've been told about, so nothing is lost if a phone
@@ -510,8 +510,8 @@ account signed in on the device.
 ## 1.10 Reporting a problem
 
 <div class="pair">
-  <figure><img class="wide" src="manual/img/report-wide.png" alt="Report a problem in a browser, with a report written"><figcaption>In a browser</figcaption></figure>
-  <figure><img class="narrow" src="manual/img/report-phone.png" alt="Report a problem on a phone, with a report written"><figcaption>On a phone</figcaption></figure>
+  <figure class="ph"><img src="manual/img/report-phone.png" alt="Report a problem on a phone, with a report written"><figcaption>On a phone</figcaption></figure>
+  <figure class="wd"><img src="manual/img/report-wide.png" alt="Report a problem in a browser, with a report written"><figcaption>In a browser</figcaption></figure>
 </div>
 
 If something on a board breaks the institute's rules — a card, a comment, a file,
@@ -581,8 +581,8 @@ and only an admin can change that.
 ## 2.2 Board settings
 
 <div class="pair">
-  <figure><img class="wide" src="manual/img/settings-wide.png" alt="Board settings in a browser"><figcaption>In a browser</figcaption></figure>
-  <figure><img class="narrow" src="manual/img/settings-phone.png" alt="Board settings on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="ph"><img src="manual/img/settings-phone.png" alt="Board settings on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="wd"><img src="manual/img/settings-wide.png" alt="Board settings in a browser"><figcaption>In a browser</figcaption></figure>
 </div>
 
 Open a board and tap its **settings** (the gear — along the bottom on a phone,
@@ -591,8 +591,8 @@ people** instead and says **Board members**: the same screen with the member lis
 and nothing else.
 
 <div class="pair">
-  <figure><img class="wide" src="manual/img/roster-wide.png" alt="The member list as somebody who does not own the board, in a browser"><figcaption>Not an owner, in a browser — owners marked, no controls</figcaption></figure>
-  <figure><img class="narrow" src="manual/img/roster-phone.png" alt="The member list as somebody who does not own the board, on a phone"><figcaption>The same on a phone</figcaption></figure>
+  <figure class="ph"><img src="manual/img/roster-phone.png" alt="The member list as somebody who does not own the board, on a phone"><figcaption>The same on a phone</figcaption></figure>
+  <figure class="wd"><img src="manual/img/roster-wide.png" alt="The member list as somebody who does not own the board, in a browser"><figcaption>Not an owner, in a browser — owners marked, no controls</figcaption></figure>
 </div>
 
 From here:
@@ -642,8 +642,8 @@ From here:
 ### Letting somebody else run the board
 
 <div class="pair">
-  <figure><img class="wide" src="manual/img/owners-wide.png" alt="The Members section of Board settings, with an Owner switch on each row"><figcaption>In a browser — the Owner switch sits on each member's row</figcaption></figure>
-  <figure><img class="narrow" src="manual/img/owners-phone.png" alt="The same Members section on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="ph"><img src="manual/img/owners-phone.png" alt="The same Members section on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="wd"><img src="manual/img/owners-wide.png" alt="The Members section of Board settings, with an Owner switch on each row"><figcaption>In a browser — the Owner switch sits on each member's row</figcaption></figure>
 </div>
 
 Turn a member's switch on and they can run the board exactly as you can; turn it
@@ -707,8 +707,8 @@ it — the one exception to boards being private.
 ## 3.1 The People screen — approving new users
 
 <div class="pair">
-  <figure><img class="wide" src="manual/img/people-wide.png" alt="The People screen in a browser"><figcaption>In a browser</figcaption></figure>
-  <figure><img class="narrow" src="manual/img/people-phone.png" alt="The People screen on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="ph"><img src="manual/img/people-phone.png" alt="The People screen on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="wd"><img src="manual/img/people-wide.png" alt="The People screen in a browser"><figcaption>In a browser</figcaption></figure>
 </div>
 
 Open **More → People**. It lists everyone who has signed in. A new account
@@ -749,8 +749,8 @@ open any board and give anybody ownership of it.
 ## 3.3 Stats — how the boards are being used
 
 <div class="pair">
-  <figure><img class="wide" src="manual/img/stats-wide.png" alt="Stats in a browser"><figcaption>In a browser</figcaption></figure>
-  <figure><img class="narrow" src="manual/img/stats-phone.png" alt="Stats on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="ph"><img src="manual/img/stats-phone.png" alt="Stats on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="wd"><img src="manual/img/stats-wide.png" alt="Stats in a browser"><figcaption>In a browser</figcaption></figure>
 </div>
 
 **More → Stats.** Admins only. It answers "is this being used, and by whom?" —
@@ -781,8 +781,8 @@ all attachments.
 ### Tap a bar to see what is behind it
 
 <div class="pair">
-  <figure><img class="wide" src="manual/img/statsDetail-wide.png" alt="A selected bar broken down by board"><figcaption>In a browser</figcaption></figure>
-  <figure><img class="narrow" src="manual/img/statsDetail-phone.png" alt="A selected bar broken down by board on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="ph"><img src="manual/img/statsDetail-phone.png" alt="A selected bar broken down by board on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="wd"><img src="manual/img/statsDetail-wide.png" alt="A selected bar broken down by board"><figcaption>In a browser</figcaption></figure>
 </div>
 
 Selecting a bar adds a panel underneath it, and what the panel shows depends on
@@ -965,5 +965,5 @@ stay.
 are regenerated from the seeded dev stack by `node scripts/manual-shots.mjs`
 (every one except `pending.png`, which needs an unapproved account; `rules.png`
 is taken by withdrawing a seeded account's acceptance first). The PDF is
-built from the markdown by `python3 docs/render-manual.py`. When the app
+built from the markdown by `npx sabeel-ci render-manual`. When the app
 changes, update all three in the same batch — text, images, PDF.*

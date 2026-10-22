@@ -1,4 +1,4 @@
-# Running the app locally
+# Dev tooling
 
 Local development runs against the Firebase emulators, which need no accounts,
 no keys and no network; production is `sabeel-institute-kanban`
@@ -329,6 +329,40 @@ They are the list CI runs, one runner each (`ci.browserSuites` in
 screenshots to `shots/`, and on failure dump what each page actually displayed —
 much faster than guessing.
 
+### Dead code: knip
+
+`npm run knip` reports unused files, exports and dependencies, and CI runs it
+(`ci.knip` in `ci-tools.json`). A clean run is **empty**. Nothing outside this
+repo consumes it, so anything unused is deleted, not deprecated; a finding is
+either dead code or a gap in `knip.json` to close at its cause, never a reason
+to widen an ignore list. **A workspace that uses a package declares it**:
+hoisting is a resolution accident, not a dependency.
+
+`knip.json` has the same shape as the LMS's and the time tracker's:
+
+- **Entries per workspace.** The root's are `scripts/*.mjs`; the app's are
+  `App.tsx`, `metro.config.js`, `public/**/*.js` and the `.web` seams, which
+  the bundler resolves and no import names; the functions' are `src/index.ts`
+  (esbuild builds the bundle, so nothing maps `main` back to the source) and
+  the tests.
+- **`ignoreExportsUsedInFile` for types and interfaces**, so a type exported
+  beside the function that takes it is not a finding.
+- **The app ignores `expo-updates`, `@expo/metro-runtime` and
+  `expo-system-ui`**: knip's Expo plugin infers them from Expo's defaults and
+  attributes them to `app/app.json`, where none appears. Do not install them
+  to quiet the report.
+- **`ignoreBinaries`: `firebase` and `expo`**: the global CLI, and the app
+  workspace's own, which the root's `dev:web` and `dev:android` run from
+  `app/`.
+
+Before deleting an export knip calls unused, **grep `.ts` AND `.tsx`, then
+typecheck**: its only consumer may be a `.web.tsx` seam (`rerankColumnIfNeeded`
+was deleted on exactly that basis). And **never list `@sabeel/shared` in
+`functions/package.json`**: esbuild bundles it into `functions/lib/index.js`,
+and listed there Cloud Build tries to install a private package from the
+public registry and the deploy fails (`docs/INHERITED-STACK.md` lesson 3b).
+The root declares it, which knip accepts for the functions too.
+
 ### Every screen, every width
 
 One harness covers this — it seeds, signs in, walks every authenticated screen
@@ -433,9 +467,9 @@ Run both. Neither substitutes for the other.
 
 `npx sabeel-ci native-e2e` runs the Maestro flows in `maestro/` against the
 debug build: it builds and installs the APK, starts the emulators (`sabeel-ci
-emulators`), seeds them through the web app (`scripts/seed-dev.mjs`, the
-`native.seed` of `ci-tools.json`, with a web dev server on the `web` port for
-it, since `native.seedWeb` is set), serves the JavaScript from Metro on 8081
+emulators`), seeds them through the web app (`scripts/seed-emulators.mjs`,
+with a web dev server on the `web` port for it, since `ci-tools.json`'s
+`native.seedWeb` is set), serves the JavaScript from Metro on 8081
 with `EXPO_PUBLIC_USE_EMULATORS=1`, and runs every flow, or the one you name
 (`npx sabeel-ci native-e2e maestro/board.yaml`). It needs one booted emulator
 (`npx sabeel-ci emulator headless`) and installs the pinned Maestro itself
@@ -483,13 +517,13 @@ the flows, and keeps the same folder as `native-ios-<sha>`.
 
 Different job, different script. `screens-e2e.mjs` asserts; this one only
 produces the images `docs/USER-MANUAL.md` embeds, at the two sizes
-`render-manual.py` lays out for:
+`npx sabeel-ci render-manual` lays out for:
 
 ```sh
 scripts/dev.sh web              # emulators + web + seed, and WAIT for the seed
 node scripts/manual-shots.mjs   # every image → docs/manual/img/
 node scripts/manual-shots.mjs stats search   # or just the ones that changed
-python3 docs/render-manual.py   # rebuild docs/USER-MANUAL.pdf
+npx sabeel-ci render-manual     # rebuild docs/USER-MANUAL.pdf (needs uv and google-chrome)
 ```
 
 It covers **every** image the manual uses except `pending.png`, which needs an

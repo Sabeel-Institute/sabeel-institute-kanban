@@ -1679,9 +1679,9 @@ try {
    */
   // Guard the guard. If the panel already reads the message we are waiting for,
   // the check below passes without anything having happened — which is the
-  // failure mode this whole file exists to avoid. It is reachable: with no
-  // EXPO_PUBLIC_FCM_VAPID_KEY every state collapses to 'unsupported', which is
-  // how CI ran until e2e.sh started supplying a fake one.
+  // failure mode this whole file exists to avoid. It is reachable: without a
+  // VAPID key, or in a browser lacking the Push API, every state collapses to
+  // 'unsupported'.
   check(
     'the device panel starts somewhere a re-read could move it from',
     deviceShown[0] !== UNSUPPORTED,

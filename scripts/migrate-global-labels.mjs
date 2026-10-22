@@ -19,7 +19,7 @@
 // Both are idempotent and print what they will do before doing it.
 //
 //   # emulators
-//   FIRESTORE_EMULATOR_HOST=127.0.0.1:$(npx sabeel-ci ports firestore) GCLOUD_PROJECT=demo-sabeel-kanban \
+//   FIRESTORE_EMULATOR_HOST=127.0.0.1:$(npx sabeel-ci ports firestore) GCLOUD_PROJECT=$(npx sabeel-ci ports --project) \
 //     node scripts/migrate-global-labels.mjs part-a
 //   # production (gcloud ADC)
 //   GCLOUD_PROJECT=sabeel-institute-kanban node scripts/migrate-global-labels.mjs part-a
@@ -35,8 +35,8 @@ if (part !== 'part-a' && part !== 'part-b') {
 const projectId = process.env.GCLOUD_PROJECT;
 if (!projectId) {
   console.error(
-    'Refusing to run without GCLOUD_PROJECT. Use demo-sabeel-kanban for the ' +
-      'emulators, or the real project id for production.',
+    'Refusing to run without GCLOUD_PROJECT. Use $(npx sabeel-ci ports --project) ' +
+      'for the emulators, or the real project id for production.',
   );
   process.exit(1);
 }

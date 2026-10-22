@@ -9,14 +9,14 @@ ClickUp.
 
 **Docs**
 - `docs/USER-MANUAL.md` — what the app does, for the people using it. Built to
-  `docs/USER-MANUAL.pdf` with `docs/render-manual.py`; its screenshots come from
-  `scripts/manual-shots.mjs`.
+  `docs/USER-MANUAL.pdf` with `npx sabeel-ci render-manual`; its screenshots
+  come from `scripts/manual-shots.mjs`.
 - `docs/PRODUCT_BRIEF.md` — decisions, data model, access rules. Source of truth.
 - `docs/PERMISSIONS.md` — who can do what.
 - `docs/PHASE_STATUS.md` — the phase plan, exit criteria, live build status, and
   the **deploy log** (what shipped, when, and what it broke).
-- `docs/DEVELOPING.md` — the dev loops: emulators, tests, screenshots, the screen
-  sweep.
+- `docs/DEV-TOOLING.md` — the dev loops: emulators, tests, dead code,
+  screenshots, the screen sweep.
 - `docs/DEPLOY.md` — the access a releaser needs, deploying, shipping a release
   (web, Play, versioned GitHub APK releases, TestFlight), rollback.
 - `docs/IOS-BUILD.md` — the iPhone app: builds on GitHub, TestFlight testers,
@@ -32,7 +32,6 @@ ClickUp.
   project, and the traps it already paid for.
 - `docs/SECRETS.md` — which values are secret, where each one lives, and the
   vault that holds a copy of every file.
-- `docs/VERSIONING-RULE.md` — what a version means here and where it is enforced.
 - `docs/MIGRATION.md` — the ClickUp import, done once.
 - `docs/STACK-GOTCHAS.md` — a stub; the traps live in the `expo-firebase-stack`
   skill, which is public and shared with the sibling project.

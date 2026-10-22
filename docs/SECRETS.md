@@ -11,7 +11,7 @@ being casual with the one thing that actually grants access.
 
 | Kind | Examples | Handling |
 |---|---|---|
-| **Public by design** | Firebase web config, `WEB_CLIENT_ID` | **Committed.** Access is controlled by `firestore.rules`, never by hiding these. Hiding them would buy nothing and make setup harder. |
+| **Public by design** | Firebase web config, `WEB_CLIENT_ID`, the web push (VAPID) public key, the Sentry org and project slugs | **Committed.** Access is controlled by `firestore.rules`, never by hiding these. Hiding them would buy nothing and make setup harder. |
 | **Not secret, still not committed** | Sentry client DSNs | Gitignored `app/.env.local`. They ship inside every browser and app bundle, so they cannot be secret; they are kept out of git only so a fork or public mirror does not inherit this project's event quota. |
 | **Genuinely secret** | `SENTRY_DSN` and `APNS_KEY` (functions), `SENTRY_AUTH_TOKEN`, the signing keys, the Play service-account key | **Secret Manager** for the functions; a file outside the repo, copied into the vault, for build and publish credentials (below). Never in the repo, never in chat. |
 
@@ -19,9 +19,17 @@ being casual with the one thing that actually grants access.
 
 | Name | Used by | Where to get it |
 |---|---|---|
-| `EXPO_PUBLIC_SENTRY_DSN_WEB` | `app/src/sentry.web.ts` | Sentry → web project → Client Keys (DSN) |
-| `EXPO_PUBLIC_SENTRY_DSN_NATIVE` | `app/src/sentry.ts`; `ci-tools.json`'s `build.sentryDsnVariable`, so `sabeel-ci build-aab` and `build-ios` refuse a release without it | Sentry → React Native project → Client Keys (DSN) |
-| `EXPO_PUBLIC_FCM_VAPID_KEY` | `app/src/notify.web.ts`: web push | Firebase console → Project settings → Cloud Messaging → Web Push certificates (console only). `npm run check:web-push` refuses a bundle without it |
+| `EXPO_PUBLIC_SENTRY_DSN_WEB` | `app/src/sentry.web.ts`; `sabeel-ci ci-platform web` refuses a release web build without it | Sentry → web project → Client Keys (DSN) |
+| `EXPO_PUBLIC_SENTRY_DSN_NATIVE` | `app/src/sentry.ts`; `sabeel-ci build-aab`, `build-ios` and `check:ios` refuse a release without it | Sentry → React Native project → Client Keys (DSN) |
+
+These two names are ci-tools' and the same in every Sabeel app; `npx sabeel-ci
+check-app` fails one the app does not read, or a third.
+
+The web push (VAPID) public key is not here: it is `VAPID_PUBLIC_KEY` in
+`app/src/firebase-config.ts`, committed beside the rest of the web config
+(Firebase console → Project settings → Cloud Messaging → Web Push
+certificates). `npm run check:web-push`, which every web release build runs,
+refuses an export without it.
 
 Web and native are **separate Sentry projects** with separate DSNs, so their
 releases and source maps do not collide. A single shared variable would send
@@ -54,9 +62,11 @@ because a list here goes out of date. The one
 exception is `onUserCreate`, a v1 auth trigger: v1 functions have no `secrets`
 option, which is why `sentry.ts` also reads the DSN from the environment.
 
-Locally, `functions/.secret.local` (gitignored) sets it empty so the emulator
-never reports. The emulator still logs one 403 at startup trying to reach real
-Secret Manager — harmless, not silenced, and not a new failure.
+Under the emulators, `functions/.secret.local` (gitignored) gives each secret
+a placeholder from `ci-tools.json`'s `ci.emulatorSecrets` (`SENTRY_DSN` is
+`disabled`, which `sentry.ts` treats as off). Nobody keeps it by hand:
+`sabeel-ci emulators`, `test-emulator` and `emulator-secrets` write it, and
+`scripts/e2e.sh` runs the last before it starts its own emulators.
 
 **Not a secret, deliberately: `PASSWORD_SIGN_IN_EMAIL`**, the one address that
 may sign in with a password. Rules cannot read a secret, so it is a literal in
@@ -65,95 +75,76 @@ account's security is its long generated password (Faisal's vault, never here)
 and Firebase's rate limiting, and signed in it is a member of one board of
 sample cards. `docs/STORE-RELEASE.md` § 3, The review account.
 
-## Build machine — the shell that cuts a RELEASE, on either platform
+## Build machine — the shell that cuts a RELEASE, on any platform
 
-| Name | Used by | Where to get it |
+| Name | Where it lives | Used by |
 |---|---|---|
-| `SENTRY_ORG` | both native builds | Sentry → Settings → the org URL slug |
-| `SENTRY_PROJECT` | both | the **React Native** project — Android and iOS share it |
-| `SENTRY_AUTH_TOKEN` | both | An **organization** token: Settings → Developer Settings → Organization Tokens. Scope `org:ci` — see below |
+| Sentry org and projects | `ci-tools.json`'s `sentry`, committed: `devnull-ke`; `sabeel-kanban-mobile` (Android and iOS), `sabeel-kanban-web`, `sabeel-kanban-functions` | the release builds, which hand them to `sentry-cli`; never in a secret |
+| `SENTRY_AUTH_TOKEN` | the gitignored `app/.env.sentry-build-plugin`; on GitHub the `BUILD_ENV` secret | the source-map and symbol uploads of every release build |
 
-Only the first two are non-secret. **The token is genuinely secret** and belongs
-in the gitignored `app/.env.sentry-build-plugin` (or the build shell's
-environment), never in a file this repo tracks.
-
-**One set of names for both platforms**, reached two different ways because the
-two native folders are managed differently:
-
-- **iOS** — `@sentry/react-native/expo` in `app/app.json`, registered **bare**.
-  Given `organization`/`project` options it writes them verbatim into
-  `ios/sentry.properties`, and **this repo is public**; its own code also warns
-  that an `authToken` option "will be written to the application package". Bare,
-  it falls back to these three variables.
-- **Android** — `app/android/app/build.gradle` applies `sentry.gradle`, but
-  **only when `app/.env.sentry-build-plugin` exists or `SENTRY_AUTH_TOKEN` is
-  set**. `sentry.gradle` hands that file to `sentry-cli` as `SENTRY_DOTENV_PATH`,
-  and `sentry-cli` also reads the three from the environment. Deliberately NOT
-  an `android/sentry.properties`: a second file holding the same three values is
-  a second thing to keep in step, and this one would hold a real token in a
-  public repo.
-
-### Getting them into the build, on each machine
-
-**`app/.env.local` is NOT the mechanism.** Nothing sources it: Expo reads it to
-inline `EXPO_PUBLIC_*` into the JS bundle, and the release gates read it as a
-file to check the DSN line exists. `sentry-cli` never sees it, so `SENTRY_*`
-placed there does nothing at all — silently, since the build still succeeds.
-
-**`app/.env.sentry-build-plugin` is**, on both platforms. Gitignored, and the
-same file on every machine:
+The token is an **organization** token (Sentry → Settings → Developer Settings
+→ Organization Tokens, scope `org:ci`), one for every Sabeel app, and
+**genuinely secret**: never in a file this repo tracks. The same file carries
+the iOS build's `IOS_TEAM_ID`, `ASC_KEY_ID` and `ASC_ISSUER_ID`:
 
 ```properties
-SENTRY_ORG=<org slug>
-SENTRY_PROJECT=<native project>
 SENTRY_AUTH_TOKEN=<token>
+IOS_TEAM_ID=<team id>
+ASC_KEY_ID=<key id>
+ASC_ISSUER_ID=<issuer id>
 ```
 
-- **Linux, for `npm run build:aab`** — `build.gradle` applies `sentry.gradle`
-  when the file exists, and `sentry.gradle` points `sentry-cli` at it. An
-  `export` in the shell works too.
-- **Mac, for `npm run build:ios`** — `sabeel-ci build-ios` loads the file into
-  the environment `xcodebuild` runs in, alongside `IOS_TEAM_ID` and the App
-  Store Connect key's ids. `export` does **not** reach an Xcode GUI build: build
-  phases run in a sanitised environment and Xcode 15+ does not inherit from a
-  launching terminal; for one, fill in `app/ios/sentry.properties` (a gitignored
-  build product, so this is not repo config — but prebuild rewrites it).
-  `docs/IOS-BUILD.md` has both.
+How each surface uploads, all through ci-tools (its README, "Sentry"):
 
-**GitHub, for `ios.yml`** — the whole of `app/.env.sentry-build-plugin` is the
-`IOS_BUILD_ENV` secret and `app/.env.local` is `APP_ENV_LOCAL`, written into
-place before the build by `sabeel-ci ci-platform prepare-ios`; the Apple
-Distribution certificate, the App Store profile and the App Store Connect key
-are secrets beside them. The Android workflow writes only `APP_ENV_LOCAL`, so
-CI's Android bundles upload no source maps. The table, and
-where each comes from, is in `docs/IOS-BUILD.md` § Builds on GitHub. The
-workflow masks every value on its own, because the logs are public and GitHub
-masks a multi-line secret only line by line.
+- **Android** — `app/android/app/build.gradle` applies `sentry.gradle` exactly
+  when `app/.env.sentry-build-plugin` exists; `sentry.gradle` hands the file to
+  `sentry-cli` as `SENTRY_DOTENV_PATH`, and `sabeel-ci build-aab` and `release
+  --ship` run Gradle with `SENTRY_ORG` and `SENTRY_PROJECT` from
+  `ci-tools.json`. Deliberately NOT an `android/sentry.properties`, which would
+  hold a real token in a public repo. A config plugin cannot do this half:
+  plugins run at `prebuild`, and `app/android/` is committed and hand-edited.
+- **iOS** — `@sentry/react-native/expo` in `app/app.json`, registered
+  **bare**. Given `organization`/`project` options it writes them verbatim into
+  `ios/sentry.properties`, and its own code warns that an `authToken` option
+  "will be written to the application package". `sabeel-ci build-ios` loads the
+  file into the environment `xcodebuild` runs in and exports the org and the
+  native project from `ci-tools.json`. `export` does **not** reach an Xcode GUI
+  build: build phases run in a sanitised environment and Xcode 15+ does not
+  inherit from a launching terminal; for one, fill in `app/ios/sentry.properties`
+  (a gitignored build product — prebuild rewrites it). `docs/IOS-BUILD.md` has
+  both.
+- **Web** — `app/metro.config.js` builds on `getSentryExpoConfig`, so every
+  script carries a debug id; `sabeel-ci ci-platform web` exports with source
+  maps beside the site, and Deploy Web's `sourcemaps` job uploads them to the
+  web project before the site is published.
 
-A config plugin cannot do the Android half. Plugins run at `prebuild`, and
-`app/android/` is committed and hand-edited — prebuild here is always scoped
-`--platform ios`. Gradle is the only mechanism that reaches it.
+**`app/.env.local` is NOT the mechanism for the token.** Nothing sources it:
+Expo reads it to inline `EXPO_PUBLIC_*` into the JS bundle, and the release
+gates read it as a file to check the DSN lines. `sentry-cli` never sees it.
 
-**Both platforms report to ONE Sentry project**, since both read
-`EXPO_PUBLIC_SENTRY_DSN_NATIVE`. Parity is structural, not something to maintain.
+**GitHub** — the whole of `app/.env.sentry-build-plugin` is the `BUILD_ENV`
+secret and `app/.env.local` is `APP_ENV_LOCAL`, written into place by
+`sabeel-ci ci-platform prepare-android`, `prepare-web` and `prepare-ios`; the
+signing keys are secrets beside them. The table, and where each comes from, is
+in `docs/IOS-BUILD.md` § Builds on GitHub. The workflows mask every value on
+their own, because the logs are public and GitHub masks a multi-line secret
+only line by line.
 
-Absent, both builds **succeed and upload nothing**, so crashes arrive as
-minified frames. Said out loud rather than enforced: `npm run check:ios` and
-`sabeel-ci build-ios` warn, and Gradle warns on a release build. None fails —
-unlike the DSN gate beside them, which does. The difference
-is deliberate: no DSN means *no reports at all*, while no token means reports
-that are merely harder to read, and blocking a release on a machine that has no
-token would be the worse trade.
+**Absent, a release refuses to build.** `sabeel-ci build-aab` and `build-ios`
+stop without the token and without the native DSN, and `ci-platform web`
+without the web DSN, because a release whose crashes nobody can read, or which
+reports none, looks no different until the first crash. Pull-request builds
+need none of it: without the file Gradle registers no Sentry tasks at all, and
+a Gradle release started by hand without it only warns.
 
-The Android gate is also what keeps this safe: with neither the file nor the
-token the release build registers no Sentry tasks at all, so CI and a fresh
-clone build exactly what they would otherwise, and the release path never
-depends on reaching sentry.io.
+**Both native platforms report to ONE Sentry project**, since both read
+`EXPO_PUBLIC_SENTRY_DSN_NATIVE`. Parity is structural, not something to
+maintain.
 
 **Do NOT run `npx @sentry/wizard`** to set this up. It rewrites committed native
 files and Metro config and writes a `sentry.properties` containing a real token.
-The plugin registration in `app/app.json` and the gated `apply from:` in
-`build.gradle` are the whole configuration.
+The plugin registration in `app/app.json`, the gated `apply from:` in
+`build.gradle` and `app/metro.config.js` are the whole configuration.
 
 ## Build and publish credentials — files outside the repo
 
@@ -167,7 +158,7 @@ Each lives at its path on the machine that uses it and is copied into the vault
 | `upload_certificate.pem` (public) | `~/keys/` | a Play upload-key reset only | `sabeel/kanban/android/` |
 | Play service-account key `sabeel-play-publisher.json` | `~/keys/` (or `PLAY_KEY`) | `npx sabeel-ci publish-play`, `release --ship` | `sabeel/google-play/` |
 | `app/.env.local` | gitignored | every bundle (table above) | `sabeel/kanban/env/` |
-| `app/.env.sentry-build-plugin`: the Sentry three, `IOS_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID` | gitignored | native release builds, `build:ios` | `sabeel/kanban/env/` |
+| `app/.env.sentry-build-plugin`: `SENTRY_AUTH_TOKEN`, `IOS_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID` | gitignored | every release build | `sabeel/kanban/env/` |
 | App Store Connect API key `AuthKey_<ASC_KEY_ID>.p8` (Admin) | `~/.appstoreconnect/private_keys/` | `build:ios`, `sabeel-ci testflight-check`, the `ASC_KEY_P8` secret | `sabeel/apple/` |
 | APNs key `AuthKey_<APNS_KEY_ID>.p8` | `~/.apns/`, or `APNS_KEY_FILE` | `npx sabeel-ci send-test-push --apple`; the `APNS_KEY` secret, which `check:push` reads | `sabeel/apple/` |
 | Apple Distribution certificate (`distribution.key`, `.cer`, `.p12`, `p12-password`) and the profile `SabeelKanban_AppStore_CI.mobileprovision` | `~/.config/sabeel-lms/ios-distribution/` on the Linux machine | the GitHub secrets below | `sabeel/apple/ios-distribution/` |
@@ -187,7 +178,7 @@ Store Connect's App Review Information.
 ### GitHub Actions secrets
 
 `IOS_DIST_P12`, `IOS_DIST_P12_PASSWORD`, `IOS_PROFILE`, `ASC_KEY_P8`,
-`IOS_BUILD_ENV` (`app/.env.sentry-build-plugin`), `APP_ENV_LOCAL`
+`BUILD_ENV` (`app/.env.sentry-build-plugin`), `APP_ENV_LOCAL`
 (`app/.env.local`), `ANDROID_KEYSTORE` and `ANDROID_KEYSTORE_PROPERTIES`, each
 set from the files above as secrets of the `release-build` environment, which
 only main and `v*` tags may enter. `npx sabeel-ci check-app` (in CI) fails a
@@ -225,10 +216,6 @@ and aborted the suite until this gate was added.
 
 ## Deliberately NOT configured
 
-- **Web source-map upload.** Not wired: a web stack trace still names the bundle
-  chunk and the line, and the web bundle is not minified past readability the way
-  a Hermes bytecode frame is. Android and iOS *are* wired — see the build-machine
-  section above.
 - **Any mail credential.** Report a problem sends as
   `apps-noreply@oursabeel.com` through domain-wide delegation with no password
   and no key: the function signs a delegation token as

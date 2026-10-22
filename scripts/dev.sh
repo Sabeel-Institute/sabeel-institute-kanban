@@ -217,7 +217,7 @@ case "${1:-status}" in
     echo "Stopping:"; stop || exit 1
     metro_port_free || exit 1
     # The web server is not optional here even though nothing iOS uses it:
-    # `seed-dev.mjs` seeds by DRIVING the web app in a browser, so no web server
+    # `seed-emulators.mjs` seeds by DRIVING the web app in a browser, so no web server
     # means no seed, and the simulator comes up signed in to an empty project.
     launch /tmp/sk-emulators.log npm run emulators
     launch /tmp/sk-web.log npm run dev:web

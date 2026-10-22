@@ -15,6 +15,7 @@ import {
   updateDoc,
   deleteDoc,
 } from 'firebase/firestore';
+import { EMULATOR_PROJECT_ID } from '@sabeel/shared';
 import { firestoreHostPort } from './emulatorHosts';
 
 let env: RulesTestEnvironment;
@@ -42,7 +43,7 @@ const CARD = 'cards/card1';
 
 beforeAll(async () => {
   env = await initializeTestEnvironment({
-    projectId: 'demo-sabeel-kanban',
+    projectId: EMULATOR_PROJECT_ID,
     firestore: {
       rules: readFileSync('../firestore.rules', 'utf8'),
       ...firestoreHostPort(),

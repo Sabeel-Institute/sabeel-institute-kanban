@@ -47,7 +47,7 @@ symptom-first — in the same batch as the fix, not only into a commit message.
 
 The skill also carries `tools/bootstrap-linux.sh`, which installs this whole
 toolchain on a fresh machine under `$HOME` with no root, and `tools/check-host.sh`.
-See `docs/DEVELOPING.md`.
+See `docs/DEV-TOOLING.md`.
 
 Sibling project `../sabeel-institute-time-tracker/` is the reference
 implementation for every convention here — read its files directly rather than
@@ -313,7 +313,9 @@ itself is deliberately NOT darkened — that would collapse it into
   a figure someone might act on, branch on `status` explicitly.
 - Live Firestore reads in `app/src` go through a single `useLiveQuery`/`useLiveDoc`
   module — never hand-roll `onSnapshot` state in a hook (lint-enforced). See
-  `docs/INHERITED-STACK.md` for why this is non-negotiable.
+  `docs/INHERITED-STACK.md` for why this is non-negotiable. Both take the
+  query builder FIRST and its `deps` SECOND, the only shape
+  `react-hooks/exhaustive-deps` (an error here) can check; keep that order.
 - **Live reads are timed to the SERVER's answer, not the first snapshot**
   (`slowReads.ts`, wired in `liveQuery.ts`), and reported at warning past 5 s,
   like slow writes; a read abandoned unanswered past 5 s too. A cached partial
@@ -430,7 +432,10 @@ itself is deliberately NOT darkened — that would collapse it into
 - Backend: Cloud Functions (TS, nodejs22, us-central1) + Firestore + **Cloud
   Storage** (card attachments). The bucket must be a modern
   `*.firebasestorage.app` one in us-central1/us-west1/us-east1 — only those get
-  the no-cost quotas. Sentry on web/native/functions.
+  the no-cost quotas. Sentry on web/native/functions, set up as ci-tools'
+  README "Sentry" says: the org and projects in `ci-tools.json`, the DSNs in
+  `app/.env.local`, the token in `app/.env.sentry-build-plugin`
+  (`docs/SECRETS.md`).
 - Monorepo (npm workspaces): `app`, `functions`, `packages/shared`. Shared types
   and any cross-surface pure logic live in `@sabeel/shared` — the app and
   functions must never each hold their own copy of a rule.
@@ -444,7 +449,7 @@ itself is deliberately NOT darkened — that would collapse it into
 
 ## Dev & test loops
 
-`docs/DEVELOPING.md` is the full guide, including how to install the toolchain on
+`docs/DEV-TOOLING.md` is the full guide, including how to install the toolchain on
 a new machine.
 
 - **This checkout owns the emulator block 61200-61299** (`emulators.base` in
@@ -512,7 +517,7 @@ a new machine.
 - Native flows: `npx sabeel-ci native-e2e` — the Maestro flows in `maestro/`
   on the emulator against the debug build, the same command the Native workflow
   runs on main pushes and release tags; `--ios` runs them on an iPhone simulator
-  (macOS). `docs/DEVELOPING.md`.
+  (macOS). `docs/DEV-TOOLING.md`.
 - Android: `npx sabeel-ci emulator headless` (AVD `tb_emu`, or `SABEEL_AVD`), then
   `npm run android -w @sabeel/app`. Firebase emulators from the AVD = `10.0.2.2`.
   There are NO physical devices. **Check `emulator -accel-check` first** — see
@@ -527,10 +532,11 @@ a new machine.
   perfectly successful build.
 - CI (GitHub Actions): `sabeel-ci check-app` + lint + typecheck + knip + unit +
   emulator + every browser suite on every push. Keep it green; `npm run knip`
-  must be clean (`docs/DEADCODE.md`). **Nothing deploys on a push.** The one deploy CI
-  can make is the TestFlight job of `ios.yml`, which runs only when started by
-  hand with `testflight=true`, and only with Faisal's go-ahead, like any
-  release. Its build job uploads nothing and may be run at any time.
+  must be clean (`docs/DEV-TOOLING.md` § Dead code). **Nothing deploys on a
+  push.** The one deploy CI can make is the TestFlight job of `ios.yml`, which
+  runs only when started by hand with `testflight=true`, and only with
+  Faisal's go-ahead, like any release. Its build job uploads nothing and may
+  be run at any time.
 - **A suite nothing invokes is not coverage.** `functions/test/unit/suite-coverage.test.ts`
   guards the emulator lists and `app/src/ciCoverage.test.ts` guards the e2e ones;
   a new browser suite gets an npm script and an entry in `ci-tools.json`'s
@@ -673,9 +679,10 @@ factory rather than being silently dropped.
 - NEVER ask for, accept, or echo real API keys/DSNs/tokens in chat; never hardcode
   them. Server secrets: output the exact `firebase functions:secrets:set NAME`
   command for Faisal to run.
-- Client-side non-secrets (Firebase web config, `WEB_CLIENT_ID`,
-  `google-services.json`, `firestore.rules`) are committed **by design** — rules
-  are enforced server-side, so this is security by design, not obscurity.
+- Client-side non-secrets (Firebase web config, `WEB_CLIENT_ID`, the web push
+  public key, `google-services.json`, `firestore.rules`) are committed **by
+  design** — rules are enforced server-side, so this is security by design,
+  not obscurity.
 - Client DSNs go in gitignored `.env.local` (key names only in docs).
 
 ## Division of labor
@@ -702,7 +709,8 @@ factory rather than being silently dropped.
   it) and the only record of why.
 - **The user manual is part of the app.** A change to any screen means
   `docs/USER-MANUAL.md`, then `node scripts/manual-shots.mjs` for its images, then
-  `python3 docs/render-manual.py` for the PDF — all three, same batch. Add new
+  `npx sabeel-ci render-manual` for the PDF (needs `uv` and `google-chrome`) —
+  all three, same batch. Add new
   screens to the generator; an image with no generator goes stale unnoticed.
   User-visible changes ship with their documentation in the same batch as the
   code — never let the manual lag a release.
@@ -749,9 +757,10 @@ factory rather than being silently dropped.
   tasks — both on at once fails with *"Multiple shrunk-resources files found"*.
   `sabeel-ci build-aab` holds every gate: store-legal version, a deploy-log
   entry that exists *before* the build, the native Sentry DSN
-  (`EXPO_PUBLIC_SENTRY_DSN_NATIVE` in `app/.env.local`), and a signature that
-  is not the debug key; `publish-play` completes a release only once Play signs
-  the installed APKs with `ci-tools.json`'s `release.appSigningCertificate`.
+  (`EXPO_PUBLIC_SENTRY_DSN_NATIVE` in `app/.env.local`) and token
+  (`app/.env.sentry-build-plugin`), and a signature that is not the debug
+  key; `publish-play` completes a release only once Play signs the installed
+  APKs with `ci-tools.json`'s `release.appSigningCertificate`.
 - **Signing: the upload key lives outside the repo**, with a copy in the vault;
   a missing one is restored from there, never generated (`docs/SECRETS.md`).
   `signingConfigs.release` reads `~/.config/sabeel-kanban/keystore.properties`,

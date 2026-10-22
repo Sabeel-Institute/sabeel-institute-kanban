@@ -28,7 +28,7 @@
 //
 //   # APPLY to the emulators:
 //   FIRESTORE_EMULATOR_HOST=127.0.0.1:$(npx sabeel-ci ports firestore) FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:$(npx sabeel-ci ports auth) \
-//   GCLOUD_PROJECT=demo-sabeel-kanban node scripts/import-clickup.mjs --apply
+//   GCLOUD_PROJECT=$(npx sabeel-ci ports --project) node scripts/import-clickup.mjs --apply
 //
 //   # APPLY to production (needs gcloud ADC / GOOGLE_APPLICATION_CREDENTIALS):
 //   GCLOUD_PROJECT=<prod-project-id> node scripts/import-clickup.mjs --apply
@@ -200,8 +200,8 @@ if (DRY) {
 const projectId = process.env.GCLOUD_PROJECT;
 if (!projectId) {
   console.error(
-    'Refusing to --apply without GCLOUD_PROJECT set. Use demo-sabeel-kanban for ' +
-      'the emulators, or the real project id for production.',
+    'Refusing to --apply without GCLOUD_PROJECT set. Use $(npx sabeel-ci ports --project) ' +
+      'for the emulators, or the real project id for production.',
   );
   process.exit(1);
 }

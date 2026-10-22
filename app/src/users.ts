@@ -26,8 +26,9 @@ export interface AdminUserRow {
  */
 export function useAllUsers(enabled = true) {
   return useLiveQuery<AdminUserRow[]>(
-    'users',
     () => (enabled ? query(collection(db, 'users'), orderBy('displayName')) : null),
+    [enabled],
+    'users',
     (docs) =>
       docs.map((d) => ({
         uid: d.id,
@@ -36,7 +37,6 @@ export function useAllUsers(enabled = true) {
         role: (d.data.role as Role) ?? 'member',
         status: (d.data.status as UserStatus) ?? 'pending',
       })),
-    [enabled],
   );
 }
 

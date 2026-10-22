@@ -36,6 +36,18 @@ const realConfig = {
 export { GOOGLE_WEB_CLIENT_ID };
 
 /**
+ * The WEB PUSH public key (VAPID), from Firebase console → Project settings →
+ * Cloud Messaging → Web Push certificates.
+ *
+ * Not a secret, in the same way `apiKey` above is not: it is the PUBLIC half of
+ * the pair, and shipping it in every client bundle is precisely its job — the
+ * browser needs it to subscribe. The private half never leaves Google. Every
+ * web build's `npx sabeel-ci check-web-push` requires it in the export.
+ */
+export const VAPID_PUBLIC_KEY =
+  'BGBKIhww32Az_mCrFUBrtrE8oaWaarlm_APqR99_C3FTXJmN_PRVLN2byXozS1HK0djQ_ZZ_ok5CORX9C0xJ6p8';
+
+/**
  * Emulator mode overrides the project id AND the bucket. Overriding only the
  * project id leaves the client uploading to the real bucket while every
  * server-side path looks in the emulator's — and the sole symptom is a finalize

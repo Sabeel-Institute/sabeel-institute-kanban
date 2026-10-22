@@ -29,8 +29,9 @@ const commentRef = (cardId: string, commentId: string) =>
 
 export function useComments(cardId: string) {
   return useLiveQuery<Comment[]>(
-    'comments',
     () => query(commentsRef(cardId), orderBy('createdAt')),
+    [cardId],
+    'comments',
     (docs) =>
       docs.map((d) => ({
         id: d.id,
@@ -40,7 +41,6 @@ export function useComments(cardId: string) {
         createdAt: (d.data.createdAt as number) ?? 0,
         editedAt: d.data.editedAt as number | undefined,
       })),
-    [cardId],
   );
 }
 

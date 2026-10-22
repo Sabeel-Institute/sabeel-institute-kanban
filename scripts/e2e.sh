@@ -15,8 +15,8 @@ cd "$(dirname "$0")/.."
 # is absent from it — so the safety property is tested, not assumed.
 #
 # The web port, the emulator project and JDK 21 come from ci-tools
-# (`npx sabeel-ci ports web`, ci-tools.json, `npx sabeel-ci jdk21`); no port is
-# stated here.
+# (`npx sabeel-ci ports web`, `ports --project`, `jdk21`); no port is stated
+# here.
 
 # shellcheck source=scripts/lib/procs.sh
 . "$(dirname "$0")/lib/procs.sh"
@@ -31,7 +31,7 @@ JAVA_HOME=$(npx --no sabeel-ci jdk21)
 export JAVA_HOME PATH="$JAVA_HOME/bin:$PATH"
 
 WEB_PORT=$(npx --no sabeel-ci ports web)
-PROJECT=$(node -p "require('./ci-tools.json').emulators.project")
+PROJECT=$(npx --no sabeel-ci ports --project)
 export E2E_BASE="http://127.0.0.1:${WEB_PORT}/"
 # In this checkout, under shots/ (which CI keeps when a suite fails), not a
 # fixed /tmp name another checkout's run would overwrite. Absolute: the server
@@ -98,27 +98,9 @@ echo "Starting Expo web dev server on ${WEB_PORT}…"
 # --clear because Metro will otherwise serve a bundle built under different
 # EXPO_PUBLIC_* values (see docs/INHERITED-STACK.md lesson 4).
 #
-# EXPO_PUBLIC_FCM_VAPID_KEY is set to a FAKE value on purpose, and only here.
-#
-# `canRequestPush()` in notify.web.ts needs nothing but a truthy key, and
-# without one it reports 'unsupported' whatever the browser would actually
-# permit — so the notifications panel had exactly one reachable state in CI, and
-# the check that it "says exactly one thing about this device" could never see
-# the other three. The permission states are the point of that panel.
-#
-# The value is deliberately NOT shaped like a VAPID key: `sabeel-ci
-# check-web-push` looks for 87 base64url characters, so if this ever reached an exported bundle
-# the release gate would fail with "no VAPID key" rather than pass on a fake.
-# Nothing here can reach `getToken` in any case — `claimToken` returns on
-# USE_EMULATORS before the key is ever used.
-#
-# Set on THIS LINE, never exported: the production export above must stay
-# keyless, which is what makes the dev-row and gate checks mean anything.
-#
 # `exec` inside the subshell, so `$!` is the server itself and not a subshell
 # whose death would leave it running.
 ( cd app && CI=1 EXPO_PUBLIC_USE_EMULATORS=1 \
-    EXPO_PUBLIC_FCM_VAPID_KEY=e2e-fake-vapid-key-not-a-real-one \
     exec npx expo start --web --port "$WEB_PORT" --clear >"$WEB_LOG" 2>&1 ) &
 WEB_PID=$!
 
@@ -146,6 +128,11 @@ fi
 # Which suite to drive. Defaults to the full flow; pass a script to run a
 # focused one against the same stack (e.g. scripts/attachments-e2e.mjs).
 SUITE="${1:-scripts/web-e2e.mjs}"
+
+# The secrets the functions bind, as the placeholders ci-tools.json names
+# (functions/.secret.local): unset, the Functions emulator asks the real
+# Secret Manager for them.
+npx --no sabeel-ci emulator-secrets
 
 # A child, never `exec`: exec replaces this shell and takes the EXIT trap with
 # it. In the background and `wait`ed on, because bash defers a trap until a

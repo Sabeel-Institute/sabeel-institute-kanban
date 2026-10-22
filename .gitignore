@@ -21,9 +21,10 @@ ui-debug.log
 .env.local
 app/.env.local
 functions/.env
-# Sentry build config. Neither should ever exist here — org, project and token
-# come from the environment (docs/SECRETS.md) — but both are files the tooling
-# writes a real auth token into, and this repo is PUBLIC. Backstop, not a plan.
+# Sentry build config. The properties files should never exist here — the org
+# and projects are ci-tools.json's, the token is app/.env.sentry-build-plugin's
+# (docs/SECRETS.md) — but the tooling writes a real auth token into them, and
+# this repo is PUBLIC. Backstop, not a plan.
 app/android/sentry.properties
 app/ios/sentry.properties
 .env.sentry-build-plugin
@@ -64,10 +65,12 @@ app/ios/
 # live in ~/.config/sabeel-kanban/ (docs/SECRETS.md).
 app/android/keystore.properties
 *.jks
-# Play publishing credentials. They belong in ~/keys/, never here — this repo is
-# PUBLIC, and a service-account key committed once stays readable in history.
+# Play publishing and Firebase Admin credentials. They belong in ~/keys/, never
+# here — this repo is PUBLIC, and a service-account key committed once stays
+# readable in history.
 *play-publisher*.json
 *service-account*.json
+*firebase-adminsdk*.json
 
 # Metro transform cache, kept in-repo (see app/metro.config.js)
 app/.metro-cache/

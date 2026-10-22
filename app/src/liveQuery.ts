@@ -217,12 +217,18 @@ function timeServerAnswer(
  *
  * Pass `null` for the query to subscribe to nothing (e.g. while signed out)
  * without violating the rules of hooks.
+ *
+ * ARGUMENT ORDER IS LOAD-BEARING. `build` first and `deps` second is the only
+ * shape `react-hooks/exhaustive-deps` can read (eslint.config.mjs names this
+ * hook), and that rule is what proves every live screen resubscribes when an
+ * input `build` reads changes. Move them and the check goes quiet without
+ * failing.
  */
 export function useLiveQuery<T>(
-  label: string,
   build: () => Query | null,
-  map: (docs: LiveDoc[]) => T,
   deps: readonly unknown[],
+  label: string,
+  map: (docs: LiveDoc[]) => T,
 ): LiveState<T> {
   const key = cacheKey(label, deps);
   const [state, setState] = useState<LiveState<T>>(() => cachedState<T>(key));
@@ -279,12 +285,15 @@ export function useLiveQuery<T>(
   return state;
 }
 
-/** Subscribe to a single document. Same invariants as useLiveQuery. */
+/**
+ * Subscribe to a single document. Same invariants as useLiveQuery, and the same
+ * argument order, for the same reason.
+ */
 export function useLiveDoc<T>(
-  label: string,
   build: () => DocumentReference | null,
-  map: (doc: LiveDoc | null) => T,
   deps: readonly unknown[],
+  label: string,
+  map: (doc: LiveDoc | null) => T,
 ): LiveState<T> {
   const key = cacheKey(label, deps);
   const [state, setState] = useState<LiveState<T>>(() => cachedState<T>(key));

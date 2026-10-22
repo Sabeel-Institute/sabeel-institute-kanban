@@ -5,7 +5,7 @@
  *
  *   # alone, or against a production shape (`--shape`, below):
  *   JAVA_HOME=$(npx sabeel-ci jdk21) firebase emulators:exec \
- *     --project demo-sabeel-kanban --only firestore,auth \
+ *     --project $(npx sabeel-ci ports --project) --only firestore,auth \
  *     "node scripts/migration-e2e.mjs [--shape migration/shape-<project>.json]"
  *
  * These four scripts change who can do what, against live production data, and

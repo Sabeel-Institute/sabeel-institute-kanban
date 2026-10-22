@@ -17,8 +17,9 @@ const labelsRef = () => collection(db, 'labels');
 
 export function useLabels() {
   return useLiveQuery<Label[]>(
-    'labels',
     () => labelsRef(),
+    [],
+    'labels',
     // Sorted here rather than with `orderBy('name')`: Firestore orders by UTF-16
     // code unit, which would file the dozen emoji-prefixed names together and far
     // from the words they belong beside. See `sortLabels` in @sabeel/shared.
@@ -35,7 +36,6 @@ export function useLabels() {
           createdBy: (d.data.createdBy as string) ?? '',
         })),
       ),
-    [],
   );
 }
 

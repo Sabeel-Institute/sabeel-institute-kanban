@@ -1,26 +1,21 @@
 import { getMessaging, getToken, isSupported } from 'firebase/messaging';
 import { deleteDoc, doc, setDoc } from 'firebase/firestore';
 import { app, db } from './firebase';
+import { VAPID_PUBLIC_KEY } from './firebase-config';
 import { USE_EMULATORS } from './env';
 import { captureError } from './sentry';
 
 /**
  * Push registration — WEB (native sibling: notify.ts).
  *
- * Web push needs two things that native does not, and quietly does nothing
- * without either:
- *
- *  - the Web Push certificate (VAPID) public key in EXPO_PUBLIC_FCM_VAPID_KEY;
- *  - a service worker at /firebase-messaging-sw.js, since a browser cannot be
- *    woken by a message without one.
- *
- * Both are inert-by-default on purpose: a half-configured web push should do
- * nothing rather than throw at someone signing in. See TODO.md § I.
+ * Web push needs two things that native does not: the Web Push certificate
+ * (VAPID) public key, committed as `VAPID_PUBLIC_KEY` in firebase-config.ts,
+ * and a service worker at /firebase-messaging-sw.js, since a browser cannot be
+ * woken by a message without one.
  *
  * It also needs a third thing that is not configuration: permission has to be
  * asked FROM A CLICK. Signing in is not one — see `enablePush`.
  */
-const VAPID_KEY = process.env.EXPO_PUBLIC_FCM_VAPID_KEY ?? '';
 
 /**
  * The checks that can be made WITHOUT awaiting anything.
@@ -40,7 +35,6 @@ const VAPID_KEY = process.env.EXPO_PUBLIC_FCM_VAPID_KEY ?? '';
  */
 function canRequestPush(): boolean {
   return (
-    !!VAPID_KEY &&
     typeof window !== 'undefined' &&
     'Notification' in window &&
     'serviceWorker' in navigator &&
@@ -215,7 +209,7 @@ async function claimToken(uid: string): Promise<boolean> {
   ]);
   if (!registration) return false;
   const token = await getToken(getMessaging(app), {
-    vapidKey: VAPID_KEY,
+    vapidKey: VAPID_PUBLIC_KEY,
     serviceWorkerRegistration: registration,
   });
   if (!token) return false;
@@ -241,7 +235,7 @@ export async function unregisterPush(uid: string): Promise<void> {
     if (!(await supported())) return;
     const sw = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
     const token = await getToken(getMessaging(app), {
-      vapidKey: VAPID_KEY,
+      vapidKey: VAPID_PUBLIC_KEY,
       serviceWorkerRegistration: sw,
     });
     if (!token) return;

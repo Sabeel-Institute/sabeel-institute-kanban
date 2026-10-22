@@ -9,7 +9,7 @@ on:
   pull_request:
     paths:
       - maestro/**
-      - scripts/seed-dev.mjs
+      - scripts/seed-emulators.mjs
       - ci-tools.json
       - package-lock.json
       - .github/workflows/native.yml
@@ -66,11 +66,6 @@ jobs:
       # demo ones, which the debug build only needs to compile against.
       - name: Placeholder Firebase app configuration
         run: if [ ! -f app/google-services.json ]; then sabeel-ci ci-premerge prepare; fi
-      - name: Emulator secret placeholders
-        env:
-          SECRETS: '{"SENTRY_DSN":"disabled","APNS_KEY":"unused-in-emulator"}'
-        run: |
-          node -e 'const secrets = JSON.parse(process.env.SECRETS); require("node:fs").writeFileSync("functions/.secret.local", Object.entries(secrets).map(([name, value]) => name + "=" + value + "\n").join(""))'
       - name: Install Chromium for the seed
         run: npx playwright install --with-deps chromium
       - name: Boot an Android emulator
@@ -124,11 +119,6 @@ jobs:
         run: npm ci
       - name: Install Firebase CLI
         run: npm install --global firebase-tools@^15
-      - name: Emulator secret placeholders
-        env:
-          SECRETS: '{"SENTRY_DSN":"disabled","APNS_KEY":"unused-in-emulator"}'
-        run: |
-          node -e 'const secrets = JSON.parse(process.env.SECRETS); require("node:fs").writeFileSync("functions/.secret.local", Object.entries(secrets).map(([name, value]) => name + "=" + value + "\n").join(""))'
       - name: Install Chromium for the seed
         run: npx playwright install chromium
       - name: Install Maestro

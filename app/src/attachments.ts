@@ -36,8 +36,9 @@ const attachmentsRef = (cardId: string) => collection(db, 'cards', cardId, 'atta
 
 export function useAttachments(cardId: string) {
   return useLiveQuery<Attachment[]>(
-    'attachments',
     () => query(attachmentsRef(cardId), orderBy('uploadedAt')),
+    [cardId],
+    'attachments',
     (docs) =>
       docs.map((d) => ({
         id: d.id,
@@ -48,7 +49,6 @@ export function useAttachments(cardId: string) {
         status: d.data.status === 'ready' ? 'ready' : 'uploading',
         sizeBytes: d.data.sizeBytes as number | undefined,
       })),
-    [cardId],
   );
 }
 

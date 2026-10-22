@@ -34,8 +34,8 @@ import { getFirestore } from 'firebase-admin/firestore';
 const projectId = process.env.GCLOUD_PROJECT;
 if (!projectId) {
   console.error(
-    'Refusing to run without GCLOUD_PROJECT. Use demo-sabeel-kanban for the ' +
-      'emulators, or the real project id for production.',
+    'Refusing to run without GCLOUD_PROJECT. Use $(npx sabeel-ci ports --project) ' +
+      'for the emulators, or the real project id for production.',
   );
   process.exit(1);
 }
@@ -202,7 +202,7 @@ if (claimless.length) {
 
 console.log(
   '\nRehearse the whole upgrade against this shape, on the emulators:\n' +
-    '  JAVA_HOME=$(npx sabeel-ci jdk21) firebase emulators:exec --project demo-sabeel-kanban \\\n' +
+    '  JAVA_HOME=$(npx sabeel-ci jdk21) firebase emulators:exec --project $(npx sabeel-ci ports --project) \\\n' +
     `    --only firestore,auth "node scripts/migration-e2e.mjs --shape ${shapePath}"`,
 );
 process.exit(0);
