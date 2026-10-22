@@ -167,7 +167,7 @@ export async function markUnread(user: SessionUser, item: InboxItem): Promise<vo
  * the day somebody adds an `onDocumentWritten` on this collection, marking a
  * week of alerts unread would re-page the whole organisation.
  */
-export async function markUnreadById(uid: string, notifId: string): Promise<void> {
+async function markUnreadById(uid: string, notifId: string): Promise<void> {
   const notifRef = doc(db, 'users', uid, 'notifications', notifId);
   const userRef = doc(db, 'users', uid);
   await runTransaction(db, async (tx) => {

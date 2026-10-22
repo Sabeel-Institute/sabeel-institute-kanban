@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { EMULATOR_PROJECT_ID, EMULATOR_STORAGE_BUCKET } from '@sabeel/shared';
 
-export const PROJECT_ID = EMULATOR_PROJECT_ID;
+const PROJECT_ID = EMULATOR_PROJECT_ID;
 
 /**
  * READ the emulator hosts; never assign them.
@@ -72,7 +72,7 @@ process.env.GCLOUD_PROJECT = PROJECT_ID;
 
 let app: App | undefined;
 
-export function adminApp(): App {
+function adminApp(): App {
   if (!app) {
     app = getApps().length
       ? getApps()[0]

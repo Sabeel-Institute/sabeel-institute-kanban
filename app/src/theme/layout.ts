@@ -26,7 +26,7 @@ import { Platform, useWindowDimensions } from 'react-native';
  * the iPhone 14 Pro Max at 430px, so there is a wide margin before any handset
  * could reach this.
  */
-export const WIDE_BREAKPOINT = 700;
+const WIDE_BREAKPOINT = 700;
 
 /** Where a single column of forms and lists stops being comfortable to read. */
 export const CONTENT_MAX_WIDTH = 840;

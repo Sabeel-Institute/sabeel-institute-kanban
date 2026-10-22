@@ -24,7 +24,7 @@ export const sentryDsn = defineSecret('SENTRY_DSN');
 let initialised = false;
 
 /** Initialise once, lazily, from a DSN supplied at call time. */
-export function ensureSentry(dsn: string | undefined): boolean {
+function ensureSentry(dsn: string | undefined): boolean {
   if (initialised) return true;
   if (!dsn) return false;
   Sentry.init({
@@ -35,8 +35,6 @@ export function ensureSentry(dsn: string | undefined): boolean {
   initialised = true;
   return true;
 }
-
-export { Sentry };
 
 /** Report an UNEXPECTED error. Expected HttpsErrors are not defects. */
 export async function reportError(e: unknown): Promise<void> {

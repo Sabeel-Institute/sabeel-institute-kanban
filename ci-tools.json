@@ -3,7 +3,7 @@
   "ci": {
     "browserSuites": ["test:screens", "test:e2e", "test:e2e:attachments", "test:e2e:stats", "test:e2e:richtext", "test:e2e:typing-perf"],
     "emulatorSecrets": { "SENTRY_DSN": "disabled", "APNS_KEY": "unused-in-emulator" },
-    "knip": false
+    "knip": true
   },
   "build": { "sentryDsnVariable": "EXPO_PUBLIC_SENTRY_DSN_NATIVE" },
   "emulators": { "base": 61200, "project": "demo-sabeel-kanban" },

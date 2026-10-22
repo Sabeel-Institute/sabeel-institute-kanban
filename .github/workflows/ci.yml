@@ -66,6 +66,8 @@ jobs:
         run: npm run lint
       - name: Typecheck
         run: npm run typecheck
+      - name: Dead-code audit
+        run: npm run knip
       - name: Unit tests
         run: npm test
 

@@ -36,13 +36,6 @@ const realConfig = {
 export { GOOGLE_WEB_CLIENT_ID };
 
 /**
- * The emulator project id now lives in `@sabeel/shared` — functions need it too,
- * to decide whether they may take the emulator branch of the signed-URL seam,
- * and the app and functions must never each hold their own copy of a rule.
- */
-export { EMULATOR_PROJECT_ID };
-
-/**
  * Emulator mode overrides the project id AND the bucket. Overriding only the
  * project id leaves the client uploading to the real bucket while every
  * server-side path looks in the emulator's — and the sole symptom is a finalize
@@ -55,12 +48,3 @@ export const firebaseConfig = USE_EMULATORS
       storageBucket: EMULATOR_STORAGE_BUCKET,
     }
   : realConfig;
-
-/**
- * True while the config above has not been replaced with real values.
- *
- * Kept after the real config landed: it is what the gate screens use to explain
- * "this build has no backend" rather than failing with a network error, and it
- * would silently start lying if deleted the moment it read false.
- */
-export const IS_PLACEHOLDER_CONFIG = realConfig.apiKey === 'demo-api-key';
