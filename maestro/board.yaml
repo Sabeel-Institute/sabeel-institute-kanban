@@ -61,9 +61,20 @@ name: Board, card, rich text and gestures
 - takeScreenshot: 03-card-description
 - tapOn: "Back"
 
-# Long-press starts a selection.
-- longPressOn: "Book the venue[\\s\\S]*"
-- assertVisible: "1 selected[\\s\\S]*"
+# Long-press starts a selection. The board must be back and settled first: a
+# long-press that lands while it is still animating in starts nothing (the
+# iPhone simulator on a busy CI Mac, Kanban #29), so a missed one gets one
+# more try; a press that did select shows "1 selected" within the wait.
+- extendedWaitUntil:
+    visible: "Tap a card to open it\\.[\\s\\S]*"
+    timeout: 15000
+- retry:
+    maxRetries: 1
+    commands:
+      - longPressOn: "Book the venue[\\s\\S]*"
+      - extendedWaitUntil:
+          visible: "1 selected[\\s\\S]*"
+          timeout: 10000
 - takeScreenshot: 04-selection
 - tapOn: "Back"
 
