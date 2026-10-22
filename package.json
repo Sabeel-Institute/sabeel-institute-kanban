@@ -47,7 +47,7 @@
     "@eslint/js": "^9.39.0",
     "@sabeel-institute/ci-tools": "github:Sabeel-Institute/ci-tools#b101329ea38d3b068a563e5b906638bcd28170c1",
     "@sabeel/shared": "*",
-    "@types/node": "^22.10.0",
+    "@types/node": "^22.20.5",
     "eslint": "^9.39.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "firebase-admin": "^13.10.0",
