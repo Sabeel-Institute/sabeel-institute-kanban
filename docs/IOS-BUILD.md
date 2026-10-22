@@ -130,7 +130,7 @@ and every row was discovered by something failing:
 | Tool | Why it is needed | How, without brew |
 |---|---|---|
 | **Firebase CLI** | `npm run emulators` and `npm run test:emulator` invoke a bare `firebase` | `npm config set prefix ~/.local && npm i -g firebase-tools` |
-| **Playwright browsers** | `seed-dev.mjs` seeds by *driving the web app*; `playwright` is already a devDependency, only its binaries are absent | `npx playwright install chromium` |
+| **Playwright browsers** | `seed-emulators.mjs` seeds by *driving the web app*; `playwright` is already a devDependency, only its binaries are absent | `npx playwright install chromium` |
 | **JDK 21** | the Firestore and Auth emulators are Java | already on the machine at `/opt/homebrew/opt/openjdk@21`, where `npx sabeel-ci jdk21` finds it; `SABEEL_JDK21_HOME` names another |
 | **`idb`** *(optional)* | scripting the simulator's UI; `simctl` has no tap primitive | prebuilt `idb-companion.universal.tar.gz` from the idb releases into `~/.local/opt`, plus `uv tool install fb-idb --python 3.11` |
 
@@ -162,7 +162,7 @@ scripts/dev.sh stop         # stop what dev.sh started; never Metro or idb
 
 It stops everything, starts the emulators, the web server and Metro, seeds,
 boots the simulator and launches the app. **The web server is started even
-though nothing on iOS reads it** — `seed-dev.mjs` drives the web app in a
+though nothing on iOS reads it** — `seed-emulators.mjs` drives the web app in a
 browser to create its data, so no web server means no seed and a simulator that
 comes up signed in to an empty project.
 
@@ -173,8 +173,8 @@ than a sign something broke.
 
 Both are gitignored, and neither failing announces itself:
 
-- **`app/.env.local`** — carries `EXPO_PUBLIC_SENTRY_DSN_NATIVE`,
-  `EXPO_PUBLIC_SENTRY_DSN_WEB` and `EXPO_PUBLIC_FCM_VAPID_KEY`. Copy it across
+- **`app/.env.local`** — carries `EXPO_PUBLIC_SENTRY_DSN_NATIVE` and
+  `EXPO_PUBLIC_SENTRY_DSN_WEB`. Copy it across
   out of band (it is deliberately not in git so a fork does not inherit this
   project's Sentry quota). Without it the build **succeeds** and `initErrorReporting()`
   returns early on a missing DSN — so the app ships with crash reporting silently
@@ -183,8 +183,8 @@ Both are gitignored, and neither failing announces itself:
 
   **`npm run check:ios` refuses to pass without it**, and `npm run build:aab`
   refuses to build — deliberately, even though the value only matters for release
-  builds. Only `EXPO_PUBLIC_SENTRY_DSN_NATIVE` is needed for iOS; the other two
-  are web-only. Get the DSN from Sentry -> the mobile project -> Client Keys.
+  builds. Only `EXPO_PUBLIC_SENTRY_DSN_NATIVE` is needed for iOS; the other is
+  web-only. Get the DSN from Sentry -> the mobile project -> Client Keys.
 - **`app/src/build-info.ts`** — generated, and `npm ci` creates it via the root
   `prepare` script. It is what puts the version and commit on the sign-in screen.
   It records the commit at the moment it runs, which is why `npm run build:ios`
@@ -196,17 +196,17 @@ Both are gitignored, and neither failing announces itself:
   off a build serving current source, because a bare `expo start` does not
   regenerate the file. Everything about the running app looked right.
 
-### Three Sentry values, and how they reach an Xcode build
+### The Sentry values, and how they reach an Xcode build
 
-`@sentry/react-native/expo` is registered **bare** in `app.json`, so it reads all
-three at build time rather than from a committed file — this repo is public, and
-the plugin writes whatever options it is given straight into
-`ios/sentry.properties`.
+`@sentry/react-native/expo` is registered **bare** in `app.json`, so it reads
+its values at build time rather than from a committed file — this repo is
+public, and the plugin writes whatever options it is given straight into
+`ios/sentry.properties`. Three reach `sentry-cli`:
 
 ```
-SENTRY_ORG=<org slug>            # Sentry -> Settings -> the org URL slug
-SENTRY_PROJECT=<native project>  # the React Native project, shared with Android
-SENTRY_AUTH_TOKEN=<token>        # an ORG token, scope org:ci — see docs/SECRETS.md
+SENTRY_ORG       # ci-tools.json's sentry.org
+SENTRY_PROJECT   # ci-tools.json's sentry.projects.native, shared with Android
+SENTRY_AUTH_TOKEN=<token>  # app/.env.sentry-build-plugin: an ORG token, scope org:ci — see docs/SECRETS.md
 ```
 
 **EXPORTING THEM IN YOUR SHELL DOES NOT REACH XCODE.** Xcode's build system runs
@@ -220,12 +220,13 @@ Two ways that actually work. Pick by how you are building:
 
 - **Archiving in the Xcode GUI — fill in `app/ios/sentry.properties`.** The
   plugin generates that file at prebuild with `# no org found, falling back to
-  SENTRY_ORG environment variable` in place of each value; replace those lines:
+  SENTRY_ORG environment variable` in place of each value; replace those lines,
+  the org and project from `ci-tools.json`:
 
   ```properties
   defaults.url=https://sentry.io/
-  defaults.org=<org slug>
-  defaults.project=<native project>
+  defaults.org=<sentry.org>
+  defaults.project=<sentry.projects.native>
   auth.token=<token>
   ```
 
@@ -236,29 +237,28 @@ Two ways that actually work. Pick by how you are building:
   which would be committed to a public repo.
 
 - **Archiving from the command line** — `xcodebuild` *does* inherit the shell.
-  `npm run build:ios` (`sabeel-ci build-ios`) reads the three values from the
-  gitignored `app/.env.sentry-build-plugin` and exports them before it runs
-  `xcodebuild`; a value already in the environment wins. The iOS workflow
-  writes that file from the `IOS_BUILD_ENV` secret, so this is the shape every
-  build takes, local or on GitHub.
+  `npm run build:ios` (`sabeel-ci build-ios`) loads the gitignored
+  `app/.env.sentry-build-plugin`, exports `SENTRY_ORG` and `SENTRY_PROJECT`
+  from `ci-tools.json`, and **refuses to build without `SENTRY_AUTH_TOKEN`**.
+  The iOS workflow writes that file from the `BUILD_ENV` secret, so this is the
+  shape every build takes, local or on GitHub.
 
 **The token is a real secret.** Never commit it, never paste it in chat, and do
 not pass it as an `authToken` plugin option — the plugin itself warns that doing
 so writes it into the application package.
 
-Missing, the Xcode build **succeeds and uploads no debug symbols**, so the first
-evidence is a crash report full of hex addresses weeks later. `npm run check:ios`
-warns when they are absent rather than failing, because only the archiving
-machine needs them.
+Missing from an Xcode GUI build, the build **succeeds and uploads no debug
+symbols**, so the first evidence is a crash report full of hex addresses weeks
+later. `npm run check:ios` warns when the token is absent rather than failing,
+because only the archiving machine needs it; `build-ios` is where it is
+required.
 
-**The same three variables serve Android**, so the two platforms are at parity
-and there is one set of names to remember. They get there by a different
-mechanism — `app/android/app/build.gradle` applies `sentry.gradle` when
-`app/.env.sentry-build-plugin` exists (or `SENTRY_AUTH_TOKEN` is set), and
-sentry-cli reads the file — because a config plugin runs at `prebuild` and that
-folder is committed and never prebuilt. A release build without either warns
-that it uploads no source maps, as `check:ios` does here. Full reasoning in
-`docs/SECRETS.md`.
+**The same org, project and token serve Android**, so the two platforms are at
+parity. They get there by a different mechanism — `app/android/app/build.gradle`
+applies `sentry.gradle` when `app/.env.sentry-build-plugin` exists, and
+`sabeel-ci build-aab` passes the org and project — because a config plugin runs
+at `prebuild` and that folder is committed and never prebuilt. Full reasoning
+in `docs/SECRETS.md`.
 
 ### Archiving over ssh needs the login keychain unlocked
 
@@ -617,7 +617,7 @@ mistake to expect at renewal — a new certificate with the old profile.
 | `IOS_DIST_P12`, `IOS_DIST_P12_PASSWORD` | the Apple Distribution certificate with its private key, base64, and its password | Faisal's Linux machine, `~/.config/sabeel-lms/ios-distribution/` (shared with the LMS and the time tracker), and the vault |
 | `IOS_PROFILE` | the App Store profile "Sabeel Kanban App Store CI", base64 | the same folder |
 | `ASC_KEY_P8` | the App Store Connect API key (Admin) — read by the upload job only | `~/.appstoreconnect/private_keys/` on Faisal's machine and on the Mac |
-| `IOS_BUILD_ENV` | `app/.env.sentry-build-plugin`: the Sentry three, `IOS_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID` | the Mac's copy, `NAME=value` lines only, no `ASC_KEY_PATH` |
+| `BUILD_ENV` | `app/.env.sentry-build-plugin`: `SENTRY_AUTH_TOKEN`, `IOS_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID`; the Android and web release builds read the same secret | the Mac's copy, `NAME=value` lines only, no `ASC_KEY_PATH` |
 | `APP_ENV_LOCAL` | `app/.env.local` | the Mac's copy, `NAME=value` lines only |
 
 `app/GoogleService-Info.plist` is committed, so it needs no secret. Everything

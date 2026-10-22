@@ -433,9 +433,9 @@ Run both. Neither substitutes for the other.
 
 `npx sabeel-ci native-e2e` runs the Maestro flows in `maestro/` against the
 debug build: it builds and installs the APK, starts the emulators (`sabeel-ci
-emulators`), seeds them through the web app (`scripts/seed-dev.mjs`, the
-`native.seed` of `ci-tools.json`, with a web dev server on the `web` port for
-it, since `native.seedWeb` is set), serves the JavaScript from Metro on 8081
+emulators`), seeds them through the web app (`scripts/seed-emulators.mjs`,
+with a web dev server on the `web` port for it, since `ci-tools.json`'s
+`native.seedWeb` is set), serves the JavaScript from Metro on 8081
 with `EXPO_PUBLIC_USE_EMULATORS=1`, and runs every flow, or the one you name
 (`npx sabeel-ci native-e2e maestro/board.yaml`). It needs one booted emulator
 (`npx sabeel-ci emulator headless`) and installs the pinned Maestro itself

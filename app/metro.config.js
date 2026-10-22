@@ -1,17 +1,21 @@
-// Expo's default Metro config, with TWO changes: the transform cache lives in
-// this repo rather than in a directory shared by every Expo project on the
-// machine, and Lexical resolves to ONE of its builds rather than both.
+// Expo's default Metro config through Sentry's wrapper, with TWO changes of
+// its own: the transform cache lives in this repo rather than in a directory
+// shared by every Expo project on the machine, and Lexical resolves to ONE of
+// its builds rather than both.
 //
-// This file did not exist before 2026-08-28. Everything else here is delegated
-// to `getDefaultConfig`, deliberately — the app built correctly without a config
-// at all, so this must not quietly change resolution, watch folders or
-// transforms. Each change here is its own decision; the Lexical one (2026-10-13)
-// touches resolution for Lexical's packages and nothing else.
-const { getDefaultConfig } = require('expo/metro-config');
+// `getSentryExpoConfig` is `getDefaultConfig` plus a serializer step that
+// stamps every bundle with a debug id, which is how Sentry matches a crash to
+// its uploaded source map with no release name to keep in step (ci-tools'
+// README, "Sentry"; `sabeel-ci check-app` holds this file to it). Everything
+// else is delegated to it, deliberately: this must not quietly change
+// resolution, watch folders or transforms. Each change here is its own
+// decision; the Lexical one touches resolution for Lexical's packages and
+// nothing else.
+const { getSentryExpoConfig } = require('@sentry/react-native/metro');
 const path = require('path');
 
 const projectRoot = __dirname;
-const config = getDefaultConfig(projectRoot);
+const config = getSentryExpoConfig(projectRoot);
 
 /**
  * Keep the transform cache INSIDE this repo.
@@ -46,8 +50,9 @@ config.cacheStores = ({ FileStore }) => [
  * every subpath of one, also publishes the two builds under the `development`
  * and `production` export conditions, so ask for the one this build is — for
  * Lexical's packages only, since other packages' meaning of those conditions
- * is not this file's business. Expo's default config sets no
- * `resolveRequest` of its own, so this hands straight to Metro's resolver.
+ * is not this file's business. Neither Expo's config nor Sentry's (at its
+ * defaults) sets a `resolveRequest` of its own, so this hands straight to
+ * Metro's resolver.
  */
 const lexicalBuild = process.env.NODE_ENV === 'production' ? 'production' : 'development';
 config.resolver.resolveRequest = (context, moduleName, platform) =>

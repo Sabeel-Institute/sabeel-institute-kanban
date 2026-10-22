@@ -46,7 +46,7 @@ differs from its template.
 - **Native** runs the Maestro flows (`maestro/`) on an Android emulator on the
   runner, against the debug build and the Firebase emulators, on main pushes,
   release tags, pull requests that change the flows, their seed
-  (`scripts/seed-dev.mjs`), `ci-tools.json` or the ci-tools pin, and by hand:
+  (`scripts/seed-emulators.mjs`), `ci-tools.json` or the ci-tools pin, and by hand:
   `npx sabeel-ci native-e2e`, as locally (`docs/DEVELOPING.md`). Its
   screens and logs are the `native-<sha>` artifact. Its `ios` job runs the same
   flows on an iPhone simulator on a macOS runner (`--ios`) for release tags,
@@ -70,8 +70,10 @@ differs from its template.
   successful one.
   Artifacts are retained for 14 days. The AAB uses the existing release/upload
   key and is ready for a separately authorized Play upload.
-- Build records identify the source commit and workflow run. Web artifacts
-  contain neither source maps nor environment files.
+- Build records identify the source commit and workflow run. The site in the
+  Web artifact holds neither source maps nor environment files; its maps sit
+  beside it, for Deploy Web to upload to Sentry. The Android and iOS builds
+  upload their own source maps and symbols to Sentry (`docs/SECRETS.md`).
 
 ## Who changes main
 
@@ -89,7 +91,10 @@ differs from its template.
 
 - **Deploy Web** only runs manually from main. Supply a successful **Web** run
   ID. CI must have passed on that exact commit. The workflow verifies artifact
-  provenance and checksums and uses short-lived Google credentials.
+  provenance and checksums and uses short-lived Google credentials. With
+  `deploy=true` its `sourcemaps` job first uploads the build's source maps to
+  Sentry, from the `release-build` environment, and the site is published only
+  once they are in.
 - The default `deploy=false` checks Hosting access without publishing. Select
   `deploy=true` to publish the selected artifact to live Firebase Hosting.
   No rebuilding occurs during deployment; functions, rules, indexes and data
@@ -135,12 +140,13 @@ TestFlight upload) first checks that the organization owner started it and,
 when it is re-run, re-ran it: the organization variables `RELEASE_OWNER_ID`
 and `RELEASE_OWNER_LOGIN`, which only organization admins can change.
 
-The `release-build` environment holds `APP_ENV_LOCAL`, the existing iOS
-signing secrets (`IOS_DIST_P12`, `IOS_DIST_P12_PASSWORD`, `IOS_PROFILE`,
-`IOS_BUILD_ENV`, `ASC_KEY_P8`), `ANDROID_KEYSTORE` and
-`ANDROID_KEYSTORE_PROPERTIES`. It admits main and `v*` tags only, and only the
-jobs that build a release enter it (Android, Web, iOS and its TestFlight
-upload), so a workflow on any other branch reads none of them; repository
+The `release-build` environment holds `APP_ENV_LOCAL`, `BUILD_ENV` (the Sentry
+token and the App Store Connect key ids), the iOS signing secrets
+(`IOS_DIST_P12`, `IOS_DIST_P12_PASSWORD`, `IOS_PROFILE`, `ASC_KEY_P8`),
+`ANDROID_KEYSTORE` and `ANDROID_KEYSTORE_PROPERTIES`. It admits main and `v*`
+tags only, and only the jobs that build a release enter it (Android, Web, iOS
+and its TestFlight upload, Deploy Web's source-map upload), so a workflow on
+any other branch reads none of them; repository
 secrets would reach a workflow on any branch a collaborator pushes.
 `sabeel-ci check-app` fails if a job reads one outside that environment, or a
 release job does not check its owner first. Set one again from the vault with

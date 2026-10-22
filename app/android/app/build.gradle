@@ -14,25 +14,23 @@ def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
  * can never reach Android. Wiring it in Gradle is not a workaround; it is the
  * only mechanism that applies to a bare-workflow native folder.
  *
- * GATED ON app/.env.sentry-build-plugin, the gitignored file that carries
- * SENTRY_ORG, SENTRY_PROJECT and SENTRY_AUTH_TOKEN for both platforms: the
- * iOS build loads it (`sabeel-ci build-ios`), and sentry.gradle hands it to
- * sentry-cli as SENTRY_DOTENV_PATH. One file, one set of names, nothing
- * project-identifying committed to a public repo (docs/SECRETS.md). The token
- * in the environment works too. Without either this block applies nothing, so
- * CI, a fresh clone and any machine without the token build exactly what they
- * built before: the release path never depends on a network service that can
- * fail. A release build that would upload nothing says so.
- *
- * Android and iOS report to ONE Sentry project, since both read
- * EXPO_PUBLIC_SENTRY_DSN_NATIVE — so SENTRY_PROJECT is a single value and parity
- * is structural rather than something to keep in step.
+ * GATED ON app/.env.sentry-build-plugin, the build machine's gitignored file
+ * holding SENTRY_AUTH_TOKEN (`BUILD_ENV` in CI), and on nothing else: the gate
+ * line is exactly the one ci-tools' `check-app` holds every app to.
+ * sentry.gradle hands the file to sentry-cli as SENTRY_DOTENV_PATH; the org
+ * and the project are not in it but in ci-tools.json's `sentry`, which
+ * `sabeel-ci build-aab` passes to Gradle as SENTRY_ORG and SENTRY_PROJECT
+ * (the `native` project, which iOS shares, since both read
+ * EXPO_PUBLIC_SENTRY_DSN_NATIVE). Without the file this block applies nothing,
+ * so a pull-request build, a fresh clone and any machine without the token
+ * build exactly what they built before; `build-aab` refuses a release without
+ * it, and a release built some other way says so here.
  */
-if (file("$projectRoot/.env.sentry-build-plugin").exists() || System.getenv("SENTRY_AUTH_TOKEN")) {
+if (file("$projectRoot/.env.sentry-build-plugin").exists()) {
     apply from: new File(["node", "--print", "require.resolve('@sentry/react-native/package.json')"].execute(null, rootDir).text.trim(), "../sentry.gradle")
 } else if (gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }) {
-    logger.warn('*** No app/.env.sentry-build-plugin and no SENTRY_AUTH_TOKEN: this release build uploads no ' +
-        'source maps, so its crashes arrive in Sentry as minified frames (docs/SECRETS.md). ***')
+    logger.warn('*** No app/.env.sentry-build-plugin: this release build uploads no source maps, so its ' +
+        'crashes arrive in Sentry as minified frames (docs/SECRETS.md). ***')
 }
 
 /**

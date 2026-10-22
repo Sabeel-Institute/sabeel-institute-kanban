@@ -16,7 +16,7 @@ if [ $# -lt 1 ]; then
 fi
 
 # The emulators' project and ports, from ci-tools.json through ci-tools.
-GCLOUD_PROJECT=$(node -p "require('./ci-tools.json').emulators.project")
+GCLOUD_PROJECT=$(npx --no sabeel-ci ports --project)
 FIRESTORE_EMULATOR_HOST=127.0.0.1:$(npx --no sabeel-ci ports firestore)
 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:$(npx --no sabeel-ci ports auth)
 export GCLOUD_PROJECT FIRESTORE_EMULATOR_HOST FIREBASE_AUTH_EMULATOR_HOST

@@ -25,7 +25,7 @@
 //
 //   # emulators
 //   FIRESTORE_EMULATOR_HOST=127.0.0.1:$(npx sabeel-ci ports firestore) FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:$(npx sabeel-ci ports auth) \
-//     GCLOUD_PROJECT=demo-sabeel-kanban node scripts/rename-manager-role.mjs --apply
+//     GCLOUD_PROJECT=$(npx sabeel-ci ports --project) node scripts/rename-manager-role.mjs --apply
 //   # production
 //   GCLOUD_PROJECT=sabeel-institute-kanban node scripts/rename-manager-role.mjs --apply
 //   # and back again
@@ -55,8 +55,8 @@ if (revertIdx >= 0 && !REVERT) {
 const projectId = process.env.GCLOUD_PROJECT;
 if (!projectId) {
   console.error(
-    'Refusing to run without GCLOUD_PROJECT. Use demo-sabeel-kanban for the ' +
-      'emulators, or the real project id for production.',
+    'Refusing to run without GCLOUD_PROJECT. Use $(npx sabeel-ci ports --project) ' +
+      'for the emulators, or the real project id for production.',
   );
   process.exit(1);
 }

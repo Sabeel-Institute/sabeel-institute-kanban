@@ -205,27 +205,26 @@ creation**.
       password is in the vault (`sabeel/review/kanban-app-review.txt`), never
       here. `docs/STORE-RELEASE.md`.
 
-- [x] **Symbolication wired for BOTH platforms (2026-08-12), at parity.**
-      `SENTRY_ORG`, `SENTRY_PROJECT` and `SENTRY_AUTH_TOKEN` in the gitignored
-      `app/.env.sentry-build-plugin`, one set of names for iOS and Android, and
-      both report to the same Sentry project because both read
-      `EXPO_PUBLIC_SENTRY_DSN_NATIVE`.
+- [x] **Symbolication wired for every surface, at parity.** The org and the
+      projects are `ci-tools.json`'s `sentry`, committed; the one secret is
+      `SENTRY_AUTH_TOKEN` in the gitignored `app/.env.sentry-build-plugin`
+      (`BUILD_ENV` on GitHub). Android and iOS report to the same Sentry
+      project because both read `EXPO_PUBLIC_SENTRY_DSN_NATIVE`.
       iOS: `@sentry/react-native/expo` registered **bare** in `app/app.json` —
       options would be written verbatim into `ios/sentry.properties` and this
       repo is public; `sabeel-ci build-ios` loads the file. Android:
       `app/android/app/build.gradle` applies `sentry.gradle` when the file
-      exists (or `SENTRY_AUTH_TOKEN` is in the environment), since a config
-      plugin runs at prebuild and that folder is never prebuilt.
+      exists, since a config plugin runs at prebuild and that folder is never
+      prebuilt. Web: Deploy Web uploads the build's source maps before it
+      publishes the site.
       **The file must be on the machine that builds a release, on either
-      platform.** Without it each build succeeds and uploads nothing.
-      `npm run check:ios` and the Android release build both warn; neither
-      fails, because unlike a missing DSN this degrades reports rather than
-      losing them. Without the file and the token Gradle applies no Sentry
-      tasks, so CI and a fresh clone are unaffected.
+      platform:** `sabeel-ci build-aab` and `build-ios` refuse to build without
+      the token. Without the file Gradle applies no Sentry tasks, so
+      pull-request builds and a fresh clone are unaffected.
       **You already have a token and it works here unchanged.**
-      `sabeel-apk-sourcemaps`, an ORGANIZATION token with scope `org:ci`, used by
-      the sibling time-tracker. Organization tokens reach **every project in the
-      org**, so one token serves every Sabeel app; only `SENTRY_PROJECT` differs.
+      `sabeel-apk-sourcemaps`, an ORGANIZATION token with scope `org:ci`.
+      Organization tokens reach **every project in the org**, so one token
+      serves every Sabeel app.
       Confirmed against the API: releases endpoints answer 200, while org and
       project-list endpoints answer 403 — `org:ci` grants exactly the CI/release
       permissions and nothing more, which is the right shape for a build secret.

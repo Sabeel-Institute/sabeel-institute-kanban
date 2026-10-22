@@ -62,6 +62,13 @@
     <meta-data android:name="com.google.firebase.messaging.default_notification_color" android:resource="@color/notification_icon_color"/>
     <meta-data android:name="expo.modules.notifications.default_notification_icon" android:resource="@drawable/ic_notification"/>
     <meta-data android:name="expo.modules.notifications.default_notification_color" android:resource="@color/notification_icon_color"/>
+    <!-- The channel a push lands in when its send names none. The functions
+         always name PUSH_CHANNEL_ID (functions/src/fcm.ts), so this is not
+         consulted today; it is here so that a send which ever stops naming it
+         lands in the app's own channel rather than one Android makes up and
+         shows as "Miscellaneous". A manifest cannot import the constant, so
+         `npx sabeel-ci check-app` holds this literal to it. -->
+    <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="sabeel-alerts"/>
     <meta-data android:name="expo.modules.updates.ENABLED" android:value="false"/>
     <meta-data android:name="expo.modules.updates.ENABLE_BSDIFF_PATCH_SUPPORT" android:value="true"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_CHECK_ON_LAUNCH" android:value="ALWAYS"/>

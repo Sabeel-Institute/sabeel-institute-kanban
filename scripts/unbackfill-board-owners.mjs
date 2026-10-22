@@ -13,7 +13,7 @@
 // admin, which is a worse state than the one you are trying to leave. If you
 // have already flipped authority, roll the RULES back first, then run this.
 //
-//   FIRESTORE_EMULATOR_HOST=127.0.0.1:$(npx sabeel-ci ports firestore) GCLOUD_PROJECT=demo-sabeel-kanban \
+//   FIRESTORE_EMULATOR_HOST=127.0.0.1:$(npx sabeel-ci ports firestore) GCLOUD_PROJECT=$(npx sabeel-ci ports --project) \
 //     node scripts/unbackfill-board-owners.mjs
 //   GCLOUD_PROJECT=sabeel-institute-kanban node scripts/unbackfill-board-owners.mjs --apply
 import { initializeApp } from 'firebase-admin/app';
@@ -26,8 +26,8 @@ const ONLY = onlyIdx >= 0 ? process.argv[onlyIdx + 1] : null;
 const projectId = process.env.GCLOUD_PROJECT;
 if (!projectId) {
   console.error(
-    'Refusing to run without GCLOUD_PROJECT. Use demo-sabeel-kanban for the ' +
-      'emulators, or the real project id for production.',
+    'Refusing to run without GCLOUD_PROJECT. Use $(npx sabeel-ci ports --project) ' +
+      'for the emulators, or the real project id for production.',
   );
   process.exit(1);
 }

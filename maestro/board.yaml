@@ -1,6 +1,6 @@
 # The board on Android: sign-in, the column pager and its swipe, a card, the
 # native rich-text editor, the tabs and long-press selection. Seeded by
-# scripts/seed-dev.mjs (ci-tools.json native.seed); run by `npx sabeel-ci native-e2e`.
+# scripts/seed-emulators.mjs; run by `npx sabeel-ci native-e2e`.
 appId: ${APP_ID}
 name: Board, card, rich text and gestures
 ---

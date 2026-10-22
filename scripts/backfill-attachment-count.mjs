@@ -8,7 +8,7 @@
 // where the stored value is wrong, so it is safe to re-run and cheap to repeat.
 //
 //   # emulators
-//   FIRESTORE_EMULATOR_HOST=127.0.0.1:$(npx sabeel-ci ports firestore) GCLOUD_PROJECT=demo-sabeel-kanban \
+//   FIRESTORE_EMULATOR_HOST=127.0.0.1:$(npx sabeel-ci ports firestore) GCLOUD_PROJECT=$(npx sabeel-ci ports --project) \
 //     node scripts/backfill-attachment-count.mjs
 //   # production (gcloud ADC)
 //   GCLOUD_PROJECT=sabeel-institute-kanban node scripts/backfill-attachment-count.mjs
@@ -18,8 +18,8 @@ import { getFirestore } from 'firebase-admin/firestore';
 const projectId = process.env.GCLOUD_PROJECT;
 if (!projectId) {
   console.error(
-    'Refusing to run without GCLOUD_PROJECT. Use demo-sabeel-kanban for the ' +
-      'emulators, or the real project id for production.',
+    'Refusing to run without GCLOUD_PROJECT. Use $(npx sabeel-ci ports --project) ' +
+      'for the emulators, or the real project id for production.',
   );
   process.exit(1);
 }

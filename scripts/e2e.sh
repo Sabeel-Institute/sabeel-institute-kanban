@@ -15,8 +15,8 @@ cd "$(dirname "$0")/.."
 # is absent from it — so the safety property is tested, not assumed.
 #
 # The web port, the emulator project and JDK 21 come from ci-tools
-# (`npx sabeel-ci ports web`, ci-tools.json, `npx sabeel-ci jdk21`); no port is
-# stated here.
+# (`npx sabeel-ci ports web`, `ports --project`, `jdk21`); no port is stated
+# here.
 
 # shellcheck source=scripts/lib/procs.sh
 . "$(dirname "$0")/lib/procs.sh"
@@ -31,7 +31,7 @@ JAVA_HOME=$(npx --no sabeel-ci jdk21)
 export JAVA_HOME PATH="$JAVA_HOME/bin:$PATH"
 
 WEB_PORT=$(npx --no sabeel-ci ports web)
-PROJECT=$(node -p "require('./ci-tools.json').emulators.project")
+PROJECT=$(npx --no sabeel-ci ports --project)
 export E2E_BASE="http://127.0.0.1:${WEB_PORT}/"
 # In this checkout, under shots/ (which CI keeps when a suite fails), not a
 # fixed /tmp name another checkout's run would overwrite. Absolute: the server
@@ -129,6 +129,11 @@ ready=""
 for _ in $(seq 1 90); do
   if grep -qi "is being used by another process" "$WEB_LOG" 2>/dev/null; then
     echo "Another process grabbed port ${WEB_PORT}; refusing to test stale code." >&2
+# The secrets the functions bind, as the placeholders ci-tools.json names
+# (functions/.secret.local): unset, the Functions emulator asks the real
+# Secret Manager for them.
+npx --no sabeel-ci emulator-secrets
+
     exit 1
   fi
   if curl -sf -o /dev/null "http://127.0.0.1:${WEB_PORT}/"; then

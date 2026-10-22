@@ -6,17 +6,18 @@
  * at the same offset in every block, so a port in a `ss` or `ps` line names
  * its app and its service at a glance. Scripts state none of them:
  * `npx sabeel-ci check-app` fails one that does. In shell,
- * `npx --no sabeel-ci ports <name>`.
+ * `npx --no sabeel-ci ports <name>`, and `npx --no sabeel-ci ports --project`
+ * for the project.
  *
  *   PORTS.firestore, PORTS.auth, PORTS.functions, PORTS.storage   the emulators
  *   PORTS.web                                                     the Expo web dev server
  */
 import { config } from '@sabeel-institute/ci-tools/lib/config.mjs';
-import { ports } from '@sabeel-institute/ci-tools/lib/ports.mjs';
+import { emulatorProject, ports } from '@sabeel-institute/ci-tools/lib/ports.mjs';
 
 const SETTINGS = config(new URL('../..', import.meta.url).pathname);
 
 export const PORTS = ports(SETTINGS);
 
-/** The emulators' demo project: a `demo-` id, so nothing can reach a real one. */
-export const PROJECT = SETTINGS.emulators.project;
+/** The emulators' demo project, demo-sabeel-<name>: a `demo-` id, so nothing can reach a real one. */
+export const PROJECT = emulatorProject(SETTINGS);

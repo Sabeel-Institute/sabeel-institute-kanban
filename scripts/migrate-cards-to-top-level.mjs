@@ -15,7 +15,7 @@
 // functions are deployed should anything write to `cards/*` for real.
 //
 // Usage (emulator):
-//   FIRESTORE_EMULATOR_HOST=127.0.0.1:$(npx sabeel-ci ports firestore) GCLOUD_PROJECT=demo-sabeel-kanban \
+//   FIRESTORE_EMULATOR_HOST=127.0.0.1:$(npx sabeel-ci ports firestore) GCLOUD_PROJECT=$(npx sabeel-ci ports --project) \
 //   node scripts/migrate-cards-to-top-level.mjs [--dry|--verify-only|--purge]
 // Usage (prod): GOOGLE_CLOUD_PROJECT=sabeel-institute-kanban node scripts/... (gcloud ADC)
 import { initializeApp } from 'firebase-admin/app';
@@ -31,8 +31,8 @@ const PURGE = process.argv.includes('--purge');
 const projectId = process.env.GCLOUD_PROJECT ?? process.env.GOOGLE_CLOUD_PROJECT;
 if (!projectId) {
   console.error(
-    'Set GCLOUD_PROJECT (demo-sabeel-kanban for the emulators, or the real ' +
-      'project id for production) before running this migration.',
+    'Set GCLOUD_PROJECT ($(npx sabeel-ci ports --project) for the emulators, or the ' +
+      'real project id for production) before running this migration.',
   );
   process.exit(1);
 }

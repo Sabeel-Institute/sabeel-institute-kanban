@@ -116,7 +116,8 @@ errors with "Could not find rules for the following storage targets: rules".
 Hosting serves `app/dist-web`, built automatically by the predeploy hook
 (`npm run web:export -w @sabeel/app`, which is `sabeel-ci build-web`). The
 usual web release is **Deploy Web** instead, which publishes the artifact the
-Web workflow built and checked for that commit (§ Shipping a release).
+Web workflow built and checked for that commit, after uploading its source
+maps to Sentry (§ Shipping a release); a local deploy uploads none.
 
 **Attachments cannot be fully verified before this deploy.** The Storage
 emulator has no signing service, so `getAttachmentUrl` takes a different branch
@@ -179,10 +180,11 @@ npx sabeel-ci publish-play --internal
 ```
 
 `sabeel-ci build-aab` refuses to start Gradle without a store-legal version, a
-deploy-log entry for it that exists **before** the build, and the native Sentry
-DSN (`EXPO_PUBLIC_SENTRY_DSN_NATIVE`, `ci-tools.json`'s
-`build.sentryDsnVariable`) in `app/.env.local`; it stamps the commit, builds,
-and refuses an unsigned or debug-signed bundle. Play wants one bundle carrying
+deploy-log entry for it that exists **before** the build, the native Sentry
+DSN (`EXPO_PUBLIC_SENTRY_DSN_NATIVE`) in `app/.env.local` and the Sentry token
+in `app/.env.sentry-build-plugin`; it stamps the commit, builds with
+`ci-tools.json`'s Sentry org and native project (the bundle's source map goes
+there), and refuses an unsigned or debug-signed bundle. Play wants one bundle carrying
 every ABI and does its own per-device splitting, so the `splits` block turns
 itself off for bundle tasks — leaving both on fails with *"Multiple
 shrunk-resources files found"*.
