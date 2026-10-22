@@ -10,7 +10,7 @@ import { runHealthCheck } from '../../src/health';
  * written and re-read.
  *
  * The scheduled function itself never runs here: there is no pubsub emulator
- * (docs/DEVELOPING.md), which is exactly why the body lives in `runHealthCheck`.
+ * (docs/DEV-TOOLING.md), which is exactly why the body lives in `runHealthCheck`.
  *
  * Counts include whatever the other suites left behind — the emulator is shared
  * within one `emulators:exec` run — so every assertion is about a DELTA this test

@@ -41,13 +41,13 @@ differs from its template.
   failed checks beside them and what changed against main's latest sweep,
   before / after / difference. The run page's summary lists the failed checks
   and changed screens and the `gh run download` command for the page
-  (`docs/DEVELOPING.md`). New PR pushes cancel superseded CI runs. No
+  (`docs/DEV-TOOLING.md`). New PR pushes cancel superseded CI runs. No
   production deployment credentials are used.
 - **Native** runs the Maestro flows (`maestro/`) on an Android emulator on the
   runner, against the debug build and the Firebase emulators, on main pushes,
   release tags, pull requests that change the flows, their seed
   (`scripts/seed-emulators.mjs`), `ci-tools.json` or the ci-tools pin, and by hand:
-  `npx sabeel-ci native-e2e`, as locally (`docs/DEVELOPING.md`). Its
+  `npx sabeel-ci native-e2e`, as locally (`docs/DEV-TOOLING.md`). Its
   screens and logs are the `native-<sha>` artifact. Its `ios` job runs the same
   flows on an iPhone simulator on a macOS runner (`--ios`) for release tags,
   pull requests that change the flows, and by hand, as `native-ios-<sha>`.

@@ -32,7 +32,7 @@ sabeel-institute-kanban/
 Emulator ports: each app owns a block of 100 in ci-tools (`emulators.base` in
 `ci-tools.json`; this one 61200-61299, the time tracker 61000-61099), every
 service at the same offset; `firebase.json` pins them, with **storage** among
-them, UI on, `singleProjectMode: true`. `docs/DEVELOPING.md` has the layout.
+them, UI on, `singleProjectMode: true`. `docs/DEV-TOOLING.md` has the layout.
 
 Hosting headers worth copying verbatim: `no-cache, must-revalidate` on `**`, and
 `max-age=31536000, immutable` on `/_expo/static/**`.

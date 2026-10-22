@@ -728,7 +728,7 @@ order above is enforced rather than merely written down.
 structure — no names, no addresses, no board titles, no cards — which
 `scripts/migration-e2e.mjs --shape <file>` replays through the whole sequence on
 the emulators. It answers the question the seeded fixtures cannot: does this
-work on the database that actually exists. See `docs/DEVELOPING.md`.
+work on the database that actually exists. See `docs/DEV-TOOLING.md`.
 
 **A restore cannot undo the backfill.** An import merges by document id, so it
 recreates what was deleted and cannot remove what was wrongly *added* — a field

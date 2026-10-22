@@ -47,7 +47,7 @@ symptom-first — in the same batch as the fix, not only into a commit message.
 
 The skill also carries `tools/bootstrap-linux.sh`, which installs this whole
 toolchain on a fresh machine under `$HOME` with no root, and `tools/check-host.sh`.
-See `docs/DEVELOPING.md`.
+See `docs/DEV-TOOLING.md`.
 
 Sibling project `../sabeel-institute-time-tracker/` is the reference
 implementation for every convention here — read its files directly rather than
@@ -446,7 +446,7 @@ itself is deliberately NOT darkened — that would collapse it into
 
 ## Dev & test loops
 
-`docs/DEVELOPING.md` is the full guide, including how to install the toolchain on
+`docs/DEV-TOOLING.md` is the full guide, including how to install the toolchain on
 a new machine.
 
 - **This checkout owns the emulator block 61200-61299** (`emulators.base` in
@@ -514,7 +514,7 @@ a new machine.
 - Native flows: `npx sabeel-ci native-e2e` — the Maestro flows in `maestro/`
   on the emulator against the debug build, the same command the Native workflow
   runs on main pushes and release tags; `--ios` runs them on an iPhone simulator
-  (macOS). `docs/DEVELOPING.md`.
+  (macOS). `docs/DEV-TOOLING.md`.
 - Android: `npx sabeel-ci emulator headless` (AVD `tb_emu`, or `SABEEL_AVD`), then
   `npm run android -w @sabeel/app`. Firebase emulators from the AVD = `10.0.2.2`.
   There are NO physical devices. **Check `emulator -accel-check` first** — see
@@ -529,10 +529,11 @@ a new machine.
   perfectly successful build.
 - CI (GitHub Actions): `sabeel-ci check-app` + lint + typecheck + knip + unit +
   emulator + every browser suite on every push. Keep it green; `npm run knip`
-  must be clean (`docs/DEADCODE.md`). **Nothing deploys on a push.** The one deploy CI
-  can make is the TestFlight job of `ios.yml`, which runs only when started by
-  hand with `testflight=true`, and only with Faisal's go-ahead, like any
-  release. Its build job uploads nothing and may be run at any time.
+  must be clean (`docs/DEV-TOOLING.md` § Dead code). **Nothing deploys on a
+  push.** The one deploy CI can make is the TestFlight job of `ios.yml`, which
+  runs only when started by hand with `testflight=true`, and only with
+  Faisal's go-ahead, like any release. Its build job uploads nothing and may
+  be run at any time.
 - **A suite nothing invokes is not coverage.** `functions/test/unit/suite-coverage.test.ts`
   guards the emulator lists and `app/src/ciCoverage.test.ts` guards the e2e ones;
   a new browser suite gets an npm script and an entry in `ci-tools.json`'s

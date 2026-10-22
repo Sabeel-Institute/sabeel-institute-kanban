@@ -85,7 +85,7 @@ first in the emulator suite's rules pass. All of them run in CI on every push,
 and `app/src/ciCoverage.test.ts` fails if a suite is ever left out of the
 workflow.
 
-See `docs/DEVELOPING.md` to run it, `docs/USER-MANUAL.md` for the user guide and
+See `docs/DEV-TOOLING.md` to run it, `docs/USER-MANUAL.md` for the user guide and
 `docs/DEPLOY.md` for the production checklist.
 
 ### Known gaps, stated plainly

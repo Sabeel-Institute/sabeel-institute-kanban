@@ -1,4 +1,4 @@
-# Running the app locally
+# Dev tooling
 
 Local development runs against the Firebase emulators, which need no accounts,
 no keys and no network; production is `sabeel-institute-kanban`
@@ -328,6 +328,40 @@ They are the list CI runs, one runner each (`ci.browserSuites` in
 (`scripts/e2e-all.sh richtext web` for some, by short name). They write
 screenshots to `shots/`, and on failure dump what each page actually displayed —
 much faster than guessing.
+
+### Dead code: knip
+
+`npm run knip` reports unused files, exports and dependencies, and CI runs it
+(`ci.knip` in `ci-tools.json`). A clean run is **empty**. Nothing outside this
+repo consumes it, so anything unused is deleted, not deprecated; a finding is
+either dead code or a gap in `knip.json` to close at its cause, never a reason
+to widen an ignore list. **A workspace that uses a package declares it**:
+hoisting is a resolution accident, not a dependency.
+
+`knip.json` has the same shape as the LMS's and the time tracker's:
+
+- **Entries per workspace.** The root's are `scripts/*.mjs`; the app's are
+  `App.tsx`, `metro.config.js`, `public/**/*.js` and the `.web` seams, which
+  the bundler resolves and no import names; the functions' are `src/index.ts`
+  (esbuild builds the bundle, so nothing maps `main` back to the source) and
+  the tests.
+- **`ignoreExportsUsedInFile` for types and interfaces**, so a type exported
+  beside the function that takes it is not a finding.
+- **The app ignores `expo-updates`, `@expo/metro-runtime` and
+  `expo-system-ui`**: knip's Expo plugin infers them from Expo's defaults and
+  attributes them to `app/app.json`, where none appears. Do not install them
+  to quiet the report.
+- **`ignoreBinaries`: `firebase` and `expo`**: the global CLI, and the app
+  workspace's own, which the root's `dev:web` and `dev:android` run from
+  `app/`.
+
+Before deleting an export knip calls unused, **grep `.ts` AND `.tsx`, then
+typecheck**: its only consumer may be a `.web.tsx` seam (`rerankColumnIfNeeded`
+was deleted on exactly that basis). And **never list `@sabeel/shared` in
+`functions/package.json`**: esbuild bundles it into `functions/lib/index.js`,
+and listed there Cloud Build tries to install a private package from the
+public registry and the deploy fails (`docs/INHERITED-STACK.md` lesson 3b).
+The root declares it, which knip accepts for the functions too.
 
 ### Every screen, every width
 
