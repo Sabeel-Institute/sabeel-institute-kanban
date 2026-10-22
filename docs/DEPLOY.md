@@ -54,8 +54,8 @@ In place for `sabeel-institute-kanban`; every deploy assumes them:
    the review account (`docs/STORE-RELEASE.md`). The provider on first leaves a
    window in which anyone holding the public API key can make an account.
 4. On the deploying machine, `app/.env.local` (`docs/SECRETS.md`): a hosting
-   bundle without its VAPID key cannot register web push, and
-   `npm run check:web-push` refuses it.
+   bundle without its web Sentry DSN reports nothing. The Web workflow's build
+   refuses one; a local `firebase deploy` does not.
 5. **Report a problem can send mail.** `reportProblem` sends as
    `apps-noreply@oursabeel.com` by domain-wide delegation, keyless: it asks IAM
    Credentials to sign a delegation token as

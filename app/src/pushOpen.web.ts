@@ -1,9 +1,9 @@
 /**
  * Taps on a push notification — WEB (native sibling: pushOpen.ts).
  *
- * Inert, deliberately — but no longer because nothing arrives. A VAPID key IS
- * deployed (verified in the live bundle), and permission is now asked from a
- * press rather than from a snapshot callback, so browsers DO receive these.
+ * Inert, deliberately, though pushes do arrive: the VAPID key is committed
+ * (`VAPID_PUBLIC_KEY` in firebase-config.ts) and permission is asked from a
+ * press rather than from a snapshot callback, so browsers receive them.
  *
  * What is still missing is a destination. The web app has no URL handling for
  * board and card ids, so `firebase-messaging-sw.js` deliberately focuses the

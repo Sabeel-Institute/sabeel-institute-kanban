@@ -421,7 +421,7 @@ would update rather than duplicate.
 
 Push is wired on all three surfaces: Android and the web through FCM, iPhones
 through Apple (`APNS_KEY`; § D2 item 5 is the iPhone check). The web push VAPID
-key is deployed.
+public key is committed (`VAPID_PUBLIC_KEY` in `app/src/firebase-config.ts`).
 
 - [x] **Verify a push actually arrives.** Done, on your phone, 2026-09-16:
       two mention pushes minutes apart. What the screenshot ALSO showed was the
@@ -455,10 +455,8 @@ key is deployed.
 - [ ] **Web push — confirm a push actually ARRIVES.** The configuration half is
       done and verified against the live site, so this is now one question, not
       three. Confirmed by reading the deployed bundle and the deployed origin:
-      the VAPID key is present and non-empty (the minifier folded the
-      `!VAPID_KEY` guard away, which it can only do for a truthy literal),
-      `USE_EMULATORS` compiles to `false`, and `/firebase-messaging-sw.js`
-      returns HTTP 200.
+      the VAPID key is present, `USE_EMULATORS` compiles to `false`, and
+      `/firebase-messaging-sw.js` returns HTTP 200.
 
       A browser honours a permission request only straight from a click, so the
       ask is on a button.
@@ -499,18 +497,18 @@ key is deployed.
       signs each push. Android needs none of this because FCM reaches Play
       services on the device directly.
 
-      The key already exists and is already deployed — nothing to generate. It
-      lives in `app/.env.local` as `EXPO_PUBLIC_FCM_VAPID_KEY` and reaches the
-      bundle from the environment that runs `expo export`. If it is ever lost or
-      rotated: Firebase console → **Project settings** → **Cloud Messaging** →
-      *Web configuration* → **Web Push certificates**. Console-only — there is
-      no `firebase` CLI command and no REST endpoint for it (checked, not
-      assumed).
+      The key already exists — nothing to generate. Its public half is
+      `VAPID_PUBLIC_KEY` in `app/src/firebase-config.ts`, committed like the
+      rest of the web config. If it is ever rotated: Firebase console →
+      **Project settings** → **Cloud Messaging** → *Web configuration* →
+      **Web Push certificates**, then replace the constant. Console-only —
+      there is no `firebase` CLI command and no REST endpoint for it (checked,
+      not assumed).
 
-      `npm run check:web-push` now reads the exported bundle and refuses when
-      the key is missing or the wrong shape, so a keyless deploy — which would
-      silently make every device report that it cannot receive notifications —
-      cannot go out unnoticed. Run it between `web:export` and the deploy.
+      `npm run check:web-push` reads the exported bundle and refuses when the
+      key is missing or the wrong shape, and every web release build runs it,
+      so a keyless deploy — which would silently make every device report that
+      it cannot receive notifications — cannot go out unnoticed.
 
 - [x] **Functions Sentry verified 2026-07-20.** Marker
       `functions-sentry-check 2026-07-20T16:01:17.471Z` arrived in
