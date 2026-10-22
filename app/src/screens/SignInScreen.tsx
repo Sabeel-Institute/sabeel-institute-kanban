@@ -11,7 +11,7 @@ import { DEV_ACCOUNTS, devSignIn, devSignInAvailable } from '../auth/devSignIn';
 import { EMAIL_SIGN_IN_MESSAGES, signInWithEmail, type EmailSignInRefusal } from '../auth/email';
 import { Body, Button, Caption, Card, Hint, Row, Screen, TextField, Title } from '../components/ui';
 import { radius, space, useTheme } from '../theme';
-import sabeelLogo from '../../assets/brand/sabeel-logo.png';
+import sabeelLogo from '../../assets/logo.png';
 import { toUserMessage } from '../errors';
 import { BUILD_INFO } from '../build-info';
 

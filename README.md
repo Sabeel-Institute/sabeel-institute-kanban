@@ -9,8 +9,8 @@ ClickUp.
 
 **Docs**
 - `docs/USER-MANUAL.md` — what the app does, for the people using it. Built to
-  `docs/USER-MANUAL.pdf` with `docs/render-manual.py`; its screenshots come from
-  `scripts/manual-shots.mjs`.
+  `docs/USER-MANUAL.pdf` with `npx sabeel-ci render-manual`; its screenshots
+  come from `scripts/manual-shots.mjs`.
 - `docs/PRODUCT_BRIEF.md` — decisions, data model, access rules. Source of truth.
 - `docs/PERMISSIONS.md` — who can do what.
 - `docs/PHASE_STATUS.md` — the phase plan, exit criteria, live build status, and

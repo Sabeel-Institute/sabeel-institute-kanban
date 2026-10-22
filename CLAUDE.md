@@ -702,7 +702,8 @@ factory rather than being silently dropped.
   it) and the only record of why.
 - **The user manual is part of the app.** A change to any screen means
   `docs/USER-MANUAL.md`, then `node scripts/manual-shots.mjs` for its images, then
-  `python3 docs/render-manual.py` for the PDF — all three, same batch. Add new
+  `npx sabeel-ci render-manual` for the PDF (needs `uv` and `google-chrome`) —
+  all three, same batch. Add new
   screens to the generator; an image with no generator goes stale unnoticed.
   User-visible changes ship with their documentation in the same batch as the
   code — never let the manual lag a release.

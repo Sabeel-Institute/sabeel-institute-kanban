@@ -483,13 +483,13 @@ the flows, and keeps the same folder as `native-ios-<sha>`.
 
 Different job, different script. `screens-e2e.mjs` asserts; this one only
 produces the images `docs/USER-MANUAL.md` embeds, at the two sizes
-`render-manual.py` lays out for:
+`npx sabeel-ci render-manual` lays out for:
 
 ```sh
 scripts/dev.sh web              # emulators + web + seed, and WAIT for the seed
 node scripts/manual-shots.mjs   # every image → docs/manual/img/
 node scripts/manual-shots.mjs stats search   # or just the ones that changed
-python3 docs/render-manual.py   # rebuild docs/USER-MANUAL.pdf
+npx sabeel-ci render-manual     # rebuild docs/USER-MANUAL.pdf (needs uv and google-chrome)
 ```
 
 It covers **every** image the manual uses except `pending.png`, which needs an
