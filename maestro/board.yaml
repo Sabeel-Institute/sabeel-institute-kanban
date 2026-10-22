@@ -9,13 +9,21 @@ name: Board, card, rich text and gestures
 - extendedWaitUntil:
     visible: "Dev sign-in \\(emulator only\\)"
     timeout: 180000
-- tapOn: "faisal"
 # A card's texts are one accessibility label on iOS ("Fundraising 2026, 14
 # cards · 3 members"), and Maestro matches the whole label, so names here are
-# prefixes.
-- extendedWaitUntil:
-    visible: "Fundraising 2026[\\s\\S]*"
-    timeout: 60000
+# prefixes. On a busy CI Mac the debug app can reload once after its first
+# screen (Metro served the bundle twice on Kanban #30), taking a sign-in tap
+# with it; the tap gets one more try.
+- retry:
+    maxRetries: 1
+    commands:
+      - extendedWaitUntil:
+          visible: "Dev sign-in \\(emulator only\\)"
+          timeout: 60000
+      - tapOn: "faisal"
+      - extendedWaitUntil:
+          visible: "Fundraising 2026[\\s\\S]*"
+          timeout: 60000
 - runFlow:
     when:
       visible: "Not now"
