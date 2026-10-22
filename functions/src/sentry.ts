@@ -23,14 +23,38 @@ export const sentryDsn = defineSecret('SENTRY_DSN');
 
 let initialised = false;
 
-/** Initialise once, lazily, from a DSN supplied at call time. */
+/**
+ * Initialise once, lazily, from a DSN supplied at call time, with the same
+ * settings as the LMS's and the time tracker's functions.
+ *
+ * `dataCollection` keeps people out of the events: no user fields, cookies or
+ * HTTP bodies, and no header or query parameter that names a client address
+ * (`forwarded`, `*-ip`, `remote-*`, `via`, `*-user`).
+ */
 function ensureSentry(dsn: string | undefined): boolean {
   if (initialised) return true;
-  if (!dsn) return false;
+  // A real DSN is an https URL. Anything else — unset, or the `disabled`
+  // placeholder ci-tools writes into functions/.secret.local for the
+  // emulators — leaves reporting off without letting a bad value reach
+  // Sentry.init.
+  if (!dsn || !dsn.startsWith('https://')) return false;
   Sentry.init({
     dsn,
     tracesSampleRate: 0,
-    environment: process.env.NODE_ENV ?? 'development',
+    dataCollection: {
+      userInfo: false,
+      cookies: false,
+      httpHeaders: {
+        request: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] },
+        response: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] },
+      },
+      httpBodies: [],
+      urlQueryParams: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] },
+      genAI: { inputs: false, outputs: false },
+      databaseQueryData: false,
+      queues: false,
+      graphQL: { document: false, variables: false },
+    },
   });
   initialised = true;
   return true;
