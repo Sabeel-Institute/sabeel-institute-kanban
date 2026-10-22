@@ -14,9 +14,10 @@ import { APP_ID } from '@sabeel/shared';
  * request; each answers what Apple would.
  *
  * Not covered here, because only Apple can say: that Apple accepts this
- * project's real key and topic (`node scripts/check-push.mjs` asks it, with a
- * token that cannot exist), and that a phone shows the result (a simulator
- * with `scripts/send-test-push.mjs`, and a phone through TestFlight).
+ * project's real key and topic (`npx sabeel-ci check-push apple` asks it,
+ * with a token that cannot exist), and that a phone shows the result (a
+ * simulator with `npx sabeel-ci send-test-push --apple`, and a phone through
+ * TestFlight).
  * Plain-text HTTP/2 stands in for TLS; the requests are the same.
  */
 
