@@ -47,7 +47,13 @@ name: Board, card, rich text and gestures
 - inputText: "Native flow line"
 - tapOn: "Bold"
 - inputText: " bold"
-- hideKeyboard
+# Android's keyboard covers Save. iOS leaves it in view, and Maestro cannot
+# dismiss the native editor's keyboard there.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
 - tapOn: "Save"
 - extendedWaitUntil:
     visible: "[\\s\\S]*Native flow line bold[\\s\\S]*"
