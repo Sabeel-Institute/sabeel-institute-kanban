@@ -89,6 +89,26 @@ describe('the native sign-in gate', () => {
     await expect(signIn()).resolves.toBe('no-account');
   });
 
+  it('signs out of Google when the server cannot answer, so a retry opens the chooser', async () => {
+    googleSignIn.mockResolvedValue(chose('tok'));
+    googleSignOutNative.mockResolvedValue(undefined);
+    callable.mockRejectedValue(Object.assign(new Error('internal'), { code: 'functions/internal' }));
+
+    await expect(signIn()).rejects.toMatchObject({ code: 'functions/internal' });
+    expect(signInWithCredential).not.toHaveBeenCalled();
+    expect(googleSignOutNative).toHaveBeenCalledTimes(1);
+  });
+
+  it('signs out of Google when the exchange itself fails, and keeps its error', async () => {
+    googleSignIn.mockResolvedValue(chose('tok'));
+    googleSignOutNative.mockRejectedValue(new Error('sign-out failed'));
+    callable.mockResolvedValue({ data: { exists: true } });
+    signInWithCredential.mockRejectedValueOnce(Object.assign(new Error('network'), { code: 'auth/network-request-failed' }));
+
+    await expect(signIn()).rejects.toMatchObject({ code: 'auth/network-request-failed' });
+    expect(googleSignOutNative).toHaveBeenCalledTimes(1);
+  });
+
   it('signs in normally when the account exists', async () => {
     googleSignIn.mockResolvedValue(chose('tok'));
     callable.mockResolvedValue({ data: { exists: true } });
