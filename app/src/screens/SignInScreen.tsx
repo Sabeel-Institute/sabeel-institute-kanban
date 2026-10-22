@@ -151,11 +151,13 @@ export function SignInScreen() {
 
       {/*
         Emulator-only. Gated on __DEV__ AND the emulator flag, so it cannot reach
-        a release build. Verify by screenshot before publishing an APK — this row
-        must be absent.
+        a release build. Headed "Dev sign-in (emulator only)", testID
+        `dev-sign-in`, as in every Sabeel app: the release check
+        (`sabeel-ci check-release`) cold-starts the release build and fails if
+        this row is on screen.
       */}
       {devSignInAvailable ? (
-        <Card>
+        <Card testID="dev-sign-in">
           <Hint>Dev sign-in (emulator only)</Hint>
           <Row style={styles.wrap}>
             {DEV_ACCOUNTS.map((name) => (
@@ -176,8 +178,8 @@ export function SignInScreen() {
       ) : null}
 
       {/* Which build is running — so "what version are you on?" is answerable
-          from the screen everyone sees. Injected at build time by
-          scripts/gen-build-info.mjs. */}
+          from the screen everyone sees. Stamped at build time by
+          `sabeel-ci build-info`. */}
       {/* Also here, not only behind the More menu: an App Review reviewer sees
           this screen before any other, and 5.1.1(i) asks for the policy to be
           easily accessible IN the app. In the footer beside the build stamp,

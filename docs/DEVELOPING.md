@@ -17,13 +17,22 @@ root, and is idempotent:
 ```sh
 ../agent-skills/skills/expo-firebase-stack/tools/check-host.sh   # what is missing
 ../agent-skills/skills/expo-firebase-stack/tools/bootstrap-linux.sh \
-    --jdk21-aliases SK --repo "$PWD"
+    --jdk21-aliases SABEEL --repo "$PWD"
 ```
 
-`--jdk21-aliases SK` is what sets `SK_JDK21_HOME`, which `scripts/jdk21.sh`
-reads to find JDK 21 without disturbing the Gradle default. The scripts here
-fall back to `~/opt/jdk-21` and then to whatever `java` is on `PATH`, so a
-machine set up differently still works — but the variable is the reliable route.
+`--jdk21-aliases SABEEL` sets `SABEEL_JDK21_HOME`, the first place `npx
+sabeel-ci jdk21` looks for JDK 21 for the emulators; the Gradle default stays
+17. After it, `~/opt/jdk-21`, `JAVA_HOME`, the `java` on `PATH`, and where a Mac
+keeps one (`java_home -v 21`, Homebrew's `openjdk@21`, Android Studio's
+runtime), each run rather than trusted for existing — so a machine set up
+differently still works, but the variable is the reliable route.
+
+The CI, release, emulator and device tooling is the shared
+`Sabeel-Institute/ci-tools` package, a dev dependency pinned to a commit in
+`package-lock.json` and run as `npx sabeel-ci <command>` (its README lists
+them); `ci-tools.json` says what differs for this app. `scripts/` holds this
+app's own tools: the browser suites and their runner, the seed, the dev loop,
+the first-admin bootstrap and the data migrations.
 
 ```sh
 npm install     # once
@@ -33,26 +42,40 @@ npm install     # once
 
 Two terminals.
 
-**Terminal 1 — emulators** (Firestore, Auth, Functions):
+**Terminal 1 — emulators** (Firestore, Auth, Functions, Storage):
 
 ```sh
 npm run emulators
 ```
 
-> **This checkout owns ports 61200-61207** (firestore 61200, its websocket
+`sabeel-ci emulators`: it frees this checkout's ports, builds the functions
+(the Functions emulator loads the built bundle, so without the build it serves
+stale triggers, or none), and starts every emulator `firebase.json` runs under
+the demo project `demo-sabeel-kanban`. `npm run emulators:free` (`sabeel-ci
+free-emulator-ports`) stops a leftover run by itself: it stops only processes
+working inside this checkout, names any other holder of the block's ports with
+its pid and directory and stops nothing, and reaps functions runtimes an
+interrupted run orphaned.
+
+> **This checkout owns the port block 61200-61299**, ci-tools' block for this
+> app (`emulators.base` in `ci-tools.json`): firestore 61200, its websocket
 > 61201, auth 61202, functions 61203, ui 61204, hub 61205, logging 61206,
-> storage 61207) and **61210** for the Expo web dev server. The sibling Sabeel
-> repos own 61000+ and 61100+.
+> storage 61207, tasks 61208, eventarc 61209, and **61210** for the Expo web
+> dev server. Every Sabeel app sits at the same offsets in its own block (the
+> time tracker 61000+, LMS 61300+), so a port in a `ss` or `ps` line names its
+> app and service at a glance.
 >
-> Three of them share this machine. On the defaults 8080/9099/5001/9199,
-> whichever suite started second would kill the other's Firestore — and the
-> victim's symptoms would look like bugs in its own code. 61200+ because this box's
-> ephemeral range is 32768-60999 and Firebase's own defaults stop at 9499, so the
-> block collides with nothing chosen at random or by the CLI.
+> The apps share this machine. On Firebase's default ports, whichever suite
+> started second would kill the other's Firestore — and the victim's symptoms
+> would look like bugs in its own code. 61000+ because this box's ephemeral
+> range is 32768-60999 and Firebase's own defaults stop at 9499, so the block
+> collides with nothing chosen at random or by the CLI.
 >
-> `functions/test/unit/emulatorPorts.test.ts` holds firebase.json, `app/src/env.ts`,
-> `scripts/lib/ports.mjs`, `dev.sh`'s PORTS and `e2e.sh`'s WEB_PORT in step, and
-> refuses a sweep list containing anything this checkout does not own.
+> Scripts read the ports from ci-tools and state none: `scripts/lib/emulators.mjs`
+> in Node, `npx sabeel-ci ports <name>` in shell (`npx sabeel-ci ports` lists
+> them all). `firebase.json` and `app/src/env.ts` cannot, so they state them,
+> and `npx sabeel-ci check-app` (in CI) holds both in step with `ci-tools.json`
+> and fails a script or `package.json` that states one.
 >
 > **Metro's 8081 and idb's 10882 stay shared** — the Android emulator reaches the
 > host directly at `10.0.2.2:8081`, so that port cannot move. Concurrent *web*
@@ -80,8 +103,8 @@ scripts/dev.sh e2e        # stop, then run the full suite
 
 Always `stop` before starting anything. A stale emulator or Metro holding a port
 fails in ways that look like application bugs — `Could not start Authentication
-Emulator, port taken`, or worse, a dev server that answers on 61210 while serving
-code from a different checkout. `stop` re-checks the ports afterwards rather than
+Emulator, port taken`, or worse, a dev server that answers on the web port while
+serving code from a different checkout. `stop` re-checks the ports afterwards rather than
 trusting that a kill worked, because a silently-failed kill is exactly how a
 "cleared" port keeps serving yesterday's bundle.
 
@@ -146,11 +169,11 @@ curl -X DELETE "http://127.0.0.1:61202/emulator/v1/projects/demo-sabeel-kanban/a
 >
 > If `/proc/cpuinfo` shows `hypervisor` but neither `vmx` nor `svm`, nested
 > virtualization is off at the host and nothing inside the machine — root
-> included — can enable it. **`scripts/emulator.sh` handles this on its own**:
-> it checks per launch and adds `-accel off` only when there is no KVM, so an
-> accelerated machine is untouched and runs at full speed.
+> included — can enable it. **`npx sabeel-ci emulator` handles this on its
+> own**: it checks per launch and adds `-accel off` only when there is no KVM,
+> so an accelerated machine is untouched and runs at full speed.
 >
-> Start it through that script rather than by hand. `-accel auto` — the default
+> Start it through that command rather than by hand. `-accel auto` — the default
 > — does NOT fall back for an x86_64 image: it exits at once with *"x86_64
 > emulation currently requires hardware acceleration!"*, which looks like a
 > broken emulator instead of a missing CPU feature. Only an explicit
@@ -181,13 +204,16 @@ curl -X DELETE "http://127.0.0.1:61202/emulator/v1/projects/demo-sabeel-kanban/a
 Terminal 1 is the same (`npm run emulators`). Then:
 
 ```sh
-scripts/emulator.sh headless     # boot the tb_emu AVD (or `window` to watch it)
+npx sabeel-ci emulator headless  # boot the tb_emu AVD (or `window` to watch it)
 npm run dev:android              # build, install, launch (~2 min the first time)
 ```
 
-The AVD runs **headless** by default, so nothing appears on your desktop. Either
-use `scripts/emulator.sh window` to watch it live, or take screenshots:
-`scripts/emulator.sh shot my-screen` → `shots/my-screen.png`.
+The AVD is `tb_emu`, or the one `SABEEL_AVD` names. Every Sabeel checkout on
+the machine shares it, so `headless` and `window` refuse to boot it twice and
+name the process already running it, with the directory it was started from
+(`npx sabeel-ci emulator list` shows the same). Headless shows nothing on your
+desktop: use `npx sabeel-ci emulator window` to watch it live, or take
+screenshots: `npx sabeel-ci emulator shot my-screen` → `shots/my-screen.png`.
 
 Already built once? Just restart Metro and relaunch, which is much faster:
 
@@ -206,14 +232,15 @@ is the same account — approve once and both are in.
 The app reaches the emulators at `10.0.2.2` automatically — that's the Android
 emulator's alias for your machine, handled in `app/src/env.ts`.
 
-Screenshot what you see: `scripts/emulator.sh shot my-screen` → `shots/`.
+Screenshot what you see: `npx sabeel-ci emulator shot my-screen` → `shots/`.
 
 > **Metro port note.** Port 8081 is shared with your other React Native projects.
 > The Android emulator reaches Metro at `10.0.2.2:8081` — your machine, directly —
 > so `adb reverse` cannot redirect it. If another project's Metro holds 8081, this
 > app silently loads *that project's bundle* and shows a confusing red screen.
-> `npm run dev:android` refuses to start in that case and names the offending
-> process.
+> `npm run dev:android` (and `npm run android` / `npm run start` in `app/`)
+> runs `sabeel-ci preflight-metro` first, which refuses to start in that case
+> and names the offending process.
 
 ## Signing in
 
@@ -262,15 +289,45 @@ From then on, approve everyone else in-app under **Manage people**.
 ## Tests
 
 ```sh
-npm run lint
+npx sabeel-ci check-app   # what the shared tooling assumes of this repo
+npm run lint              # ESLint, the version check, no control bytes in sources
 npm run typecheck
-npm test              # unit: shared + functions
-npm run test:emulator # rules + real triggers/callables against the emulators
-npm run e2e           # full browser flow: sign-in, approval, live un-gating
+npm run knip              # dead code: unused files, exports, dependencies
+npm test                  # unit: shared, functions and the app's pure logic
+npm run test:emulator     # rules + real triggers/callables against the emulators
+npm run test:e2e          # full browser flow: sign-in, approval, live un-gating
 ```
 
-`npm run e2e` writes screenshots to `shots/`, and on failure dumps what each page
-actually displayed — much faster than guessing.
+CI runs all of them, and every browser suite (below).
+
+`npm run test:emulator` is `sabeel-ci test-emulator`: it builds, frees this
+checkout's ports, then runs the functions workspace's two passes against
+different emulator sets. `test:emulator:rules` runs without the Functions
+emulator, so a write fires no trigger: it first rehearses the board-ownership
+migration scripts end to end (`scripts/migration-e2e.mjs`, on an empty
+project), then the rules suites. `test:emulator:functions` runs the triggers
+and callables. A resident Gradle daemon is reported, not stopped:
+`SABEEL_STOP_GRADLE=1 npm run test:emulator` stops it, and every other
+checkout's with it, since they share one registry.
+
+The browser suites are npm scripts, each `bash scripts/e2e.sh <suite>`, which
+starts the emulators and an Expo web dev server on the `web` port, runs the
+suite, and stops both (the server's log is `shots/e2e-web-server.log`):
+
+| Script | Suite |
+|---|---|
+| `npm run test:screens` | every screen at every width (below) |
+| `npm run test:e2e` | the full flow |
+| `npm run test:e2e:attachments` | attachments |
+| `npm run test:e2e:stats` | Stats |
+| `npm run test:e2e:richtext` | the rich-text editor |
+| `npm run test:e2e:typing-perf` | typing cost on a busy screen against an empty one |
+
+They are the list CI runs, one runner each (`ci.browserSuites` in
+`ci-tools.json`); `scripts/e2e-all.sh` runs them all here, one at a time
+(`scripts/e2e-all.sh richtext web` for some, by short name). They write
+screenshots to `shots/`, and on failure dump what each page actually displayed —
+much faster than guessing.
 
 ### Every screen, every width
 
@@ -278,24 +335,24 @@ One harness covers this — it seeds, signs in, walks every authenticated screen
 at five widths, **asserts**, and writes a screenshot of each:
 
 ```sh
-bash scripts/e2e.sh scripts/screens-e2e.mjs                   # the CI set
-SWEEP_FULL=1 bash scripts/e2e.sh scripts/screens-e2e.mjs      # + device profiles
-SWEEP_WIDTHS=320 bash scripts/e2e.sh scripts/screens-e2e.mjs  # one width, while iterating
+npm run test:screens                   # the CI set
+SWEEP_FULL=1 npm run test:screens      # + device profiles
+SWEEP_WIDTHS=320 npm run test:screens  # one width, while iterating
 ```
 
 → `shots/screens/<width>-<screen>.png`, one per screen per viewport.
 
 **Review a sweep in its report.** The sweep also writes every check
 (`results.json`) to `shots/screens/`, which is emptied at the start of each run;
-`scripts/screens-report.mjs` turns them into one page: every screen at every
+`npx sabeel-ci screens-report` turns them into one page: every screen at every
 width side by side, the failed checks beside the screenshot they are about,
 and what changed against a baseline sweep as before / after / difference. A
 filter narrows it to a screen or a width, or to what failed or changed.
 `manifest.json` beside the page holds the same data for an agent.
 
 ```sh
-node scripts/screens-report.mjs shots/screens --baseline-from-main   # → shots/screens-report/index.html
-node scripts/screens-report.mjs shots/screens --baseline <dir of screenshots>
+npx sabeel-ci screens-report shots/screens --baseline-from-main   # → shots/screens-report/index.html
+npx sabeel-ci screens-report shots/screens --baseline <dir of screenshots>
 ```
 
 `--baseline-from-main` compares with the report of the latest successful CI
@@ -337,15 +394,15 @@ Two rules this encodes, both learned expensively:
 `verify-board-owners.mjs` are run by hand against **production** a handful of
 times each, so nothing else exercises them. This does, against seeded awkward
 data, driving each as a real subprocess because three of their gates ARE exit
-codes:
+codes: `scripts/migration-e2e.mjs`, which `npm run test:emulator` runs first in
+its rules pass, on an empty project with no Functions emulator, so no trigger
+adds writes it would have to reason about. CI runs it on every push. Alone:
 
 ```sh
-. scripts/jdk21.sh
-firebase emulators:exec --project demo-sabeel-kanban --only firestore,auth \
-  "node scripts/migration-e2e.mjs"
+JAVA_HOME=$(npx sabeel-ci jdk21) firebase emulators:exec \
+  --project demo-sabeel-kanban --only firestore,auth "node scripts/migration-e2e.mjs"
 ```
-
-CI runs it on every push. `docs/DEPLOY.md` § Restoring across the board-ownership
+ `docs/DEPLOY.md` § Restoring across the board-ownership
 migration says when to reach for the scripts themselves.
 
 **And against the shape of the real database.** The fixtures above contain every
@@ -355,7 +412,8 @@ harness can replay the structure that actually exists —
 
 ```sh
 GCLOUD_PROJECT=sabeel-institute-kanban node scripts/dump-migration-shape.mjs
-firebase emulators:exec --project demo-sabeel-kanban --only firestore,auth \
+JAVA_HOME=$(npx sabeel-ci jdk21) firebase emulators:exec \
+  --project demo-sabeel-kanban --only firestore,auth \
   "node scripts/migration-e2e.mjs --shape migration/shape-sabeel-institute-kanban.json"
 ```
 
@@ -373,15 +431,17 @@ Run both. Neither substitutes for the other.
 
 ### Native flows on the Android emulator
 
-`bash scripts/native-e2e.sh` runs the Maestro flows in `maestro/` against the
-debug build: it builds and installs the APK, starts the emulators, seeds them
-through the web app (`npm run seed`), serves the JavaScript from Metro on 8081
+`npx sabeel-ci native-e2e` runs the Maestro flows in `maestro/` against the
+debug build: it builds and installs the APK, starts the emulators (`sabeel-ci
+emulators`), seeds them through the web app (`scripts/seed-dev.mjs`, the
+`native.seed` of `ci-tools.json`, with a web dev server on the `web` port for
+it, since `native.seedWeb` is set), serves the JavaScript from Metro on 8081
 with `EXPO_PUBLIC_USE_EMULATORS=1`, and runs every flow, or the one you name
-(`bash scripts/native-e2e.sh maestro/board.yaml`). It needs one booted emulator
-(`scripts/emulator.sh headless`) and installs the pinned Maestro itself
-(`scripts/install-maestro.sh`). Screenshots, Maestro's JUnit report and the
+(`npx sabeel-ci native-e2e maestro/board.yaml`). It needs one booted emulator
+(`npx sabeel-ci emulator headless`) and installs the pinned Maestro itself
+(`npx sabeel-ci install-maestro`). Screenshots, Maestro's JUnit report and the
 emulator, web, Metro and device logs land in `shots/native/`. It refuses a held
-8081 or 61210 and stops only what it started.
+8081 or web port and stops only what it started.
 
 `maestro/board.yaml` signs in, pages and swipes the columns, opens a card, types
 into the native rich-text editor, bolds a word and saves, long-presses to select,
@@ -391,12 +451,15 @@ warning, and the toast takes the taps meant for the tabs, so the runner starts
 Metro with `EXPO_PUBLIC_E2E=1` and `app/index.ts` then tells LogBox to ignore
 warnings; they still reach `logs/metro.log`.
 
-**On the iOS simulator**: `bash scripts/native-e2e.sh --ios` (macOS) builds the
-debug app for the simulator with `scripts/ios-sim-build.sh` (a prebuild scoped
+**On the iOS simulator**: `npx sabeel-ci native-e2e --ios` (macOS) builds the
+debug app for the simulator with `sabeel-ci ios-sim-build` (a prebuild scoped
 to iOS, the committed `Podfile.lock`, `xcodebuild` for `iphonesimulator`),
 installs it on a booted iPhone simulator, and runs the same flows. Each flow
-takes the installed app's id as `${APP_ID}`, since the Android and iOS builds
-differ. On iOS a pressable card's texts are one accessibility label and
+names its app `appId: ${APP_ID}`, which `native-e2e` sets to the build it
+installed, since the Android and iOS builds differ (`npx sabeel-ci check-app`
+fails a flow that names its own). The flows find the dev sign-in row by its
+heading, "Dev sign-in (emulator only)" (testID `dev-sign-in`), the same in every
+Sabeel app. On iOS a pressable card's texts are one accessibility label and
 Maestro matches a label whole, so texts inside a card or a row are matched as
 part of one (`"Fundraising 2026[\s\S]*"`).
 
@@ -409,8 +472,9 @@ kept; any other failure stands. A failed run also keeps Maestro's view of the
 screen (`logs/hierarchy-at-failure.json`), the labels to match against.
 
 The **Native** workflow runs the same command on GitHub's emulator
-(`scripts/ci-avd.sh`) on every main push, every release tag, every pull
-request that changes the flows or their scripts, and by hand, and keeps
+(`sabeel-ci ci-avd`) on every main push, every release tag, every pull
+request that changes the flows, their seed, `ci-tools.json` or the
+`package-lock.json` that pins ci-tools, and by hand, and keeps
 `shots/native/` as the `native-<sha>` artifact. Its `ios` job runs `--ios` on a
 macOS runner for release tags, by hand and for pull requests that change
 the flows, and keeps the same folder as `native-ios-<sha>`.
@@ -439,7 +503,7 @@ look at the real Android app against seeded data:
 
 ```sh
 npm run dev:android           # debug build, emulator-backed (dev sign-in row)
-scripts/emulator.sh shot NAME
+npx sabeel-ci emulator shot NAME
 ```
 
 Two traps that cost time here: a debug build loads its JS **from Metro at

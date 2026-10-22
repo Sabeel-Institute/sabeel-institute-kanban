@@ -2,15 +2,22 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# Web end-to-end against the emulators.
+# One browser suite against the emulators and an Expo web dev server, both
+# started here and both stopped on exit. The npm scripts `test:screens`,
+# `test:e2e` and `test:e2e:*` run it, and CI runs those (ci-tools.json
+# `ci.browserSuites`).
+#
+#   bash scripts/e2e.sh scripts/<suite>-e2e.mjs
 #
 # Drives the Expo web DEV server, not an exported bundle: `expo export` sets
 # __DEV__ false, which correctly strips the emulator dev sign-in this flow needs
 # to drive. The script also builds the PRODUCTION bundle and asserts the dev row
 # is absent from it — so the safety property is tested, not assumed.
+#
+# The web port, the emulator project and JDK 21 come from ci-tools
+# (`npx sabeel-ci ports web`, ci-tools.json, `npx sabeel-ci jdk21`); no port is
+# stated here.
 
-# shellcheck source=scripts/jdk21.sh
-. "$(dirname "$0")/jdk21.sh"
 # shellcheck source=scripts/lib/procs.sh
 . "$(dirname "$0")/lib/procs.sh"
 if [ -z "$PORT_TOOL" ]; then
@@ -18,8 +25,20 @@ if [ -z "$PORT_TOOL" ]; then
   exit 1
 fi
 
-WEB_PORT=61210
+# The Firebase emulators need JDK 21 or later; the Android build keeps 17 as
+# the default `java`, so only this run is pointed at 21.
+JAVA_HOME=$(npx --no sabeel-ci jdk21)
+export JAVA_HOME PATH="$JAVA_HOME/bin:$PATH"
+
+WEB_PORT=$(npx --no sabeel-ci ports web)
+PROJECT=$(node -p "require('./ci-tools.json').emulators.project")
 export E2E_BASE="http://127.0.0.1:${WEB_PORT}/"
+# In this checkout, under shots/ (which CI keeps when a suite fails), not a
+# fixed /tmp name another checkout's run would overwrite. Absolute: the server
+# starts from app/, the readiness check below reads it from here.
+WEB_LOG="$PWD/shots/e2e-web-server.log"
+mkdir -p "$(dirname "$WEB_LOG")"
+: >"$WEB_LOG"
 
 npm run build -w @sabeel/shared
 npm run build -w functions
@@ -45,8 +64,8 @@ fi
 # LEAVE NOTHING RUNNING: stop the web server this script started — its pid and
 # every descendant (npm exec -> expo -> Metro workers), by pid — then check the
 # port is free. Killing only the listener used to leave its `npm exec` parent,
-# and the final `exec firebase` meant this trap never ran at all: every run
-# left a dev server on 61210 for the next one to trip over.
+# and a final `exec firebase` would take this trap with it: every run would
+# leave a dev server on the web port for the next one to trip over.
 # shellcheck disable=SC2329 # invoked by the EXIT trap
 cleanup() {
   local rc=$? left
@@ -87,8 +106,8 @@ echo "Starting Expo web dev server on ${WEB_PORT}…"
 # the check that it "says exactly one thing about this device" could never see
 # the other three. The permission states are the point of that panel.
 #
-# The value is deliberately NOT shaped like a VAPID key: `check-web-push.mjs`
-# looks for 87 base64url characters, so if this ever reached an exported bundle
+# The value is deliberately NOT shaped like a VAPID key: `sabeel-ci
+# check-web-push` looks for 87 base64url characters, so if this ever reached an exported bundle
 # the release gate would fail with "no VAPID key" rather than pass on a fake.
 # Nothing here can reach `getToken` in any case — `claimToken` returns on
 # USE_EMULATORS before the key is ever used.
@@ -100,7 +119,7 @@ echo "Starting Expo web dev server on ${WEB_PORT}…"
 # whose death would leave it running.
 ( cd app && CI=1 EXPO_PUBLIC_USE_EMULATORS=1 \
     EXPO_PUBLIC_FCM_VAPID_KEY=e2e-fake-vapid-key-not-a-real-one \
-    exec npx expo start --web --port "$WEB_PORT" --clear >/tmp/sk-web-e2e.log 2>&1 ) &
+    exec npx expo start --web --port "$WEB_PORT" --clear >"$WEB_LOG" 2>&1 ) &
 WEB_PID=$!
 
 # Wait for the dev server. The refusal above means whatever answers on this port
@@ -108,7 +127,7 @@ WEB_PID=$!
 # explicitly, because that is the failure that silently serves stale code.
 ready=""
 for _ in $(seq 1 90); do
-  if grep -qi "is being used by another process" /tmp/sk-web-e2e.log 2>/dev/null; then
+  if grep -qi "is being used by another process" "$WEB_LOG" 2>/dev/null; then
     echo "Another process grabbed port ${WEB_PORT}; refusing to test stale code." >&2
     exit 1
   fi
@@ -119,8 +138,8 @@ for _ in $(seq 1 90); do
   sleep 2
 done
 if [ -z "$ready" ]; then
-  echo "Expo web dev server never became ready — see /tmp/sk-web-e2e.log" >&2
-  tail -25 /tmp/sk-web-e2e.log >&2 || true
+  echo "Expo web dev server never became ready — see $WEB_LOG" >&2
+  tail -25 "$WEB_LOG" >&2 || true
   exit 1
 fi
 
@@ -133,7 +152,7 @@ SUITE="${1:-scripts/web-e2e.mjs}"
 # FOREGROUND child exits: a TERM sent to this script would otherwise sit there
 # until the suite finished. The suite's exit status is passed on via `cleanup`.
 firebase emulators:exec \
-  --project demo-sabeel-kanban \
+  --project "$PROJECT" \
   --only firestore,auth,functions,storage \
   "node ${SUITE}" &
 FB_PID=$!

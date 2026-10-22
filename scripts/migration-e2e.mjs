@@ -1,8 +1,12 @@
 /**
  * The board-ownership migration scripts, rehearsed end to end.
  *
- *   . scripts/jdk21.sh && firebase emulators:exec --project demo-sabeel-kanban \
- *     --only firestore,auth "node scripts/migration-e2e.mjs"
+ *   npm run test:emulator    # its rules pass runs this first, on an empty project
+ *
+ *   # alone, or against a production shape (`--shape`, below):
+ *   JAVA_HOME=$(npx sabeel-ci jdk21) firebase emulators:exec \
+ *     --project demo-sabeel-kanban --only firestore,auth \
+ *     "node scripts/migration-e2e.mjs [--shape migration/shape-<project>.json]"
  *
  * These four scripts change who can do what, against live production data, and
  * they are run by hand at most a handful of times — so nothing else exercises
@@ -27,11 +31,15 @@ import { shapeMode } from './migration-shape-replay.mjs';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import { EMULATOR_PORTS } from './lib/ports.mjs';
+import { PORTS, PROJECT } from './lib/emulators.mjs';
 
-const PROJECT = 'demo-sabeel-kanban';
-process.env.FIRESTORE_EMULATOR_HOST ??= `127.0.0.1:${EMULATOR_PORTS.firestore}`;
-process.env.FIREBASE_AUTH_EMULATOR_HOST ??= `127.0.0.1:${EMULATOR_PORTS.auth}`;
+// The scripts under test write their manifests to `migration/` relative to the
+// working directory, as an operator runs them from the repo root. So does this,
+// whoever starts it: `npm run test:emulator` starts it in functions/.
+process.chdir(resolve(import.meta.dirname, '..'));
+
+process.env.FIRESTORE_EMULATOR_HOST ??= `127.0.0.1:${PORTS.firestore}`;
+process.env.FIREBASE_AUTH_EMULATOR_HOST ??= `127.0.0.1:${PORTS.auth}`;
 process.env.GCLOUD_PROJECT = PROJECT;
 
 const MANIFEST = resolve(import.meta.dirname, '..', 'migration', 'rehearsal-role-rename.json');

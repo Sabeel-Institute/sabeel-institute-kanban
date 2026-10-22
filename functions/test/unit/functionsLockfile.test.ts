@@ -13,8 +13,10 @@ import { resolve } from 'node:path';
  * With the lockfile the buildpack runs `npm ci`, which resolves nothing.
  *
  * `npm ci` refuses a lockfile whose root block disagrees with package.json,
- * and that refusal would arrive at deploy time, after everything else passed.
- * This is the same check, in CI. Regenerating the lockfile: docs/DEPLOY.md.
+ * and that refusal would arrive at deploy time, after everything else passed:
+ * `npx sabeel-ci check-app` (in CI) holds the root block to the manifest, and
+ * this holds the lockfile to resolving what it declares. Regenerating the
+ * lockfile: docs/DEPLOY.md.
  *
  * Paths resolve from the functions workspace, vitest's cwd here.
  */
@@ -22,14 +24,6 @@ const pkg = JSON.parse(readFileSync(resolve('package.json'), 'utf8'));
 const lock = JSON.parse(readFileSync(resolve('package-lock.json'), 'utf8'));
 
 describe('the functions lockfile', () => {
-  it('declares exactly what functions/package.json declares', () => {
-    const root = lock.packages[''];
-    expect({ dependencies: root.dependencies, devDependencies: root.devDependencies }).toEqual({
-      dependencies: pkg.dependencies,
-      devDependencies: pkg.devDependencies,
-    });
-  });
-
   it('resolves every runtime dependency', () => {
     for (const name of Object.keys(pkg.dependencies)) {
       expect({ name, version: lock.packages[`node_modules/${name}`]?.version }).toEqual({

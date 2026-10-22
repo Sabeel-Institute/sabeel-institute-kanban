@@ -4,9 +4,10 @@ import { readFileSync, readdirSync } from 'node:fs';
 /**
  * Every integration suite is actually RUN by one of the two emulator passes.
  *
- * `test:integration:rules` and `test:integration:fn` list their files
- * explicitly, and they have to: the two passes need different emulator sets, and
- * mixing them reintroduces a real flake (see scripts/test-emulator.sh). The cost
+ * `test:emulator:rules` and `test:emulator:functions` list their files
+ * explicitly, and they have to: the two passes need different emulator sets
+ * (`sabeel-ci test-emulator` starts the first without the Functions emulator),
+ * and mixing them reintroduces a real flake. The cost
  * of that is a new suite being silently skipped — added, green locally, never
  * executed, and the totals look unchanged because they ARE unchanged.
  *
@@ -18,7 +19,7 @@ describe('emulator suite coverage', () => {
     // Paths are relative to the functions workspace, which is vitest's cwd —
     // the same way the rules suites read '../firestore.rules'.
     const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
-    const listed = `${pkg.scripts['test:integration:rules']} ${pkg.scripts['test:integration:fn']}`;
+    const listed = `${pkg.scripts['test:emulator:rules']} ${pkg.scripts['test:emulator:functions']}`;
 
     const onDisk = readdirSync('test/integration').filter((f) => f.endsWith('.test.ts'));
     expect(onDisk.length).toBeGreaterThan(0);

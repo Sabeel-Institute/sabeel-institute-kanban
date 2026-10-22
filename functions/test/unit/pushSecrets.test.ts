@@ -18,7 +18,7 @@ import { resolve } from 'node:path';
  */
 
 // Paths resolve from the functions workspace, vitest's cwd here — the same
-// convention emulatorPorts.test.ts uses.
+// convention suite-coverage.test.ts uses.
 const SRC = resolve('src');
 
 /** The exported functions (deployed ones are `export const X = on…(`) that call `notify(`. */

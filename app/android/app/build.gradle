@@ -2,6 +2,8 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
+def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
+
 /**
  * Sentry source-map upload, so an Android crash reports function names rather
  * than minified frames — the same thing `@sentry/react-native/expo` does for
@@ -12,74 +14,62 @@ apply plugin: "com.facebook.react"
  * can never reach Android. Wiring it in Gradle is not a workaround; it is the
  * only mechanism that applies to a bare-workflow native folder.
  *
- * GATED ON THE ENVIRONMENT, and that gate is load-bearing. Without
- * SENTRY_AUTH_TOKEN this block does nothing at all, so CI, a fresh clone and any
- * machine without the token build exactly what they built before. The release
- * path must not acquire a dependency on a network service that can fail.
- *
- * THE SAME THREE VARIABLES SERVE BOTH PLATFORMS — SENTRY_ORG, SENTRY_PROJECT and
- * SENTRY_AUTH_TOKEN — because `sentry-cli` reads them from the environment and
- * the Expo plugin is registered bare so that it falls back to them too. One set
- * of names, one place to set them, and nothing project-identifying committed to
- * a public repo. Deliberately NOT the sibling time-tracker's `sentry.properties`
- * file: that would be a second source for the same three values, and the two
- * would drift. See docs/SECRETS.md.
+ * GATED ON app/.env.sentry-build-plugin, the gitignored file that carries
+ * SENTRY_ORG, SENTRY_PROJECT and SENTRY_AUTH_TOKEN for both platforms: the
+ * iOS build loads it (`sabeel-ci build-ios`), and sentry.gradle hands it to
+ * sentry-cli as SENTRY_DOTENV_PATH. One file, one set of names, nothing
+ * project-identifying committed to a public repo (docs/SECRETS.md). The token
+ * in the environment works too. Without either this block applies nothing, so
+ * CI, a fresh clone and any machine without the token build exactly what they
+ * built before: the release path never depends on a network service that can
+ * fail. A release build that would upload nothing says so.
  *
  * Android and iOS report to ONE Sentry project, since both read
  * EXPO_PUBLIC_SENTRY_DSN_NATIVE — so SENTRY_PROJECT is a single value and parity
  * is structural rather than something to keep in step.
  */
-if (System.getenv("SENTRY_AUTH_TOKEN")) {
+if (file("$projectRoot/.env.sentry-build-plugin").exists() || System.getenv("SENTRY_AUTH_TOKEN")) {
     apply from: new File(["node", "--print", "require.resolve('@sentry/react-native/package.json')"].execute(null, rootDir).text.trim(), "../sentry.gradle")
+} else if (gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }) {
+    logger.warn('*** No app/.env.sentry-build-plugin and no SENTRY_AUTH_TOKEN: this release build uploads no ' +
+        'source maps, so its crashes arrive in Sentry as minified frames (docs/SECRETS.md). ***')
 }
 
-def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
-
 /**
- * Single source of version truth: app.json.
+ * The app version has ONE source of truth: app.json → expo.version. Nothing
+ * here carries its own copy — two copies desync silently, and the symptom is
+ * every release reporting the same version to Sentry.
  *
- * versionName / versionCode used to be the Gradle scaffold defaults ("0.1.0", 1)
- * and were never bumped, so every release shipped from here reported to Sentry
- * as com.sabeelinstitute.kanban@0.1.0+1 — seven builds indistinguishable, and
- * release-health tracking dead. Deriving both from app.json means a version bump
- * happens in exactly one place and cannot silently desync again.
+ * versionCode is major * 1000000 + minor * 1000 + patch (0.12.2 is 12002), the
+ * scheme every Sabeel app uses (ci-tools' lib/version.mjs), and the iOS build
+ * number is the same number. Three digits each for minor and patch: two
+ * collide (0.1.100 and 0.2.0 both give 200), and Android refuses an install
+ * whose versionCode is not greater than the installed one, so that release
+ * simply never goes out.
  *
- * versionCode is computed from the semver so it increases monotonically:
- * major*1000000 + minor*1000 + patch (0.1.7 -> 1007).
+ * These checks are also `npx sabeel-ci check-version` on purpose: that one
+ * must catch a web-only release that never runs Gradle, and this one must fail
+ * even when nobody ran it — which is exactly the case where a hole here
+ * matters. The regex below must stay CHARACTER-IDENTICAL to the one there.
  *
- * The multipliers used to be 10000/100, which gave each component only two
- * digits — and 0.1.100 and 0.2.0 both computed to 200. A COLLISION, not merely a
- * quirk: Android refuses an install whose versionCode is not greater than the
- * installed one, and Play rejects a duplicate outright, so the release after
- * 0.1.99 would simply have failed to go out. At the rate patches were landing
- * that was weeks away, not years. Widening is safe because it only ever produces
- * LARGER codes than the old scheme (0.1.33: 133 -> 1033), so monotonicity across
- * the change is preserved.
- *
- * Room for 999 minor and 999 patch, and major up to ~2147 before Android's
- * signed-32-bit ceiling (2100000000). Anything out of range STOPS the build
- * rather than silently colliding again.
- *
- * The version itself must stay App-Store-legal (three integers, no suffix) —
- * scripts/check-version.mjs enforces that, and it is why nothing here strips a
- * pre-release suffix any more: there must not be one to strip.
+ * It rejects leading zeros, which the naive /^\d+\.\d+\.\d+$/ accepts:
+ * `2026.07.01` is three dot-separated integers, but 07 and 7 are the same
+ * number, so 2026.07.01 and 2026.7.1 compute the SAME versionCode.
  */
 def expoVersion = new groovy.json.JsonSlurper()
     .parse(file("$projectRoot/app.json")).expo.version
-// No leading zeros: `2026.07.01` passes a naive \d+ check and is even legal to
-// Apple, but 07 and 7 are the same number — so the scheme silently stops
-// increasing, and the arithmetic below reads 7 where a human reads 07.
-def versionParts = expoVersion.tokenize('.')
-if (versionParts.size() != 3 || !expoVersion.matches(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/)) {
+if (!expoVersion.matches(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/)) {
     throw new GradleException(
-        "app.json version '${expoVersion}' must be exactly three integers (X.Y.Z), " +
-        "no leading zeros — see scripts/check-version.mjs.")
+        "app.json version '${expoVersion}' must be exactly three integers (X.Y.Z) " +
+        "with no leading zeros — no pre-release suffix, no fourth component, no " +
+        "date-style components. See `npx sabeel-ci check-version`.")
 }
-def (vMajor, vMinor, vPatch) = versionParts.collect { it.toInteger() }
-if (vMinor > 999 || vPatch > 999 || vMajor > 2147) {
+def (vMajor, vMinor, vPatch) = expoVersion.tokenize('.').collect { it.toInteger() }
+// Major at most 2100 keeps the sum below Integer.MAX_VALUE before it is compared.
+if (vMinor > 999 || vPatch > 999 || vMajor > 2100 || vMajor * 1000000 + vMinor * 1000 + vPatch > 2100000000) {
     throw new GradleException(
         "app.json version '${expoVersion}' overflows the versionCode scheme " +
-        "(minor/patch max 999, major max 2147).")
+        "(minor and patch at most 999, the code at most 2100000000, Play's limit).")
 }
 def computedVersionCode = vMajor * 1000000 + vMinor * 1000 + vPatch
 
@@ -182,29 +172,32 @@ android {
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
     /**
-     * Release signing. The keystore and its passwords live OUTSIDE the repo, in
-     * a gitignored `app/android/keystore.properties`:
+     * Release builds sign with the app's own key, never the debug one.
+     *
+     * The debug keystore is public — it is committed here and ships with every
+     * Android SDK — so a release signed with it could be rebuilt by anyone and
+     * installed OVER the real app as an update. The release key lives outside
+     * the repo, named by `~/.config/sabeel-kanban/keystore.properties` (or
+     * wherever SABEEL_KEYSTORE_PROPERTIES points, as ci-tools' `ci-platform`
+     * sets it in CI):
      *
      *     storeFile=/absolute/path/to/sabeel-kanban-upload.jks
      *     storePassword=...
      *     keyAlias=upload
      *     keyPassword=...
      *
-     * Never in this file, and never in git — this repo is public. The keystore
-     * and this file exist already: restore both from the vault, never generate
-     * a new key (docs/SECRETS.md).
-     *
-     * When the file is absent the release build falls back to the DEBUG key so
-     * local builds still work, but it says so loudly, and scripts/publish-apk.sh
-     * refuses to publish the result. A debug-signed release is exactly the kind
-     * of failure that imitates success: the APK installs and runs perfectly, and
-     * the only symptom is that anyone holding this public repo can sign an
-     * update Android will accept as this app.
+     * docs/SECRETS.md says what it is and how it is backed up; restore it from
+     * the vault, never generate a new key. Without that file the release
+     * signing config stays empty and the check below the android block stops
+     * any release packaging or signing task before it runs: fail closed, never
+     * fall back to the debug key, and never leave an unsigned artifact beside
+     * the signed ones. Debug builds are unaffected.
      */
-    def keystorePropsFile = rootProject.file('keystore.properties')
-    def keystoreProps = new Properties()
-    if (keystorePropsFile.exists()) {
-        keystorePropsFile.withInputStream { keystoreProps.load(it) }
+    def releaseKeyProps = new Properties()
+    def releaseKeyFile = file(System.getenv('SABEEL_KEYSTORE_PROPERTIES')
+        ?: "${System.getProperty('user.home')}/.config/sabeel-kanban/keystore.properties")
+    if (releaseKeyFile.exists()) {
+        releaseKeyFile.withInputStream { releaseKeyProps.load(it) }
     }
     signingConfigs {
         debug {
@@ -213,12 +206,12 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
-        if (keystorePropsFile.exists()) {
-            release {
-                storeFile file(keystoreProps['storeFile'])
-                storePassword keystoreProps['storePassword']
-                keyAlias keystoreProps['keyAlias']
-                keyPassword keystoreProps['keyPassword']
+        release {
+            if (releaseKeyProps['storeFile']) {
+                storeFile file(releaseKeyProps['storeFile'])
+                storePassword releaseKeyProps['storePassword']
+                keyAlias releaseKeyProps['keyAlias']
+                keyPassword releaseKeyProps['keyPassword']
             }
         }
     }
@@ -283,13 +276,7 @@ android {
             applicationIdSuffix '.debug'
         }
         release {
-            if (keystorePropsFile.exists()) {
-                signingConfig signingConfigs.release
-            } else {
-                logger.warn('*** RELEASE BUILD IS DEBUG-SIGNED: app/android/keystore.properties ' +
-                    'is missing. Fine locally; NOT publishable. Restore it from the vault: docs/SECRETS.md. ***')
-                signingConfig signingConfigs.debug
-            }
+            signingConfig signingConfigs.release
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds
@@ -355,6 +342,25 @@ dependencies {
         implementation("com.facebook.react:hermes-android")
     } else {
         implementation jscFlavor
+    }
+}
+
+/**
+ * Fail closed. Left to itself, AGP packages a release whose signing config
+ * has no keystore as an UNSIGNED artifact rather than failing, so a missing key
+ * shows up later, or not at all. A release packaging or signing task stops
+ * here instead, naming the file it looked for. The pre-merge build removes the
+ * release signing config on purpose (ci-tools' `ci-premerge`) to build an
+ * unsigned bundle with no secrets, and passes.
+ */
+gradle.taskGraph.whenReady { graph ->
+    def releaseSigning = android.buildTypes.release.signingConfig
+    def packagesRelease = graph.allTasks.any { it.project == project && it.name ==~ /^(package|sign)Release(Bundle)?$/ }
+    if (packagesRelease && releaseSigning != null && releaseSigning.storeFile == null) {
+        throw new GradleException(
+            "No release key: ${System.getenv('SABEEL_KEYSTORE_PROPERTIES') ?: '~/.config/sabeel-kanban/keystore.properties'} " +
+            "is missing or names no storeFile. Restore it from the vault (docs/SECRETS.md); a release is never " +
+            "signed with the debug key, and never left unsigned.")
     }
 }
 

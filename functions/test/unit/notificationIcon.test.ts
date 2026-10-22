@@ -24,7 +24,7 @@ import { resolve } from 'node:path';
  * ever the launcher mipmap — the exact three ways the drift can come back.
  *
  * Paths resolve from the functions workspace, which is vitest's cwd here — the
- * same convention `emulatorPorts.test.ts` uses.
+ * same convention `suite-coverage.test.ts` uses.
  */
 const manifest = readFileSync(
   resolve('..', 'app/android/app/src/main/AndroidManifest.xml'),

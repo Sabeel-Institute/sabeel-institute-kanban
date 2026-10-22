@@ -202,7 +202,7 @@ if (claimless.length) {
 
 console.log(
   '\nRehearse the whole upgrade against this shape, on the emulators:\n' +
-    '  . scripts/jdk21.sh && firebase emulators:exec --project demo-sabeel-kanban \\\n' +
+    '  JAVA_HOME=$(npx sabeel-ci jdk21) firebase emulators:exec --project demo-sabeel-kanban \\\n' +
     `    --only firestore,auth "node scripts/migration-e2e.mjs --shape ${shapePath}"`,
 );
 process.exit(0);

@@ -13,25 +13,24 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { EMULATOR_PROJECT_ID, EMULATOR_STORAGE_BUCKET } from '@sabeel/shared';
 
-export const PROJECT_ID = EMULATOR_PROJECT_ID;
+const PROJECT_ID = EMULATOR_PROJECT_ID;
 
 /**
  * READ the emulator hosts; never assign them.
  *
- * This file used to *overwrite* what `emulators:exec` had already exported,
- * pinning every integration test to 127.0.0.1:8080 whatever `firebase.json`
- * said. On a machine where three checkouts run emulators that is the one
- * genuinely dangerous state in this codebase: the suite would connect to
- * whatever sat on 8080 — possibly a SIBLING repo's Firestore — read and write
- * happily, and pass.
+ * Overwriting what `emulators:exec` exported would pin every integration test
+ * to one address whatever `firebase.json` says. On a machine where three
+ * checkouts run emulators that is the one genuinely dangerous state in this
+ * codebase: the suite would connect to whatever sat there — possibly a SIBLING
+ * repo's Firestore — read and write happily, and pass.
  *
- * LAZY, not module-load. The two integration sets run against DIFFERENT emulator
- * sets (see scripts/test-emulator.sh): the rules set is `--only
- * firestore,storage`, so FIREBASE_AUTH_EMULATOR_HOST is legitimately absent
- * there. `concurrentMoves.test.ts` rides along in that set and imports this
- * module purely for `adminDb()`. Demanding every host at import time broke it —
- * so each host is required at the point of use, and a test pays only for what
- * it actually touches.
+ * LAZY, not module-load. The two integration passes run against DIFFERENT
+ * emulator sets (`sabeel-ci test-emulator`): the rules pass has no Functions
+ * emulator, so a host it does not start is legitimately absent there.
+ * `concurrentMoves.test.ts` rides along in that pass and imports this module
+ * purely for `adminDb()`. Demanding every host at import time broke it — so
+ * each host is required at the point of use, and a test pays only for what it
+ * actually touches.
  *
  * There is no fallback. `emulators:exec` exports these
  * (`firebase-tools/lib/emulator/env.js`) for whichever emulators it started, so
@@ -42,8 +41,8 @@ function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
     throw new Error(
-      `${name} is unset — run via npm run test:emulator, and check the --only list ` +
-        `in scripts/test-emulator.sh includes that emulator for this test set`,
+      `${name} is unset — run via npm run test:emulator, and check this test is in the ` +
+        `pass that starts that emulator (test:emulator:functions has them all)`,
     );
   }
   return value;
@@ -73,7 +72,7 @@ process.env.GCLOUD_PROJECT = PROJECT_ID;
 
 let app: App | undefined;
 
-export function adminApp(): App {
+function adminApp(): App {
   if (!app) {
     app = getApps().length
       ? getApps()[0]

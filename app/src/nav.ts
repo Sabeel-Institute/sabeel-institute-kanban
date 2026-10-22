@@ -54,7 +54,7 @@ function popInternal() {
 // A browser Back walks our stack rather than leaving the site.
 onPopState(popInternal);
 
-export function pop() {
+function pop() {
   if (stack.length <= 1) return;
   // On web let the BROWSER drive: history.back() fires popstate, which calls
   // popInternal. Popping here as well would take two screens off one press.
@@ -64,7 +64,7 @@ export function pop() {
 }
 
 /** Replace the whole stack — used when signing out, or jumping to a root tab. */
-export function reset(route: Route) {
+function reset(route: Route) {
   stack = [route];
   replaceHistory();
   emit();

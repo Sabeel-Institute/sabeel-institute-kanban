@@ -35,9 +35,9 @@
          disagree for a frame, the gap shows the app's own background instead of
          white. The value is Warm Ivory from docs/BRAND.md, mirrored from
          `app/src/theme/palette.ts` — which is the source of truth.
-         `scripts/check-web-template.mjs` runs on the export path (and so in CI)
-         and fails if the two drift apart, because this is a hardcoded colour
-         outside the theme and the only honest way to hold that is to check it.
+         `app/src/webTemplate.test.ts` (in `npm test`, and so in CI) fails if
+         the two drift apart, because this is a hardcoded colour outside the
+         theme and the only honest way to hold that is to check it.
     -->
     <style id="expo-reset">
       /* These styles make the body full-height */

@@ -13,20 +13,25 @@
 # Why this exists: half a dozen debugging sessions were lost to a stale emulator
 # or Metro holding a port, which fails in ways that look like application bugs —
 # "Could not start Authentication Emulator, port taken", or worse, a dev server
-# that answers on 61210 while serving code from another checkout.
+# that answers on the web port while serving code from another checkout.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
-# Named ports for the waits below. Same block as the PORTS sweep list, and
-# `functions/test/unit/emulatorPorts.test.ts` fails if this file mentions any of
-# the old shared defaults — which is how a stale `wait_for` here went unnoticed
-# long enough to break `dev.sh` after the port move.
-FIRESTORE_PORT=61200
-WEB_PORT=61210
-
-# This checkout's block: what `status` reports and `stop` verifies.
-PORTS=(61200 61201 61202 61203 61204 61205 61206 61207 61210)
-LABELS=("firestore" "fs-ws" "auth" "functions" "ui" "hub" "logging" "storage" "web")
+# This checkout's block, from ci-tools (`sabeel-ci ports` prints one
+# "<port> <name>" per line): what `status` reports and `stop` verifies. No port
+# is stated here; `sabeel-ci check-app` fails a script that states one.
+PORTS=()
+LABELS=()
+while read -r port name; do
+  PORTS+=("$port")
+  LABELS+=("$name")
+done < <(npx --no sabeel-ci ports)
+if [ "${#PORTS[@]}" -eq 0 ]; then
+  echo "dev.sh: sabeel-ci ports gave no ports (npm ci first?)" >&2
+  exit 1
+fi
+FIRESTORE_PORT=$(npx --no sabeel-ci ports firestore)
+WEB_PORT=$(npx --no sabeel-ci ports web)
 # Machine-wide ports every React Native checkout on the machine shares: Metro
 # (the Android emulator reaches the host at 10.0.2.2:8081, so it cannot move)
 # and idb. `status` shows who holds them; nothing here ever frees them, because
@@ -168,7 +173,7 @@ wait_for() { # wait_for <url> <label>
 #
 # This is load-bearing, and its absence cost two debugging sessions. Firestore
 # comes up seconds before the functions emulator finishes loading, so seeding as
-# soon as 8080 answers races `onUserCreate`. A sign-in that lands in that window
+# soon as its port answers races `onUserCreate`. A sign-in that lands in that window
 # creates an auth account with NO user doc — and the app reads "auth account,
 # no profile" as a rejected non-org address and shows **Wrong account** forever.
 # Nothing looks broken: the emulators are up, the seed just "times out waiting

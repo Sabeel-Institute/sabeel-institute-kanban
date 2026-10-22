@@ -19,16 +19,20 @@ sabeel-institute-kanban/
 ├── .firebaserc                # the real project id: sabeel-institute-kanban
 ├── firestore.rules / firestore.indexes.json
 ├── CLAUDE.md, README.md, TODO.md, docs/
-├── scripts/                   # emulator.sh, test-emulator.sh, web-e2e.mjs, grant-admin.mjs
-├── .github/workflows/ci.yml   # lint → typecheck → unit → emulator (JDK 21 + firebase-tools)
+├── ci-tools.json              # this app's settings for the shared CI, release and device
+│                              # tooling (Sabeel-Institute/ci-tools, `npx sabeel-ci <command>`)
+├── scripts/                   # the app's own: browser suites, seed, grant-admin, migrations
+├── .github/workflows/         # rendered from ci-tools' templates (`npx sabeel-ci workflows`)
 ├── packages/shared/           # @sabeel/shared — types, constants, pure domain rules
 ├── functions/                 # nodejs22 TS; esbuild bundle; Vitest unit + rules-unit-testing
 └── app/                       # @sabeel/app — Expo, react-native-web
     └── src/{screens,components,auth}/ + platform seams as *.web.ts(x)
 ```
 
-Emulator ports (from `firebase.json`): auth 9099, functions 5001, firestore 8080,
-**storage 9199**, UI on, `singleProjectMode: true`.
+Emulator ports: each app owns a block of 100 in ci-tools (`emulators.base` in
+`ci-tools.json`; this one 61200-61299, the time tracker 61000-61099), every
+service at the same offset; `firebase.json` pins them, with **storage** among
+them, UI on, `singleProjectMode: true`. `docs/DEVELOPING.md` has the layout.
 
 Hosting headers worth copying verbatim: `no-cache, must-revalidate` on `**`, and
 `max-age=31536000, immutable` on `/_expo/static/**`.
@@ -211,7 +215,8 @@ See `docs/PRODUCT_BRIEF.md` for the full decisions. Deltas from the time tracker
 - **Card ordering: fractional base-62 string ranks**, one doc write per move.
 - **Storage.** Attachments were declined at the outset and added on 2026-07-26,
   so the time tracker's no-Storage `firebase.json` no longer copies over as-is:
-  this project has a `storage` block, `storage.rules`, and the emulator on 9199.
+  this project has a `storage` block, `storage.rules`, and a Storage emulator
+  at its offset in the port block (61207).
   The reference implementation is the sibling **recording app**, not the time
   tracker — it is the only Sabeel project that had Cloud Storage first.
 - **Timezone machinery is NOT copied.** It was load-bearing for work-local time

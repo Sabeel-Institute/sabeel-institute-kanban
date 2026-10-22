@@ -19,7 +19,7 @@
 // Both are idempotent and print what they will do before doing it.
 //
 //   # emulators
-//   FIRESTORE_EMULATOR_HOST=127.0.0.1:61200 GCLOUD_PROJECT=demo-sabeel-kanban \
+//   FIRESTORE_EMULATOR_HOST=127.0.0.1:$(npx sabeel-ci ports firestore) GCLOUD_PROJECT=demo-sabeel-kanban \
 //     node scripts/migrate-global-labels.mjs part-a
 //   # production (gcloud ADC)
 //   GCLOUD_PROJECT=sabeel-institute-kanban node scripts/migrate-global-labels.mjs part-a

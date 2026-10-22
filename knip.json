@@ -1,32 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "workspaces": {
-    "app": {
-      "entry": [
-        "index.ts",
-        "App.tsx",
-        "**/*.web.ts",
-        "**/*.web.tsx",
-        "src/**/*.test.ts"
-      ],
-      "project": [
-        "src/**/*.{ts,tsx}",
-        "*.{ts,tsx}"
-      ]
-    },
-    "functions": {
-      "entry": [
-        "src/index.ts",
-        "test/**/*.test.ts"
-      ],
-      "project": "src/**/*.ts"
-    },
-    "packages/shared": {
-      "entry": [
-        "src/index.ts"
-      ],
-      "project": "src/**/*.ts"
-    },
     ".": {
       "entry": [
         "scripts/*.mjs"
@@ -34,14 +8,48 @@
       "project": [
         "scripts/**/*.mjs"
       ]
+    },
+    "app": {
+      "entry": [
+        "App.tsx",
+        "metro.config.js",
+        "public/**/*.js",
+        "src/**/*.web.ts",
+        "src/**/*.web.tsx"
+      ],
+      "project": [
+        "**/*.{ts,tsx,js}"
+      ],
+      "ignoreDependencies": [
+        "expo-updates",
+        "@expo/metro-runtime",
+        "expo-system-ui"
+      ]
+    },
+    "functions": {
+      "entry": [
+        "src/index.ts",
+        "test/**/*.test.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "test/**/*.ts"
+      ]
+    },
+    "packages/shared": {
+      "entry": [],
+      "project": [
+        "src/**/*.ts",
+        "test/**/*.ts"
+      ]
     }
   },
-  "ignoreDependencies": [
-    "@sentry/react",
-    "@sabeel/shared"
-  ],
   "ignoreBinaries": [
     "firebase",
     "expo"
-  ]
+  ],
+  "ignoreExportsUsedInFile": {
+    "interface": true,
+    "type": true
+  }
 }

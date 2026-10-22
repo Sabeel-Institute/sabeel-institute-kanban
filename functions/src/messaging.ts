@@ -3,7 +3,7 @@ import { defineSecret, defineString } from 'firebase-functions/params';
 import { logger } from 'firebase-functions/v2';
 import type { PushTokenDoc } from '@sabeel/shared';
 import { APNS_TOKEN, sendToApns, type ApnsCredentials, type ApnsSend } from './apns';
-import { fcmMessage } from './fcm';
+import { DEAD_TOKEN_CODES, fcmMessage } from './fcm';
 import { reportError } from './sentry';
 
 /**
@@ -43,22 +43,6 @@ export interface SendOutcome {
 type Sender = (deliveries: Delivery[]) => Promise<SendOutcome>;
 
 /**
- * FCM error codes that mean "this token will never work again".
- *
- * Anything else — a quota error, a transient unavailable — must NOT delete the
- * token: pruning on a temporary failure would silently unregister a working
- * device and the only symptom would be notifications quietly stopping.
- *
- * `messaging/invalid-argument` is deliberately NOT here, though it looks like it
- * belongs: FCM also returns it for a malformed MESSAGE, so one bad title would
- * come back against every device at once and prune every recipient's tokens.
- */
-const DEAD_FCM_CODES = new Set([
-  'messaging/registration-token-not-registered',
-  'messaging/invalid-registration-token',
-]);
-
-/**
  * An iPhone's row from before iPhones had rows of their own.
  *
  * Every build up to v0.11.5 build 11 filed Apple's token as `platform:
@@ -77,10 +61,10 @@ async function sendToFcm(deliveries: Delivery[]): Promise<SendOutcome> {
   if (deliveries.length === 0) return { stale: [], sent: 0 };
   // One message per DEVICE, not one multicast: each carries its recipient's
   // own inbox id, so the payloads differ.
-  const res = await getMessaging().sendEach(deliveries.map((d) => fcmMessage(d.token, d.message)));
+  const res = await getMessaging().sendEach(deliveries.map((d) => ({ token: d.token, ...fcmMessage(d.message) })));
   const stale = deliveries.filter((_, i) => {
     const r = res.responses[i];
-    return !r.success && DEAD_FCM_CODES.has(r.error?.code ?? '');
+    return !r.success && DEAD_TOKEN_CODES.has(r.error?.code ?? '');
   });
   return { stale, sent: res.successCount };
 }
@@ -162,7 +146,7 @@ const deviceSender: Sender = async (deliveries) => {
  * SDK returns would be read as a verdict on real tokens, and a dead-token
  * verdict deletes the row. That matters now that a local build registers its
  * device — an iPhone simulator's sandbox token is real, and the way to prove
- * it is `scripts/send-test-push.mjs`, not a trigger.
+ * it is `npx sabeel-ci send-test-push`, not a trigger.
  */
 const emulatorSender: Sender = async (deliveries) => {
   logger.info(`[emulator] push suppressed for ${deliveries.length} device(s)`);

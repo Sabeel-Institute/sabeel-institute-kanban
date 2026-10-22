@@ -5,8 +5,8 @@
 // with `u1..uN`. This seeds an emulator from that file and runs the real
 // scripts, in the real order, over it.
 //
-//   . scripts/jdk21.sh
-//   firebase emulators:exec --project demo-sabeel-kanban --only firestore,auth \
+//   JAVA_HOME=$(npx sabeel-ci jdk21) firebase emulators:exec \
+//     --project demo-sabeel-kanban --only firestore,auth \
 //     "node scripts/migration-e2e.mjs --shape migration/shape-<project>.json"
 //
 // WHAT THIS ANSWERS, that the hand-written fixtures do not: whether the sequence

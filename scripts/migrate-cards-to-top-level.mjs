@@ -15,7 +15,7 @@
 // functions are deployed should anything write to `cards/*` for real.
 //
 // Usage (emulator):
-//   FIRESTORE_EMULATOR_HOST=127.0.0.1:61200 GCLOUD_PROJECT=demo-sabeel-kanban \
+//   FIRESTORE_EMULATOR_HOST=127.0.0.1:$(npx sabeel-ci ports firestore) GCLOUD_PROJECT=demo-sabeel-kanban \
 //   node scripts/migrate-cards-to-top-level.mjs [--dry|--verify-only|--purge]
 // Usage (prod): GOOGLE_CLOUD_PROJECT=sabeel-institute-kanban node scripts/... (gcloud ADC)
 import { initializeApp } from 'firebase-admin/app';

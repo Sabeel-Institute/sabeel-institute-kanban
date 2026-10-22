@@ -57,7 +57,7 @@ const TABS: TabDef[] = [
 ];
 
 /** Which narrow routes show the bottom bar — the four tab roots only. */
-export const TAB_ROOTS: RouteName[] = TABS.map((t) => t.key);
+const TAB_ROOTS: RouteName[] = TABS.map((t) => t.key);
 export function isTabRoot(name: RouteName): boolean {
   return TAB_ROOTS.includes(name);
 }

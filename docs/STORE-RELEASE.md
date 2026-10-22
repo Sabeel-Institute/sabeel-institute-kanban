@@ -10,8 +10,10 @@ and this file is the one to fix. Building and shipping: `docs/DEPLOY.md` and
 ## Where it stands (2026-10-16)
 
 **iPhone.** TestFlight internal testing: v0.11.5 builds 11, 12 and 13, all
-VALID, in the group "Sabeel Kanban Internal". The next upload is build 14
-(`expo.ios.buildNumber`). App Store Connect app 6801011482, SKU `sabeel-kanban`,
+VALID, in the group "Sabeel Kanban Internal". Each later version goes up once,
+as the build numbered by its versionCode (`expo.ios.buildNumber`, which `npx
+sabeel-ci release` writes: 12002 for 0.12.2), from the iOS workflow on its
+tag. App Store Connect app 6801011482, SKU `sabeel-kanban`,
 bundle id `com.sabeelinstitute.kanban`. **Nothing has been submitted to App
 Review.** Destination: the App Store, unlisted. Kanban goes through App Review
 first and alone, the pilot for the other Sabeel apps (decided 2026-08-18), so a
@@ -20,9 +22,11 @@ correction from Apple costs one app's rework rather than three.
 **Android.** Google Play internal testing now: v0.11.4 (versionCode 11004) on
 the track, testers the account-wide "Sabeel staff" email list. Destination:
 Play production, a public listing (decided by Faisal 2026-10-16). The app
-signing key is Google-generated; the repo's key (in the vault) is the upload
-key only. A locally built APK (`docs/DEPLOY.md`) is signed with the upload
-key, so it and a Play install cannot replace each other.
+signing key is Google-generated, and its certificate is
+`release.appSigningCertificate` in `ci-tools.json`, which `npx sabeel-ci
+publish-play` holds every release to; the repo's key (in the vault) is the
+upload key only. The APKs on each GitHub release (`docs/DEPLOY.md`) are signed
+with the upload key, so they and a Play install cannot replace each other.
 
 **Web.** <https://sabeel-institute-kanban.web.app>, v0.11.5 (`67913fa`), serving
 `/privacy`, `/support` and `/get-app` as static pages. The email sign-in's
@@ -360,18 +364,21 @@ the vault is the upload key. The consequences (skill, decision 8):
 - Play installs run under Google's key; its SHA-1 is registered in Firebase, or
   Google sign-in fails with `DEVELOPER_ERROR` for Play users only
   (`docs/DEPLOY.md`).
-- A locally built APK carries the upload key, so it and a Play install
-  cannot replace each other: uninstall first; nothing is lost, all state is in
-  Firestore.
+- An APK from a GitHub release carries the upload key, so it and a Play
+  install cannot replace each other: uninstall first; nothing is lost, all
+  state is in Firestore.
+- `npx sabeel-ci publish-play` completes a release only once Play signs the
+  APKs phones install with the certificate `release.appSigningCertificate` in
+  `ci-tools.json` names; a change of signing key changes that value too.
 - A lost upload key is reset through Play Console support; the signing key,
   which must never change, is Google's.
 - **Open, for Faisal:** whether Kanban keeps Google's key. Play allows a
   change until a release reaches open testing or production, but staff who
   installed Kanban from internal testing run under Google's key, and their
   copies would need reinstalling after a change. The LMS and the Time Tracker
-  use their own keys so their locally built APKs and Play installs update
+  use their own keys so their GitHub release APKs and Play installs update
   each other. Kanban testers install through Play internal testing; developer
-  verification can use locally built APKs.
+  verification can use the GitHub release APKs.
 
 ### 9. Distribution
 
@@ -384,11 +391,12 @@ the vault is the upload key. The consequences (skill, decision 8):
   an Organization under Sabeel Institute, so the listing carries the
   institute's name.
 - **Android now:** internal testing, the "Sabeel staff" list ticked on the
-  track; `npm run publish:play -- --internal` publishes; testers join through
-  the opt-in link (`docs/DEPLOY.md` § Testers).
-- **Android next:** production, released from Play Console: `publish:play`
-  publishes to internal testing only, and its service account holds "Release
-  apps to testing tracks", not production.
+  track; `npx sabeel-ci release --ship` publishes every release there
+  (`sabeel-ci publish-play --internal`); testers join through the opt-in link
+  (`docs/DEPLOY.md` § Testers).
+- **Android next:** production, released from Play Console: `sabeel-ci
+  publish-play` publishes to internal testing only, and its service account
+  holds "Release apps to testing tracks", not production.
 
 ### 10. Store checks
 
@@ -396,8 +404,8 @@ the vault is the upload key. The consequences (skill, decision 8):
 `macos-26` runners (Xcode 26, iOS 26 SDK); `targetSdk` 36 and `minSdk` 33; both
 external-storage permissions removed with `tools:node="remove"`. Play
 registered `com.sabeelinstitute.kanban` for Android developer verification; the
-download-page APK's upload key needs registering by the 2027 rollout
-(`docs/DEPLOY.md`).
+upload key of the APKs on the GitHub releases needs registering by the 2027
+rollout (`docs/DEPLOY.md`).
 
 ## Store answers
 
@@ -486,8 +494,8 @@ sign-in screen) states the address, the process and what is retained.
 
 **App Store, first and alone:**
 
-- [ ] **Build 14 or later**, from a release with its own version and deploy-log
-      entry (`docs/DEPLOY.md` § Shipping a release), carrying the Next and Go
+- [ ] **A build from a release** with its own version and deploy-log entry
+      (`docs/DEPLOY.md` § Shipping a release), carrying the Next and Go
       keys on the email form (on `main`), the rules screen and Report a problem
       (§ 4, built).
 - [ ] **The iPhone refusal round trip** on a TestFlight install: a Google

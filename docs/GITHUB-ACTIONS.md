@@ -1,5 +1,13 @@
 # GitHub Actions
 
+The workflows are the shared ones from `Sabeel-Institute/ci-tools`, rendered
+into `.github/workflows/` for this app's `ci-tools.json` by `npx sabeel-ci
+workflows`; change them there, never here. Every job that runs a ci-tools
+command first clones ci-tools at the commit `package-lock.json` pins, refuses a
+commit that is not on ci-tools' `main`, and puts `sabeel-ci` on the PATH.
+`sabeel-ci check-app`, in CI's quality job, fails when a rendered workflow
+differs from its template.
+
 ## Checks and builds
 
 - **Pre-merge Builds** runs on every main-targeting PR, including Dependabot,
@@ -22,17 +30,24 @@
   release workflow accepts a commit it has not passed.
   Green checks validate compilation and tested behavior, not every possible
   runtime behavior or a dependency vendor's privacy defaults.
-- **CI** runs lint, type checks, unit tests, Firebase-emulator integration tests
-  and browser regressions on main pushes and pull requests. Every sweep, pass or fail, leaves a `screens-report` artifact: a
-  page of every screen at every width with the failed checks beside them and
-  what changed against main's latest sweep, before / after / difference. The
-  run page's summary lists the failed checks and changed screens and the
-  `gh run download` command for the page (`docs/DEVELOPING.md`). New PR pushes cancel
-  superseded CI runs. No production deployment credentials are used.
+- **CI** runs `sabeel-ci check-app`, lint, type checks, knip, unit tests,
+  Firebase-emulator integration tests (`npm run test:emulator`, whose rules
+  pass also rehearses the board-ownership migration scripts end to end) and the
+  six browser suites `ci-tools.json` names (`npm run test:screens`, the
+  multi-width sweep; `test:e2e`, the full flow; `test:e2e:attachments`,
+  `test:e2e:stats`, `test:e2e:richtext` and `test:e2e:typing-perf`), one runner
+  each, on main pushes and pull requests. Every sweep, pass or fail, leaves a
+  `screens-report` artifact: a page of every screen at every width with the
+  failed checks beside them and what changed against main's latest sweep,
+  before / after / difference. The run page's summary lists the failed checks
+  and changed screens and the `gh run download` command for the page
+  (`docs/DEVELOPING.md`). New PR pushes cancel superseded CI runs. No
+  production deployment credentials are used.
 - **Native** runs the Maestro flows (`maestro/`) on an Android emulator on the
   runner, against the debug build and the Firebase emulators, on main pushes,
-  release tags, pull requests that change the flows or their scripts, and by
-  hand: `bash scripts/native-e2e.sh`, as locally (`docs/DEVELOPING.md`). Its
+  release tags, pull requests that change the flows, their seed
+  (`scripts/seed-dev.mjs`), `ci-tools.json` or the ci-tools pin, and by hand:
+  `npx sabeel-ci native-e2e`, as locally (`docs/DEVELOPING.md`). Its
   screens and logs are the `native-<sha>` artifact. Its `ios` job runs the same
   flows on an iPhone simulator on a macOS runner (`--ios`) for release tags,
   pull requests that change the flows, and by hand, as `native-ios-<sha>`.
@@ -40,12 +55,12 @@
   also be started manually. They do not run on untrusted pull requests.
 - Every Android build (Android, the pre-merge build and Native) first installs
   the NDK and build tools React Native's version catalog names, retrying a bad
-  download (`scripts/ci-android-sdk.sh`); Gradle would fetch them once and fail
+  download (`sabeel-ci ci-android-sdk`); Gradle would fetch them once and fail
   the build on a truncated file.
 - Android uploads a signed AAB and build record; Web uploads checksummed static
   files and a build record; iOS uploads its signed IPA and build record.
 - Android then checks that AAB on an emulator it boots on the runner
-  (`device-check`, `scripts/ci-avd.sh`): `npm run check:release` installs a
+  (`device-check`, `sabeel-ci ci-avd`): `sabeel-ci check-release` installs a
   universal APK made from the bundle and cold-starts it five times. Each start
   must reach the sign-in screen and stay up, its label must read
   `v<version> · <commit>` for this commit, the emulator-only sign-in row must be
@@ -89,26 +104,29 @@
   every callable must answer an unauthenticated call with its own JSON error
   (not Cloud Run's 403), and the functions must have logged no errors
   since the deploy began, apart from the scanners that GET every new revision.
-  `scripts/ci-functions.mjs` runs the same checks from a terminal
+  `npx sabeel-ci ci-functions` runs the same checks from a terminal
   (`docs/DEPLOY.md`).
 - **iOS** uploads to TestFlight only after a manual run with `testflight=true`.
   Automatic pushes never run its publishing job.
 - **Publish Android** runs manually from main. Supply a successful **Android**
   run ID with passing CI on the same commit. It verifies the downloaded AAB's
   provenance, checksum, upload certificate, embedded commit, package and native
-  version, then reuses the existing Play publisher without rebuilding.
+  version, then publishes it through `sabeel-ci publish-play` without
+  rebuilding.
 - The default `publish=false` checks Play permissions by creating and discarding
   an edit; it uploads no bundle and changes no track. Select `publish=true` to
   release to internal testing only. There is no production-track input.
 - New uploads require an unused Android versionCode. Bump the version and build
   a new AAB before publishing an update; uploading an already-used version is
-  not a way to release new code. Existing draft-resume and Play-signing checks
-  in the local publisher remain in force. Where draft resume is supported,
-  Play's SHA-256 must match the selected AAB exactly.
+  not a way to release new code. The publisher's draft-resume and Play-signing
+  checks apply: a draft is resumed only with the very bundle Play holds for
+  that versionCode, and the release completes only once Play signs the APKs
+  phones install with `release.appSigningCertificate` in `ci-tools.json`.
 - Dirty-marked AABs cannot be published. Permission-check mode may inspect one
   to validate credentials, but a clean Android build is required for release.
-- The local `npm run publish:play -- --internal` command remains available.
-  Android builds never upload to Play automatically.
+- The local `npx sabeel-ci publish-play --internal` command remains available,
+  and `npx sabeel-ci release --ship` runs it (`docs/DEPLOY.md`). Android builds
+  never upload to Play automatically.
 
 ## Credentials and trust
 
@@ -124,8 +142,8 @@ signing secrets (`IOS_DIST_P12`, `IOS_DIST_P12_PASSWORD`, `IOS_PROFILE`,
 jobs that build a release enter it (Android, Web, iOS and its TestFlight
 upload), so a workflow on any other branch reads none of them; repository
 secrets would reach a workflow on any branch a collaborator pushes.
-`functions/test/unit/releaseAccess.test.mjs` fails if a job reads one
-outside that environment. Set one again from the vault with
+`sabeel-ci check-app` fails if a job reads one outside that environment, or a
+release job does not check its owner first. Set one again from the vault with
 `gh secret set NAME --env release-build -R <repo>`. LMS also needs
 `ANDROID_GOOGLE_SERVICES_JSON`. The certificate fingerprint is stored in
 `ANDROID_SIGNING_CERT_SHA256`; builds verify it before uploading an AAB.
@@ -156,8 +174,9 @@ The `play-internal` environment also permits main only and holds the encrypted
 available only to the manual Play job, not ordinary builds or pull requests.
 Its temporary runner copy is removed when the publisher finishes; original
 local and vault credentials are unchanged.
-The current main-branch release validators and publisher are retained when
-checking out the selected build commit, so old artifacts use current safeguards.
+The release jobs fetch ci-tools at main's pin before they check out the
+selected build commit, so the validators and the publisher are always main's,
+and old artifacts meet current safeguards.
 
 The central vault is `~/.config/secrets-vault/`. Existing local keys and
 secret files remain authoritative and must not be deleted without express
@@ -167,13 +186,15 @@ approval. CI does not generate replacement signing keys.
 
 - Secret scanning and push protection are enabled. Dependabot alerts and
   security-update pull requests are enabled.
-- Dependabot checks npm workspaces and GitHub Actions weekly. Minor/patch npm
-  updates and security fixes are grouped separately; major upgrades require
-  explicit review. Updates never auto-merge or deploy.
+- Dependabot checks npm workspaces weekly. Minor/patch npm updates and
+  security fixes are grouped separately; major upgrades require explicit
+  review. Updates never auto-merge or deploy. The workflows' actions move in
+  ci-tools, whose Dependabot updates the templates, and arrive here with the
+  next ci-tools pin.
 - CodeQL scans JavaScript/TypeScript on main pushes, pull requests and weekly,
   without native builds or production credentials.
 - CI has separate workflow-validation, quality/unit, emulator-integration and
-  browser jobs, plus a migration job. Each browser matrix suite can be rerun separately.
+  browser jobs. Each browser matrix suite can be rerun separately.
   The final `build-test` gate requires every CI job to succeed; releases still
   require the complete CI workflow to pass on the exact build commit.
 - Workflow validation uses checksum-pinned actionlint with ShellCheck for

@@ -15,8 +15,10 @@ if [ $# -lt 1 ]; then
   exit 1
 fi
 
-export GCLOUD_PROJECT=demo-sabeel-kanban
-export FIRESTORE_EMULATOR_HOST=127.0.0.1:61200
-export FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:61202
+# The emulators' project and ports, from ci-tools.json through ci-tools.
+GCLOUD_PROJECT=$(node -p "require('./ci-tools.json').emulators.project")
+FIRESTORE_EMULATOR_HOST=127.0.0.1:$(npx --no sabeel-ci ports firestore)
+FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:$(npx --no sabeel-ci ports auth)
+export GCLOUD_PROJECT FIRESTORE_EMULATOR_HOST FIREBASE_AUTH_EMULATOR_HOST
 
 exec node scripts/grant-admin.mjs "$@"

@@ -14,10 +14,8 @@
  *   # against production (needs gcloud ADC or GOOGLE_APPLICATION_CREDENTIALS)
  *   GCLOUD_PROJECT=<project-id> node scripts/grant-admin.mjs you@oursabeel.com
  *
- *   # against the running emulators
- *   FIRESTORE_EMULATOR_HOST=127.0.0.1:61200 \
- *   FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:61202 \
- *   GCLOUD_PROJECT=demo-sabeel-kanban node scripts/grant-admin.mjs you@oursabeel.com
+ *   # against the running emulators (their project and ports from ci-tools)
+ *   npm run grant-admin -- you@oursabeel.com
  */
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';

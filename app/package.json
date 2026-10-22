@@ -4,10 +4,10 @@
   "private": true,
   "main": "index.ts",
   "scripts": {
-    "start": "node ../scripts/preflight-metro.mjs && expo start",
-    "android": "node ../scripts/preflight-metro.mjs && expo run:android",
+    "start": "sabeel-ci build-info && sabeel-ci preflight-metro && expo start",
+    "android": "sabeel-ci build-info && sabeel-ci preflight-metro && expo run:android",
     "web": "expo start --web",
-    "web:export": "node ../scripts/check-version.mjs && node ../scripts/check-web-template.mjs && node ../scripts/gen-build-info.mjs && expo export --platform web --output-dir dist-web --clear",
+    "web:export": "sabeel-ci build-web",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },

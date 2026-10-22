@@ -1,0 +1,12 @@
+{
+  "name": "kanban",
+  "ci": {
+    "browserSuites": ["test:screens", "test:e2e", "test:e2e:attachments", "test:e2e:stats", "test:e2e:richtext", "test:e2e:typing-perf"],
+    "emulatorSecrets": { "SENTRY_DSN": "disabled", "APNS_KEY": "unused-in-emulator" },
+    "knip": true
+  },
+  "build": { "sentryDsnVariable": "EXPO_PUBLIC_SENTRY_DSN_NATIVE" },
+  "emulators": { "base": 61200, "project": "demo-sabeel-kanban" },
+  "native": { "seed": "scripts/seed-dev.mjs", "seedWeb": true },
+  "release": { "appSigningCertificate": "39:AA:DF:C6:8F:A4:6F:86:DC:9C:22:50:85:D4:94:27:68:3C:4D:5B:A5:FC:68:BA:52:D8:6E:BE:C3:EF:B8:8C" }
+}

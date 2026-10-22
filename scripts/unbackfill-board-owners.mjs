@@ -13,7 +13,7 @@
 // admin, which is a worse state than the one you are trying to leave. If you
 // have already flipped authority, roll the RULES back first, then run this.
 //
-//   FIRESTORE_EMULATOR_HOST=127.0.0.1:61200 GCLOUD_PROJECT=demo-sabeel-kanban \
+//   FIRESTORE_EMULATOR_HOST=127.0.0.1:$(npx sabeel-ci ports firestore) GCLOUD_PROJECT=demo-sabeel-kanban \
 //     node scripts/unbackfill-board-owners.mjs
 //   GCLOUD_PROJECT=sabeel-institute-kanban node scripts/unbackfill-board-owners.mjs --apply
 import { initializeApp } from 'firebase-admin/app';

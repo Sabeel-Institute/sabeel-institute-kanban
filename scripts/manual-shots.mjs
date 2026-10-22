@@ -34,11 +34,11 @@ import { chromium } from 'playwright';
 import { mkdir } from 'node:fs/promises';
 import { initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
-import { EMULATOR_PORTS, WEB_PORTS } from './lib/ports.mjs';
+import { PORTS, PROJECT } from './lib/emulators.mjs';
 import { RULES_TITLE } from './lib/rules.mjs';
 
 const OUT = 'docs/manual/img';
-const BASE = process.env.MANUAL_BASE ?? `http://127.0.0.1:${WEB_PORTS.e2e}`;
+const BASE = process.env.MANUAL_BASE ?? `http://127.0.0.1:${PORTS.web}`;
 const BOARD = 'Fundraising 2026';
 const CARD = 'Draft the donor letter';
 
@@ -65,9 +65,9 @@ const wanted = (name) => only.length === 0 || only.includes(name);
  * priorities, labels on a card face, and one card carrying a file.
  */
 async function enrich() {
-  process.env.FIRESTORE_EMULATOR_HOST ??= `127.0.0.1:${EMULATOR_PORTS.firestore}`;
-  process.env.GCLOUD_PROJECT = 'demo-sabeel-kanban';
-  initializeApp({ projectId: 'demo-sabeel-kanban' });
+  process.env.FIRESTORE_EMULATOR_HOST ??= `127.0.0.1:${PORTS.firestore}`;
+  process.env.GCLOUD_PROJECT = PROJECT;
+  initializeApp({ projectId: PROJECT });
   const db = getFirestore();
 
   const users = await db

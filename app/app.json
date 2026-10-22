@@ -15,7 +15,7 @@
     ],
     "ios": {
       "bundleIdentifier": "com.sabeelinstitute.kanban",
-      "buildNumber": "17",
+      "buildNumber": "12002",
       "supportsTablet": false,
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
@@ -102,6 +102,7 @@
     },
     "plugins": [
       "expo-status-bar",
+      "expo-notifications",
       "expo-sharing",
       [
         "expo-image-picker",
