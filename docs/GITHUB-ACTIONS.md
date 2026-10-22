@@ -194,7 +194,9 @@ approval. CI does not generate replacement signing keys.
   security-update pull requests are enabled.
 - Dependabot checks npm workspaces weekly. Minor/patch npm updates and
   security fixes are grouped separately; major upgrades require explicit
-  review. Updates never auto-merge or deploy. The workflows' actions move in
+  review. `react-native-enriched-html` updates arrive in a pull request of
+  their own: `app/src/mentionSeam.test.ts` fails them until a device has
+  shown that picking a mention still stores `@handle`. Updates never auto-merge or deploy. The workflows' actions move in
   ci-tools, whose Dependabot updates the templates, and arrive here with the
   next ci-tools pin.
 - CodeQL scans JavaScript/TypeScript on main pushes, pull requests and weekly,
