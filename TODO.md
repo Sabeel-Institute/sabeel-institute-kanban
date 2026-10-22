@@ -17,12 +17,13 @@ tells you the command to run.
 ## Play publishing from the command line — **DONE, verified 2026-08-29**
 
 All five steps below are ticked because they were *exercised*, not because
-someone remembered doing them: `npm run publish:play -- --internal` uploaded
-v0.11.3 as versionCode 11003, and `-- --check` created and discarded a real
-edit first, which is what proves the service account can actually release.
+someone remembered doing them: the publisher uploaded v0.11.3 as versionCode
+11003 to internal testing, and its `--check` created and discarded a real edit
+first, which is what proves the service account can actually release.
 
 So a build can reach your phone when you are away from this machine. Everything
-below is console work; the script is already written (`npm run publish:play`).
+below is console work; the publisher is `npx sabeel-ci publish-play`, which
+`npx sabeel-ci release --ship` runs.
 
 - [x] **Enable the API.** Google Cloud Console → the project already backing
       Firebase → *APIs & Services → Library* → **Google Play Android Developer
@@ -35,7 +36,7 @@ below is console work; the script is already written (`npm run publish:play`).
       user* → paste the service account's `…iam.gserviceaccount.com` address →
       restrict it to **this app** → tick **Release apps to testing tracks**.
       Send the invite.
-- [x] **Put the key where the script looks:**
+- [x] **Put the key where the publisher looks** (or set `PLAY_KEY` to its path):
       ```
       mkdir -p ~/keys
       mv ~/Downloads/<the-file>.json ~/keys/sabeel-play-publisher.json
@@ -43,7 +44,7 @@ below is console work; the script is already written (`npm run publish:play`).
       ```
       **Never inside the repo — it is public.** Hand back nothing; do not paste
       any part of it into chat. A copy is in the vault (`docs/SECRETS.md`).
-- [x] **Confirm it works:** `npm run publish:play -- --check`. It runs every
+- [x] **Confirm it works:** `npx sabeel-ci publish-play --check`. It runs every
       gate and proves the Play permission by creating and discarding an edit —
       a key mints a token whether or not Play granted it anything, so this
       checks the thing that actually fails. Uploads nothing.
@@ -182,7 +183,7 @@ creation**.
       exemption to guideline 4.8 applies). Reasoning in `docs/IOS-BUILD.md`.
 - [x] **APNs authentication key** (2026-08-04). It is the `APNS_KEY` secret
       the functions send to iPhones with (`functions/src/apns.ts`);
-      `npm run check:apple-push` asks Apple whether it accepts the key for this
+      `npm run check:push -- apple` asks Apple whether it accepts the key for this
       app. **This is NOT the App Store Connect API key**, which is a different
       `.p8` that uploads builds rather than delivering pushes. Both download
       exactly once and both are real secrets; both are in the vault
@@ -205,20 +206,22 @@ creation**.
       here. `docs/STORE-RELEASE.md`.
 
 - [x] **Symbolication wired for BOTH platforms (2026-08-12), at parity.**
-      `SENTRY_ORG`, `SENTRY_PROJECT` and `SENTRY_AUTH_TOKEN` in the build shell,
-      one set of names for iOS and Android, and both report to the same Sentry
-      project because both read `EXPO_PUBLIC_SENTRY_DSN_NATIVE`.
+      `SENTRY_ORG`, `SENTRY_PROJECT` and `SENTRY_AUTH_TOKEN` in the gitignored
+      `app/.env.sentry-build-plugin`, one set of names for iOS and Android, and
+      both report to the same Sentry project because both read
+      `EXPO_PUBLIC_SENTRY_DSN_NATIVE`.
       iOS: `@sentry/react-native/expo` registered **bare** in `app/app.json` —
       options would be written verbatim into `ios/sentry.properties` and this
-      repo is public. Android: `app/android/app/build.gradle` applies
-      `sentry.gradle`, gated on `SENTRY_AUTH_TOKEN`, since a config plugin runs
-      at prebuild and that folder is never prebuilt.
-      **You must export the three before building a release, on either
-      platform.** Without them each build succeeds and uploads nothing.
-      `npm run check:ios` and `scripts/build-aab.sh` both warn; neither fails,
-      because unlike a missing DSN this degrades reports rather than losing them.
-      Verified by diffing the Gradle task graph: no token → zero Sentry tasks, so
-      CI and a fresh clone are unaffected.
+      repo is public; `sabeel-ci build-ios` loads the file. Android:
+      `app/android/app/build.gradle` applies `sentry.gradle` when the file
+      exists (or `SENTRY_AUTH_TOKEN` is in the environment), since a config
+      plugin runs at prebuild and that folder is never prebuilt.
+      **The file must be on the machine that builds a release, on either
+      platform.** Without it each build succeeds and uploads nothing.
+      `npm run check:ios` and the Android release build both warn; neither
+      fails, because unlike a missing DSN this degrades reports rather than
+      losing them. Without the file and the token Gradle applies no Sentry
+      tasks, so CI and a fresh clone are unaffected.
       **You already have a token and it works here unchanged.**
       `sabeel-apk-sourcemaps`, an ORGANIZATION token with scope `org:ci`, used by
       the sibling time-tracker. Organization tokens reach **every project in the
@@ -265,24 +268,24 @@ Two more worth reusing:
 2. **Testers**: `docs/IOS-BUILD.md` § Adding a tester.
 3. **A build:**
    `gh workflow run ios.yml -R Sabeel-Institute/sabeel-institute-kanban --ref vX.Y.Z -f testflight=true`,
-   started on the release tag. From the Mac instead:
+   started on the release tag. TestFlight takes only that build, of the commit
+   tagged `vX.Y.Z`, once per version; nothing uploads from a Mac. The Mac can
+   still build one to inspect:
    ```bash
    git pull && npm ci
    # copy app/.env.local and app/.env.sentry-build-plugin across
    npm run build:ios -- --check     # free, proves every gate
-   npm run build:ios                # archive + upload to TestFlight
+   npm run build:ios                # archive + signed .ipa in build/ios/export
    ```
-4. **`expo.ios.buildNumber` rises before every upload.** Apple requires it to
-   increase within a version; unlike Android's versionCode it does not derive
-   itself. On App Store Connect: builds 1, 2, 4 and 6–13, the last v0.11.5
-   build 13 (2026-10-16 UTC, VALID, in "Sabeel Kanban Internal"). Builds 3 and
-   5 were never uploaded, which cost nothing: the number need only rise
-   *within* a version, so carrying it across versions is the cheapest way never
-   to collide. It is `14` now, unused. The GitHub upload job checks it with
-   Apple before uploading.
+4. **The build number is the versionCode** (`12002` for v0.12.2):
+   `npx sabeel-ci release` writes `expo.ios.buildNumber` with the version, and
+   `npx sabeel-ci check-app` fails when the two disagree. App Store Connect
+   holds builds up to 16 of the earlier per-upload numbering, all below every
+   number of the scheme. The GitHub upload job asks Apple first
+   (`sabeel-ci testflight-check`) and stops if the number is taken.
 5. [ ] **First thing on a TestFlight install: confirm a push arrives, and that
    tapping it with the app closed opens the card.** Apple accepts the key
-   (`npm run check:apple-push`) and the sandbox path works on the simulator;
+   (`npm run check:push -- apple`) and the sandbox path works on the simulator;
    the production service, and a tap from outside the app, only a phone can
    show. Assign yourself a card from another account, or have someone mention
    you, with the app in the background.
@@ -290,7 +293,7 @@ Two more worth reusing:
    App Store profiles of all three apps that share it** — Kanban, the LMS and
    the time tracker — set `IOS_DIST_P12`, `IOS_DIST_P12_PASSWORD` and
    `IOS_PROFILE` again in all three repos, and revoke the old certificate. After
-   that date the gates in `build-ios.sh` stop every GitHub build in seconds
+   that date the gates in `sabeel-ci build-ios` stop every GitHub build in seconds
    with "expired"; the Mac is unaffected (it signs automatically). Steps:
    `docs/IOS-BUILD.md` § Renewal.
 7. [ ] **App Review, then unlisted distribution**, against build 14 or later —
@@ -299,8 +302,9 @@ Two more worth reusing:
 
 **Answered 2026-08-15, and nothing goes under `ios.entitlements`.** The question
 was whether the `aps-environment` entitlement survives a prebuild. It does, and
-not through Xcode: `expo-notifications` ships an `app.plugin.js`, so its config
-plugin applies automatically and writes the entitlement on every prebuild.
+not through Xcode: `expo-notifications`' config plugin, registered bare in
+`app/app.json` (`npm run check:ios` requires it), writes the entitlement on
+every prebuild.
 Confirmed again on v0.9.0 build 6 by reading the exported `.ipa` — the archive
 carries `development`/`get-task-allow true` and the export re-signs it to
 `production`/`false` off the App Store profile, so setting `production` by hand
@@ -310,8 +314,8 @@ detail.
 `docs/IOS-BUILD.md` is the runbook.
 
 > The repo side is done: `app/app.json` carries the bundle id, the plist, the
-> Google Sign-In plugin and the Sentry plugin, and `npm run check:ios` guards
-> all of it.
+> Google Sign-In, notifications and Sentry plugins, and `npm run check:ios`
+> guards all of it.
 
 ---
 
@@ -355,12 +359,17 @@ Play internal testing now; public production is the destination
 (`docs/STORE-RELEASE.md`).
 
 - [x] **The upload keystore exists**: `~/keys/sabeel-kanban-upload.jks`, read
-      through the gitignored `app/android/keystore.properties`, both copied in
-      the vault. **On a new machine, restore both from the vault — never
-      generate a new key**: Play refuses a new upload key until Play Console
-      support resets it (`docs/DEPLOY.md` § The signing and publishing files).
-      Without `keystore.properties` a release build is debug-signed, and
-      `build-aab.sh`, `publish:play` and `publish-apk.sh` refuse it.
+      through `~/.config/sabeel-kanban/keystore.properties` (or the file
+      `SABEEL_KEYSTORE_PROPERTIES` names), both copied in the vault. **On a new
+      machine, restore both from the vault — never generate a new key**: Play
+      refuses a new upload key until Play Console support resets it
+      (`docs/DEPLOY.md` § The signing and publishing files). Without the
+      properties file Gradle refuses to package a release build; nothing falls
+      back to the debug key.
+- [ ] **Delete, or keep as a spare, the old `app/android/keystore.properties`
+      in the main checkout.** Nothing reads it: the build reads
+      `~/.config/sabeel-kanban/keystore.properties`, which exists. It stays
+      gitignored either way.
 - [x] **Play app created with Play App Signing**: Google generated and holds
       the app signing key; the repo's key is only the upload key.
 - [x] **Fingerprints registered in Firebase** on `com.sabeelinstitute.kanban`

@@ -16,7 +16,7 @@ Roles, not people: whoever holds a role today grants it.
 | Firebase / Google Cloud project `sabeel-institute-kanban` | Owner | `firebase deploy`, `functions:secrets:set`, and the scripts run with `GCLOUD_PROJECT=…` (gcloud ADC) |
 | Google Play Console, the Sabeel developer account | user on this app with **Release apps to testing tracks** and **Manage testing tracks and edit tester lists** | the Testers tab, App content, the app-signing fingerprints |
 | App Store Connect, the Sabeel Institute team | **Admin** or **App Manager** on this app; the **Account Holder** files the unlisted-distribution request | TestFlight testers, App Review submissions |
-| GitHub `Sabeel-Institute/sabeel-institute-kanban` | write; repository administrators manage Actions secrets | pushing branches (only the organization owner merges into `main`), `gh workflow run ios.yml`, `publish-apk.sh`'s versioned release |
+| GitHub `Sabeel-Institute/sabeel-institute-kanban` | write; repository administrators manage Actions secrets | pushing branches and `npx sabeel-ci release`'s pull request (only the organization owner merges into `main` and creates release tags, so `release --ship` is the owner's), `gh workflow run` |
 | Sentry, the Sabeel org | member of the three Kanban projects | DSNs, the build token, triage |
 | The vault owner | — | every file in `docs/SECRETS.md` § Build and publish credentials |
 
@@ -104,16 +104,19 @@ Google login. The same guards run here:
 
 ```sh
 export FIREBASE_PROJECT_ID=sabeel-institute-kanban
-node scripts/ci-functions.mjs require-ci && node scripts/ci-functions.mjs plan
+npx sabeel-ci ci-functions require-ci && npx sabeel-ci ci-functions plan
 npx firebase deploy --only functions --project sabeel-institute-kanban
-node scripts/ci-functions.mjs verify --since <the time the deploy started, ISO>
+npx sabeel-ci ci-functions verify --since <the time the deploy started, ISO>
 ```
 
 It is `storage`, **not** `storage:rules`. The `storage` block in `firebase.json`
 is a single unnamed config, so a named target does not exist and `storage:rules`
 errors with "Could not find rules for the following storage targets: rules".
 
-Hosting serves `app/dist-web`, built automatically by the predeploy hook.
+Hosting serves `app/dist-web`, built automatically by the predeploy hook
+(`npm run web:export -w @sabeel/app`, which is `sabeel-ci build-web`). The
+usual web release is **Deploy Web** instead, which publishes the artifact the
+Web workflow built and checked for that commit (§ Shipping a release).
 
 **Attachments cannot be fully verified before this deploy.** The Storage
 emulator has no signing service, so `getAttachmentUrl` takes a different branch
@@ -156,29 +159,33 @@ From then on, promote everyone else in-app under **People**.
 Testers install through Play internal testing:
 https://play.google.com/apps/internaltest/4701475909888991410
 
-`npm run build:apk` builds the release APKs.
-`scripts/publish-apk.sh --check` validates version, signing, ABI splits and
-manual freshness without publishing. `scripts/publish-apk.sh` creates or
-updates the versioned release in `Sabeel-Institute/sabeel-institute-kanban`
-with its APKs and manual. No personal website or Pages clone is involved.
-
-Play distribution uses `npm run build:aab` and
-`npm run publish:play -- --internal`. Sideloaded APKs use the upload key;
-Play installs use Google's app signing key and cannot replace those APKs.
+Every release also carries its APKs on the versioned GitHub release in
+`Sabeel-Institute/sabeel-institute-kanban`, beside the manual:
+`sabeel-institute-kanban-arm64-v8a.apk` and
+`sabeel-institute-kanban-universal.apk`, which `npx sabeel-ci release --ship`
+builds, checks and attaches (§ Shipping a release). No personal website or
+Pages clone is involved. Those APKs carry the upload key; Play installs use
+Google's app signing key, so neither can replace the other.
 
 ## Android releases — Google Play
 
+`npx sabeel-ci release --ship` builds the bundle and publishes it (§ Shipping a
+release). The two steps alone, for a rerun:
+
 ```sh
-npm run build:aab
+npm run build:aab                          # sabeel-ci build-aab
 # outputs app/android/app/build/outputs/bundle/release/app-release.aab
-npm run publish:play -- --internal
+npx sabeel-ci publish-play --internal
 ```
 
-`build-aab.sh` holds the gates the old publish script did: a store-legal version,
-a deploy-log entry that exists **before** the build, and a refusal to proceed on
-a debug signature. Play wants one bundle carrying every ABI and does its own
-per-device splitting, so the `splits` block turns itself off for bundle tasks —
-leaving both on fails with *"Multiple shrunk-resources files found"*.
+`sabeel-ci build-aab` refuses to start Gradle without a store-legal version, a
+deploy-log entry for it that exists **before** the build, and the native Sentry
+DSN (`EXPO_PUBLIC_SENTRY_DSN_NATIVE`, `ci-tools.json`'s
+`build.sentryDsnVariable`) in `app/.env.local`; it stamps the commit, builds,
+and refuses an unsigned or debug-signed bundle. Play wants one bundle carrying
+every ABI and does its own per-device splitting, so the `splits` block turns
+itself off for bundle tasks — leaving both on fails with *"Multiple
+shrunk-resources files found"*.
 
 ### Three SHA-1s, because there are three signing identities
 
@@ -188,7 +195,7 @@ onto a device, and a missing one fails only for that route:
 | Build | Signed with | Needed for |
 |---|---|---|
 | `npm run dev:android`, `expo run:android` | committed debug keystore | day-to-day development |
-| `npm run build:apk` (sideload) | upload key, `~/keys/…jks` | a locally installed release build |
+| any release build: the APKs on a GitHub release, a local `assembleRelease` | upload key, `~/keys/…jks` | an APK installed by hand |
 | installed from Play | **Google's app signing key** | everyone actually using the app |
 
 Play's is the one that gets forgotten: **Play re-signs whatever you upload**,
@@ -196,7 +203,10 @@ so the key you built with is not the key the installed app runs under. Its
 fingerprint is under Play Console → App integrity → *App signing key
 certificate*. Miss it and sign-in fails with `DEVELOPER_ERROR` for Play users
 only, while every build on your own machine works — so it reads as a device
-problem.
+problem. Its SHA-256 is also `release.appSigningCertificate` in
+`ci-tools.json`, read from the APKs Play generated for 0.12.2: `sabeel-ci
+publish-play` completes a release only when Play signs with it, so a key change
+on Play's side stops the next release instead of reaching phones.
 
 ### DEVELOPER_ERROR on a Play install — diagnose in this order
 
@@ -282,21 +292,22 @@ specific participating stores in Brazil, Indonesia, Singapore and Thailand.
 Global rollout is **2027**. Creating the app in Play Console registered
 `com.sabeelinstitute.kanban` automatically, so the Play route is already covered.
 
-The one thing with a real horizon is the **website APK download**: by the 2027
-global rollout, an app sideloaded from a page rather than a store needs its
-signing key registered under Play Console -> Android developer verification.
-Retiring that channel resolves it; so would registering the upload key there.
+The one thing with a real horizon is the **APKs on the GitHub releases**: by
+the 2027 global rollout, an app sideloaded from a page rather than a store needs
+its signing key registered under Play Console -> Android developer
+verification. Retiring that channel resolves it; so would registering the
+upload key there.
 
 ### The signing and publishing files, and where they are kept
 
-Three files in `~/keys`, plus `app/android/keystore.properties`; each is copied
-into the vault (`docs/SECRETS.md`).
+Three files in `~/keys`, plus `~/.config/sabeel-kanban/keystore.properties`;
+each is copied into the vault (`docs/SECRETS.md`).
 
 | File | Role | If it is missing |
 |---|---|---|
 | `sabeel-kanban-upload.jks` | Play **upload** key | **Restore it from the vault. Never generate a new one**: Play refuses a new upload key until Play Console support resets it |
-| `app/android/keystore.properties` | its passwords | Restore it with the keystore; one is useless without the other |
-| `sabeel-play-publisher.json` | Play service-account key for `publish:play` | Restore it, or mint a new one (below) |
+| `~/.config/sabeel-kanban/keystore.properties` | the keystore's absolute path, its passwords and alias, which `build.gradle` reads (or the file `SABEEL_KEYSTORE_PROPERTIES` names) | Gradle refuses to package a release. Restore it with the keystore; one is useless without the other |
+| `sabeel-play-publisher.json` | Play service-account key for `sabeel-ci publish-play` | Restore it, or mint a new one (below) |
 | `upload_certificate.pem` | public certificate of the upload key | What Play support asks for in an upload-key reset; re-exportable from the keystore |
 
 **Losing the upload key is friction, not death.** Under Play App Signing, Google
@@ -313,54 +324,53 @@ app-scoped: one account publishes every app on the developer account.
 
 ### Publishing from the command line, without a browser
 
-`npm run publish:play` uploads the release AAB through the Google Play Developer
-API, so a build can reach a phone when nobody is at the computer that built it.
+`npx sabeel-ci publish-play` uploads the release AAB through the Google Play
+Developer API, so a build can reach a phone when nobody is at the computer that
+built it. `npx sabeel-ci release --ship` runs it last; alone it is for a rerun.
 
 ```
-npm run publish:play -- --check      # every gate + the Play permission, uploads nothing
-npm run publish:play -- --internal   # publish to the internal testing track
+npx sabeel-ci publish-play --check      # every gate + the Play permission, uploads nothing
+npx sabeel-ci publish-play --internal   # publish to the internal testing track
 ```
 
 **There is one destination, and it must be named.** Publishing is a release to
-the whole tester list, so a bare invocation prints help and refuses rather than
-guessing; unrecognised flags are refused too. The flow is edit → upload → point
-the track at the new `versionCode` → commit, and a failure discards the edit.
+the whole tester list, so a bare invocation prints the usage and refuses rather
+than guessing; unrecognised flags are refused too.
 
 Internal app sharing is not supported. Use Play internal testing for testers
 and a locally installed release APK for developer verification.
 
-**Gates, before anything leaves the machine.**
+**Gates, before anything leaves the machine.** The bundle must be signed, and
+not with the debug key; its JavaScript must carry HEAD's commit, not marked
+`+` (built from uncommitted changes); its manifest must name `app.json`'s
+version, from a `build.gradle` that derives the version rather than stating
+one. A timestamp describes the file, not the build, so nothing here trusts one.
 
-- A store-legal version, and a deploy-log entry that already describes it.
-- A destination must be named, and unknown flags are refused, so no typo can
-  reach the publish path.
-- **The bundle must SAY it is this version.** The versionName is read out of
-  `base/manifest/AndroidManifest.xml` inside the AAB and compared with
-  `app.json`. This started as an mtime comparison and was defeated the first
-  time it was tested: copying the file back after an experiment refreshed its
-  timestamp, and a bundle whose contents said 0.7.4 passed as 0.7.5. A timestamp
-  describes the file, not the build. mtime survives only as a secondary note.
-- **The signature must not be the debug key**, checked here and not merely
-  trusted from `build-aab.sh`. Play would reject a wrong upload key anyway, but
-  failing here names the problem instead of making Play do it.
+**Then three steps.** The bundle goes up as a DRAFT on the internal track, which
+no tester sees, and Play's reading of its versionCode must be the one the
+version gives; a rerun after a failure resumes only with this very bundle. Play
+then makes the APKs phones install, and the release is completed only when Play
+signs them with `release.appSigningCertificate` in `ci-tools.json`, the app
+signing certificate (§ Three SHA-1s); then testers get it. Play keeps an app's
+first release a draft when the API may not complete it, and says so: one "Start
+rollout" in Play Console sends it.
 
-`--check` runs all of it, proves the Play permission by creating and discarding
-an edit, and uploads nothing. **Every artifact gate is advisory there and fatal
-on a real run** — the bundle may be missing, stale or the wrong version and
-`--check` will still tell you whether the credentials and permissions work,
-because that is the state you are in *before* rebuilding and the question
-`--check` exists to answer. It reports what a real run would refuse, and will not
-claim "gates pass" when one of them would.
+`--check` runs every gate, then proves the Play permission by creating and
+discarding an edit — even when a gate fails, because a missing or stale bundle
+is the state you are in *before* rebuilding, and whether the credentials work is
+the question `--check` exists to answer. It exits 1 when a real run would
+refuse, and uploads nothing.
 
 **One credential for every app, named for the ACCOUNT not the app.** A Play
 service account belongs to the developer account and is scoped per-app by Play
 Console permissions, so one key publishes them all and a second app needs no new
 credential — only a tick box. That is the opposite of the upload **keystore**,
-which is per-app and stays app-named (`sabeel-kanban-upload.jks`). Every sibling
-repo can copy this script and find the same key with no configuration.
+which is per-app and stays app-named (`sabeel-kanban-upload.jks`). Every Sabeel
+app publishes through the same `sabeel-ci publish-play` and finds the same key
+with no configuration.
 
 **The credential lives at `~/keys/sabeel-play-publisher.json`** (override with
-`SK_PLAY_KEY`), beside the upload keystore and for the same reason: this repo is
+`PLAY_KEY`), beside the upload keystore and for the same reason: this repo is
 PUBLIC, and a service-account key committed once is a publish credential for the
 app that stays readable in history no matter what a later commit removes.
 `.gitignore` carries a name-pattern backstop, but the file should simply never be
@@ -378,12 +388,12 @@ Set up already; for a new service account, all of it in consoles:
    with **Release apps to testing tracks**.
 4. `chmod 600 ~/keys/sabeel-play-publisher.json`, then
    `bash ~/.config/secrets-vault/vault.sh collect`.
-5. `npm run publish:play -- --check`.
+5. `npx sabeel-ci publish-play --check`.
 
 ### Testers: the "Sabeel staff" list
 
-Internal testing is this app's Play track now, and `publish:play` publishes to
-it alone; public production is the destination, released from Play Console
+Internal testing is this app's Play track, and `sabeel-ci publish-play`
+publishes to it alone; public production is the destination, released from Play Console
 (`docs/STORE-RELEASE.md`). Who gets each internal release is an account-wide
 Play Console **email list**, "Sabeel staff", shared by every app on the
 developer account:
@@ -404,17 +414,20 @@ device as this same screen), the Play Store's ACTIVE account (profile icon) is
 the one that opted in, and the release is rolled out rather than a draft. A
 pre-13 phone cannot install the app; that person uses the web app.
 
-### Building a sideloadable APK
+### The release APKs, and signing
 
-The per-ABI APKs attached to the versioned Institute release:
+`npx sabeel-ci release --ship` builds the per-ABI APKs with `./gradlew
+assembleRelease` and attaches two of them to the versioned GitHub release:
 
-```sh
-npm run build:apk
-# outputs app/android/app/build/outputs/apk/release/app-<abi>-release.apk
+```
+app/android/app/build/outputs/apk/release/app-arm64-v8a-release.apk  -> sabeel-institute-kanban-arm64-v8a.apk
+app/android/app/build/outputs/apk/release/app-universal-release.apk  -> sabeel-institute-kanban-universal.apk
 ```
 
-Per-ABI splits plus R8 take arm64 from 82 MB to 27 MB. Both R8 flags are ON in
-`gradle.properties` and both are OFF by default in the React Native template.
+It refuses an APK not signed with the bundle's key, and cold-starts the
+universal one on the AVD before anything is published. Per-ABI splits plus R8
+take arm64 from 82 MB to 27 MB. Both R8 flags are ON in `gradle.properties` and
+both are OFF by default in the React Native template.
 
 **`./gradlew clean` can fail** in `externalNativeBuildCleanDebug` while CMake
 regenerates. Delete the caches instead:
@@ -426,20 +439,26 @@ rm -rf app/android/app/.cxx app/android/app/build
 **After any change to R8 or splits, install and RUN the result** — R8 strips
 classes reached only by reflection, and Google Sign-In is exactly that kind of
 dependency. A smaller APK that crashes on launch is worse than a large one that
-works:
+works. `sabeel-ci check-release` installs a release APK or bundle on the AVD
+(booting it when no device is attached), cold-starts it five times, and fails
+unless each start reaches the sign-in screen with this build's label, no dev
+sign-in row and no crash in the device log:
 
 ```sh
-adb install app/android/app/build/outputs/apk/release/app-x86_64-release.apk
-adb shell monkey -p com.sabeelinstitute.kanban -c android.intent.category.LAUNCHER 1
-adb exec-out screencap -p > shots/check.png     # then LOOK at it
+npx sabeel-ci build-info && (cd app/android && ./gradlew assembleRelease --no-daemon)
+npx sabeel-ci check-release app/android/app/build/outputs/apk/release/app-universal-release.apk --out shots/release-check
 ```
 
-**Signing.** `signingConfigs.release` reads a gitignored
-`app/android/keystore.properties`; without it the build still works but is
-debug-signed and says so loudly, and `build-aab.sh`, `publish:play` and
-`publish-apk.sh` each refuse a debug-signed artifact. The debug keystore is
-committed to this **public** repo, so a release signed with it could be
-reproduced by anyone with a clone.
+**Signing.** `signingConfigs.release` reads
+`~/.config/sabeel-kanban/keystore.properties`, or the file
+`SABEEL_KEYSTORE_PROPERTIES` names, which is how CI hands Gradle the key
+(`sabeel-ci ci-platform prepare-android` writes it from the `release-build`
+secrets). Without it the release signing configuration stays empty and Gradle
+refuses to package a release: it fails closed, never falling back to the debug
+key. The debug keystore is committed to this **public** repo, so a release
+signed with it could be reproduced by anyone with a clone; `sabeel-ci
+build-aab`, `publish-play` and `release --ship` each refuse a debug-signed
+artifact as well.
 
 The debug keystore is still committed and its SHA-1 still registered, on purpose:
 it is what makes `npm run dev:android` sign in without per-machine setup. The
@@ -532,80 +551,104 @@ cd /tmp/fnlock && npm install --package-lock-only --ignore-scripts
 npx -y npm@10 ci --dry-run --omit=dev    # what the buildpack runs; must pass
 ```
 
-`functions/test/unit/functionsLockfile.test.ts` fails when the lock's root block
-and `functions/package.json` disagree, which `npm ci` would otherwise reject only
-at deploy time.
+`npx sabeel-ci check-app` (in CI's quality job) fails when the lock's root
+block and `functions/package.json` disagree, which `npm ci` would otherwise
+reject only at deploy time, and `functions/test/unit/functionsLockfile.test.ts`
+fails when the lock does not resolve a runtime dependency.
 
-**`expo export` must always `--clear`.** Configured in `web:export`. Metro will
-otherwise serve a bundle built with different `EXPO_PUBLIC_*` values, and an
-emulator-mode bundle must never reach Hosting.
+**`expo export` must always `--clear`.** `sabeel-ci build-web` (`web:export`)
+always passes it. Metro would otherwise serve a bundle built with different
+`EXPO_PUBLIC_*` values, and an emulator-mode bundle must never reach Hosting.
 
 ## Shipping a release
 
 `android/` is committed; there is no EAS. A ship touches **the backend when it
-changed, web, versioned GitHub release assets, Play internal testing and TestFlight**, and
-they go out in one batch after Faisal's go-ahead. The iPhone build runs on
-GitHub (`docs/IOS-BUILD.md` § Builds on GitHub).
+changed, web, the versioned GitHub release, Play internal testing and
+TestFlight**, and they go out in one batch after Faisal's go-ahead. **Do not run
+the Gradle or `gh release` steps by hand**: `npx sabeel-ci release` (ci-tools)
+encodes them and their checks, and skipping it is how versions and stamps drift
+apart. The version is X.Y.Z, written only in `app/app.json`; Android's
+versionCode and the iOS build number are both `major * 1000000 + minor * 1000 +
+patch` (0.12.2 is 12002), and each version must be above main's and every
+released tag's.
 
 ```sh
-# 0. In one commit: expo.version in app/app.json; expo.ios.buildNumber above
-#    every build App Store Connect holds (testflight-check.mjs asks Apple); and
-#    the newest deploy-log heading in docs/PHASE_STATUS.md renamed to end
-#    "— vX.Y.Z". build-aab.sh, build-ios.sh and publish:play find the entry by
-#    that suffix, and refuse without it.
-# 1. Merge that commit into main by pull request FIRST (main takes no direct
-#    pushes) — a release attaches to a commit GitHub already has.
-# 2. Backend, when functions, rules or indexes changed, BEFORE the clients that
+# 0. CI green on main; the AVD free for the release check (--ship boots it).
+
+# 1. Backend, when functions, rules or indexes changed, BEFORE the clients that
 #    need it. Indexes first; a deploy-log entry that needs another order (such as
-#    functions before rules) states it.
+#    functions before rules) states it. Functions can also go through Deploy
+#    Functions (docs/GITHUB-ACTIONS.md).
 npx firebase deploy --only firestore:indexes --project sabeel-institute-kanban
 npx firebase deploy --only firestore:rules,storage,functions --project sabeel-institute-kanban
-# 3. The clients
-npm run web:export -w @sabeel/app
-npm run check:web-push      # the VAPID key actually reached the bundle
-npx firebase deploy --only hosting --project sabeel-institute-kanban
-npm run build:apk && scripts/publish-apk.sh          # Institute vX.Y.Z release assets
-npm run build:aab && npm run publish:play -- --internal   # the team, via Play
-gh workflow run ios.yml -R Sabeel-Institute/sabeel-institute-kanban --ref vX.Y.Z -f testflight=true   # iPhones, via TestFlight
+
+# 2. The deploy-log entry, heading first, kept outside the checkout (--ship
+#    refuses an untracked file):
+#      ### 2026-11-02 — <summary> — v0.13.0
+#      <the release notes>
+#    then the release pull request; Faisal merges it once its checks pass.
+npx sabeel-ci release 0.13.0 --notes ../v0.13.0.md
+
+# 3. Ship the merged commit from main: bundle, APKs, AVD check, tag, Play.
+git switch main && git pull --ff-only
+npx sabeel-ci release --ship
+
+# 4. The web and the iPhones, from the same commit: the two runs --ship prints.
+gh workflow run web-deploy.yml -R Sabeel-Institute/sabeel-institute-kanban -f build_run_id=<the Web run for that commit> -f deploy=true
+gh workflow run ios.yml -R Sabeel-Institute/sabeel-institute-kanban --ref v0.13.0 -f testflight=true
 ```
 
-The iOS run starts on the tag `publish-apk.sh` just cut, so the iPhone build
-carries the same commit as the others. Its upload job stops in seconds if the
-build number is taken; raise `expo.ios.buildNumber`, commit, and run again.
+`npx sabeel-ci release X.Y.Z --notes <entry>` works from origin/main in a
+worktree of its own: it writes the version and the iOS build number in
+`app/app.json`, moves the manual's version line and renders the manual PDF,
+adds the entry to the deploy log in `docs/PHASE_STATUS.md`, commits that on
+`release/vX.Y.Z`, pushes the branch and opens the pull request, titled and
+described by the entry. `--dry-run` shows the change and leaves nothing behind.
 
-**Push before publishing.** `publish-apk.sh` cuts a GitHub Release, which cannot
-attach to a commit GitHub has not seen — shipping v0.7.0 failed at exactly that
-step with `target_commitish is invalid`.
+`--ship`, on main after the merge, refuses unless main is clean and matches
+origin/main, then builds the AAB (`sabeel-ci build-aab`'s gates), checks it and
+Play's permission (`publish-play --check`), builds the APKs and refuses one not
+signed with the bundle's key, cold-starts the universal APK on the AVD five
+times (`sabeel-ci check-release`), creates the versioned GitHub release with
+its tag on that commit — the APKs and `docs/USER-MANUAL.pdf` attached, titled
+and described by the deploy-log entry — and publishes to Play internal testing
+last, because that reaches every tester's phone by itself. If Play refuses,
+the GitHub release stands; `npx sabeel-ci publish-play --internal` reruns that
+step alone. No personal website or Pages credentials are required.
 
-**Build the artifacts AFTER the last commit.** Both `build:apk` and `build:aab`
-stamp the running commit onto the sign-in screen. An artifact built earlier
-carries a superseded hash, so rebuild if anything landed since — the version
-gate will not catch it, because the version is still right.
+The tag is the release: Deploy Web publishes the Web workflow's artifact of the
+same commit, after checking its provenance, and the iOS run builds the tag, so
+every surface carries one commit. Its TestFlight job stops in seconds unless the
+commit is the one tagged `v<version>` and App Store Connect has not taken the
+build number (`sabeel-ci testflight-check`); each version goes to TestFlight
+once.
 
-Before sharing any build:
+**The artifacts carry the commit they were built from.** `--ship` builds from
+main's HEAD after the merge, and `publish-play` refuses a bundle whose
+JavaScript does not carry HEAD's commit, or carries it marked `+` (built from
+uncommitted changes), so a superseded build cannot go out by accident.
 
-1. **Install it and check the sign-in screen**: `npm run check:release --
-   <apk or aab>` installs it on the AVD (booting it if none is attached),
-   cold-starts it five times and fails unless the dev sign-in row is absent,
-   the version/commit stamp is the build you just cut, and the device log
-   shows no crash. The Android workflow runs the same check on every bundle it
-   builds, and the e2e suite asserts the same for the web bundle on every run.
-2. **Read the version back from the artifact, not from your notes.** Web: load the
-   live site and read the stamp. Android: install and look. This has caught a
-   stale bundle more than once.
+Before sharing any build, **read the version back from the artifact, not from
+your notes.** Web: load the live site and read the stamp. Android: the release
+check reads it off the sign-in screen of the APK that ships, and the Android
+workflow runs the same check on every bundle it builds; the e2e suite asserts
+the web bundle has no dev sign-in row on every run.
 
-The **deploy-log entry in `docs/PHASE_STATUS.md` is mandatory and comes first** —
-`build-aab.sh`, `build-ios.sh` and `publish:play` refuse without one, and
-`publish-apk.sh` takes the versioned release's notes from it. It is the only
-record of why a release exists.
+The **deploy-log entry in `docs/PHASE_STATUS.md` is mandatory and comes first**
+— `sabeel-ci build-aab` and `build-ios` refuse without one, and `release`
+takes the pull request's and the GitHub release's title and notes from it
+(`npx sabeel-ci deploy-notes <version>`). It is the only record of why a
+release exists.
 
 ### Play specifics
 
-- Uploading is **scripted**: `npm run publish:play -- --internal` does the whole
-  edit/upload/track/commit cycle, and `-- --check` proves the gates and the Play
-  permission without uploading. The console is only needed for things the API
-  cannot do — permissions, testers, and reading the app-signing fingerprints.
-  Play is deliberately **never deployed from CI** (see `CLAUDE.md`).
+- Uploading is **scripted**: `npx sabeel-ci publish-play --internal` does the
+  whole draft/upload/signing check/completion cycle, and `--check` proves the
+  gates and the Play permission without uploading. The console is only needed
+  for things the API cannot do — permissions, testers, and reading the
+  app-signing fingerprints. Play is never published automatically: `--ship`
+  publishes from the release machine, and the manual **Publish Android**
+  workflow publishes a bundle CI built (`docs/GITHUB-ACTIONS.md`).
 - Testers: § Testers above. Internal app sharing is not supported; § Publishing
   from the command line says why.
 - `versionCode` is derived from the semver (`major*1000000 + minor*1000 + patch`),
@@ -614,8 +657,8 @@ record of why a release exists.
 - Processing takes a few minutes before a build appears on the testing track.
 - Tagging a GitHub release at a commit whose `.github/workflows` differs from
   the default branch needs the `workflow` token scope
-  (`gh auth refresh -h github.com -s workflow`). `publish-apk.sh` tags HEAD
-  after the push, so a normal ship never hits it.
+  (`gh auth refresh -h github.com -s workflow`). `--ship` tags main's HEAD, so a
+  normal ship never hits it.
 
 ## Rollback
 
@@ -690,7 +733,8 @@ recreates what was deleted and cannot remove what was wrongly *added* — a fiel
 addition is outside the backup's reach entirely. The undo is
 `scripts/unbackfill-board-owners.mjs`, and it only helps while rules that do not
 require the field are live. All four scripts are exercised end to end by
-`scripts/migration-e2e.mjs`, which CI runs on every push.
+`scripts/migration-e2e.mjs`, which `npm run test:emulator` runs first in its
+rules pass, and so CI on every push.
 
 ## Backups and disaster recovery
 

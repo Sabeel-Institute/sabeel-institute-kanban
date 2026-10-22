@@ -81,8 +81,9 @@ testing, and on iPhones through TestFlight:
 across four suites — access and board flow (176), attachments (21), the stats
 chart at nine widths (280), and every screen at five widths (259). Rich text (35)
 and typing performance (3) run beside them, and the migration scripts (96) run
-under their own emulator. All of them run in CI on every push, and
-`app/src/ciCoverage.test.ts` fails if a suite is ever left out of the workflow.
+first in the emulator suite's rules pass. All of them run in CI on every push,
+and `app/src/ciCoverage.test.ts` fails if a suite is ever left out of the
+workflow.
 
 See `docs/DEVELOPING.md` to run it, `docs/USER-MANUAL.md` for the user guide and
 `docs/DEPLOY.md` for the production checklist.
@@ -137,7 +138,8 @@ Scope: npm-workspaces monorepo (`app`, `functions`, `packages/shared`);
 `tsconfig.base.json` (strict); flat ESLint config; `firebase.json` with
 firestore + hosting + emulators (**no storage**); `.firebaserc` placeholder;
 Vitest wired for shared + functions; GitHub Actions CI (lint → typecheck → unit →
-emulator); `scripts/emulator.sh` + `test-emulator.sh`; Expo app with
+emulator); the AVD and emulator-suite runners (`npx sabeel-ci emulator`,
+`npm run test:emulator`); Expo app with
 react-native-web; **semantic theme tokens, single light theme (no dark mode)**.
 
 **Exit criteria**
@@ -155,7 +157,7 @@ react-native-web; **semantic theme tokens, single light theme (no dark mode)**.
       deploy failed on it, and it is cheaper to prove now than at Phase 13.
 
 **Notes**
-- Metro port 8081 is contended on this machine; `scripts/preflight-metro.mjs` now
+- Metro port 8081 is contended on this machine; `sabeel-ci preflight-metro`
   guards it. See CLAUDE.md § Dev & test loops.
 
 ## Phase 1 — Auth, approval, roles
@@ -181,7 +183,7 @@ disabled; admin user-management screen; `scripts/grant-admin.mjs`.
       three levels: pure logic, the real callable over HTTP, and rules.
 
 **Tests:** 32 shared + 11 functions unit + 40 emulator integration = 83, plus 11
-browser e2e checks (`npm run e2e`).
+browser e2e checks (`npm run test:e2e`).
 
 **Two traps found and documented** (`docs/INHERITED-STACK.md` lessons 8 and 10):
 the emulator project-id mismatch, and React Native needing
