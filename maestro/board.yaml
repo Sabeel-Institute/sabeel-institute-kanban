@@ -14,7 +14,7 @@ name: Board, card, rich text and gestures
 # cards · 3 members"), and Maestro matches the whole label, so names here are
 # prefixes.
 - extendedWaitUntil:
-    visible: "Fundraising 2026.*"
+    visible: "Fundraising 2026[\\s\\S]*"
     timeout: 60000
 - runFlow:
     when:
@@ -24,7 +24,7 @@ name: Board, card, rich text and gestures
 - takeScreenshot: 01-boards
 
 # The column pager: the arrow and the swipe.
-- tapOn: "Fundraising 2026.*"
+- tapOn: "Fundraising 2026[\\s\\S]*"
 - extendedWaitUntil:
     visible: "To Do"
     timeout: 30000
@@ -39,7 +39,7 @@ name: Board, card, rich text and gestures
 - assertVisible: "To Do"
 
 # A card, and the native editor: type, bold, save.
-- tapOn: "Draft the donor letter.*"
+- tapOn: "Draft the donor letter[\\s\\S]*"
 - assertVisible: "Attachments \\(1\\)"
 - tapOn: "Edit description"
 - tapOn:
@@ -50,14 +50,14 @@ name: Board, card, rich text and gestures
 - hideKeyboard
 - tapOn: "Save"
 - extendedWaitUntil:
-    visible: ".*Native flow line bold.*"
+    visible: "[\\s\\S]*Native flow line bold[\\s\\S]*"
     timeout: 15000
 - takeScreenshot: 03-card-description
 - tapOn: "Back"
 
 # Long-press starts a selection.
-- longPressOn: "Book the venue.*"
-- assertVisible: "1 selected.*"
+- longPressOn: "Book the venue[\\s\\S]*"
+- assertVisible: "1 selected[\\s\\S]*"
 - takeScreenshot: 04-selection
 - tapOn: "Back"
 
@@ -66,7 +66,7 @@ name: Board, card, rich text and gestures
 - assertVisible: "Nothing is assigned to you right now\\."
 - tapOn: "Search"
 - assertVisible: "Search cards across your boards"
-- tapOn: "Alerts.*"
+- tapOn: "Alerts[\\s\\S]*"
 - assertVisible: "Mark all read"
 - tapOn: "More"
 - assertVisible: "Report a problem"
