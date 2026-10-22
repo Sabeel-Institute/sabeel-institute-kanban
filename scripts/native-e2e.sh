@@ -129,7 +129,7 @@ wait_for "http://127.0.0.1:${METRO_PORT}/status" Metro 60
 # Bundle before launch, so a bundling failure fails here with Metro's log rather
 # than as a flow timing out on a red screen. Expo serves the app's entry at its
 # virtual path; /index.bundle is a 404.
-echo "Bundling for Android…"
+echo "Bundling for ${PLATFORM}…"
 curl -sf -o /dev/null --max-time 600 \
   "http://127.0.0.1:${METRO_PORT}/.expo/.virtual-metro-entry.bundle?platform=${PLATFORM}&dev=true&minify=false" \
   || { echo "native-e2e.sh: Metro could not bundle the app; see $LOGS/metro.log" >&2; exit 1; }
