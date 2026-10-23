@@ -197,7 +197,7 @@ onto a device, and a missing one fails only for that route:
 | Build | Signed with | Needed for |
 |---|---|---|
 | `npm run dev:android`, `expo run:android` | committed debug keystore | day-to-day development |
-| any release build: the APKs on a GitHub release, a local `assembleRelease` | upload key, `~/keys/…jks` | an APK installed by hand |
+| any release build: the APKs on a GitHub release, a local `assembleRelease` | upload key, `~/.config/sabeel-kanban/…jks` | an APK installed by hand |
 | installed from Play | **Google's app signing key** | everyone actually using the app |
 
 Play's is the one that gets forgotten: **Play re-signs whatever you upload**,

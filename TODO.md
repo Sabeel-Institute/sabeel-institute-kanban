@@ -357,18 +357,17 @@ The upload key, Play App Signing and the fingerprints are set up. Android is on
 Play internal testing now; public production is the destination
 (`docs/STORE-RELEASE.md`).
 
-- [x] **The upload keystore exists**: `~/keys/sabeel-kanban-upload.jks`, read
-      through `~/.config/sabeel-kanban/keystore.properties` (or the file
+- [x] **The upload keystore exists**: `~/.config/sabeel-kanban/sabeel-kanban-upload.jks`,
+      read through `keystore.properties` beside it (or the file
       `SABEEL_KEYSTORE_PROPERTIES` names), both copied in the vault. **On a new
       machine, restore both from the vault — never generate a new key**: Play
       refuses a new upload key until Play Console support resets it
       (`docs/DEPLOY.md` § The signing and publishing files). Without the
       properties file Gradle refuses to package a release build; nothing falls
       back to the debug key.
-- [ ] **Delete, or keep as a spare, the old `app/android/keystore.properties`
-      in the main checkout.** Nothing reads it: the build reads
-      `~/.config/sabeel-kanban/keystore.properties`, which exists. It stays
-      gitignored either way.
+- [x] **Delete the old `app/android/keystore.properties` in the main
+      checkout.** Deleted 2026-10-23 at the owner's word; the build reads
+      `~/.config/sabeel-kanban/keystore.properties`.
 - [x] **Play app created with Play App Signing**: Google generated and holds
       the app signing key; the repo's key is only the upload key.
 - [x] **Fingerprints registered in Firebase** on `com.sabeelinstitute.kanban`
