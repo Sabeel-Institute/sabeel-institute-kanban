@@ -64,7 +64,11 @@ const grant = (email) =>
     c.on('exit', (code) => (code === 0 ? res() : rej(new Error(`grant-admin ${code}`))));
   });
 
-const browser = await chromium.launch({ channel: 'chromium' });
+// Chromium's own notification centre, not the desktop's: with a notification
+// daemon on the machine's session bus, Chromium hands banners to it and drops
+// them from `getNotifications()` when the daemon closes them, so the banner
+// this suite reads back can be gone before it looks.
+const browser = await chromium.launch({ channel: 'chromium', args: ['--disable-features=NativeNotifications,SystemNotifications'] });
 const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
 await context.grantPermissions(['notifications'], { origin: ORIGIN });
 const page = await context.newPage();
@@ -168,11 +172,11 @@ for (const c of cases) {
   check(`${c.event}: the push is shown, with its words and its routing data`,
     Boolean(banner) && banner.body === c.payload.notification.body
       && JSON.stringify(banner.data) === JSON.stringify(c.payload.data),
-    JSON.stringify(banner));
+    JSON.stringify(banner ?? await shown()));
   await worker.evaluate(async (notifId) => {
     const n = (await self.registration.getNotifications()).find((x) => x.data?.notifId === notifId);
     // eslint-disable-next-line no-undef -- runs in the worker, where it is a global
-    self.dispatchEvent(new NotificationEvent('notificationclick', { notification: n }));
+    if (n) self.dispatchEvent(new NotificationEvent('notificationclick', { notification: n }));
   }, c.payload.data.notifId);
   check(`${c.event}: tapping it opens its subject in the open tab`, await c.landed(page));
   check(`${c.event}: the tapped notification is closed`,
