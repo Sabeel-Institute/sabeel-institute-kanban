@@ -21,9 +21,9 @@
  * an empty one costs. That is machine-independent, and it is exactly what
  * regresses when a draft is hoisted back into a screen.
  *
- * Ratios before the fix were 4-15x and are now near 1, so the 2.5 threshold sits
- * in open space and needs no tuning. Absolute figures are LOGGED every run
- * because they are useful, and gated on never.
+ * Ratios before the fix were 4-15x and are now near 1, and the threshold is 3:
+ * the median of five still reached 2.62 on a busy CI runner. Absolute figures
+ * are LOGGED every run because they are useful, and gated on never.
  *
  * The seed is deliberately the smallest that still separates the two arms: CI
  * runs every e2e suite sequentially in one job, so this one's wall clock is
@@ -48,7 +48,7 @@ process.env.FIREBASE_AUTH_EMULATOR_HOST ??= `127.0.0.1:${PORTS.auth}`;
 process.env.GCLOUD_PROJECT = PROJECT;
 
 /** Above this, typing costs materially more on a busy screen than an empty one. */
-const MAX_RATIO = 2.5;
+const MAX_RATIO = 3;
 /** Long enough to average out one slow frame, short enough to stay cheap. */
 const SAMPLE = 'the quick brown fox jumps over it';
 /** Samples per arm; the median is the arm's cost (see `msPerChar`). */
