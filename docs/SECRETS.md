@@ -154,10 +154,10 @@ Each lives at its path on the machine that uses it and is copied into the vault
 
 | What | Live path | Used by | Vault copy |
 |---|---|---|---|
-| Play **upload** keystore `sabeel-kanban-upload.jks` | `~/.config/sabeel-kanban/`, beside `keystore.properties` | every release build (`build:aab`, `release --ship`), through `keystore.properties` | `sabeel/kanban/android/` |
+| Play **upload** keystore `sabeel-kanban-upload.jks` | `~/.config/sabeel-kanban/`, beside `keystore.properties` | every release build (`build:aab`, and the Android workflow through `ANDROID_KEYSTORE`), through `keystore.properties` | `sabeel/kanban/android/` |
 | `keystore.properties` (keystore path, alias and passwords) | `~/.config/sabeel-kanban/`, or the file `SABEEL_KEYSTORE_PROPERTIES` names | `signingConfigs.release`; without it Gradle refuses to package a release | `sabeel/kanban/android/` |
 | `upload_certificate.pem` (public) | `~/.config/sabeel-kanban/` | a Play upload-key reset only | `sabeel/kanban/android/` |
-| Play service-account key `sabeel-play-publisher.json` | `~/keys/` (or `PLAY_KEY`) | `npx sabeel-ci publish-play`, `release --ship` | `sabeel/google-play/` |
+| Play service-account key `sabeel-play-publisher.json` | `~/keys/` (or `PLAY_KEY`) | `npx sabeel-ci publish-play`; `sabeel-ci play-apk`, which `release --ship` runs | `sabeel/google-play/` |
 | `app/.env.local` | gitignored | every bundle (table above) | `sabeel/kanban/env/` |
 | `app/.env.sentry-build-plugin`: `SENTRY_AUTH_TOKEN`, `IOS_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID` | gitignored | every release build | `sabeel/kanban/env/` |
 | App Store Connect API key `AuthKey_<ASC_KEY_ID>.p8` (Admin) | `~/.appstoreconnect/private_keys/` | `build:ios`, `sabeel-ci testflight-check`, the `ASC_KEY_P8` secret | `sabeel/apple/` |

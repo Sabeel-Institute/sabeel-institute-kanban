@@ -16,7 +16,7 @@ route, that file is the reasoning.
 
 > You are checking the **iOS** release of Sabeel Kanban from the cloud Mac.
 > The release is tagged and its other surfaces (the GitHub release with the
-> APKs, Play internal testing, web hosting) went out from that tag. The
+> APK, Play internal testing, web hosting) went out from that tag. The
 > TestFlight upload is the iOS workflow's build of the same tag, which Faisal
 > starts on GitHub; **you upload nothing from this Mac.**
 >
