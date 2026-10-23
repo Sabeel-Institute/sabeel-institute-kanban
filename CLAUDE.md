@@ -728,7 +728,7 @@ factory rather than being silently dropped.
   including the commit, then **stop and show him what is ready**. Once he says go,
   ship **every** surface in one batch; never ask platform by platform. The gate
   exists because a release is only reversible *forwards*, through another release.
-  The surfaces are **the backend when it changed, web hosting, the APKs on the
+  The surfaces are **the backend when it changed, web hosting, the APK on the
   GitHub release, Play internal testing and TestFlight** — `docs/DEPLOY.md`
   § Shipping a release has the order, and the order matters: **merge into
   `main` first**, by pull request (a GitHub Release cannot attach to an
@@ -738,22 +738,24 @@ factory rather than being silently dropped.
   --notes <entry>` writes the version and the iOS build number, moves the
   manual's version line and renders its PDF, adds the deploy-log entry
   (`<entry>`, heading first) and opens the release pull request; after Faisal
-  merges it, `npx sabeel-ci release --ship` on main builds the Play bundle and
-  the arm64-v8a and universal APKs, cold-starts the universal APK on the AVD
-  (`sabeel-ci check-release`), creates the GitHub release `vX.Y.Z` with the
-  APKs and the manual, and publishes to Play internal testing. It prints the
-  two runs that put the same commit on the web (`gh workflow run
-  web-deploy.yml -f build_run_id=<the Web run> -f deploy=true`) and on iPhones
-  (`gh workflow run ios.yml --ref vX.Y.Z -f testflight=true`). **Never
-  hand-bump versions.** Store decisions — tracks, testers, App Review — are
-  `docs/STORE-RELEASE.md`.
+  merges it, `npx sabeel-ci release --ship` on main publishes the bundle CI
+  built from that commit to Play internal testing (the Publish Android
+  workflow), cold-starts the universal APK Play signs from it on the AVD
+  (`sabeel-ci play-apk`, `sabeel-ci check-release`), and last creates the GitHub
+  release `vX.Y.Z` with that APK and the manual, which creates the tag; it
+  builds and signs nothing locally. It prints the two runs that put the same
+  commit on the web (`gh workflow run web-deploy.yml -f build_run_id=<the Web
+  run> -f deploy=true`) and on iPhones (`gh workflow run ios.yml --ref vX.Y.Z -f
+  testflight=true`). **Never hand-bump versions.** Store decisions — tracks,
+  testers, App Review — are `docs/STORE-RELEASE.md`.
 - **Android ships through Google Play** (decided 2026-08-02), release-signed:
   internal testing now, to the account-wide "Sabeel staff" email list
   (`docs/DEPLOY.md` § Testers); public production is the destination
   (decided 2026-10-16, `docs/STORE-RELEASE.md`).
-  `npx sabeel-ci release --ship` builds and publishes; alone, `npm run
-  build:aab` (`sabeel-ci build-aab`) builds the bundle and `npx sabeel-ci
-  publish-play --internal` uploads it — through the Play Developer API, so it
+  `npx sabeel-ci release --ship` publishes the Android workflow's bundle
+  through the Publish Android workflow; on this machine, `npm run build:aab`
+  (`sabeel-ci build-aab`) builds a bundle and `npx sabeel-ci publish-play
+  --internal` uploads it — through the Play Developer API, so it
   needs no browser, with the key `~/keys/sabeel-play-publisher.json` (or
   `PLAY_KEY`). `publish-play --check` proves every gate and the Play permission
   without uploading anything. Play Console is still required for the things the
@@ -780,11 +782,12 @@ factory rather than being silently dropped.
   Both belong in Firebase; miss the former and sign-in fails with
   `DEVELOPER_ERROR` for Play users only, while local builds work.
 - **Android distribution:** testers install through Play internal testing.
-  `npx sabeel-ci release --ship` attaches the arm64-v8a and universal APKs
-  (`sabeel-institute-kanban-<abi>.apk`) and the manual to the versioned
-  Institute repository release, never to a personal website. Sideloaded APKs use the
-  upload key; Play installs use Google's app signing key and cannot replace
-  those APKs.
+  `npx sabeel-ci release --ship` attaches the universal APK Play generated from
+  the release's bundle (`sabeel-institute-kanban-universal.apk`) and the
+  manual to the versioned Institute repository release, never to a personal
+  website. That APK carries Google's app signing key, as Play installs do, so
+  either updates the other. v0.12.2's APKs carry the upload key: a phone with
+  one uninstalls it once.
 - **Never `git add` a binary.** APKs belong in GitHub Release assets.
 - **Publisher checks must not upload.** Use `npx sabeel-ci publish-play
   --check` and `npx sabeel-ci release X.Y.Z --dry-run` when verifying the

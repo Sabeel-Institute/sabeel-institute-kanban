@@ -25,8 +25,9 @@ Play production, a public listing (decided by Faisal 2026-10-16). The app
 signing key is Google-generated, and its certificate is
 `release.appSigningCertificate` in `ci-tools.json`, which `npx sabeel-ci
 publish-play` holds every release to; the repo's key (in the vault) is the
-upload key only. The APKs on each GitHub release (`docs/DEPLOY.md`) are signed
-with the upload key, so they and a Play install cannot replace each other.
+upload key only. The APK on each GitHub release (`docs/DEPLOY.md`) is Play's
+own universal one, under Google's key, so it and a Play install update each
+other; v0.12.2's APKs carry the upload key.
 
 **Web.** <https://sabeel-institute-kanban.web.app>, v0.11.5 (`67913fa`), serving
 `/privacy`, `/support` and `/get-app` as static pages. The email sign-in's
@@ -364,9 +365,10 @@ the vault is the upload key. The consequences (skill, decision 8):
 - Play installs run under Google's key; its SHA-1 is registered in Firebase, or
   Google sign-in fails with `DEVELOPER_ERROR` for Play users only
   (`docs/DEPLOY.md`).
-- An APK from a GitHub release carries the upload key, so it and a Play
-  install cannot replace each other: uninstall first; nothing is lost, all
-  state is in Firestore.
+- The APK on a GitHub release is the universal one Play generated, under
+  Google's key, so it and a Play install update each other. v0.12.2's APKs
+  carry the upload key: a phone with one uninstalls it first; nothing is lost,
+  all state is in Firestore.
 - `npx sabeel-ci publish-play` completes a release only once Play signs the
   APKs phones install with the certificate `release.appSigningCertificate` in
   `ci-tools.json` names; a change of signing key changes that value too.
@@ -375,9 +377,9 @@ the vault is the upload key. The consequences (skill, decision 8):
 - **Open, for Faisal:** whether Kanban keeps Google's key. Play allows a
   change until a release reaches open testing or production, but staff who
   installed Kanban from internal testing run under Google's key, and their
-  copies would need reinstalling after a change. The LMS and the Time Tracker
-  use their own keys so their GitHub release APKs and Play installs update
-  each other. Kanban testers install through Play internal testing; developer
+  copies would need reinstalling after a change. Every app's GitHub release
+  APK is Play's own, so it and a Play install update each other whichever key
+  Play holds. Kanban testers install through Play internal testing; developer
   verification can use the GitHub release APKs.
 
 ### 9. Distribution
@@ -392,7 +394,7 @@ the vault is the upload key. The consequences (skill, decision 8):
   institute's name.
 - **Android now:** internal testing, the "Sabeel staff" list ticked on the
   track; `npx sabeel-ci release --ship` publishes every release there
-  (`sabeel-ci publish-play --internal`); testers join through the opt-in link
+  (the Publish Android workflow); testers join through the opt-in link
   (`docs/DEPLOY.md` § Testers).
 - **Android next:** production, released from Play Console: `sabeel-ci
   publish-play` publishes to internal testing only, and its service account
@@ -403,9 +405,9 @@ the vault is the upload key. The consequences (skill, decision 8):
 `ios.config.usesNonExemptEncryption` is false; builds run on GitHub's
 `macos-26` runners (Xcode 26, iOS 26 SDK); `targetSdk` 36 and `minSdk` 24; both
 external-storage permissions removed with `tools:node="remove"`. Play
-registered `com.sabeelinstitute.kanban` for Android developer verification; the
-upload key of the APKs on the GitHub releases needs registering by the 2027
-rollout (`docs/DEPLOY.md`).
+registered `com.sabeelinstitute.kanban` for Android developer verification, and
+the APKs on the GitHub releases are Play's, under the same app signing key
+(`docs/DEPLOY.md`).
 
 ## Store answers
 

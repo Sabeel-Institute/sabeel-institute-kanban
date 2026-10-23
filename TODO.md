@@ -23,7 +23,7 @@ first, which is what proves the service account can actually release.
 
 So a build can reach your phone when you are away from this machine. Everything
 below is console work; the publisher is `npx sabeel-ci publish-play`, which
-`npx sabeel-ci release --ship` runs.
+the Publish Android workflow runs for `npx sabeel-ci release --ship`.
 
 - [x] **Enable the API.** Google Cloud Console → the project already backing
       Firebase → *APIs & Services → Library* → **Google Play Android Developer

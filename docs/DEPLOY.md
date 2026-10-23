@@ -160,18 +160,21 @@ From then on, promote everyone else in-app under **People**.
 Testers install through Play internal testing:
 https://play.google.com/apps/internaltest/4701475909888991410
 
-Every release also carries its APKs on the versioned GitHub release in
+Every release also carries its APK on the versioned GitHub release in
 `Sabeel-Institute/sabeel-institute-kanban`, beside the manual:
-`sabeel-institute-kanban-arm64-v8a.apk` and
-`sabeel-institute-kanban-universal.apk`, which `npx sabeel-ci release --ship`
-builds, checks and attaches (§ Shipping a release). No personal website or
-Pages clone is involved. Those APKs carry the upload key; Play installs use
-Google's app signing key, so neither can replace the other.
+`sabeel-institute-kanban-universal.apk`, the universal APK Play generated from
+the release's bundle, which `npx sabeel-ci release --ship` fetches, checks and
+attaches (§ Shipping a release). No personal website or Pages clone is
+involved. It carries Google's app signing key, as Play installs do, so either
+updates the other. The APKs on v0.12.2's release carry the upload key instead:
+a phone with one uninstalls it once before installing from Play or a later
+release; nothing is lost, all state is in Firestore.
 
 ## Android releases — Google Play
 
-`npx sabeel-ci release --ship` builds the bundle and publishes it (§ Shipping a
-release). The two steps alone, for a rerun:
+`npx sabeel-ci release --ship` publishes the bundle the Android workflow built
+from the release commit (§ Shipping a release). Building and publishing one
+from this machine instead, which a release does not need:
 
 ```sh
 npm run build:aab                          # sabeel-ci build-aab
@@ -197,8 +200,8 @@ onto a device, and a missing one fails only for that route:
 | Build | Signed with | Needed for |
 |---|---|---|
 | `npm run dev:android`, `expo run:android` | committed debug keystore | day-to-day development |
-| any release build: the APKs on a GitHub release, a local `assembleRelease` | upload key, `~/.config/sabeel-kanban/…jks` | an APK installed by hand |
-| installed from Play | **Google's app signing key** | everyone actually using the app |
+| any release build: CI's bundle, `build:aab`, a local `assembleRelease` | upload key, `~/.config/sabeel-kanban/…jks` | an APK built and installed by hand |
+| installed from Play, or the APK on a GitHub release | **Google's app signing key** | everyone actually using the app |
 
 Play's is the one that gets forgotten: **Play re-signs whatever you upload**,
 so the key you built with is not the key the installed app runs under. Its
@@ -271,9 +274,10 @@ Two consequences worth knowing:
   and then try to launch the unsuffixed package. `npm run dev:android` passes
   `--app-id com.sabeelinstitute.kanban.debug` to correct that.
 
-**A sideloaded release APK and a Play install still collide** — both are
-`com.sabeelinstitute.kanban` with different signatures, so neither can replace
-the other. Uninstall to move between those two.
+**A locally built release APK and a Play install collide** — both are
+`com.sabeelinstitute.kanban`, one under the upload key and one under Google's,
+so neither can replace the other. Uninstall to move between those two. The APK
+on a GitHub release is Play's own and does not collide.
 
 ### Android developer verification, and why it does not threaten dev builds
 
@@ -294,11 +298,11 @@ specific participating stores in Brazil, Indonesia, Singapore and Thailand.
 Global rollout is **2027**. Creating the app in Play Console registered
 `com.sabeelinstitute.kanban` automatically, so the Play route is already covered.
 
-The one thing with a real horizon is the **APKs on the GitHub releases**: by
-the 2027 global rollout, an app sideloaded from a page rather than a store needs
-its signing key registered under Play Console -> Android developer
-verification. Retiring that channel resolves it; so would registering the
-upload key there.
+By the 2027 global rollout, an app sideloaded from a page rather than a store
+needs its signing key registered. The **APK on each GitHub release** is Play's
+own, signed with Google's app signing key, the key Play holds for
+`com.sabeelinstitute.kanban`; the upload key reaches a phone only over adb.
+v0.12.2's APKs, signed with the upload key, are the exception.
 
 ### The signing and publishing files, and where they are kept
 
@@ -309,7 +313,7 @@ each is copied into the vault (`docs/SECRETS.md`).
 |---|---|---|
 | `sabeel-kanban-upload.jks` | Play **upload** key | **Restore it from the vault. Never generate a new one**: Play refuses a new upload key until Play Console support resets it |
 | `~/.config/sabeel-kanban/keystore.properties` | the keystore's absolute path, its passwords and alias, which `build.gradle` reads (or the file `SABEEL_KEYSTORE_PROPERTIES` names) | Gradle refuses to package a release. Restore it with the keystore; one is useless without the other |
-| `sabeel-play-publisher.json` | Play service-account key for `sabeel-ci publish-play` | Restore it, or mint a new one (below) |
+| `sabeel-play-publisher.json` | Play service-account key for `sabeel-ci publish-play`, and for `sabeel-ci play-apk`, which `release --ship` runs | Restore it, or mint a new one (below) |
 | `upload_certificate.pem` | public certificate of the upload key | What Play support asks for in an upload-key reset; re-exportable from the keystore |
 
 **Losing the upload key is friction, not death.** Under Play App Signing, Google
@@ -326,9 +330,10 @@ app-scoped: one account publishes every app on the developer account.
 
 ### Publishing from the command line, without a browser
 
-`npx sabeel-ci publish-play` uploads the release AAB through the Google Play
+`npx sabeel-ci publish-play` uploads a release AAB through the Google Play
 Developer API, so a build can reach a phone when nobody is at the computer that
-built it. `npx sabeel-ci release --ship` runs it last; alone it is for a rerun.
+built it. The Publish Android workflow runs it on CI's bundle, which is how
+`npx sabeel-ci release --ship` publishes (`docs/GITHUB-ACTIONS.md`).
 
 ```
 npx sabeel-ci publish-play --check      # every gate + the Play permission, uploads nothing
@@ -416,19 +421,16 @@ device as this same screen), the Play Store's ACTIVE account (profile icon) is
 the one that opted in, and the release is rolled out rather than a draft. An
 older phone cannot install the app; that person uses the web app.
 
-### The release APKs, and signing
+### The release APK, and signing
 
-`npx sabeel-ci release --ship` builds the per-ABI APKs with `./gradlew
-assembleRelease` and attaches two of them to the versioned GitHub release:
-
-```
-app/android/app/build/outputs/apk/release/app-arm64-v8a-release.apk  -> sabeel-institute-kanban-arm64-v8a.apk
-app/android/app/build/outputs/apk/release/app-universal-release.apk  -> sabeel-institute-kanban-universal.apk
-```
-
-It refuses an APK not signed with the bundle's key, and cold-starts the
-universal one on the AVD before anything is published. Per-ABI splits plus R8
-take arm64 from 82 MB to 27 MB. Both R8 flags are ON in `gradle.properties` and
+`npx sabeel-ci release --ship` attaches one APK to the versioned GitHub release,
+`sabeel-institute-kanban-universal.apk`: the universal APK Play generated from
+the release's bundle, downloaded through the Play Developer API (`sabeel-ci
+play-apk`), which refuses it unless Play signed it with
+`release.appSigningCertificate`. It carries every ABI (86 MB for 0.12.2), and it
+is cold-started on the AVD before the release is tagged. Per-ABI splits plus R8
+take a local arm64 build from 82 MB to 27 MB, and Play cuts the per-device APKs
+phones install the same way. Both R8 flags are ON in `gradle.properties` and
 both are OFF by default in the React Native template; Sentry's Android Gradle
 plugin uploads each release's mapping file, so its Java and Kotlin frames read.
 
@@ -460,8 +462,8 @@ secrets). Without it the release signing configuration stays empty and Gradle
 refuses to package a release: it fails closed, never falling back to the debug
 key. The debug keystore is committed to this **public** repo, so a release
 signed with it could be reproduced by anyone with a clone; `sabeel-ci
-build-aab`, `publish-play` and `release --ship` each refuse a debug-signed
-artifact as well.
+build-aab` and `publish-play`, which Publish Android runs, each refuse a
+debug-signed artifact as well.
 
 The debug keystore is still committed and its SHA-1 still registered, on purpose:
 it is what makes `npm run dev:android` sign in without per-machine setup. The
@@ -567,13 +569,13 @@ always passes it. Metro would otherwise serve a bundle built with different
 
 `android/` is committed; there is no EAS. A ship touches **the backend when it
 changed, web, the versioned GitHub release, Play internal testing and
-TestFlight**, and they go out in one batch after Faisal's go-ahead. **Do not run
-the Gradle or `gh release` steps by hand**: `npx sabeel-ci release` (ci-tools)
-encodes them and their checks, and skipping it is how versions and stamps drift
-apart. The version is X.Y.Z, written only in `app/app.json`; Android's
-versionCode and the iOS build number are both `major * 1000000 + minor * 1000 +
-patch` (0.12.2 is 12002), and each version must be above main's and every
-released tag's.
+TestFlight**, and they go out in one batch after Faisal's go-ahead. **Do not
+publish to Play or run `gh release` by hand**: `npx sabeel-ci release`
+(ci-tools) encodes them and their checks, and skipping it is how versions and
+stamps drift apart. The version is X.Y.Z, written only in `app/app.json`;
+Android's versionCode and the iOS build number are both `major * 1000000 +
+minor * 1000 + patch` (0.12.2 is 12002), and each version must be above main's
+and every released tag's.
 
 ```sh
 # 0. CI green on main; the AVD free for the release check (--ship boots it).
@@ -592,7 +594,8 @@ npx firebase deploy --only firestore:rules,storage,functions --project sabeel-in
 #    then the release pull request; Faisal merges it once its checks pass.
 npx sabeel-ci release 0.13.0 --notes ../v0.13.0.md
 
-# 3. Ship the merged commit from main: bundle, APKs, AVD check, tag, Play.
+# 3. Ship the merged commit from main: CI's bundle to Play, Play's APK checked
+#    on the AVD, then the tag.
 git switch main && git pull --ff-only
 npx sabeel-ci release --ship
 
@@ -609,15 +612,30 @@ adds the entry to the deploy log in `docs/PHASE_STATUS.md`, commits that on
 described by the entry. `--dry-run` shows the change and leaves nothing behind.
 
 `--ship`, on main after the merge, refuses unless main is clean and matches
-origin/main, then builds the AAB (`sabeel-ci build-aab`'s gates), checks it and
-Play's permission (`publish-play --check`), builds the APKs and refuses one not
-signed with the bundle's key, cold-starts the universal APK on the AVD five
-times (`sabeel-ci check-release`), creates the versioned GitHub release with
-its tag on that commit — the APKs and `docs/USER-MANUAL.pdf` attached, titled
-and described by the deploy-log entry — and publishes to Play internal testing
-last, because that reaches every tester's phone by itself. If Play refuses,
-the GitHub release stands; `npx sabeel-ci publish-play --internal` reruns that
-step alone. No personal website or Pages credentials are required.
+origin/main, and builds and signs nothing on this machine. Then it:
+
+- waits for the Android workflow's run on that commit and refuses one that
+  failed. That run signed the Play bundle in the `release-build` environment
+  (`sabeel-ci build-aab`'s gates) and cold-started it five times on an
+  emulator;
+- has Publish Android check that bundle (provenance, checksum, signature,
+  version, commit) and Play's permission without uploading, then put it on
+  Play internal testing, completing the release only once Play signs the APKs
+  phones install with `release.appSigningCertificate`;
+- downloads the universal APK Play generated, signed exactly as Play installs
+  it (`sabeel-ci play-apk`, refusing any other signer), and cold-starts it on
+  the AVD five times (`sabeel-ci check-release`);
+- last, creates the versioned GitHub release at that commit — that APK and
+  `docs/USER-MANUAL.pdf` attached, titled and described by the deploy-log
+  entry — as a draft, then publishes it, which creates the tag.
+
+The tag comes last because Play's APK exists only once Play holds the bundle:
+a tagged release always holds its APK and manual and names a version testers
+have. A failure before it leaves no tag; fix the cause and run `npx sabeel-ci
+release --ship` again, which resumes (Play's held bundle is not uploaded twice,
+and a draft left behind is replaced). If only publishing the draft fails,
+`--ship` prints the `gh release edit` that finishes it. No personal website or
+Pages credentials are required.
 
 The tag is the release: Deploy Web publishes the Web workflow's artifact of the
 same commit, after checking its provenance, and the iOS run builds the tag, so
@@ -626,10 +644,11 @@ commit is the one tagged `v<version>` and App Store Connect has not taken the
 build number (`sabeel-ci testflight-check`); each version goes to TestFlight
 once.
 
-**The artifacts carry the commit they were built from.** `--ship` builds from
-main's HEAD after the merge, and `publish-play` refuses a bundle whose
-JavaScript does not carry HEAD's commit, or carries it marked `+` (built from
-uncommitted changes), so a superseded build cannot go out by accident.
+**The artifacts carry the commit they were built from.** `--ship` takes the
+Android workflow's bundle of main's HEAD after the merge, and Publish Android
+refuses a bundle whose JavaScript does not carry that commit, or carries it
+marked `+` (built from uncommitted changes), so a superseded build cannot go
+out by accident.
 
 Before sharing any build, **read the version back from the artifact, not from
 your notes.** Web: load the live site and read the stamp. Android: the release
@@ -650,8 +669,8 @@ release exists.
   gates and the Play permission without uploading. The console is only needed
   for things the API cannot do — permissions, testers, and reading the
   app-signing fingerprints. Play is never published automatically: `--ship`
-  publishes from the release machine, and the manual **Publish Android**
-  workflow publishes a bundle CI built (`docs/GITHUB-ACTIONS.md`).
+  starts the manual **Publish Android** workflow on the bundle CI built from
+  the release commit (`docs/GITHUB-ACTIONS.md`).
 - Testers: § Testers above. Internal app sharing is not supported; § Publishing
   from the command line says why.
 - `versionCode` is derived from the semver (`major*1000000 + minor*1000 + patch`),
