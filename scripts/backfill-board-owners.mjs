@@ -151,7 +151,7 @@ for (const uid of owners) {
   try {
     record = await auth.getUser(uid);
   } catch (e) {
-    if (e?.errorInfo?.code !== 'auth/user-not-found') throw e;
+    if (e?.code !== 'auth/user-not-found') throw e;
   }
   const claims = record?.customClaims ?? null;
   // No Auth account at all: the mirror is the only thing left to judge by, and

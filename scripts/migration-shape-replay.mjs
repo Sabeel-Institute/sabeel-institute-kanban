@@ -65,7 +65,7 @@ export async function shapeMode({ path, db, auth, run, check, results }) {
       try {
         await auth.createUser({ uid: a.uid, email: `${a.uid}@oursabeel.com`, emailVerified: true });
       } catch (e) {
-        if (e?.errorInfo?.code !== 'auth/uid-already-exists') throw e;
+        if (e?.code !== 'auth/uid-already-exists') throw e;
       }
       // An account with no claims at all is a real state, and one the scripts
       // treat differently from any other — so an empty pair means empty, not
