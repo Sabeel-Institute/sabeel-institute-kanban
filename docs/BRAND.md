@@ -181,7 +181,7 @@ composition is pressed against the same circle from two directions.
 **Do not regenerate these with a bare `expo prebuild`.** All three repos commit
 `android/`, so the script writes the native mipmaps directly. Prebuild defaults
 to *clean* — it deletes and recreates the native folder — so an unscoped run
-takes `build.gradle` with it, including this repo's hardcoded `minSdkVersion 33`.
+takes `build.gradle` with it, and this repo's release signing and Sentry setup.
 It only clears the platforms named by `--platform`, which is why
 `--platform ios` is safe. See `docs/IOS-BUILD.md`.
 

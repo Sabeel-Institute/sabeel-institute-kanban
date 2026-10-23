@@ -19,7 +19,7 @@ All three repos COMMIT their `android/` directory, so `app.json` and
 `assets/icon.png` alone change nothing a build would see: Gradle compiles the
 mipmaps under `android/app/src/main/res`. Expo regenerates those during
 `prebuild`, but prebuild also rewrites `build.gradle` from its template — which
-in the kanban repo would silently drop the hardcoded `minSdkVersion 33`. So this
+would silently drop each repo's release signing and Sentry setup. So this
 script writes exactly what prebuild would write, and nothing else.
 
 The output matches `@expo/prebuild-config` (withAndroidIcons.js): a foreground

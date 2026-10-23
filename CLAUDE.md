@@ -381,11 +381,13 @@ itself is deliberately NOT darkened — that would collapse it into
 
 ## Stack (locked — mirrors the time tracker)
 
-- **Android 13 (API 33) is the floor**, set explicitly in
-  `app/android/app/build.gradle` rather than inherited from Expo's default of 24.
-  Android 12 and older are unsupported (decided 2026-07-27). That is what lets the
-  photo picker be permission-free and both external-storage permissions be removed
-  outright — on 13+ the system photo picker needs neither.
+- **Android 7 (API 24) is the floor**, React Native's default, as in the LMS and
+  the time tracker (decided 2026-10-23).
+  Attachments need no storage permission on any version: "Photo library" is the
+  system photo picker, which falls back to the document picker on a phone without
+  one, and "Files" is the document picker; both hand over the one item picked.
+  So both external-storage permissions stay removed (`tools:node="remove"` in the
+  manifest), and only "Take a photo" asks for anything, the camera, at the tap.
 - One Expo codebase (`app/`) on **three** surfaces: Android (local Gradle builds,
   committed `android/`), **iOS** (added 2026-08-01, Xcode builds on a cloud Mac
   or on GitHub's macOS runners, `app/ios/` gitignored) and web via react-native-web
@@ -395,7 +397,8 @@ itself is deliberately NOT darkened — that would collapse it into
   So `npx expo prebuild` must ALWAYS be scoped: `--platform ios`. Prebuild
   defaults to **clean** — it deletes and regenerates the native folder, and
   `--no-clean` is the opt-out — but it only clears the platforms you name. A bare
-  prebuild therefore wipes `android/` and silently drops `minSdkVersion 33`.
+  prebuild therefore wipes `android/`, its removed permissions and its network
+  client with it.
   Because `ios/` is regenerated, **nothing changed in Xcode's UI survives**;
   anything that must persist belongs in `app/app.json`. `docs/IOS-BUILD.md` is the
   runbook, and `npm run check:ios` guards the config that fails late.
