@@ -405,6 +405,23 @@ the team.
 
 ## Deploy log
 
+### 2026-10-23 — v0.13.0 for iPhones and the GitHub APK — v0.13.1
+
+- **The same app as v0.13.0, now on every channel.** v0.13.0 reached the web
+  and Google Play internal testing only: Play Console's automatic protection
+  was on for Kanban, so Play's APK opened only when Play had installed it, and
+  the GitHub release and TestFlight waited. Protection is off, as it is for
+  the LMS and the Time Tracker, and v0.13.1 goes to Play, the GitHub release
+  and TestFlight.
+- What v0.13.0 brought, for anyone updating from v0.12.2: phones on Android 7
+  and newer can install the app; sign-in says what went wrong ("Cannot reach
+  the server…") and the next tap opens the account chooser again; tapping a
+  notification on the web opens its card; "Please update" when an old version
+  is retired; after moving to a new phone, sign in again, since Android no
+  longer backs up the app's data.
+- The release APK on GitHub is the one Play signs, so it and a Play install
+  update each other. A phone with v0.12.2's APK uninstalls it once.
+
 ### 2026-10-23 — Android 7 and newer; sign-in says what went wrong; web notifications open their card — v0.13.0
 
 - **Phones on Android 7 and newer can install the app**; it was Android 13

@@ -427,7 +427,9 @@ older phone cannot install the app; that person uses the web app.
 `sabeel-institute-kanban-universal.apk`: the universal APK Play generated from
 the release's bundle, downloaded through the Play Developer API (`sabeel-ci
 play-apk`), which refuses it unless Play signed it with
-`release.appSigningCertificate`. It carries every ABI (86 MB for 0.12.2), and it
+`release.appSigningCertificate`, and refuses an APK carrying Play's installer
+check: Play Console's automatic protection stays off for this app, since a
+protected APK opens only when Play installed it. It carries every ABI (86 MB for 0.12.2), and it
 is cold-started on the AVD before the release is tagged. Per-ABI splits plus R8
 take a local arm64 build from 82 MB to 27 MB, and Play cuts the per-device APKs
 phones install the same way. Both R8 flags are ON in `gradle.properties` and
