@@ -113,7 +113,7 @@ for (const doc of snap.docs) {
     await auth.getUser(uid);
     exists = true;
   } catch (e) {
-    if (e?.errorInfo?.code !== 'auth/user-not-found') throw e;
+    if (e?.code !== 'auth/user-not-found') throw e;
   }
 
   if (exists) {
