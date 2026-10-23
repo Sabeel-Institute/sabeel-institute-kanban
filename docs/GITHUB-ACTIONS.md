@@ -83,6 +83,9 @@ differs from its template.
   owner merges" restricts updates to `main` and exempts the owner for pull
   requests only; "main: verified pre-merge builds" requires the three checks
   above.
+- A collaborator's pull request also needs the code owner's approval
+  (`.github/CODEOWNERS`, through the ruleset "main: pull requests only"),
+  which the owner bypasses.
 - Release tags (`v*`) are created, moved and deleted by the owner alone (the
   tag ruleset "release tags: only the owner"): the signing environment
   below admits them.
