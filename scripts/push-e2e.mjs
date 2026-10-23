@@ -133,7 +133,7 @@ for (const [i, { event }] of NOTIFY_EVENTS.entries()) {
 await db.doc(`users/${uid}`).update({ unreadNotifCount: cases.length * 2 });
 
 // ---- the worker -----------------------------------------------------------
-await page.goto(BASE, { waitUntil: 'networkidle' });
+await page.goto(BASE, { waitUntil: 'domcontentloaded' });
 await page.evaluate(async () => {
   await navigator.serviceWorker.register('/firebase-messaging-sw.js');
   await navigator.serviceWorker.ready;
@@ -155,7 +155,7 @@ const shown = () =>
 
 /** Back to the boards list, so every tap has to navigate to be seen to work. */
 async function home(p) {
-  await p.goto(BASE, { waitUntil: 'networkidle' });
+  await p.goto(BASE, { waitUntil: 'domcontentloaded' });
   return visible(p.getByText(BOARD_NAME, { exact: true }), 30000);
 }
 
@@ -185,7 +185,7 @@ for (const c of cases) {
   // eslint-disable-next-line no-undef -- the worker's own function, run in the worker
   const url = await worker.evaluate((data) => subjectUrl(data), c.payload.data);
   const fresh = await context.newPage();
-  await fresh.goto(new URL(url, BASE).href, { waitUntil: 'networkidle' });
+  await fresh.goto(new URL(url, BASE).href, { waitUntil: 'domcontentloaded' });
   check(`${c.event}: the address the worker opens lands on the subject (${url})`, await c.landed(fresh));
   check(`${c.event}: and its routing data leaves the address bar`,
     !new URL(fresh.url()).searchParams.has('notifId'), fresh.url());
