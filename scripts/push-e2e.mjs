@@ -170,6 +170,23 @@ check('the worker is registered at the origin root', Boolean(registrationId));
 const shown = async () =>
   (await worker()).evaluate(async () => (await self.registration.getNotifications()).map((n) => ({ title: n.title, body: n.body, data: n.data })));
 
+/**
+ * Deliver a push to the worker and wait for the banner it draws.
+ *
+ * One DevTools delivery was lost in CI (one push in six, with the worker and
+ * the page otherwise fine and the next push shown), so a push whose banner
+ * has not come within ten seconds is delivered once more, and the run says so.
+ */
+async function pushed(payload, match) {
+  for (const attempt of [1, 2]) {
+    await cdp.send('ServiceWorker.deliverPushMessage', { origin: ORIGIN, registrationId, data: JSON.stringify(payload) });
+    const banner = await until(async () => (await shown()).find(match), 10000);
+    if (banner && attempt > 1) console.log('  ..   the push was delivered a second time');
+    if (banner) return banner;
+  }
+  return undefined;
+}
+
 /** Every worker the browser holds, its registration's scope and its banners: what to read when none came back. */
 async function diagnose() {
   return JSON.stringify(await Promise.all(context.serviceWorkers().map((w) => w.evaluate(async () => ({
@@ -189,8 +206,7 @@ for (const c of cases) {
   console.log(`\n${c.event}`);
   // -- the app open: the worker draws the push, the tap is posted to the tab --
   check(`${c.event}: the app is on its boards before the tap`, await home(page));
-  await cdp.send('ServiceWorker.deliverPushMessage', { origin: ORIGIN, registrationId, data: JSON.stringify(c.payload) });
-  const banner = await until(async () => (await shown()).find((n) => n.data?.notifId === c.payload.data.notifId));
+  const banner = await pushed(c.payload, (n) => n.data?.notifId === c.payload.data.notifId);
   check(`${c.event}: the push is shown, with its words and its routing data`,
     Boolean(banner) && banner.body === c.payload.notification.body
       && JSON.stringify(banner.data) === JSON.stringify(c.payload.data),
