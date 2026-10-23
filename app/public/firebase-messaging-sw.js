@@ -27,7 +27,8 @@
  * worker. The payload is FCM's web push JSON — `notification` (title, body)
  * and `data` — the same two fields the SDK's handler used to pass on.
  * `firebase-messaging-sw.test.ts` runs this file in a fake worker scope and
- * holds both handlers to what they do here.
+ * holds both handlers to what they do here; `scripts/push-e2e.mjs` delivers a
+ * real push of every kind to it in Chromium and follows each tap to its screen.
  */
 
 const APP_NAME = 'Sabeel Kanban';
@@ -66,17 +67,37 @@ self.addEventListener('push', (event) => {
   );
 });
 
-// Clicking a notification focuses the app. It does NOT deep-link to the card:
-// the web app has no URL handling for board/card ids yet, so a link like
-// /?board=…&card=… would look meaningful and land on the home screen anyway.
-// Writing one now would be a silent no-op. If deep links are added later, the
-// ids are already in event.notification.data and this is the place to use them.
+/**
+ * The address that opens a notification's subject in a new tab: the app's
+ * root with the push's routing data as the query, which the app reads on
+ * launch (`takeInitialPush` in pushOpen.web.ts) and routes exactly as a tapped
+ * phone notification (`routeForNotification`). The data, not a card link,
+ * because the data is all of it: who to mark read (`notifId`) and where a
+ * notification with no card goes (`newUserPending`, the People screen).
+ */
+function subjectUrl(data) {
+  const query = Object.keys(data)
+    .filter((key) => typeof data[key] === 'string')
+    .map((key) => `${encodeURIComponent(key)}=${encodeURIComponent(data[key])}`)
+    .join('&');
+  return query ? `/?${query}` : '/';
+}
+
+/**
+ * A tapped notification opens its subject. A tab of the app already open is
+ * told where to go and brought forward (one app, not a second copy beside
+ * it); with none open, a new one opens at `subjectUrl`. The message is posted
+ * before focusing, so a refused focus cannot cost the navigation.
+ */
+async function openSubject(data) {
+  const wins = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+  const open = wins.find((w) => w.url.startsWith(self.location.origin));
+  if (!open) return clients.openWindow(subjectUrl(data));
+  open.postMessage({ type: 'push-open', data });
+  return open.focus().catch(() => undefined);
+}
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
-      const open = wins.find((w) => w.url.startsWith(self.location.origin));
-      return open ? open.focus() : clients.openWindow('/');
-    }),
-  );
+  event.waitUntil(openSubject(event.notification.data ?? {}));
 });

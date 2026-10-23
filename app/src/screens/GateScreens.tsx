@@ -6,13 +6,14 @@
  * each updates LIVE — the moment an admin approves someone, session.ts refreshes
  * the token and the app un-gates without a sign-out.
  */
-import { StyleSheet, Text } from 'react-native';
-import { ALLOWED_EMAIL_DOMAIN } from '@sabeel/shared';
+import { Linking, Platform, StyleSheet, Text } from 'react-native';
+import { ALLOWED_EMAIL_DOMAIN, APP_ID, APP_NAME } from '@sabeel/shared';
+import { BUILD_INFO } from '../build-info';
 import type { SessionUser } from '../session';
 import { retryProvisioning, signOut } from '../session';
 import { acceptRules } from '../reports';
 import { useAction } from '../useAction';
-import { Body, Button, Card, Screen, Spinner, Title } from '../components/ui';
+import { Body, Button, Card, Hint, Screen, Spinner, Title } from '../components/ui';
 
 /**
  * Signed in, waiting for the profile the server writes on a first sign-in.
@@ -89,6 +90,45 @@ export function DisabledScreen({ user }: { user: SessionUser }) {
         </Body>
       </Card>
       <Button label="Sign out" variant="secondary" onPress={signOut} />
+    </Screen>
+  );
+}
+
+/**
+ * Where an update comes from: Play for an Android build, TestFlight (which
+ * opens on the build list) for an iPhone one. Never `GET_APP_URL`: that page
+ * carries the "sign in on the website first" instruction the app must not point
+ * at (docs/STORE-RELEASE.md).
+ */
+const UPDATE = Platform.OS === 'ios'
+  ? { label: 'Open TestFlight', url: 'itms-beta://' }
+  : { label: 'Open Google Play', url: `https://play.google.com/store/apps/details?id=${APP_ID}` };
+
+/**
+ * A build the institute has retired (`useMinVersion`).
+ *
+ * Shown before sign-in, in place of the whole app, so nothing behind it runs
+ * on rules it no longer matches. Sign out is offered because the person may be
+ * signed in already and on a shared phone.
+ */
+export function UpdateScreen({ signedIn }: { signedIn: boolean }) {
+  return (
+    <Screen width="read">
+      <Title>Update needed</Title>
+      <Card>
+        <Body>
+          This version of {APP_NAME} is out of date. Install the current one to
+          keep using the app; nothing on your boards is lost by updating.
+        </Body>
+      </Card>
+      <Button
+        label={UPDATE.label}
+        onPress={() => void Linking.openURL(UPDATE.url).catch(() => undefined)}
+      />
+      {signedIn ? <Button label="Sign out" variant="secondary" onPress={signOut} /> : null}
+      <Hint>
+        Installed: v{BUILD_INFO.version} · {BUILD_INFO.commit}
+      </Hint>
     </Screen>
   );
 }
