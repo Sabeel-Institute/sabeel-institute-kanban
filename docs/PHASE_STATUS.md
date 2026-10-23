@@ -405,6 +405,27 @@ the team.
 
 ## Deploy log
 
+### 2026-10-23 — Android 7 and newer; sign-in says what went wrong; web notifications open their card — v0.13.0
+
+- **Phones on Android 7 and newer can install the app**; it was Android 13
+  and newer. Attachments still need no storage permission on any version:
+  "Photo library" and "Files" hand over only the item picked, and only "Take a
+  photo" asks for anything, the camera, when it is tapped.
+- **Sign-in says what went wrong.** A sign-in the server cannot answer reads
+  "Cannot reach the server. Check your connection and try again." instead of a
+  bare code, and the next tap of Sign in with Google opens the account chooser
+  again, so a different account can be picked.
+- **Tapping a notification on the web opens its card**, in the open tab or a
+  new one.
+- **"Please update"**: when an old version is retired, the app asks for the
+  update rather than misbehaving.
+- **After moving to a new phone, sign in again**: Android no longer copies the
+  app's data, the stored sign-in included, into a backup.
+- Expo 57.0.30 and React Native 0.86.3 with the month's patch updates; the
+  backend on firebase-admin 14; Android crash reports read as source in Sentry.
+- The release APK on GitHub is the one Play signs, so it and a Play install
+  update each other. A phone with v0.12.2's APK uninstalls it once.
+
 ### 2026-10-21 — Dependency and security maintenance — v0.12.2
 
 No feature change. The backend (functions only; rules and indexes unchanged)
