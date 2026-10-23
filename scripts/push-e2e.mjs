@@ -157,6 +157,18 @@ check('the worker is registered at the origin root', Boolean(registrationId));
 const shown = () =>
   worker.evaluate(async () => (await self.registration.getNotifications()).map((n) => ({ title: n.title, body: n.body, data: n.data })));
 
+/** Why no banner came back: the permission each side sees, and whether the worker can show one at all. */
+async function diagnose(page, worker) {
+  const pagePerm = await page.evaluate(() => Notification.permission).catch((e) => `page: ${e.message}`);
+  const inWorker = await worker.evaluate(async () => {
+    const probe = await self.registration.showNotification('probe', { tag: 'probe' }).then(() => 'shown', (e) => String(e));
+    const after = (await self.registration.getNotifications()).map((n) => n.title);
+    for (const n of await self.registration.getNotifications({ tag: 'probe' })) n.close();
+    return { perm: Notification.permission, active: self.registration.active?.state, script: self.registration.active?.scriptURL, probe, after };
+  }).catch((e) => `worker: ${e.message}`);
+  return JSON.stringify({ pagePerm, inWorker, workers: page.context().serviceWorkers().map((w) => w.url()) });
+}
+
 /** Back to the boards list, so every tap has to navigate to be seen to work. */
 async function home(p) {
   await p.goto(BASE, { waitUntil: 'domcontentloaded' });
@@ -172,7 +184,7 @@ for (const c of cases) {
   check(`${c.event}: the push is shown, with its words and its routing data`,
     Boolean(banner) && banner.body === c.payload.notification.body
       && JSON.stringify(banner.data) === JSON.stringify(c.payload.data),
-    JSON.stringify(banner ?? await shown()));
+    banner ? JSON.stringify(banner) : await diagnose(page, worker));
   await worker.evaluate(async (notifId) => {
     const n = (await self.registration.getNotifications()).find((x) => x.data?.notifId === notifId);
     // eslint-disable-next-line no-undef -- runs in the worker, where it is a global
