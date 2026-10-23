@@ -26,8 +26,10 @@ import {
   ProvisioningScreen,
   RejectedScreen,
   RulesScreen,
+  UpdateScreen,
   WrongDomainScreen,
 } from './src/screens/GateScreens';
+import { useMinVersion } from './src/minVersion';
 import { BoardsScreen } from './src/screens/BoardsScreen';
 import { BoardScreen } from './src/screens/BoardScreen';
 import { BoardSettingsScreen } from './src/screens/BoardSettingsScreen';
@@ -172,6 +174,9 @@ function SignedInRoutes({ user }: { user: SessionUser }) {
 
 function Routes() {
   const session = useSession();
+  // The institute's floor for phone builds, read before anything else: a
+  // retired build shows the update screen whether or not anyone is signed in.
+  const outdated = useMinVersion();
   // Android Back / edge-swipe pops this stack instead of exiting the app.
   useHardwareBack();
 
@@ -182,6 +187,8 @@ function Routes() {
   useEffect(() => {
     setErrorUser(uid);
   }, [uid]);
+
+  if (outdated) return <UpdateScreen signedIn={session.state === 'signed-in'} />;
 
   switch (session.state) {
     case 'loading':

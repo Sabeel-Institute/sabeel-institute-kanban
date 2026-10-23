@@ -25,6 +25,7 @@
     "test:e2e:stats": "bash scripts/e2e.sh scripts/stats-e2e.mjs",
     "test:e2e:richtext": "bash scripts/e2e.sh scripts/richtext-e2e.mjs",
     "test:e2e:typing-perf": "bash scripts/e2e.sh scripts/typing-perf-e2e.mjs",
+    "test:e2e:push": "bash scripts/e2e.sh scripts/push-e2e.mjs",
     "build": "npm run build -w @sabeel/shared && npm run build -w functions",
     "knip": "knip",
     "check:version": "sabeel-ci check-version",

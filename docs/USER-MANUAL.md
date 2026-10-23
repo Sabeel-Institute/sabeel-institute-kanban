@@ -471,8 +471,9 @@ to you, when someone **@mentions** you in a comment, and — for admins — when
 what it is about — the card for a card alert, **People** for an account waiting
 for approval. A notification shows whether the app is open, in the background
 or closed — on a phone and in a browser alike. Tapping it on your phone's lock
-screen or in its notification tray does the same thing as tapping the item in
-Alerts, including when the app was not running.
+screen or in its notification tray, or on your computer's notification, does the
+same thing as tapping the item in Alerts, including when the app was not running:
+in a browser it opens in the tab you already have open, or in a new one.
 
 Each item has two icons: an **envelope** and a **✕**. The envelope flips between
 read and unread — on an unread item it marks it read, and on one you have
@@ -950,6 +951,7 @@ stay.
 | "Your report was saved but the email did not go out" | Your report is kept, but its email failed | Nothing to do: the administrators will still see it |
 | "You have sent 5 reports in the last hour" | Five reports an hour is the most one account can send | Wait a while; or tell an administrator directly |
 | You can't sign in at all, or see "Wrong account" | Only @oursabeel.com Google accounts are allowed | Use your work account, not a personal one |
+| "Update needed" when the app opens | This version of the phone app is too old to keep working | Tap **Open Google Play** (or **Open TestFlight** on an iPhone) and install the update; nothing on your boards is lost |
 | "Still setting up your account" on a first sign-in | The server is taking longer than usual to set up a new account | Tap **Try again** in a minute; your account is fine |
 | A card's due date is red | The card is overdue | Open it and update the date, or get the work done |
 | "This card is unavailable" from a shared link | You're not a member of its board, or the card was deleted | Ask one of that board's owners to add you |

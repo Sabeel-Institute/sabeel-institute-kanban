@@ -33,9 +33,10 @@ differs from its template.
 - **CI** runs `sabeel-ci check-app`, lint, type checks, knip, unit tests,
   Firebase-emulator integration tests (`npm run test:emulator`, whose rules
   pass also rehearses the board-ownership migration scripts end to end) and the
-  six browser suites `ci-tools.json` names (`npm run test:screens`, the
+  seven browser suites `ci-tools.json` names (`npm run test:screens`, the
   multi-width sweep; `test:e2e`, the full flow; `test:e2e:attachments`,
-  `test:e2e:stats`, `test:e2e:richtext` and `test:e2e:typing-perf`), one runner
+  `test:e2e:stats`, `test:e2e:richtext`, `test:e2e:typing-perf` and
+  `test:e2e:push`), one runner
   each, on main pushes and pull requests. Every sweep, pass or fail, leaves a
   `screens-report` artifact: a page of every screen at every width with the
   failed checks beside them and what changed against main's latest sweep,

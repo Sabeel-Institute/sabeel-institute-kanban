@@ -482,12 +482,10 @@ public key is committed (`VAPID_PUBLIC_KEY` in `app/src/firebase-config.ts`).
       Safari is its own case: on macOS it wants the site added to the Dock before
       it will accept web push. Chrome, Edge and Firefox on desktop need nothing.
 
-      Expect the TAP to only focus the app, not open the card. That is
-      deliberate and is not part of this item: the web app has no URLs for board
-      and card ids, so `firebase-messaging-sw.js` focuses rather than opening a
-      link that would land on the home screen anyway. Worth revisiting now that
-      web push actually arrives — the ids are already in the notification data,
-      and that handler is where it goes.
+      Expect the TAP to open the card (People, for a colleague waiting for
+      approval) and mark its Alerts entry read, in the open tab or a new one.
+      `scripts/push-e2e.mjs` proves that for every kind in Chromium; this item
+      is about a push from the real FCM reaching a real browser.
 
       A VAPID key is a public/private pair identifying *your server* to the
       browser's push service (Google's for Chrome, Mozilla's for Firefox). The

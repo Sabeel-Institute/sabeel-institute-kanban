@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
+import { NOTIFY_EVENTS } from '@sabeel/shared';
 
 /**
  * The service worker, run in a fake worker scope.
@@ -12,6 +13,8 @@ import { runInNewContext } from 'node:vm';
  * without anyone knowing (see the comment at the top of the file). No suite can
  * receive a real push, so this is the gate — it dispatches the events a browser
  * would and asserts what the worker draws and where a click goes.
+ * (`scripts/push-e2e.mjs` then delivers a real push of every kind to it in
+ * Chromium and follows each tap to its screen.)
  *
  * Every push shows a notification: that is the decision of 2026-09-17, and the
  * first test is the one that goes red if a visibility check ever creeps back.
@@ -121,9 +124,12 @@ describe('install', () => {
 });
 
 describe('notificationclick', () => {
-  function click(w: Scope) {
+  type Win = { url: string; focus: ReturnType<typeof vi.fn>; postMessage: ReturnType<typeof vi.fn> };
+  const win = (url: string, focus = vi.fn(() => Promise.resolve())): Win => ({ url, focus, postMessage: vi.fn() });
+
+  function click(w: Scope, data?: Record<string, string>) {
     const settled: Promise<unknown>[] = [];
-    const notification = { close: vi.fn() };
+    const notification = { close: vi.fn(), data };
     w.listeners.get('notificationclick')!({
       notification,
       waitUntil: (p: Promise<unknown>) => settled.push(p),
@@ -131,19 +137,49 @@ describe('notificationclick', () => {
     return { notification, settled };
   }
 
-  it('focuses a window of the app that is already open', async () => {
-    const mine = { url: 'https://kanban.example/', focus: vi.fn(() => Promise.resolve()) };
-    const other = { url: 'https://elsewhere.example/', focus: vi.fn() };
+  /** The routing data the server sends with a push of this kind (functions/src/notifications.ts). */
+  const sent = (event: string): Record<string, string> =>
+    event === 'newUserPending'
+      ? { type: event, boardId: '', notifId: 'n1' }
+      : { type: event, boardId: 'b1', cardId: 'c1', notifId: 'n1' };
+
+  it('tells a tab of the app that is open where the notification points, and brings it forward', async () => {
+    const mine = win('https://kanban.example/b/b1');
+    const other = win('https://elsewhere.example/');
     const w = worker([other, mine]);
-    const { notification, settled } = click(w);
+    const data = sent('mention');
+    const { notification, settled } = click(w, data);
     await Promise.all(settled);
     expect(notification.close).toHaveBeenCalledTimes(1);
+    expect(mine.postMessage).toHaveBeenCalledWith({ type: 'push-open', data });
     expect(mine.focus).toHaveBeenCalledTimes(1);
-    expect(other.focus).not.toHaveBeenCalled();
+    expect(other.postMessage).not.toHaveBeenCalled();
     expect(w.openWindow).not.toHaveBeenCalled();
   });
 
-  it('opens the app when no window of it is open', async () => {
+  it('still tells the tab where to go when the browser refuses to focus it', async () => {
+    const mine = win('https://kanban.example/', vi.fn(() => Promise.reject(new Error('not allowed'))));
+    const w = worker([mine]);
+    const { settled } = click(w, sent('assigned'));
+    await Promise.all(settled);
+    expect(mine.postMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(NOTIFY_EVENTS.map((e) => e.event))(
+    'opens %s in a new tab at an address carrying its routing data, when no tab is open',
+    async (event) => {
+      const w = worker([]);
+      const data = sent(event);
+      const { settled } = click(w, data);
+      await Promise.all(settled);
+      const [url] = w.openWindow.mock.calls[0] as unknown as [string];
+      expect(url.startsWith('/?')).toBe(true);
+      const query = Object.fromEntries(new URLSearchParams(url.slice(2)));
+      expect(query).toEqual(data);
+    },
+  );
+
+  it('opens the app itself for a notification with nothing to route by', async () => {
     const w = worker([]);
     const { settled } = click(w);
     await Promise.all(settled);

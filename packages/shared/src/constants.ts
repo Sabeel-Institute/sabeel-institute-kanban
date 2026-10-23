@@ -128,6 +128,40 @@ export const APP_ID = 'com.sabeelinstitute.kanban';
 export const APP_NAME = 'Sabeel Kanban';
 
 /**
+ * The oldest phone build still allowed to run, read from `config/app` before
+ * sign-in. A build below it shows the update screen in place of the app, so a
+ * release that older builds can no longer run against (a rules change that
+ * refuses a listener they still open) can retire them, rather than leave them
+ * failing with nothing on screen to say why. Raised by hand with
+ * `scripts/set-min-version.mjs`. The web has no floor: the site always serves
+ * the current bundle.
+ */
+export const APP_CONFIG_COLLECTION = 'config';
+export const APP_CONFIG_DOC = 'app';
+
+export interface AppConfigDoc {
+  /** A version's code (`versionCodeOf`); a build below this shows the update screen. */
+  minVersionCode: number;
+}
+
+/** Is a build too old to run? Unknown floors (no document yet) refuse nobody. */
+export function isBuildOutdated(versionCode: number, minVersionCode: number | null | undefined): boolean {
+  return typeof minVersionCode === 'number' && versionCode < minVersionCode;
+}
+
+/**
+ * The versionCode of an app version (X.Y.Z): major * 1000000 + minor * 1000 +
+ * patch, the number build.gradle stamps into the APK and the iPhone build
+ * carries as its build number. The scheme is ci-tools' (lib/version.mjs);
+ * `appVersion.test.ts` holds this to it, because the update gate compares
+ * this number with the floor `set-min-version` writes from ci-tools' own.
+ */
+export function versionCodeOf(version: string): number {
+  const [major, minor, patch] = version.split('.').map(Number);
+  return major * 1000000 + minor * 1000 + patch;
+}
+
+/**
  * The ONE address that may sign in with an email and a password.
  *
  * Decided by Faisal on 2026-10-15: "That sign in with password for kanban and

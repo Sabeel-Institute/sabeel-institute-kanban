@@ -322,6 +322,7 @@ suite, and stops both (the server's log is `shots/e2e-web-server.log`):
 | `npm run test:e2e:stats` | Stats |
 | `npm run test:e2e:richtext` | the rich-text editor |
 | `npm run test:e2e:typing-perf` | typing cost on a busy screen against an empty one |
+| `npm run test:e2e:push` | every kind of notification, delivered to the real service worker and tapped, opens its subject |
 
 They are the list CI runs, one runner each (`ci.browserSuites` in
 `ci-tools.json`); `scripts/e2e-all.sh` runs them all here, one at a time

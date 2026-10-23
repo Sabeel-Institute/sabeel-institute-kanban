@@ -663,6 +663,22 @@ release exists.
   (`gh auth refresh -h github.com -s workflow`). `--ship` tags main's HEAD, so a
   normal ship never hits it.
 
+## Retiring old builds
+
+Every Android and iPhone build reads `config/app.minVersionCode` before sign-in
+and shows an update screen (opening Google Play or TestFlight) when its own
+versionCode, its version's code, is below it. The iPhone build carries the same
+number. After a release that older builds can no longer run against (a rules
+change refusing a listener they still open), raise the floor by hand:
+
+```bash
+node scripts/set-min-version.mjs <X.Y.Z>   # the oldest version to keep
+```
+
+It is a decision, not a deploy step: nothing raises it for you, and nothing
+shows until it is raised. Builds from before the gate existed never read it.
+The web app has no floor; the site always serves the current bundle.
+
 ## Rollback
 
 Hosting keeps previous releases — roll back from the console in one click.
