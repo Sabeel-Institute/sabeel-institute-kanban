@@ -100,8 +100,9 @@ How each surface uploads, all through ci-tools (its README, "Sentry"):
   when `app/.env.sentry-build-plugin` exists; `sentry.gradle` hands the file to
   `sentry-cli` as `SENTRY_DOTENV_PATH`, and `sabeel-ci build-aab` and `release
   --ship` run Gradle with `SENTRY_ORG` and `SENTRY_PROJECT` from
-  `ci-tools.json`. Deliberately NOT an `android/sentry.properties`, which would
-  hold a real token in a public repo. A config plugin cannot do this half:
+  `ci-tools.json`. Sentry's Android Gradle plugin uploads the R8 mapping file
+  the same way, under the same gate. Deliberately NOT an
+  `android/sentry.properties`, which would hold a real token in a public repo. A config plugin cannot do this half:
   plugins run at `prebuild`, and `app/android/` is committed and hand-edited.
 - **iOS** — `@sentry/react-native/expo` in `app/app.json`, registered
   **bare**. Given `organization`/`project` options it writes them verbatim into

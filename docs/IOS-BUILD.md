@@ -22,12 +22,11 @@ npx expo prebuild                     # DESTROYS app/android/
 regenerate it* — `--no-clean` is the opt-out, not the other way round. It clears
 only the platforms named by `--platform`, so scoping it is what makes it safe.
 
-`app/android/` is **committed and hand-edited**. It carries `minSdkVersion 33` in
-`app/android/app/build.gradle`, set deliberately (it is what lets the photo
-picker be permission-free and both storage permissions be dropped). A bare
-prebuild regenerates that file from Expo's template and the floor silently falls
-back to Expo's default. Nothing fails; you find out when a permission you removed
-is needed again.
+`app/android/` is **committed and hand-edited**: the manifest removes both
+storage permissions, `MainApplication.kt` installs the network client, and
+`build.gradle` carries the release signing and Sentry setup. A bare prebuild
+regenerates those files from Expo's template and drops all of it. Nothing fails;
+you find out when a removed permission is back in the Play listing.
 
 There is a backstop — prebuild bails on a dirty git tree when it would delete an
 existing native folder — but a clean tree is exactly when you are most likely to

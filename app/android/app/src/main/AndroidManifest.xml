@@ -8,22 +8,23 @@
        This is NOT the whole permission list, and reading it as one is a mistake
        worth naming: libraries merge their own in. Since attachments landed, the
        MERGED manifest also carries CAMERA (expo-image-picker, for "Take a
-       photo") and READ_EXTERNAL_STORAGE capped at API 32 (the camera roll on
-       old devices). Check the merged output under
+       photo"). Check the merged output under
        android/app/build/intermediates/merged_manifest/, never this file alone. -->
   <uses-permission android:name="android.permission.INTERNET"/>
   <uses-permission android:name="android.permission.VIBRATE"/>
 
-  <!-- Both external-storage permissions are removed, and minSdkVersion is 33
-       (Android 13) so neither can ever apply.
+  <!-- Both external-storage permissions are removed, on every Android version.
 
        expo-file-system and expo-image-picker each declare them capped at API 32,
-       for the legacy camera-roll path. Android 13 and later use the system photo
-       picker, which needs no permission at all — so on every device that can
-       install this app these entries are dead weight, and a permission nobody
-       needs is one that makes people refuse an install. Android 12 and older are
-       explicitly unsupported (decided 2026-07-27); that is what makes this
-       removal safe rather than a guess about a path nobody could test. -->
+       for their camera-roll APIs, which this app never calls. "Photo library"
+       is launchImageLibraryAsync: androidx's PickVisualMedia, the system photo
+       picker, which falls back to the system document picker where a phone
+       has no photo picker, and grants the app the one picked item. "Files" is
+       the document picker. Neither checks or needs a storage permission on
+       any version, and the app reads only its own cache. So the entries are
+       dead weight everywhere, and a permission nobody needs is one that makes
+       people refuse an install. Only "Take a photo" asks for anything: CAMERA,
+       at the moment of the tap (filePicker.ts). -->
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove"/>
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:node="remove"/>
 
@@ -43,7 +44,10 @@
       <data android:mimeType="*/*"/>
     </intent>
   </queries>
-  <application android:name=".MainApplication" android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:allowBackup="true" android:theme="@style/AppTheme" android:supportsRtl="true" android:enableOnBackInvokedCallback="false">
+  <!-- allowBackup off: Android would otherwise copy the app's data, the stored
+       sign-in included, to the person's Google Drive and put it back on a new
+       or reset phone. -->
+  <application android:name=".MainApplication" android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:allowBackup="false" android:theme="@style/AppTheme" android:supportsRtl="true" android:enableOnBackInvokedCallback="false">
     <!-- The small icon and tint of a push, once per component that draws one.
          Two do, and each reads only its own keys. A push that arrives with the
          app in the background or closed is drawn by the FCM SDK from the first

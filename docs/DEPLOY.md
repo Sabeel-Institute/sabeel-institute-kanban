@@ -411,10 +411,10 @@ developer account:
 
 **"Item not found" right after opting in is normal**: a first download takes a
 while to propagate. If it persists for one person, check in this order: their
-phone is **Android 13 or newer** (`minSdkVersion 33`; Play shows an ineligible
+phone is **Android 7 or newer** (`minSdkVersion` 24; Play shows an ineligible
 device as this same screen), the Play Store's ACTIVE account (profile icon) is
-the one that opted in, and the release is rolled out rather than a draft. A
-pre-13 phone cannot install the app; that person uses the web app.
+the one that opted in, and the release is rolled out rather than a draft. An
+older phone cannot install the app; that person uses the web app.
 
 ### The release APKs, and signing
 
@@ -429,7 +429,8 @@ app/android/app/build/outputs/apk/release/app-universal-release.apk  -> sabeel-i
 It refuses an APK not signed with the bundle's key, and cold-starts the
 universal one on the AVD before anything is published. Per-ABI splits plus R8
 take arm64 from 82 MB to 27 MB. Both R8 flags are ON in `gradle.properties` and
-both are OFF by default in the React Native template.
+both are OFF by default in the React Native template; Sentry's Android Gradle
+plugin uploads each release's mapping file, so its Java and Kotlin frames read.
 
 **`./gradlew clean` can fail** in `externalNativeBuildCleanDebug` while CMake
 regenerates. Delete the caches instead:

@@ -401,7 +401,7 @@ the vault is the upload key. The consequences (skill, decision 8):
 ### 10. Store checks
 
 `ios.config.usesNonExemptEncryption` is false; builds run on GitHub's
-`macos-26` runners (Xcode 26, iOS 26 SDK); `targetSdk` 36 and `minSdk` 33; both
+`macos-26` runners (Xcode 26, iOS 26 SDK); `targetSdk` 36 and `minSdk` 24; both
 external-storage permissions removed with `tools:node="remove"`. Play
 registered `com.sabeelinstitute.kanban` for Android developer verification; the
 upload key of the APKs on the GitHub releases needs registering by the 2027
