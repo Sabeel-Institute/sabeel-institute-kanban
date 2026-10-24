@@ -43,8 +43,10 @@ mkdir -p "$(dirname "$WEB_LOG")"
 npm run build -w @sabeel/shared
 npm run build -w functions
 
-echo "Building production web bundle (for the dev-row absence check)…"
-( cd app && npx expo export --platform web --output-dir dist-web --clear >/dev/null )
+# The web export as Hosting gets it, tree-shaken, pointed at the emulators,
+# for the checks of what ships at the end of web-e2e.mjs.
+echo "Building the web export (sabeel-ci build-web --emulators)…"
+npx --no sabeel-ci build-web --emulators >/dev/null
 
 # REFUSE a held port, never kill it. A leftover dev server is the nastiest
 # failure mode here: the new `expo start` cannot bind, exits quietly, and the
