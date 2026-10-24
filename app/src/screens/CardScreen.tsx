@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Icon } from '../icons';
 import {
   PRIORITIES,
   canManageBoard,
@@ -217,7 +217,7 @@ export function CardScreen({
             hitSlop={8}
             style={styles.crumb}
           >
-            <MaterialIcons name="dashboard" size={13} color={t.accent.base} />
+            <Icon name="dashboard" size={13} color={t.accent.base} />
             {/* Shrinks, or a long board name (120 chars are allowed) is laid
                 out at full width beside the icon and spills over the Share and
                 Back actions — invisibly on web, which clips, but not on

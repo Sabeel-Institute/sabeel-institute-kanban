@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { Animated, PanResponder, StyleSheet, View } from 'react-native';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Icon } from '../icons';
 import { radius, space, useTheme, type Theme } from '../theme';
 
 /**
@@ -147,7 +147,7 @@ function ReorderRow({
       ]}
     >
       <View {...responder.panHandlers} hitSlop={10} style={styles.handle}>
-        <MaterialIcons
+        <Icon
           name="drag-indicator"
           size={22}
           color={t.text.muted}

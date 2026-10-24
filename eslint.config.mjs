@@ -51,6 +51,38 @@ const SCROLLER_MUST_ANSWER_TAPS = [
   },
 ];
 
+/**
+ * `no-restricted-imports` entries, composed below for the same reason as the
+ * selectors above.
+ */
+const SUBSCRIBE_VIA_LIVE_QUERY = [
+  {
+    name: 'firebase/firestore',
+    importNames: ['onSnapshot'],
+    message:
+      'Subscribe via useLiveQuery/useLiveDoc (src/liveQuery.ts) — they reset on input change and clear on error. See docs/INHERITED-STACK.md lesson 5.',
+  },
+];
+
+/**
+ * Icons come from `src/icons`, whose font holds only the glyphs the app names.
+ * A stock set like `@expo/vector-icons/MaterialIcons` type-checks just as well
+ * and puts its whole font back on the web's first load (ci-tools' README,
+ * "Icons").
+ * The bare package is a `path`: as a pattern it would exclude the directory,
+ * and gitignore semantics cannot re-include createIconSet beneath it.
+ */
+const ICONS_MESSAGE = 'Use Icon from src/icons; add the glyph to src/icons/names.json.';
+const ICONS_FROM_SRC_ICONS = {
+  paths: [{ name: '@expo/vector-icons', message: ICONS_MESSAGE }],
+  patterns: [
+    {
+      group: ['@expo/vector-icons/*', '!@expo/vector-icons/createIconSet'],
+      message: ICONS_MESSAGE,
+    },
+  ],
+};
+
 export default tseslint.config(
   {
     ignores: [
@@ -147,22 +179,23 @@ export default tseslint.config(
     // under another on a slow connection — see docs/INHERITED-STACK.md lesson 5.
     // Kanban makes this sharper: optimistic card moves reconciling against server
     // snapshots are exactly that bug's shape.
-    files: ['app/src/**/*.{ts,tsx}'],
+    files: ['app/**/*.{ts,tsx}'],
     ignores: ['app/src/liveQuery.ts', 'app/src/session.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
         {
-          paths: [
-            {
-              name: 'firebase/firestore',
-              importNames: ['onSnapshot'],
-              message:
-                'Subscribe via useLiveQuery/useLiveDoc (src/liveQuery.ts) — they reset on input change and clear on error. See docs/INHERITED-STACK.md lesson 5.',
-            },
-          ],
+          paths: [...SUBSCRIBE_VIA_LIVE_QUERY, ...ICONS_FROM_SRC_ICONS.paths],
+          patterns: ICONS_FROM_SRC_ICONS.patterns,
         },
       ],
+    },
+  },
+  {
+    // The two modules allowed onSnapshot keep the icon rule.
+    files: ['app/src/liveQuery.ts', 'app/src/session.ts'],
+    rules: {
+      'no-restricted-imports': ['error', ICONS_FROM_SRC_ICONS],
     },
   },
   {

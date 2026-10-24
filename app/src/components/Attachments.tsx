@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type ComponentProps } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Icon, type IconName } from '../icons';
 import { attachmentKind, formatBytes } from '@sabeel/shared';
 import {
   attachmentUrl,
@@ -31,10 +31,9 @@ import {
 import { Sheet, SheetOption } from './Sheet';
 import { AttachSheet } from './AttachSheet';
 
-type MaterialIconName = ComponentProps<typeof MaterialIcons>['name'];
 
 /** A glyph for the file's kind. Decoration inside a pressable row, not an action. */
-function glyphFor(contentType: string): MaterialIconName {
+function glyphFor(contentType: string): IconName {
   if (contentType === 'application/pdf') return 'picture-as-pdf';
   if (contentType.startsWith('image/')) return 'image';
   if (contentType.startsWith('video/')) return 'movie';
@@ -341,7 +340,7 @@ export function Attachments({
                   // jump as it starts and stops.
                   <ActivityIndicator size="small" color={t.accent.base} style={styles.glyph} />
                 ) : (
-                  <MaterialIcons
+                  <Icon
                     name={ready ? glyphFor(a.contentType) : 'error-outline'}
                     size={20}
                     color={ready ? t.text.muted : t.text.danger}

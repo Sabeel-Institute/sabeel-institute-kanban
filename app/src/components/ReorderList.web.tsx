@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Icon } from '../icons';
 import { radius, space, useTheme } from '../theme';
 
 /**
@@ -80,7 +80,7 @@ export function ReorderList<T>({
               cursor: disabled ? 'default' : 'grab',
             }}
           >
-            <MaterialIcons
+            <Icon
               name="drag-indicator"
               size={20}
               color={t.text.muted}

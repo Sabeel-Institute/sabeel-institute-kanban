@@ -7,7 +7,6 @@ import {
   createContext,
   forwardRef,
   useContext,
-  type ComponentProps,
   type ReactNode,
   type Ref,
 } from 'react';
@@ -25,13 +24,11 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { KeyboardScroll, type Scroller } from './KeyboardScroll';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Icon, type IconName } from '../icons';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 import { priorityLabel, readableInkOn, type Priority } from '@sabeel/shared';
 import { radius, space, type, useTheme } from '../theme';
 
-/** Any MaterialIcons glyph name, without re-listing them here. */
-type MaterialIconName = ComponentProps<typeof MaterialIcons>['name'];
 
 /**
  * Space kept below a focused field when the keyboard is up.
@@ -556,7 +553,7 @@ export function Toggle({
  * that was already reserved gets drawn. Crowding is set by the GAP between
  * boxes, a separate number held at `space.sm` or more.
  *
- * Raw `<MaterialIcons>` used as INLINE METADATA (a paperclip on a card face, a
+ * Raw `<Icon>` used as INLINE METADATA (a paperclip on a card face, a
  * chevron in a reorder handle) keeps its own smaller size — that is text-scale
  * ornament, not a target.
  */
@@ -575,7 +572,7 @@ export function IconAction({
   selected,
   size = ICON_INK,
 }: {
-  icon: MaterialIconName;
+  icon: IconName;
   label: string;
   onPress: () => void;
   danger?: boolean;
@@ -619,7 +616,7 @@ export function IconAction({
         pressed && { opacity: 0.6 },
       ]}
     >
-      <MaterialIcons
+      <Icon
         name={icon}
         size={size}
         // text.secondary, NOT text.muted. An icon is non-text content and needs
@@ -652,7 +649,7 @@ export function SegmentedIcons<T extends string>({
   value,
   onChange,
 }: {
-  options: readonly { key: T; icon: MaterialIconName; label: string }[];
+  options: readonly { key: T; icon: IconName; label: string }[];
   value: T;
   onChange: (next: T) => void;
 }) {
@@ -684,7 +681,7 @@ export function SegmentedIcons<T extends string>({
               pressed && !on ? { backgroundColor: t.bg.inset } : null,
             ]}
           >
-            <MaterialIcons
+            <Icon
               name={o.icon}
               size={20}
               // text.secondary, not text.muted: an icon is non-text content and
