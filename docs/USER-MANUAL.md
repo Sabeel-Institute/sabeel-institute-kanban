@@ -1,6 +1,6 @@
 # Sabeel Institute Kanban — User Manual
 
-*For app version 0.13.2 · October 2026*
+*For app version 0.13.3 · October 2026*
 
 Welcome! This guide covers everything you can do in Sabeel Kanban — from finding
 your first board to running boards and approving accounts. It is organized by
