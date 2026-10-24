@@ -295,13 +295,13 @@ itself is deliberately NOT darkened — that would collapse it into
   `<Icon>` used as inline metadata (a paperclip on a card face) keeps its
   own small size; it is ornament beside text, not a target.
 - **Every icon is `Icon` from `app/src/icons`, whose font holds only the glyphs
-  in `names.json`** (Material Icons' names). The full font is 156 KB over the
-  wire, which a slow connection could not fetch within the 12 s
-  `@expo/vector-icons` allows, leaving every icon on screen blank. To add one:
-  put its name in `names.json`, then `npm run icons -w @sabeel/app`. A name
-  missing from the list fails typecheck, a font that lags the list fails
-  `icons.test.ts`, and importing a stock set from `@expo/vector-icons` fails
-  lint.
+  in `names.json`** (Material Icons' names; ci-tools' README, "Icons"). The
+  full font is 156 KB over the wire, which a slow connection could not fetch
+  within the 12 s `@expo/vector-icons` allows, leaving every icon on screen
+  blank. To add one: put its name in `names.json`, then `npx sabeel-ci
+  icons`. A name missing from the list fails typecheck, a font that lags the
+  list fails `icons.test.ts`, and importing a stock set from
+  `@expo/vector-icons` fails lint.
 - **A control that floats over content must fit on one row WHERE IT CAN, and wrap
   rather than bleed where it cannot.** The bulk bar sits on top of the board:
   every row it takes is a row of board the user cannot see. But six 44px actions

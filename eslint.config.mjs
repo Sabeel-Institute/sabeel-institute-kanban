@@ -67,7 +67,8 @@ const SUBSCRIBE_VIA_LIVE_QUERY = [
 /**
  * Icons come from `src/icons`, whose font holds only the glyphs the app names.
  * A stock set like `@expo/vector-icons/MaterialIcons` type-checks just as well
- * and puts its whole font back on the web's first load (src/icons/build.mjs).
+ * and puts its whole font back on the web's first load (ci-tools' README,
+ * "Icons").
  * The bare package is a `path`: as a pattern it would exclude the directory,
  * and gitignore semantics cannot re-include createIconSet beneath it.
  */
