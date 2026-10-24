@@ -1,5 +1,8 @@
 import { USE_EMULATORS } from './env';
-import * as Sentry from '@sentry/react';
+// Named imports, not `import * as Sentry`: the export is tree-shaken
+// (`sabeel-ci build-web`), and only these leave the rest of the SDK, session
+// replay and the feedback widget among it, out of the bundle.
+import { captureException, init, setUser } from '@sentry/react';
 
 /**
  * Error reporting — WEB. See sentry.ts for the native variant.
@@ -31,7 +34,7 @@ let initialised = false;
 export function initErrorReporting(): void {
   if (initialised || !DSN) return;
   initialised = true;
-  Sentry.init({
+  init({
     dsn: DSN,
     // Error reporting only. This is a <50-person internal tool; performance
     // tracing would spend the event quota on data nobody is going to read.
@@ -53,7 +56,7 @@ export function captureError(
     console.warn('[error]', error, context ?? '');
     return;
   }
-  Sentry.captureException(error, { level, extra: context });
+  captureException(error, { level, extra: context });
 }
 
 /**
@@ -66,6 +69,6 @@ export function captureError(
  */
 export function setErrorUser(uid: string | null): void {
   if (!DSN) return;
-  Sentry.setUser(uid ? { id: uid } : null);
+  setUser(uid ? { id: uid } : null);
 }
 

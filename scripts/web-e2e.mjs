@@ -10,7 +10,7 @@
  *
  * Prerequisites (scripts/e2e.sh does both):
  *   - emulators running (firestore, auth, functions)
- *   - an emulator-mode web build in app/dist-web-emu
+ *   - the web export, `sabeel-ci build-web --emulators`, in app/dist-web
  *
  *   node scripts/web-e2e.mjs
  */
@@ -34,7 +34,8 @@ const SHOTS = resolve(import.meta.dirname, '..', 'shots');
 // The Expo web DEV server, started by e2e.sh. It must be the dev server rather
 // than an exported bundle: `expo export` sets __DEV__ to false, which correctly
 // strips the emulator dev sign-in — the very control this flow needs to drive.
-// That the export strips it is asserted separately at the end.
+// The export, tree-shaken as the site ships it, is driven at the end instead,
+// through the email door.
 const BASE = process.env.E2E_BASE ?? `http://127.0.0.1:${PORTS.web}/`;
 const PROD_BUNDLE = resolve(import.meta.dirname, '..', 'app', 'dist-web');
 const PROD_PORT = 4181;
@@ -51,7 +52,7 @@ const MIME = {
   '.ttf': 'font/ttf',
 };
 
-/** Serves the exported PRODUCTION bundle, for the dev-row absence check. */
+/** Serves the web export, for the checks of what ships at the end. */
 const server = createServer(async (req, res) => {
   const p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   for (const candidate of [join(PROD_BUNDLE, p), join(PROD_BUNDLE, 'index.html')]) {
@@ -2681,13 +2682,20 @@ try {
 
   await admin.emulateMedia({ colorScheme: 'light' });
 
-  // ---- Production-safety: the dev sign-in must NOT survive an export --------
-  // `expo export` sets __DEV__ false, which is one of the two conditions gating
-  // the emulator sign-in. Asserting it here means the safety property is tested
-  // rather than assumed, every run — this is the row that must never reach a
-  // release APK or Hosting.
+  // ---- What ships: the web export, tree-shaken ------------------------------
+  // e2e.sh builds it with `sabeel-ci build-web --emulators`: the build Hosting
+  // gets, pointed at the emulators. Everything above runs on the dev server,
+  // which does not tree-shake, so a module wrongly shaken out of the export
+  // would otherwise first fail on the live site.
+  //
+  // The dev sign-in must NOT survive an export: `expo export` sets __DEV__
+  // false, one of the two conditions gating it, and this build sets the other
+  // on purpose, so __DEV__ alone is shown to hold. This is the row that must
+  // never reach a release APK or Hosting.
   const prodCtx = await browser.newContext({ viewport: { width: 1100, height: 900 } });
   const prod = await prodCtx.newPage();
+  const prodErrors = [];
+  prod.on('pageerror', (e) => prodErrors.push(String(e)));
   await prod.goto(`http://127.0.0.1:${PROD_PORT}/`, { waitUntil: 'networkidle' });
   await prod.getByText('Sign in with Google').waitFor({ timeout: 20000 });
   const devRowInProd = await prod
@@ -2695,6 +2703,44 @@ try {
     .isVisible()
     .catch(() => false);
   check('exported production bundle has NO dev sign-in row', !devRowInProd);
+
+  // Signed in through the email door, as the review account: a member, so
+  // add it to the board an admin would add it to.
+  const PROD_COMMENT = 'Posted from the tree-shaken export.';
+  await adminRun(`
+    const user = await auth.getUserByEmail(${JSON.stringify(PASSWORD_SIGN_IN_EMAIL)});
+    const boards = await db.collection('boards').where('name', '==', 'Fundraising 2026').get();
+    await boards.docs[0].ref.update({
+      memberUids: FieldValue.arrayUnion(user.uid),
+      ['memberProfiles.' + user.uid]: { displayName: user.displayName ?? '', email: user.email },
+    });
+  `);
+  await prod.getByRole('button', { name: 'Sign in with email' }).click();
+  await prod.getByPlaceholder('Email').fill(PASSWORD_SIGN_IN_EMAIL);
+  await prod.getByPlaceholder('Password').fill(DOOR_PASSWORD);
+  await prod.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await prod.getByText('Fundraising 2026').first().click({ timeout: 40000 });
+  await prod.getByText('To Do').first().waitFor({ timeout: 20000 });
+  await prod.locator('[data-testid^="card-"]').first().click();
+  await prod.getByRole('button', { name: 'Share card' }).waitFor({ timeout: 20000 });
+  const prodBox = commentEditor(prod);
+  await prodBox.click();
+  await prodBox.pressSequentially(PROD_COMMENT, { delay: 10 });
+  await prod.getByRole('button', { name: 'Comment', exact: true }).click();
+  const prodPosted = await prod
+    .getByText(PROD_COMMENT)
+    .first()
+    .waitFor({ timeout: 20000 })
+    .then(() => true, () => false);
+  check('the export signs in, opens a board and a card, and posts a comment', prodPosted);
+  const prodIcons = await prod.evaluate(async () => {
+    await document.fonts.ready;
+    return [...document.fonts]
+      .filter((f) => f.family.replace(/"/g, '') === 'sabeel-icons')
+      .map((f) => f.status);
+  });
+  check('and draws its icons', prodIcons.includes('loaded'), prodIcons.join(', '));
+  check('with no uncaught error on the page', prodErrors.length === 0, prodErrors.join(' | '));
   // A stock icon set imported anywhere puts its whole font back on the web's
   // first load, which is what src/icons exists to prevent.
   const exportedFonts = (await readdir(PROD_BUNDLE, { recursive: true })).filter((f) =>
