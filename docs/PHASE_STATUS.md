@@ -405,6 +405,20 @@ the team.
 
 ## Deploy log
 
+### 2026-10-24 — Icons on slow connections; a smaller website — v0.13.2
+
+- **Icons appear on a slow connection.** The website downloaded a font of
+  2,234 icons to draw the few dozen it uses, and gave up after 12 seconds:
+  on a slow connection every icon on screen stayed blank. The app now
+  carries a 7 KB font of exactly its own icons, on the website and the
+  phone apps alike.
+- **The website is smaller**: about 40% less to download on a first visit
+  (904 KB of code and a 156 KB font before, about 630 KB in all now). The
+  build leaves out code the app never calls, including the parts of the
+  error reporter it does not use.
+- The browser tests now also run on the website exactly as it is built for
+  release, so a part left out by mistake fails a test first.
+
 ### 2026-10-23 — v0.13.0 for iPhones and the GitHub APK — v0.13.1
 
 - **The same app as v0.13.0, now on every channel.** v0.13.0 reached the web
