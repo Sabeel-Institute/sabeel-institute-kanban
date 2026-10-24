@@ -15,9 +15,9 @@
  * the real inset, floored to a minimum, so it clears a gesture pill on modern
  * phones and still looks right on button-nav devices that report a zero inset.
  */
-import { useState, type ComponentProps } from 'react';
+import { useState } from 'react';
 import { Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Icon, type IconName } from '../icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Sheet, SheetOption } from './Sheet';
 import { Caption } from './ui';
@@ -28,13 +28,12 @@ import { useUnreadCount } from '../notifications';
 import { sessionCan, signOut, type SessionUser } from '../session';
 import { radius, space, useTheme } from '../theme';
 
-type MaterialIconName = ComponentProps<typeof MaterialIcons>['name'];
 type RouteName = Route['name'];
 
 type TabDef = {
   key: RouteName;
   label: string;
-  icon: MaterialIconName;
+  icon: IconName;
   /** Routes for which this tab shows as active (a board is "under" Boards). */
   activeFor: RouteName[];
 };
@@ -246,7 +245,7 @@ function NavItem({
   rail,
   badge = 0,
 }: {
-  icon: MaterialIconName;
+  icon: IconName;
   label: string;
   active: boolean;
   onPress: () => void;
@@ -276,7 +275,7 @@ function NavItem({
       ]}
     >
       <View>
-        <MaterialIcons name={icon} size={24} color={tint} />
+        <Icon name={icon} size={24} color={tint} />
         {badge > 0 ? (
           <View style={[styles.badge, { backgroundColor: t.accent.base }]}>
             <Text style={[styles.badgeText, { color: t.accent.onAccent }]}>

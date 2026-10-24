@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, TextInput } from 'react-native';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Icon } from '../icons';
 import { BOARD_NAME_MAX, sortBoardsForList } from '@sabeel/shared';
 import {
   boardsView,
@@ -62,7 +62,7 @@ function BoardRow({
           accessibilityLabel={isFavourite ? `Unstar ${board.name}` : `Star ${board.name}`}
           hitSlop={10}
         >
-          <MaterialIcons
+          <Icon
             name={isFavourite ? 'star' : 'star-border'}
             size={24}
             color={isFavourite ? t.accent.base : t.text.muted}

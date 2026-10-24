@@ -21,7 +21,7 @@ import { PASSWORD_SIGN_IN_EMAIL } from '../packages/shared/lib/constants.js';
 import { REPORT_TEXT_MAX } from '../packages/shared/lib/report.js';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
-import { readFile, mkdir } from 'node:fs/promises';
+import { readFile, readdir, mkdir } from 'node:fs/promises';
 import { extname, join, resolve } from 'node:path';
 import { PORTS, PROJECT } from './lib/emulators.mjs';
 import { settle, tryAgainTally } from './lib/signin.mjs';
@@ -38,6 +38,8 @@ const SHOTS = resolve(import.meta.dirname, '..', 'shots');
 const BASE = process.env.E2E_BASE ?? `http://127.0.0.1:${PORTS.web}/`;
 const PROD_BUNDLE = resolve(import.meta.dirname, '..', 'app', 'dist-web');
 const PROD_PORT = 4181;
+const ICON_FONT = resolve(import.meta.dirname, '..', 'app', 'src', 'icons', 'icons.ttf');
+const ICON_GLYPHMAP = resolve(import.meta.dirname, '..', 'app', 'src', 'icons', 'glyphmap.json');
 
 const MIME = {
   '.html': 'text/html',
@@ -479,6 +481,25 @@ try {
   await admin.getByText('Done').first().waitFor({ timeout: 15000 });
   check('a new board starts with the three default columns', true);
   await admin.screenshot({ path: join(SHOTS, 'p2-board-light.png'), fullPage: true });
+
+  // The icons draw from the app's own font (src/icons). A font that failed to
+  // load leaves every icon an empty Text, which no other check here notices.
+  const iconFont = await admin.evaluate(async () => {
+    await document.fonts.ready;
+    return [...document.fonts]
+      .filter((f) => f.family.replace(/"/g, '') === 'sabeel-icons')
+      .map((f) => f.status);
+  });
+  check('the icon font loads', iconFont.includes('loaded'), iconFont.join(', '));
+  const backGlyph = await admin
+    .getByRole('button', { name: 'Back' })
+    .first()
+    .evaluate((el) => el.textContent.codePointAt(0));
+  check(
+    'and the Back icon draws its glyph from it',
+    backGlyph === JSON.parse(await readFile(ICON_GLYPHMAP, 'utf8'))['arrow-back'],
+    String(backGlyph),
+  );
 
   // Board settings: add a column, add a label, add a member.
   await admin.getByRole('button', { name: 'Board settings' }).click();
@@ -2674,6 +2695,17 @@ try {
     .isVisible()
     .catch(() => false);
   check('exported production bundle has NO dev sign-in row', !devRowInProd);
+  // A stock icon set imported anywhere puts its whole font back on the web's
+  // first load, which is what src/icons exists to prevent.
+  const exportedFonts = (await readdir(PROD_BUNDLE, { recursive: true })).filter((f) =>
+    f.endsWith('.ttf'),
+  );
+  check(
+    'the export carries the app icon font and no other',
+    exportedFonts.length === 1 &&
+      (await readFile(join(PROD_BUNDLE, exportedFonts[0]))).equals(await readFile(ICON_FONT)),
+    exportedFonts.join(', '),
+  );
   await prod.screenshot({ path: join(SHOTS, 'p1-signin-production.png'), fullPage: true });
   await prodCtx.close();
 

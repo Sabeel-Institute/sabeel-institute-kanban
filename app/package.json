@@ -9,7 +9,8 @@
     "web": "expo start --web",
     "web:export": "sabeel-ci build-web",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "icons": "node src/icons/build.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
@@ -48,6 +49,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "subset-font": "^2.9.0",
     "typescript": "~6.0.3",
     "vitest": "^4.1.11"
   }

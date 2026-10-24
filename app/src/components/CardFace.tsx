@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Icon } from '../icons';
 import { bucketFor, describeDue, todayInOrgTz, type Label, type Priority } from '@sabeel/shared';
 import type { BoardMemberProfile } from '../boards';
 import { AssigneeChip, Body, ColorBadge, PriorityBadge } from './ui';
@@ -82,7 +82,7 @@ export function CardFace({
           ))}
           {subtasks > 0 ? (
             <View style={styles.due}>
-              <MaterialIcons name="account-tree" size={13} color={t.text.muted} />
+              <Icon name="account-tree" size={13} color={t.text.muted} />
               <Text style={[type.caption, { color: t.text.muted }]}>
                 {subtasks} subtask{subtasks === 1 ? '' : 's'}
               </Text>
@@ -90,7 +90,7 @@ export function CardFace({
           ) : null}
           {files > 0 ? (
             <View style={styles.due}>
-              <MaterialIcons name="attach-file" size={13} color={t.text.muted} />
+              <Icon name="attach-file" size={13} color={t.text.muted} />
               <Text style={[type.caption, { color: t.text.muted }]}>
                 {files} file{files === 1 ? '' : 's'}
               </Text>
@@ -98,7 +98,7 @@ export function CardFace({
           ) : null}
           {card.dueDate ? (
             <View style={styles.due}>
-              <MaterialIcons name="event" size={13} color={dueColor} />
+              <Icon name="event" size={13} color={dueColor} />
               <Text style={[type.caption, { color: dueColor }]}>
                 {describeDue(card.dueDate, today)}
               </Text>
