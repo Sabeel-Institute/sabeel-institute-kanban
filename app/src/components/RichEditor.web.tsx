@@ -51,10 +51,12 @@ import {
 } from '@lexical/markdown';
 import { $findMatchingParent, mergeRegister } from '@lexical/utils';
 import {
+  $createRangeSelectionFromDom,
   $getRoot,
   $getSelection,
   $isRangeSelection,
   $isTextNode,
+  $setSelection,
   COMMAND_PRIORITY_HIGH,
   FORMAT_TEXT_COMMAND,
   KEY_ARROW_DOWN_COMMAND,
@@ -109,6 +111,9 @@ const EMPTY_MARKS: RichMarks = {
   numbers: false,
   link: false,
 };
+
+/** Keys whose keydown edits at, or moves, the caret (the set facebook/lexical#9283 reads the DOM for). */
+const CARET_KEYS = new Set(['ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'Backspace', 'Delete', 'Enter', 'Tab']);
 
 /** Load markdown into the editor, and report it back out as markdown. */
 function Bridge({
@@ -168,6 +173,43 @@ function Bridge({
       }),
     [editor],
   );
+
+  /**
+   * Act on the caret the browser shows, not the one Lexical last heard of.
+   *
+   * On keydown, Lexical 0.52 reuses its last selection instead of reading the
+   * DOM. Chromium coalesces `selectionchange`, so a caret move the browser made
+   * natively (End, Home, a click) can still be unreported when the next key
+   * arrives on a busy page, and that key then acts on the caret from before the
+   * move: select a word, Bold, End, Enter, and the Enter and what follows
+   * REPLACED the word. Lexical fixed it upstream (facebook/lexical#9283, after
+   * 0.52.0) by reading the DOM for these keys; this does the same, first, in
+   * the capture phase. Remove it once a Lexical release carries #9283.
+   * `scripts/richtext-e2e.mjs` reproduces it.
+   */
+  useEffect(() => {
+    let root: HTMLElement | null = null;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!CARET_KEYS.has(event.key) || event.isComposing) return;
+      const domSelection = root?.ownerDocument.defaultView?.getSelection() ?? null;
+      editor.update(
+        () => {
+          const fromDom = $createRangeSelectionFromDom(domSelection, editor);
+          if (fromDom !== null) $setSelection(fromDom);
+        },
+        { discrete: true },
+      );
+    };
+    const unregister = editor.registerRootListener((next, prev) => {
+      prev?.removeEventListener('keydown', onKeyDown, true);
+      next?.addEventListener('keydown', onKeyDown, true);
+      root = next;
+    });
+    return () => {
+      unregister();
+      root?.removeEventListener('keydown', onKeyDown, true);
+    };
+  }, [editor]);
 
   /**
    * Hold the callbacks in refs so the listener registers ONCE.

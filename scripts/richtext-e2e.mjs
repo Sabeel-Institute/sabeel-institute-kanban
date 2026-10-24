@@ -147,7 +147,23 @@ await page.keyboard.down('Shift');
 for (let i = 0; i < 5; i += 1) await page.keyboard.press('ArrowRight');
 await page.keyboard.up('Shift');
 await page.getByRole('button', { name: 'Bold', exact: true }).first().click();
-await page.waitForTimeout(250);
+/*
+ * And wait for the MARK, so the keys below run on a settled page. That is
+ * what exposed Lexical acting on a stale caret (RichEditor.web.tsx, "Act on
+ * the caret the browser shows"): End moved the caret natively, Enter's
+ * keydown still saw `world` selected, and Enter and `first` replaced it,
+ * stored as `hello` and a bullet reading `first and 2 \* 3 \* 4`. Before the
+ * fix this wait made that happen on every run; CI's runners hit it without.
+ */
+await page.waitForFunction(
+  () =>
+    [...(document.querySelector('[contenteditable="true"]')?.querySelectorAll('*') ?? [])].some(
+      (el) => el.textContent === 'world' && Number(getComputedStyle(el).fontWeight) >= 600,
+    ),
+  undefined,
+  { timeout: 15000 },
+);
+await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
 check(
   'an active mark reports its state to a screen reader',
   (await page.getByRole('button', { name: 'Bold', exact: true }).first().getAttribute('aria-pressed')) ===
@@ -189,6 +205,8 @@ check(
 check('and the app body size', fonts.size === '15px', fonts.size);
 
 await page.keyboard.press('End');
+// Collapsed at the line's end, or Enter below replaces the selection.
+await page.waitForFunction(() => window.getSelection()?.isCollapsed === true, undefined, { timeout: 15000 });
 await page.keyboard.press('Enter');
 await page.getByRole('button', { name: 'Bullet list', exact: true }).first().click();
 // Same reason as above: the list transform rewrites the block, so wait for the
