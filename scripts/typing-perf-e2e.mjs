@@ -21,9 +21,11 @@
  * an empty one costs. That is machine-independent, and it is exactly what
  * regresses when a draft is hoisted back into a screen.
  *
- * Ratios before the fix were 4-15x and are now near 1, and the threshold is 3:
- * the median of five still reached 2.62 on a busy CI runner. Absolute figures
- * are LOGGED every run because they are useful, and gated on never.
+ * With a draft held in the screen the ratios are 4-15x; with it local they sit
+ * near 1, and the threshold is 3. Each arm's cost is its FASTEST round (see
+ * `msPerChar`), because a noisy runner can only ever add time. Absolute
+ * figures, and every round behind them, are LOGGED every run because they are
+ * useful, and gated on never.
  *
  * The seed is deliberately the smallest that still separates the two arms: CI
  * runs every e2e suite sequentially in one job, so this one's wall clock is
@@ -51,8 +53,8 @@ process.env.GCLOUD_PROJECT = PROJECT;
 const MAX_RATIO = 3;
 /** Long enough to average out one slow frame, short enough to stay cheap. */
 const SAMPLE = 'the quick brown fox jumps over it';
-/** Samples per arm; the median is the arm's cost (see `msPerChar`). */
-const ROUNDS = 5;
+/** Rounds per arm; the fastest is the arm's cost (see `msPerChar`). */
+const ROUNDS = 7;
 
 const results = [];
 function check(name, ok, detail = '') {
@@ -167,43 +169,54 @@ async function openCard(boardName, title) {
 }
 
 /**
- * Cost of one character, in milliseconds: the median of ROUNDS samples typed
- * one after another into the same field.
+ * Cost of one character, in milliseconds: the FASTEST of ROUNDS samples typed
+ * one after another into the same field. Returns that cost and every round, in
+ * the order typed, so the report can show the spread behind it.
  *
  * A warm-up pass is typed and thrown away first: the very first keystroke into
  * a freshly mounted editor pays for lazy work that has nothing to do with the
  * property being measured, and on the light arm — where the total is small —
  * that one-off is large enough to flatter the ratio.
  *
- * ONE SAMPLE WAS A COIN TOSS on a busy screen. Typing begins while the busy
+ * ONE SAMPLE IS A COIN TOSS on a busy screen. Typing begins while the busy
  * card is still drawing its comments, and whether the one sample overlapped
- * that decided the run: on 2026-10-21 the same commit measured the description
- * arm at a ratio of 0.74 and of 3.75, and CI runs split between ~0.8 and 2.4-3.8
- * with nothing between. The median of five puts a settling screen in one
- * outlier rather than in the verdict; a draft hoisted back into the screen
- * slows every sample, so it still fails.
+ * that decides the run.
+ *
+ * WHY THE MINIMUM, NOT THE MEDIAN. Interference (a GC pause, a snapshot being
+ * delivered, a neighbour on the runner) only ever ADDS time, so the fastest
+ * round is the closest observation of what typing really costs. The rounds of
+ * an arm run back to back in one burst of about a second, so one disturbance
+ * slows all of them together, and a median cannot discard what every round
+ * shares: slow runners spread the description arm's ratio up to 2.6 while fast
+ * ones sit near 1.0. More rounds give more chances for at least one to run
+ * clean. A draft hoisted back into the screen slows every round, the fastest
+ * included, so it still fails.
  */
 async function msPerChar(locator) {
   await locator.click();
   await page.keyboard.type('warm', { delay: 0 });
-  const samples = [];
+  const rounds = [];
   for (let round = 0; round < ROUNDS; round += 1) {
     const started = Date.now();
     await page.keyboard.type(SAMPLE, { delay: 0 });
-    samples.push((Date.now() - started) / SAMPLE.length);
+    rounds.push((Date.now() - started) / SAMPLE.length);
   }
-  return samples.sort((a, b) => a - b)[Math.floor(ROUNDS / 2)];
+  return { cost: Math.min(...rounds), rounds };
 }
 
+const fmtRounds = (rounds) => rounds.map((r) => r.toFixed(1)).join(' ');
+
 function report(arm, heavy, light) {
-  const ratio = heavy / light;
+  const ratio = heavy.cost / light.cost;
   console.log(
-    `       ${arm}: heavy ${heavy.toFixed(1)} ms/char, light ${light.toFixed(1)} ms/char, ratio ${ratio.toFixed(2)}`,
+    `       ${arm}: heavy ${heavy.cost.toFixed(1)} ms/char, light ${light.cost.toFixed(1)} ms/char, ratio ${ratio.toFixed(2)}`,
   );
+  console.log(`         heavy rounds (ms/char): ${fmtRounds(heavy.rounds)}`);
+  console.log(`         light rounds (ms/char): ${fmtRounds(light.rounds)}`);
   check(
     `${arm}: typing does not slow down on a busy screen`,
     ratio < MAX_RATIO,
-    `ratio ${ratio.toFixed(2)} exceeds ${MAX_RATIO} (heavy ${heavy.toFixed(1)}, light ${light.toFixed(1)} ms/char)`,
+    `ratio ${ratio.toFixed(2)} exceeds ${MAX_RATIO} (heavy ${heavy.cost.toFixed(1)}, light ${light.cost.toFixed(1)} ms/char)`,
   );
 }
 
@@ -213,10 +226,10 @@ async function addCardCost(boardName) {
   await page.getByRole('button', { name: '+ Add card' }).first().click();
   const input = page.getByPlaceholder('Card title');
   await input.waitFor({ timeout: 15000 });
-  const cost = await msPerChar(input);
+  const measured = await msPerChar(input);
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
-  return cost;
+  return measured;
 }
 report('add card', await addCardCost('Busy board'), await addCardCost('Empty board'));
 
@@ -239,10 +252,10 @@ async function descriptionCost(title) {
   await page.getByRole('button', { name: 'Edit description' }).click();
   const box = page.locator('[contenteditable="true"]').first();
   await box.waitFor({ timeout: 20000 });
-  const cost = await msPerChar(box);
+  const measured = await msPerChar(box);
   await page.getByRole('button', { name: 'Cancel' }).first().click();
   await page.waitForTimeout(400);
-  return cost;
+  return measured;
 }
 report('description', await descriptionCost('Busy card'), await descriptionCost('Quiet card'));
 
