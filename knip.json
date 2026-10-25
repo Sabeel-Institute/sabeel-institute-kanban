@@ -34,6 +34,9 @@
       "project": [
         "src/**/*.ts",
         "test/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@google-cloud/functions-framework"
       ]
     },
     "packages/shared": {

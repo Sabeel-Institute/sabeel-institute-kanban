@@ -563,6 +563,15 @@ block and `functions/package.json` disagree, which `npm ci` would otherwise
 reject only at deploy time, and `functions/test/unit/functionsLockfile.test.ts`
 fails when the lock does not resolve a runtime dependency.
 
+**The Functions Framework is a dependency.** `functions/package.json` names the
+Functions Framework (`@google-cloud/functions-framework`) though no source
+imports it: Cloud Run starts it, and it parses every request before a function
+sees it. Named, Cloud Build installs it from `functions/package-lock.json` and
+Dependabot covers it; unnamed, Google's buildpack installs a copy of its own
+from its own lock. `check-app` fails without it, knip ignores it as unused, and
+Dependabot leaves its majors alone: it stays on the 3.x line the buildpack
+itself installs for Node 22 until a major is taken on purpose.
+
 **`expo export` must always `--clear`.** `sabeel-ci build-web` (`web:export`)
 always passes it. Metro would otherwise serve a bundle built with different
 `EXPO_PUBLIC_*` values, and an emulator-mode bundle must never reach Hosting.
