@@ -91,7 +91,16 @@ jobs:
           distribution: temurin
           java-version: 21
       - name: Install Firebase CLI
-        run: npm install --global firebase-tools@^15
+        id: firebase-cli
+        run: |
+          npm install --global firebase-tools@^15
+          echo "version=$(firebase --version)" >> "$GITHUB_OUTPUT"
+      # The emulators' jars and the Emulator UI download on their first start, and
+      # a download that fails ends the emulators: kept per Firebase CLI version.
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}-${{ steps.firebase-cli.outputs.version }}
       - name: Emulator integration tests
         run: npm run test:emulator
 
@@ -136,7 +145,16 @@ jobs:
           distribution: temurin
           java-version: 21
       - name: Install Firebase CLI
-        run: npm install --global firebase-tools@^15
+        id: firebase-cli
+        run: |
+          npm install --global firebase-tools@^15
+          echo "version=$(firebase --version)" >> "$GITHUB_OUTPUT"
+      # The emulators' jars and the Emulator UI download on their first start, and
+      # a download that fails ends the emulators: kept per Firebase CLI version.
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}-${{ steps.firebase-cli.outputs.version }}
       - name: Emulator secret placeholders
         run: sabeel-ci emulator-secrets
       # An apt mirror can stall a download indefinitely (one held this step
