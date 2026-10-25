@@ -489,6 +489,13 @@ warning, and the toast takes the taps meant for the tabs, so the runner starts
 Metro with `EXPO_PUBLIC_E2E=1` and `app/index.ts` then tells LogBox to ignore
 warnings; they still reach `logs/metro.log`.
 
+A busy CI simulator drops taps that land before a screen takes them (the
+iPhone simulator holds a CI Mac's load average past 300), so each step that
+opens another screen goes through ci-tools' `ci-tools/tap-until.yaml`: tap
+until the next screen shows, again only while the tapped thing still shows, so
+a real failure still fails. `native-e2e` copies ci-tools' shared steps into
+`maestro/ci-tools/` for each run; Git ignores the copy.
+
 **On the iOS simulator**: `npx sabeel-ci native-e2e --ios` (macOS) builds the
 debug app for the simulator with `sabeel-ci ios-sim-build` (a prebuild scoped
 to iOS, the committed `Podfile.lock`, `xcodebuild` for `iphonesimulator`),
