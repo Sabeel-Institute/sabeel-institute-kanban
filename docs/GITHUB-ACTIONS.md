@@ -24,10 +24,10 @@ differs from its template.
   SDK dependencies or pinned iOS pods fails validation rather than rewriting
   lockfiles. Native dependency PRs must include any intended Podfile.lock update.
 - The required `premerge-builds` gate fails if any constituent job fails,
-  skips or is cancelled. It is required alongside CI (`build-test`) and CodeQL
-  (`analyze`) on main, with no status-check bypasses. A branch need not be up
-  to date with main to merge: main's own CI runs on every merge, and no
-  release workflow accepts a commit it has not passed.
+  skips or is cancelled. It is required alongside CI (`build-test`), CodeQL
+  (`analyze`) and Native (`native`) on main, with no status-check bypasses. A
+  branch need not be up to date with main to merge: main's own CI runs on
+  every merge, and no release workflow accepts a commit it has not passed.
   Green checks validate compilation and tested behavior, not every possible
   runtime behavior or a dependency vendor's privacy defaults.
 - **CI** runs `sabeel-ci check-app`, lint, type checks, knip, unit tests,
@@ -46,12 +46,13 @@ differs from its template.
   production deployment credentials are used.
 - **Native** runs the Maestro flows (`maestro/`) on an Android emulator on the
   runner, against the debug build and the Firebase emulators, on main pushes,
-  release tags, pull requests that change the flows, their seed
-  (`scripts/seed-emulators.mjs`), `ci-tools.json` or the ci-tools pin, and by hand:
+  release tags, every pull request to main, and by hand:
   `npx sabeel-ci native-e2e`, as locally (`docs/DEV-TOOLING.md`). Its
   screens and logs are the `native-<sha>` artifact. Its `ios` job runs the same
   flows on an iPhone simulator on a macOS runner (`--ios`) for release tags,
-  pull requests that change the flows, and by hand, as `native-ios-<sha>`.
+  pull requests and by hand, as `native-ios-<sha>`. On a pull request its
+  `native` job passes only when the flows passed on both, and main requires
+  it.
 - **Android**, **Web** and **iOS** build automatically on main pushes and can
   also be started manually. They do not run on untrusted pull requests.
 - Every Android build (Android, the pre-merge build and Native) first installs
@@ -82,7 +83,7 @@ differs from its template.
   directly, admins included, and force-pushes and deletion are blocked.
 - Only the organization owner (Faisal) can merge. The ruleset "main: only the
   owner merges" restricts updates to `main` and exempts the owner for pull
-  requests only; "main: verified pre-merge builds" requires the three checks
+  requests only; "main: verified pre-merge builds" requires the four checks
   above.
 - A collaborator's pull request also needs the code owner's approval
   (`.github/CODEOWNERS`, through the ruleset "main: pull requests only"),
