@@ -40,7 +40,7 @@
     "react": "19.2.9",
     "react-dom": "19.2.9",
     "react-native": "0.86.3",
-    "react-native-enriched-html": "^1.1.0",
+    "react-native-enriched-html": "^1.1.1",
     "react-native-keyboard-controller": "^1.21.14",
     "react-native-reanimated": "~4.5.5",
     "react-native-safe-area-context": "~5.7.0",
