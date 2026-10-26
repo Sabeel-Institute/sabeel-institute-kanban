@@ -2564,6 +2564,15 @@ try {
   await admin.getByText('To Do').first().waitFor({ timeout: 25000 });
   await admin.getByRole('button', { name: 'Board settings' }).click();
   await admin.getByText('Board settings').first().waitFor({ timeout: 20000 });
+  // Wait for the screen to stop moving before clicking Archive. When the
+  // listAddableUsers callable answers, the Members heading gains the "Add
+  // someone" icon, or an empty hint appears, and Archive shifts down about
+  // 20px: a click that straddles the shift fires no press.
+  await admin
+    .getByRole('button', { name: /^Add someone/ })
+    .or(admin.getByText(/Nobody available to add/i))
+    .first()
+    .waitFor({ timeout: 15000 });
   await admin.getByRole('button', { name: 'Archive board' }).click();
   await admin.getByRole('button', { name: 'New board' }).waitFor({ timeout: 25000 });
   await admin.waitForTimeout(1500);

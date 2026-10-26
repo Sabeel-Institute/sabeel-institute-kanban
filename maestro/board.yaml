@@ -1,7 +1,9 @@
-# The board on Android: sign-in, the column pager and its swipe, a card, the
-# native rich-text editor and a mention through it, the tabs and long-press
+# The board: sign-in, the column pager and its swipe, a card, the native
+# rich-text editor and a mention through it, the tabs and long-press
 # selection. Seeded by scripts/seed-emulators.mjs; run by `npx sabeel-ci
-# native-e2e`.
+# native-e2e`. A step that moves the app to another screen checks that it did
+# (ci-tools/tap-until.yaml): a busy CI simulator drops taps that land before a
+# screen takes them, and a step is taken again only while its screen shows.
 appId: ${APP_ID}
 name: Board, card, rich text and gestures
 ---
@@ -12,19 +14,15 @@ name: Board, card, rich text and gestures
     timeout: 180000
 # A card's texts are one accessibility label on iOS ("Fundraising 2026, 14
 # cards · 3 members"), and Maestro matches the whole label, so names here are
-# prefixes. On a busy CI Mac the debug app can reload once after its first
+# prefixes. On a busy CI Mac the debug app can also reload once after its first
 # screen (Metro served the bundle twice on Kanban #30), taking a sign-in tap
-# with it; the tap gets one more try.
-- retry:
-    maxRetries: 1
-    commands:
-      - extendedWaitUntil:
-          visible: "Dev sign-in \\(emulator only\\)"
-          timeout: 60000
-      - tapOn: "faisal"
-      - extendedWaitUntil:
-          visible: "Fundraising 2026[\\s\\S]*"
-          timeout: 60000
+# with it.
+- runFlow:
+    file: ci-tools/tap-until.yaml
+    env:
+      TARGET: "faisal"
+      EXPECT: "Fundraising 2026[\\s\\S]*"
+      SECONDS: 60
 - runFlow:
     when:
       visible: "Not now"
@@ -33,10 +31,12 @@ name: Board, card, rich text and gestures
 - takeScreenshot: 01-boards
 
 # The column pager: the arrow and the swipe.
-- tapOn: "Fundraising 2026[\\s\\S]*"
-- extendedWaitUntil:
-    visible: "To Do"
-    timeout: 30000
+- runFlow:
+    file: ci-tools/tap-until.yaml
+    env:
+      TARGET: "Fundraising 2026[\\s\\S]*"
+      EXPECT: "To Do"
+      SECONDS: 60
 - tapOn: "Next column"
 - assertVisible: "In Progress"
 - swipe:
@@ -48,8 +48,12 @@ name: Board, card, rich text and gestures
 - assertVisible: "To Do"
 
 # A card, and the native editor: type, bold, save.
-- tapOn: "Draft the donor letter[\\s\\S]*"
-- assertVisible: "Attachments \\(1\\)"
+- runFlow:
+    file: ci-tools/tap-until.yaml
+    env:
+      TARGET: "Draft the donor letter[\\s\\S]*"
+      EXPECT: "Attachments \\(1\\)"
+      SECONDS: 30
 - tapOn: "Edit description"
 - tapOn:
     below: "Bold"
@@ -104,7 +108,7 @@ name: Board, card, rich text and gestures
     visible: "Tap a card to open it\\.[\\s\\S]*"
     timeout: 15000
 - retry:
-    maxRetries: 1
+    maxRetries: 2
     commands:
       - longPressOn: "Book the venue[\\s\\S]*"
       - extendedWaitUntil:
@@ -114,12 +118,28 @@ name: Board, card, rich text and gestures
 - tapOn: "Back"
 
 # Every tab answers, each with something only its own screen shows.
-- tapOn: "My Work"
-- assertVisible: "Nothing is assigned to you right now\\."
-- tapOn: "Search"
-- assertVisible: "Search cards across your boards"
-- tapOn: "Alerts[\\s\\S]*"
-- assertVisible: "Mark all read"
-- tapOn: "More"
-- assertVisible: "Report a problem"
+- runFlow:
+    file: ci-tools/tap-until.yaml
+    env:
+      TARGET: "My Work"
+      EXPECT: "Nothing is assigned to you right now\\."
+      SECONDS: 30
+- runFlow:
+    file: ci-tools/tap-until.yaml
+    env:
+      TARGET: "Search"
+      EXPECT: "Search cards across your boards"
+      SECONDS: 30
+- runFlow:
+    file: ci-tools/tap-until.yaml
+    env:
+      TARGET: "Alerts[\\s\\S]*"
+      EXPECT: "Mark all read"
+      SECONDS: 30
+- runFlow:
+    file: ci-tools/tap-until.yaml
+    env:
+      TARGET: "More"
+      EXPECT: "Report a problem"
+      SECONDS: 30
 - takeScreenshot: 06-more

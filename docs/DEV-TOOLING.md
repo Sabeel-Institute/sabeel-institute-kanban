@@ -489,6 +489,13 @@ warning, and the toast takes the taps meant for the tabs, so the runner starts
 Metro with `EXPO_PUBLIC_E2E=1` and `app/index.ts` then tells LogBox to ignore
 warnings; they still reach `logs/metro.log`.
 
+A busy CI simulator drops taps that land before a screen takes them (the
+iPhone simulator holds a CI Mac's load average past 300), so each step that
+opens another screen goes through ci-tools' `ci-tools/tap-until.yaml`: tap
+until the next screen shows, again only while the tapped thing still shows, so
+a real failure still fails. `native-e2e` copies ci-tools' shared steps into
+`maestro/ci-tools/` for each run; Git ignores the copy.
+
 **On the iOS simulator**: `npx sabeel-ci native-e2e --ios` (macOS) builds the
 debug app for the simulator with `sabeel-ci ios-sim-build` (a prebuild scoped
 to iOS, the committed `Podfile.lock`, `xcodebuild` for `iphonesimulator`),
@@ -511,11 +518,10 @@ screen (`logs/hierarchy-at-failure.json`), the labels to match against.
 
 The **Native** workflow runs the same command on GitHub's emulator
 (`sabeel-ci ci-avd`) on every main push, every release tag, every pull
-request that changes the flows, their seed, `ci-tools.json` or the
-`package-lock.json` that pins ci-tools, and by hand, and keeps
+request to main, and by hand, and keeps
 `shots/native/` as the `native-<sha>` artifact. Its `ios` job runs `--ios` on a
-macOS runner for release tags, by hand and for pull requests that change
-the flows, and keeps the same folder as `native-ios-<sha>`.
+macOS runner for release tags, pull requests and by hand, and keeps the same
+folder as `native-ios-<sha>`.
 
 ### Screenshots for the user manual
 

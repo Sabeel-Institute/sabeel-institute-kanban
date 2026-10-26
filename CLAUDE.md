@@ -527,8 +527,8 @@ a new machine.
   are on.
 - Native flows: `npx sabeel-ci native-e2e` — the Maestro flows in `maestro/`
   on the emulator against the debug build, the same command the Native workflow
-  runs on main pushes and release tags; `--ios` runs them on an iPhone simulator
-  (macOS). `docs/DEV-TOOLING.md`.
+  runs on main pushes, release tags and every pull request; `--ios` runs them
+  on an iPhone simulator (macOS). `docs/DEV-TOOLING.md`.
 - Android: `npx sabeel-ci emulator headless` (AVD `tb_emu`, or `SABEEL_AVD`), then
   `npm run android -w @sabeel/app`. Firebase emulators from the AVD = `10.0.2.2`.
   There are NO physical devices. **Check `emulator -accel-check` first** — see
