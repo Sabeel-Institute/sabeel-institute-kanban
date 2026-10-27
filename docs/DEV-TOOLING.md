@@ -475,8 +475,10 @@ with `EXPO_PUBLIC_USE_EMULATORS=1`, and runs every flow, or the one you name
 (`npx sabeel-ci native-e2e maestro/board.yaml`). It needs one booted emulator
 (`npx sabeel-ci emulator headless`) and installs the pinned Maestro itself
 (`npx sabeel-ci install-maestro`). Screenshots, Maestro's JUnit report and the
-emulator, web, Metro and device logs land in `shots/native/`. It refuses a held
-8081 or web port and stops only what it started.
+emulator, web, Metro and seed logs land in `shots/native/`, with the device's
+log when a flow failed. It refuses a held 8081 or web port and stops only what
+it started. Given `--build <dir>`, it installs the debug app `npx sabeel-ci
+native-build` made there instead of building one, which is how CI runs it.
 
 `maestro/board.yaml` signs in, pages and swipes the columns, opens a card, types
 into the native rich-text editor, bolds a word and saves, mentions Sara in a
@@ -497,9 +499,10 @@ a real failure still fails. `native-e2e` copies ci-tools' shared steps into
 `maestro/ci-tools/` for each run; Git ignores the copy.
 
 **On the iOS simulator**: `npx sabeel-ci native-e2e --ios` (macOS) builds the
-debug app for the simulator with `sabeel-ci ios-sim-build` (a prebuild scoped
-to iOS, the committed `Podfile.lock`, `xcodebuild` for `iphonesimulator`),
-installs it on a booted iPhone simulator, and runs the same flows. Each flow
+debug app for the simulator with `sabeel-ci native-build ios` (a prebuild
+scoped to iOS, the committed `Podfile.lock`, `xcodebuild` for
+`iphonesimulator`), boots the iPhone simulator it built for, installs the app
+and runs the same flows. Each flow
 names its app `appId: ${APP_ID}`, which `native-e2e` sets to the build it
 installed, since the Android and iOS builds differ (`npx sabeel-ci check-app`
 fails a flow that names its own). The flows find the dev sign-in row by its
