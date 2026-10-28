@@ -506,11 +506,13 @@ a new machine.
   To find an owner by hand on Linux:
   `readlink /proc/$(ss -lptn "sport = :$PORT" | grep -oP 'pid=\K[0-9]+' | head -1)/cwd`.
 - **Run e2e suites with `scripts/e2e-all.sh`, never a hand-rolled chain.**
-  `e2e.sh` runs ONE suite because CI wants it that way (each browser suite is an
-  npm script, `test:screens`, `test:e2e` and `test:e2e:<name>`, listed in
-  `ci-tools.json`'s `ci.browserSuites`); locally that invited ad-hoc loops, and
-  the loops were the problem — two chains each calling `dev.sh stop` killed each
-  other's dev server, and the corpse held a port that failed the next run.
+  `e2e.sh` runs the suites it is given on one dev server, each against
+  emulators of its own; CI's list is three npm scripts (`test:screens`,
+  `test:e2e` and `test:e2e:focused`, the five short suites in turn) in
+  `ci-tools.json`'s `ci.browserSuites`. Running suites by hand invited ad-hoc
+  loops, and the loops were the problem — two chains each calling `dev.sh
+  stop` killed each other's dev server, and the corpse held a port that
+  failed the next run.
   `e2e-all.sh` runs CI's list one at a time, verifies **every** port in the
   block is free before each (not the three you remember), and refuses to start
   rather than reporting a skip. `scripts/e2e-all.sh richtext web` for a subset.

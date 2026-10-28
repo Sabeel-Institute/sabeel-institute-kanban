@@ -310,9 +310,10 @@ and callables. A resident Gradle daemon is reported, not stopped:
 `SABEEL_STOP_GRADLE=1 npm run test:emulator` stops it, and every other
 checkout's with it, since they share one registry.
 
-The browser suites are npm scripts, each `bash scripts/e2e.sh <suite>`, which
-starts the emulators and an Expo web dev server on the `web` port, runs the
-suite, and stops both (the server's log is `shots/e2e-web-server.log`):
+The browser suites are npm scripts, each `bash scripts/e2e.sh` with one suite
+or several, which starts an Expo web dev server on the `web` port, runs each
+suite against emulators started for it alone, and stops them all (the
+server's log is `shots/e2e-web-server.log`):
 
 | Script | Suite |
 |---|---|
@@ -323,10 +324,13 @@ suite, and stops both (the server's log is `shots/e2e-web-server.log`):
 | `npm run test:e2e:richtext` | the rich-text editor |
 | `npm run test:e2e:typing-perf` | typing cost on a busy screen against an empty one |
 | `npm run test:e2e:push` | every kind of notification, delivered to the real service worker and tapped, opens its subject |
+| `npm run test:e2e:focused` | the five above, one after another on one dev server |
 
-They are the list CI runs, one runner each (`ci.browserSuites` in
-`ci-tools.json`); `scripts/e2e-all.sh` runs them all here, one at a time
-(`scripts/e2e-all.sh richtext web` for some, by short name). They write
+CI runs `test:screens`, `test:e2e` and `test:e2e:focused`, one runner each
+(`ci.browserSuites` in `ci-tools.json`): the five focused suites take about a
+minute each, less than a runner's setup. `scripts/e2e-all.sh` runs CI's list
+here, one at a time (`scripts/e2e-all.sh richtext web` for some, by short
+name). Only `test:e2e` builds the web export, which it checks at the end. They write
 screenshots to `shots/`, and on failure dump what each page actually displayed —
 much faster than guessing.
 
