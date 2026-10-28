@@ -37,7 +37,7 @@ const ROOT = resolve(import.meta.dirname, '..', '..');
 const LIB = resolve(ROOT, 'node_modules', 'react-native-enriched-html');
 
 /** The version whose serialiser output was actually verified, on a device. */
-const VERIFIED_VERSION = '1.1.0';
+const VERIFIED_VERSION = '1.1.1';
 
 function read(rel: string): string {
   // No try/catch: a missing file MUST fail. "Cannot check" and "checked, fine"
