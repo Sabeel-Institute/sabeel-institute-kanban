@@ -197,7 +197,7 @@ creation**.
 - [x] **Apple Distribution certificate for GitHub builds** (2026-10-15). One
       certificate, shared by Kanban, the LMS and the time tracker; its key,
       `.p12` and the App Store profiles are in
-      `~/.config/sabeel-lms/ios-distribution/` and in the vault. The Mac signs
+      `~/.config/sabeel-lms/ios-distribution/` and in the vault. A Mac signs
       automatically instead (cloud-managed), so no distribution identity is ever
       in its keychain.
 - [x] **Review account** (2026-10-15): `apps-reviewer@oursabeel.com`, through the
@@ -232,8 +232,8 @@ creation**.
 ### iPhone builds
 
 Builds and TestFlight uploads run on GitHub (`docs/IOS-BUILD.md` § Builds on
-GitHub). What the Mac route taught, kept because none of it is guessable from
-its symptom:
+GitHub). What building from a Mac needs, kept because none of it is guessable
+from its symptom:
 
 **The App Store Connect API key must have the Admin role.** Export failed with
 `Cloud signing permission error` and `No signing certificate "iOS Distribution"
@@ -256,7 +256,7 @@ Two more worth reusing:
   twenty-minute build. It exercises exactly the step that failed and uploads
   nothing.
 
-1. **The App Store Connect key**, for a build or upload from the Mac: every
+1. **The App Store Connect key**, for a build on a Mac: every
    identifier is in `app/.env.sentry-build-plugin` (gitignored) — the Sentry
    three, `IOS_TEAM_ID`, `ASC_KEY_ID` and `ASC_ISSUER_ID`; the `.p8` itself is
    in the vault and goes in `~/.appstoreconnect/private_keys/`, the directory
@@ -268,7 +268,7 @@ Two more worth reusing:
 3. **A build:**
    `gh workflow run ios.yml -R Sabeel-Institute/sabeel-institute-kanban --ref vX.Y.Z -f testflight=true`,
    started on the release tag. TestFlight takes only that build, of the commit
-   tagged `vX.Y.Z`, once per version; nothing uploads from a Mac. The Mac can
+   tagged `vX.Y.Z`, once per version; nothing uploads from a Mac. A Mac can
    still build one to inspect:
    ```bash
    git pull && npm ci
@@ -293,7 +293,7 @@ Two more worth reusing:
    the time tracker — set `IOS_DIST_P12`, `IOS_DIST_P12_PASSWORD` and
    `IOS_PROFILE` again in all three repos, and revoke the old certificate. After
    that date the gates in `sabeel-ci build-ios` stop every GitHub build in seconds
-   with "expired"; the Mac is unaffected (it signs automatically). Steps:
+   with "expired"; a Mac is unaffected (it signs automatically). Steps:
    `docs/IOS-BUILD.md` § Renewal.
 7. [ ] **App Review, then unlisted distribution**, against build 14 or later —
    build 14 carries the Next and Go keys on the email sign-in.

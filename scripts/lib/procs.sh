@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # Process helpers for the dev scripts. Sourced, never run: `dev.sh` and
 # `e2e.sh` share these so "who holds this port" and "what did I start" have
-# one answer each, on Linux and on the build Mac alike.
+# one answer each, on Linux and on macOS alike.
 #
 # NOTHING HERE MATCHES A PROCESS BY NAME. A pattern matches other checkouts,
 # sibling projects and the shell running the pattern (CLAUDE.md, "NEVER match
