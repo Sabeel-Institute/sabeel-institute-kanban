@@ -397,10 +397,10 @@ itself is deliberately NOT darkened — that would collapse it into
   So both external-storage permissions stay removed (`tools:node="remove"` in the
   manifest), and only "Take a photo" asks for anything, the camera, at the tap.
 - One Expo codebase (`app/`) on **three** surfaces: Android (local Gradle builds,
-  committed `android/`), **iOS** (added 2026-08-01, Xcode builds on a cloud Mac
-  or on GitHub's macOS runners, `app/ios/` gitignored) and web via react-native-web
-  (`expo export --platform web` → Firebase Hosting). **NO EAS** on any of them.
-  Platform seams as `.web.ts(x)` siblings.
+  committed `android/`), **iOS** (added 2026-08-01, Xcode builds on GitHub's
+  macOS runners, `app/ios/` gitignored; the project has no Mac of its own) and
+  web via react-native-web (`expo export --platform web` → Firebase Hosting).
+  **NO EAS** on any of them. Platform seams as `.web.ts(x)` siblings.
 - **`app/android/` is committed and hand-edited; `app/ios/` is a build product.**
   So `npx expo prebuild` must ALWAYS be scoped: `--platform ios`. Prebuild
   defaults to **clean** — it deletes and regenerates the native folder, and
@@ -410,7 +410,7 @@ itself is deliberately NOT darkened — that would collapse it into
   Because `ios/` is regenerated, **nothing changed in Xcode's UI survives**;
   anything that must persist belongs in `app/app.json`. `docs/IOS-BUILD.md` is the
   runbook, and `npm run check:ios` guards the config that fails late.
-- **iOS signs two ways, and a runner only ever MANUALLY.** The Mac signs
+- **iOS signs two ways, and a runner only ever MANUALLY.** A Mac signs
   automatically through the Admin App Store Connect key. GitHub's
   `.github/workflows/ios.yml` sets `IOS_PROFILE_NAME`, and `sabeel-ci build-ios`
   then signs the app target alone with the team's one Apple Distribution certificate
@@ -501,8 +501,8 @@ a new machine.
   server's pid, stops it and every descendant on exit (signals included), and
   fails the run if it cannot; it refuses a held web port rather than killing it.
   `functions/test/unit/devScripts.test.ts` holds the shape: no `pkill`, no raw
-  `kill`, no `exec firebase`. Freeing ports by number killed another checkout's
-  Metro and every session's `idb_companion` on the build Mac.
+  `kill`, no `exec firebase`. Freeing ports by number kills another checkout's
+  Metro and every session's `idb_companion` on the machine.
   To find an owner by hand on Linux:
   `readlink /proc/$(ss -lptn "sport = :$PORT" | grep -oP 'pid=\K[0-9]+' | head -1)/cwd`.
 - **Run e2e suites with `scripts/e2e-all.sh`, never a hand-rolled chain.**

@@ -91,8 +91,8 @@ describe('CI e2e coverage', () => {
  * needs macOS with Xcode, a simulator runtime, a debug build installed on it and
  * Metro serving — none of which exist on the Linux runner this project's CI
  * uses, and adding a macOS runner to boot a simulator and build the app for
- * every push is a cost this repo has not chosen to pay. It is run by hand from
- * the Mac that builds iOS: `bash scripts/dev.sh ios && node scripts/screens-ios-e2e.mjs`.
+ * every push is a cost this repo has not chosen to pay. It is run by hand on a
+ * Mac with Xcode: `bash scripts/dev.sh ios && node scripts/screens-ios-e2e.mjs`.
  *
  * This is a deliberate hole, declared rather than hidden. The alternative was
  * naming the file something the glob misses, which would have been the same hole
