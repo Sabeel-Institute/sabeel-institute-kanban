@@ -6,14 +6,15 @@
 #   scripts/e2e-all.sh richtext web # just these, by short name
 #
 # The suites are CI's: the npm scripts ci-tools.json lists in
-# `ci.browserSuites`, each `bash scripts/e2e.sh <suite>`. A short name is the
-# script's last word: `screens` is `test:screens`, `web` is `test:e2e`, and any
-# other `<name>` is `test:e2e:<name>`. The board-ownership migration rehearsal
+# `ci.browserSuites`, each `bash scripts/e2e.sh` with one suite or several. A
+# short name is the script's last word: `screens` is `test:screens`, `web` is
+# `test:e2e`, and any other `<name>` is `test:e2e:<name>` (`focused`, or one of
+# the five it runs). The board-ownership migration rehearsal
 # is not one of them: it runs inside `npm run test:emulator`.
 #
-# WHY THIS EXISTS. `e2e.sh` runs ONE suite; CI invokes it once per suite, which
-# is right for CI. Locally that left everyone hand-rolling a chain, and the
-# hand-rolled chains were the problem:
+# WHY THIS EXISTS. CI invokes `e2e.sh` once per npm script, which is right for
+# CI. Locally that left everyone hand-rolling a chain, and the hand-rolled
+# chains were the problem:
 #
 #   1. Two chains running at once each called `dev.sh stop`, so they killed each
 #      other's dev server mid-run. The victim then hung, and the NEXT run died
@@ -25,11 +26,10 @@
 #      times in one session. So the fix is a script, not a rule: there is now
 #      nothing left to hand-roll.
 #
-# RUN IT DETACHED. A single suite is ~10 minutes, because `e2e.sh` builds the
-# production web bundle before every one; the full set is well over an hour. Any
-# launcher with a timeout — an agent's background command, a CI step budget, an
-# ssh session that drops — will be killed long before that, and the `e2e.sh` it
-# started is NOT killed with it: it is orphaned, reparented to `systemd --user`,
+# RUN IT DETACHED. The full set takes tens of minutes. Any launcher with a
+# timeout — an agent's background command, a CI step budget, an ssh session
+# that drops — will be killed long before that, and the `e2e.sh` it started is
+# NOT killed with it: it is orphaned, reparented to `systemd --user`,
 # and carries on holding the web port and the emulator block. The next run then
 # fails on a held port, which looks like a broken test and is not. Observed
 # repeatedly in one session before the mechanism was understood.

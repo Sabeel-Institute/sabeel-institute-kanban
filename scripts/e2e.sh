@@ -2,17 +2,22 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# One browser suite against the emulators and an Expo web dev server, both
+# Browser suites against the emulators and an Expo web dev server, both
 # started here and both stopped on exit. The npm scripts `test:screens`,
 # `test:e2e` and `test:e2e:*` run it, and CI runs those (ci-tools.json
 # `ci.browserSuites`).
 #
-#   bash scripts/e2e.sh scripts/<suite>-e2e.mjs
+#   bash scripts/e2e.sh scripts/<suite>-e2e.mjs [scripts/<suite>-e2e.mjs …]
+#
+# Several suites run one after another on the one dev server, each against
+# emulators started for it alone, so no suite meets another's data or a
+# trigger another set off. Every suite runs, and the run fails if any did.
 #
 # Drives the Expo web DEV server, not an exported bundle: `expo export` sets
 # __DEV__ false, which correctly strips the emulator dev sign-in this flow needs
-# to drive. The script also builds the PRODUCTION bundle and asserts the dev row
-# is absent from it — so the safety property is tested, not assumed.
+# to drive. For web-e2e.mjs the script also builds the PRODUCTION bundle, and
+# that suite asserts the dev row is absent from it — so the safety property is
+# tested, not assumed.
 #
 # The web port, the emulator project and JDK 21 come from ci-tools
 # (`npx sabeel-ci ports web`, `ports --project`, `jdk21`); no port is stated
@@ -40,13 +45,28 @@ WEB_LOG="$PWD/shots/e2e-web-server.log"
 mkdir -p "$(dirname "$WEB_LOG")"
 : >"$WEB_LOG"
 
+# Which suites to drive, in order. Defaults to the full flow.
+SUITES=("$@")
+[ ${#SUITES[@]} -gt 0 ] || SUITES=(scripts/web-e2e.mjs)
+for suite in "${SUITES[@]}"; do
+  if [ ! -f "$suite" ]; then
+    echo "e2e.sh: no suite $suite (pass scripts/<suite>-e2e.mjs)" >&2
+    exit 2
+  fi
+done
+
 npm run build -w @sabeel/shared
 npm run build -w functions
 
 # The web export as Hosting gets it, tree-shaken, pointed at the emulators,
-# for the checks of what ships at the end of web-e2e.mjs.
-echo "Building the web export (sabeel-ci build-web --emulators)…"
-npx --no sabeel-ci build-web --emulators >/dev/null
+# for the checks of what ships at the end of web-e2e.mjs, the one suite that
+# reads it.
+for suite in "${SUITES[@]}"; do
+  if [ "$suite" = scripts/web-e2e.mjs ]; then
+    echo "Building the web export (sabeel-ci build-web --emulators)…"
+    npx --no sabeel-ci build-web --emulators >/dev/null
+  fi
+done
 
 # REFUSE a held port, never kill it. A leftover dev server is the nastiest
 # failure mode here: the new `expo start` cannot bind, exits quietly, and the
@@ -127,24 +147,32 @@ if [ -z "$ready" ]; then
   exit 1
 fi
 
-# Which suite to drive. Defaults to the full flow; pass a script to run a
-# focused one against the same stack (e.g. scripts/attachments-e2e.mjs).
-SUITE="${1:-scripts/web-e2e.mjs}"
-
 # The secrets the functions bind, as the placeholders ci-tools.json names
 # (functions/.secret.local): unset, the Functions emulator asks the real
 # Secret Manager for them.
 npx --no sabeel-ci emulator-secrets
 
+# Each suite under `firebase emulators:exec` of its own, which starts the
+# emulators empty and stops them once the suite ends.
+#
 # A child, never `exec`: exec replaces this shell and takes the EXIT trap with
 # it. In the background and `wait`ed on, because bash defers a trap until a
 # FOREGROUND child exits: a TERM sent to this script would otherwise sit there
-# until the suite finished. The suite's exit status is passed on via `cleanup`.
-firebase emulators:exec \
-  --project "$PROJECT" \
-  --only firestore,auth,functions,storage \
-  "node ${SUITE}" &
-FB_PID=$!
-rc=0
-wait "$FB_PID" || rc=$?
-exit "$rc"
+# until the suite finished. The run's exit status is passed on via `cleanup`.
+failed=()
+for suite in "${SUITES[@]}"; do
+  echo "=== ${suite}"
+  firebase emulators:exec \
+    --project "$PROJECT" \
+    --only firestore,auth,functions,storage \
+    "node ${suite}" &
+  FB_PID=$!
+  rc=0
+  wait "$FB_PID" || rc=$?
+  FB_PID=""
+  [ "$rc" -eq 0 ] || failed+=("${suite} (exit ${rc})")
+done
+if [ ${#failed[@]} -gt 0 ]; then
+  echo "e2e.sh: ${#failed[@]} of ${#SUITES[@]} suite(s) failed: ${failed[*]}" >&2
+  exit 1
+fi
