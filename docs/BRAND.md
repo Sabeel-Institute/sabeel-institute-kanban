@@ -150,8 +150,15 @@ large displays and at print sizes.
 ## The app icons — one mark, one badge per app
 
 Three Sabeel apps share one identity, so they share one generator:
-`scripts/make-app-icons.py` (kanban, time tracker, class recordings). Run it
-from this repo; `--repo` points it at a sibling.
+`scripts/make-app-icons.py` (kanban, time tracker, class recordings, LMS). Run
+it from this repo; `--repo` points it at a sibling.
+
+**The LMS is the exception: the brand's own icon.** It is the app the public
+installs from the stores, so it carries the icon the `sabeel-brand` skill
+gives: the brand logo's raspberry calligraphy alone, centred on Warm Ivory,
+no badge (`docs/brand/sabeel-calligraphy.png`, cut from the logo above its
+wordmark). The square icon has it across 76% of the tile, and the adaptive
+foreground across 76% of the 72dp a launcher shows.
 
 **The mark is the brand, the badge says which app.** Warm Ivory canvas, the
 calligraphy low, a Dark Raspberry disc above-right carrying an ivory glyph — a

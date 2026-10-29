@@ -9,9 +9,22 @@ Build the Sabeel app icons: one shared calligraphic mark, one badge per app.
     uv run scripts/make-app-icons.py kanban
     uv run scripts/make-app-icons.py timetracker --repo ../sabeel-institute-time-tracker
     uv run scripts/make-app-icons.py recordings  --repo ../sabeel-recording-app
+    uv run scripts/make-app-icons.py lms         --repo ../lms
 
 Three Sabeel apps share one identity, so they share one generator. The mark is
 the brand; the badge says which app. See docs/BRAND.md for the palette.
+
+THE LMS IS THE BRAND'S OWN ICON
+-------------------------------
+The LMS is the one Sabeel app the public installs from the stores, so it
+carries the brand's icon as the sabeel-brand skill gives it: the logo's
+raspberry calligraphy alone, centred on Warm Ivory, with no badge
+(`docs/brand/sabeel-calligraphy.png`, cut from the brand logo above its
+wordmark). The staff apps keep the earlier black mark with their badges.
+The square icon takes the brand icon's proportion, the calligraphy across 76%
+of the tile; the adaptive foreground puts it across 76% of the 72dp a
+launcher shows, so both read alike, and `--check` proves its ink stays inside
+the safe circle.
 
 WHY THIS WRITES ANDROID RESOURCES TOO
 -------------------------------------
@@ -85,11 +98,20 @@ RING = 14  # ivory separation between badge and mark
 
 MARK_SRC = Path("docs/brand/sabeel-mark.png")
 MARK_NATIVE = (1536, 949)
+# The LMS: the brand logo's calligraphy, centred, no badge. 76% of the
+# square icon, as the brand's icon has it, and 76% of the launcher's 72dp
+# (2 * SAFE_R) on the adaptive foreground.
+LMS_MARK_SRC = Path("docs/brand/sabeel-calligraphy.png")
+LMS_MARK_NATIVE = (2048, 1170)
+LMS_ICON_W = round(0.76 * CANVAS)
+LMS_FOREGROUND_W = round(0.76 * 2 * SAFE_R)
 
+# Each app's badge glyph (None: the brand's icon, no badge) and default repo.
 APPS = {
     "kanban": ("board", "."),
     "timetracker": ("stopwatch", "../sabeel-institute-time-tracker"),
     "recordings": ("mic", "../sabeel-recording-app"),
+    "lms": (None, "../lms"),
 }
 
 # Density buckets, and the baseline sizes @expo/prebuild-config uses.
@@ -138,9 +160,13 @@ def badge_glyph(kind: str, cx: float, cy: float, r: float) -> str:
     return g + "</g>"
 
 
-def icon_svg(mark_uri: str, kind: str, *, badge: bool = True, background: bool = True) -> str:
-    """background=False yields the adaptive foreground layer (transparent)."""
-    h = MARK_W * MARK_NATIVE[1] / MARK_NATIVE[0]
+def icon_svg(mark_uri: str, kind: str | None, *, badge: bool = True, background: bool = True) -> str:
+    """background=False yields the adaptive foreground layer (transparent); kind None, no badge."""
+    if kind is None:
+        w, cy, native = (LMS_ICON_W if background else LMS_FOREGROUND_W), CANVAS / 2, LMS_MARK_NATIVE
+    else:
+        w, cy, native = MARK_W, MARK_CY, MARK_NATIVE
+    h = w * native[1] / native[0]
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '
         f'width="{CANVAS}" height="{CANVAS}" viewBox="0 0 {CANVAS} {CANVAS}">'
@@ -148,10 +174,10 @@ def icon_svg(mark_uri: str, kind: str, *, badge: bool = True, background: bool =
     if background:
         parts.append(f'<rect width="{CANVAS}" height="{CANVAS}" fill="{IVORY}"/>')
     parts.append(
-        f'<image x="{(CANVAS - MARK_W) / 2}" y="{MARK_CY - h / 2}" '
-        f'width="{MARK_W}" height="{h}" xlink:href="{mark_uri}"/>'
+        f'<image x="{(CANVAS - w) / 2}" y="{cy - h / 2}" '
+        f'width="{w}" height="{h}" xlink:href="{mark_uri}"/>'
     )
-    if badge:
+    if badge and kind is not None:
         # Tangent to the safe circle: a bigger badge walks inward along the same
         # bearing, which is the only direction with room.
         t = math.radians(BEARING)
@@ -171,7 +197,7 @@ def render(svg: str, size: int = CANVAS) -> Image.Image:
     return Image.open(BytesIO(png)).convert("RGBA")
 
 
-def verify(mark_uri: str, kind: str) -> tuple[float, int]:
+def verify(mark_uri: str, kind: str | None) -> tuple[float, int]:
     """
     Re-prove the two invariants on the pixels actually produced.
 
@@ -180,15 +206,20 @@ def verify(mark_uri: str, kind: str) -> tuple[float, int]:
     trusted from the session that first measured them.
     """
     ivory = np.array([246, 235, 221])
+    yy, xx = np.mgrid[0:CANVAS, 0:CANVAS]
+    radius = np.sqrt((xx - CANVAS / 2) ** 2 + (yy - CANVAS / 2) ** 2)
+    if kind is None:
+        # No badge to hide anything; only the foreground meets the mask.
+        layer = render(icon_svg(mark_uri, kind, background=False))
+        on_ivory = Image.alpha_composite(Image.new("RGBA", layer.size, IVORY), layer)
+        ink = np.abs(np.array(on_ivory.convert("RGB")).astype(int) - ivory).sum(axis=2) > 40
+        return float(radius[ink].max()), 0
     bare = np.array(render(icon_svg(mark_uri, kind, badge=False)).convert("RGB")).astype(int)
     full = np.array(render(icon_svg(mark_uri, kind)).convert("RGB")).astype(int)
 
     dark = (np.abs(bare - ivory).sum(axis=2) > 40) & (bare.sum(axis=2) < 300)
     ink = np.abs(full - ivory).sum(axis=2) > 40
     still = ink & (full.sum(axis=2) < 300)
-
-    yy, xx = np.mgrid[0:CANVAS, 0:CANVAS]
-    radius = np.sqrt((xx - CANVAS / 2) ** 2 + (yy - CANVAS / 2) ** 2)
     return float(radius[ink].max()), int((dark & ~still).sum())
 
 
@@ -227,13 +258,16 @@ def main() -> int:
     repo = Path(args.repo) if args.repo else (here / default_repo)
     repo = repo.resolve()
 
-    mark = here / MARK_SRC
+    mark = here / (LMS_MARK_SRC if kind is None else MARK_SRC)
     if not mark.is_file():
         ap.error(f"mark source not found: {mark}")
     mark_uri = "data:image/png;base64," + base64.b64encode(mark.read_bytes()).decode()
 
     max_r, hidden = verify(mark_uri, kind)
-    print(f"badge {2 * BADGE_R}px ({200 * BADGE_R / CANVAS:.0f}% of icon)")
+    if kind is None:
+        print(f"calligraphy {LMS_ICON_W}px wide on the icon, {LMS_FOREGROUND_W}px on the adaptive foreground, no badge")
+    else:
+        print(f"badge {2 * BADGE_R}px ({200 * BADGE_R / CANVAS:.0f}% of icon)")
     print(f"  max ink radius   {max_r:6.1f} of {SAFE_R} safe")
     print(f"  calligraphy hidden {hidden:>4} px")
     if max_r > SAFE_R:
