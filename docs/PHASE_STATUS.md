@@ -411,6 +411,16 @@ the team.
 
 ## Deploy log
 
+### 2026-10-29 — Help films — v0.14.0
+
+- **Help films.** More → Help has short narrated films of the app at work:
+  signing in, boards and cards, comments, attachments, search, alerts and
+  more, then running a board, then the admins' screens. Each one comes as
+  it looks on a phone and as it looks on a computer, and everyone sees
+  every film.
+- In the phone apps, films play in the phone's own video player; on the
+  website they have captions.
+
 ### 2026-10-24 — Keyboard edits after formatting land where the caret is — v0.13.3
 
 - **On the website, a word you have just formatted is no longer replaced.**
