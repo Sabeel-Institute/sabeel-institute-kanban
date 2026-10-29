@@ -75,6 +75,12 @@ testing, and on iPhones through TestFlight:
   people and file counts by day, calendar week or calendar month, server-counted
   and stored so the screen opens instantly. Selecting a bar breaks it down —
   which boards, or which people.
+- **Help films** (More → Help): twenty-two short narrated films of the app at
+  work, for everyone, board owners and admins, each in a phone cut and a
+  computer cut, with captions on the web. Everyone sees every film. The films
+  are recorded from the dev build in a scripted guide world
+  (`scripts/tutorials`) and served from a Hosting site of their own,
+  `sabeel-kanban-help` (`docs/DEV-TOOLING.md`, "The help films").
 - Sabeel brand palette (Option 1) and logo; single light theme, no dark mode.
 
 **Tests: 709 unit + 409 emulator integration + 736 browser e2e checks**, the last

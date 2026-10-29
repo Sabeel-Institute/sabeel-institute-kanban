@@ -50,6 +50,7 @@ import { join, resolve } from 'node:path';
 import { initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { RULES_VERSION } from '../packages/shared/lib/report.js';
+import { HELP_FILMS_ORIGIN } from '../packages/shared/lib/help.js';
 import { PORTS, PROJECT } from './lib/emulators.mjs';
 import { settle, tryAgainTally } from './lib/signin.mjs';
 import { RULES_TITLE, agreeToRules } from './lib/rules.mjs';
@@ -514,7 +515,7 @@ async function rulesScreen(page, tag, width) {
 }
 
 // ---- The tour --------------------------------------------------------------
-const SCREENS = 20;
+const SCREENS = 22;
 
 async function tour(page, tag, width) {
   /**
@@ -673,6 +674,33 @@ async function tour(page, tag, width) {
     await field.waitFor({ timeout: 15000 });
     await field.fill(
       'The comment on "Book the venue for the spring fundraiser" calls a colleague names.\n\nIt was posted this morning.',
+    );
+  });
+
+  /**
+   * Help, and one film in it: the list of films with their summaries, and a
+   * film fitted WHOLE into the room under its heading — standing on a phone,
+   * lying down on a computer — with its controls above the fold. The films'
+   * own site is held unanswered, so what is measured is the frame, at every
+   * width, and no film on the internet is waited for.
+   */
+  await page.route(`${HELP_FILMS_ORIGIN}/**`, () => {});
+  await visit('help', async () => {
+    await nav('Boards');
+    await page.getByRole('button', { name: 'More' }).click();
+    await page.getByRole('button', { name: 'Help', exact: true }).click();
+    await page.getByTestId('help-film-board').waitFor({ timeout: 15000 });
+  });
+  await visit('help-film', async () => {
+    await page.getByTestId('help-film-board').click();
+    const frame = page.getByTestId('help-film');
+    await frame.waitFor({ timeout: 15000 });
+    const box = await frame.boundingBox();
+    const view = page.viewportSize();
+    check(
+      `${tag} / the help film fits whole on the screen`,
+      box !== null && box.width > 100 && box.x + box.width <= view.width + 1 && box.y + box.height <= view.height + 1,
+      JSON.stringify(box),
     );
   });
 

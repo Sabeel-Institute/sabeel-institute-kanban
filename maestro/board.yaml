@@ -143,3 +143,18 @@ name: Board, card, rich text and gestures
       EXPECT: "Report a problem"
       SECONDS: 30
 - takeScreenshot: 06-more
+
+# Help: a film opens in the platform's own player (expo-video), which is a
+# native module of its own. The player's frame is what is checked, so a
+# player missing from the build fails here; the emulator need not reach the
+# films' site.
+- tapOn: "Help"
+- extendedWaitUntil:
+    visible: "Inside a board"
+    timeout: 15000
+- tapOn: "Inside a board"
+- extendedWaitUntil:
+    visible:
+      id: "help-film"
+    timeout: 20000
+- takeScreenshot: 07-help-film

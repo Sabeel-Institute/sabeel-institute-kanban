@@ -99,7 +99,13 @@ export function AppNav({
       icon="more-horiz"
       label="More"
       rail={rail}
-      active={active === 'users' || active === 'stats' || active === 'report'}
+      active={
+        active === 'users' ||
+        active === 'stats' ||
+        active === 'report' ||
+        active === 'help' ||
+        active === 'helpFilm'
+      }
       onPress={() => setMenuOpen(true)}
     />
   );
@@ -134,6 +140,14 @@ export function AppNav({
       ) : null}
 
       <MenuSection label="You" />
+      <SheetOption
+        label="Help"
+        detail="Short films of the app at work"
+        onPress={() => {
+          setMenuOpen(false);
+          nav.push({ name: 'help' });
+        }}
+      />
       {/* Where the institute's rules tell people to look (RulesScreen), and
           what both stores ask of an app whose members post: a way to report
           content and users, inside the app. docs/STORE-RELEASE.md § 4. */}

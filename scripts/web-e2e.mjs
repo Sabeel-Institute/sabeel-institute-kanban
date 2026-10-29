@@ -19,6 +19,7 @@ import { chromium } from 'playwright';
 import { todayInOrgTz } from '../packages/shared/lib/due.js';
 import { PASSWORD_SIGN_IN_EMAIL } from '../packages/shared/lib/constants.js';
 import { REPORT_TEXT_MAX } from '../packages/shared/lib/report.js';
+import { HELP_FILMS_ORIGIN, HELP_VIDEOS, helpFilmUrl } from '../packages/shared/lib/help.js';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { readFile, readdir, mkdir } from 'node:fs/promises';
@@ -2433,6 +2434,56 @@ try {
         r0.mail?.status === 'skipped',
       JSON.stringify(stored).slice(0, 200),
     );
+
+    // ---- Help -------------------------------------------------------------
+    // Every film for everyone, each played from its own files on the films'
+    // site. That site is HELD here, then answered 404: what is checked is what
+    // the app asks for, and what it says when a film will not play — never a
+    // film on the internet.
+    const HELP_FILES = `${HELP_FILMS_ORIGIN}/**`;
+    const held = [];
+    let failing = false;
+    await page.route(HELP_FILES, (route) => (failing ? route.fulfill({ status: 404, body: '' }) : held.push(route)));
+    await page.getByRole('button', { name: 'More' }).click();
+    await page.getByRole('button', { name: 'Help', exact: true }).click();
+    await page.getByTestId('help-film-board').waitFor({ timeout: 20000 });
+    const listed = await page
+      .locator('[data-testid^="help-film-"]')
+      .evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')));
+    check(
+      "a member is offered every help film, the owners' and admins' too",
+      JSON.stringify(listed) === JSON.stringify(HELP_VIDEOS.map((v) => `help-film-${v.id}`)),
+      listed.join(', '),
+    );
+    await page.getByTestId('help-film-board').click();
+    const playing = async () => {
+      const video = page.getByTestId('help-video');
+      await video.waitFor({ state: 'attached', timeout: 20000 });
+      return video.evaluate((v) => ({ src: v.getAttribute('src'), track: v.querySelector('track')?.getAttribute('src') }));
+    };
+    const onComputer = await playing();
+    check(
+      'on a computer a film opens on its computer cut, with its captions',
+      onComputer.src === helpFilmUrl('board', 'computer', 'video') &&
+        onComputer.track === helpFilmUrl('board', 'computer', 'captions'),
+      JSON.stringify(onComputer),
+    );
+    await page.getByRole('radio', { name: 'On a phone', exact: true }).click();
+    await page.waitForTimeout(500);
+    const onPhone = await playing();
+    check(
+      'and its phone cut is a tap away',
+      onPhone.src === helpFilmUrl('board', 'phone', 'video') && onPhone.track === helpFilmUrl('board', 'phone', 'captions'),
+      JSON.stringify(onPhone),
+    );
+    failing = true;
+    for (const route of held) await route.fulfill({ status: 404, body: '' });
+    const refused = await page
+      .getByText('This film could not be played. Check your connection and try again.')
+      .waitFor({ timeout: 20000 })
+      .then(() => true, () => false);
+    check('a film that cannot be fetched says so, rather than showing an empty frame', refused);
+    await page.unroute(HELP_FILES);
 
     // Signed out and in again: straight to the app, no rules.
     await page.getByRole('button', { name: 'More' }).click();

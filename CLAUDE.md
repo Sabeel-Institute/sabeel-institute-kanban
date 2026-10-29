@@ -731,6 +731,14 @@ factory rather than being silently dropped.
   screens to the generator; an image with no generator goes stale unnoticed.
   User-visible changes ship with their documentation in the same batch as the
   code — never let the manual lag a release.
+- **So are the help films** (More → Help): one short narrated film per thing
+  people do, in a phone cut and a computer cut, listed once in `HELP_VIDEOS`
+  (`@sabeel/shared`) and scripted in `scripts/tutorials/tutorials.mjs`. A
+  change to a screen a film shows means re-recording that film and publishing
+  the set (`docs/DEV-TOOLING.md`, "The help films"). The films live on their
+  own public Hosting site, never in git, and show the guide world only — no
+  real board, card or person. Their narration is a colleague talking you
+  through the screen, never labels read out.
 - Before ANY significant install (global/system/major framework), ask first;
   routine project-local npm deps of the locked stack are fine.
 - All repo artifacts (docs, plans, protocols) live in this repo.

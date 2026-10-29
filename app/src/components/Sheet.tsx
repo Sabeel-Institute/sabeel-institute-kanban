@@ -150,15 +150,18 @@ export function SheetOption({
   detail,
   selected,
   onPress,
+  testID,
 }: {
   label: string;
   detail?: string;
   selected?: boolean;
   onPress: () => void;
+  testID?: string;
 }) {
   const t = useTheme();
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
       disabled={selected}

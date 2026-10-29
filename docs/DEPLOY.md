@@ -598,6 +598,11 @@ and every released tag's.
 npx firebase deploy --only firestore:indexes --project sabeel-institute-kanban
 npx firebase deploy --only firestore:rules,storage,functions --project sabeel-institute-kanban
 
+# 1b. The help films, when a screen one shows changed: recorded again and
+#     published to their own site before the app that links to them ships
+#     (docs/DEV-TOOLING.md, "The help films"). Deploy Web never touches them.
+node scripts/tutorials/publish.mjs --from <dir of films>
+
 # 2. The deploy-log entry, heading first, kept outside the checkout (--ship
 #    refuses an untracked file):
 #      ### 2026-11-02 — <summary> — v0.13.0
