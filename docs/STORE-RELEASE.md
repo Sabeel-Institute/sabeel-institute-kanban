@@ -15,19 +15,20 @@ as the build numbered by its versionCode (`expo.ios.buildNumber`, which `npx
 sabeel-ci release` writes: 12002 for 0.12.2), from the iOS workflow on its
 tag. App Store Connect app 6801011482, SKU `sabeel-kanban`,
 bundle id `com.sabeelinstitute.kanban`. **Nothing has been submitted to App
-Review.** Destination: the App Store, unlisted. Kanban goes through App Review
-first and alone, the pilot for the other Sabeel apps (decided 2026-08-18), so a
-correction from Apple costs one app's rework rather than three.
+Review.** Destination: TestFlight internal testing, by Faisal's decision of
+2026-10-29. Only the LMS goes to the stores, because students, who are not
+institute staff, must be able to install it; Kanban is staff-only, with a set
+number of accounts, and stays on TestFlight and Play internal testing. It
+keeps the decisions below, so it could follow the LMS without rework.
 
-**Android.** Google Play internal testing now: v0.11.4 (versionCode 11004) on
+**Android.** Google Play internal testing: v0.11.4 (versionCode 11004) on
 the track, testers the account-wide "Sabeel staff" email list. Destination:
-Play production, a public listing (decided by Faisal 2026-10-16). The app
-signing key is Google-generated, and its certificate is
-`release.appSigningCertificate` in `ci-tools.json`, which `npx sabeel-ci
-publish-play` holds every release to; the repo's key (in the vault) is the
-upload key only. The APK on each GitHub release (`docs/DEPLOY.md`) is Play's
-own universal one, under Google's key, so it and a Play install update each
-other; v0.12.2's APKs carry the upload key.
+Play internal testing (Faisal, 2026-10-29). The app signing key is
+Google-generated, and its certificate is `release.appSigningCertificate` in
+`ci-tools.json`, which `npx sabeel-ci publish-play` holds every release to; the
+repo's key (in the vault) is the upload key only. The APK on each GitHub
+release (`docs/DEPLOY.md`) is Play's own universal one, under Google's key, so
+it and a Play install update each other; v0.12.2's APKs carry the upload key.
 
 **Web.** <https://sabeel-institute-kanban.web.app>, v0.11.5 (`67913fa`), serving
 `/privacy`, `/support` and `/get-app` as static pages. The email sign-in's
@@ -225,7 +226,7 @@ seen only by members of the same board (and admins, who see every board).
 
 Kanban has the skill's two pieces (decision 4, decided by Faisal 2026-10-16),
 **built 2026-10-16** on branch `rules-and-report` and released with the next
-version, which must precede the first App Store submission or Play production
+version, which must precede any App Store submission or Play production
 release:
 
 1. **The institute's rules, accepted once.** `RulesScreen`
@@ -384,21 +385,24 @@ the vault is the upload key. The consequences (skill, decision 8):
 
 ### 9. Distribution
 
-- **iPhone now:** TestFlight, group "Sabeel Kanban Internal", which gets every
+- **iPhone:** TestFlight, group "Sabeel Kanban Internal", which gets every
   build; adding a tester is in `docs/IOS-BUILD.md`. Builds expire after 90
   days.
-- **iPhone next:** the App Store, unlisted. After the app is submitted to App
-  Review, and not as a beta, the **Account Holder** files Apple's request at
-  `developer.apple.com/contact/request/unlisted-app/`. The developer account is
-  an Organization under Sabeel Institute, so the listing carries the
-  institute's name.
-- **Android now:** internal testing, the "Sabeel staff" list ticked on the
+- **Android:** internal testing, the "Sabeel staff" list ticked on the
   track; `npx sabeel-ci release --ship` publishes every release there
   (the Publish Android workflow); testers join through the opt-in link
   (`docs/DEPLOY.md` § Testers).
-- **Android next:** production, released from Play Console: `sabeel-ci
-  publish-play` publishes to internal testing only, and its service account
-  holds "Release apps to testing tracks", not production.
+- **Destination: both stay on internal testing** (decided by Faisal on
+  2026-10-29). Only the LMS goes to the App Store (unlisted) and Google Play
+  production. Kanban is staff-only, with a set number of accounts.
+- **If Kanban were ever submitted, iPhone:** the App Store, unlisted. After the
+  app is submitted to App Review, and not as a beta, the **Account Holder**
+  files Apple's request at `developer.apple.com/contact/request/unlisted-app/`.
+  The developer account is an Organization under Sabeel Institute, so the
+  listing carries the institute's name.
+- **If Kanban were ever submitted, Android:** production, released from Play
+  Console: `sabeel-ci publish-play` publishes to internal testing only, and its
+  service account holds "Release apps to testing tracks", not production.
 
 ### 10. Store checks
 
@@ -435,8 +439,8 @@ IDs" names the Firebase installation ID, from which a phone's push token comes;
 `privacy.html` does not mention push tokens, and the two must match.
 
 **Play content rating (IARC):** completed 2026-08-29, all ages (`TODO.md` § N);
-the individual answers were not recorded. Before production, confirm the
-user-interaction question is answered **Yes** ("Users Interact").
+the individual answers were not recorded. Before any production release,
+confirm the user-interaction question is answered **Yes** ("Users Interact").
 
 **Play target audience:** 18 and over only. **Ads:** none.
 
@@ -494,7 +498,10 @@ sign-in screen) states the address, the process and what is retained.
 
 ## Before submitting
 
-**App Store, first and alone:**
+These checklists apply only if Kanban is ever submitted to a store; it stays
+on TestFlight and Play internal testing (§ 9).
+
+**App Store (unlisted):**
 
 - [ ] **A build from a release** with its own version and deploy-log entry
       (`docs/DEPLOY.md` § Shipping a release), carrying the Next and Go
@@ -532,7 +539,7 @@ sign-in screen) states the address, the process and what is retained.
 
 - [ ] Confirm `privacy@oursabeel.com` exists (a Workspace group, two admins).
 - [ ] The privacy policy read by someone who did not write it.
-- [ ] Texas SB 2420: a question for a lawyer before the first public listing
+- [ ] Texas SB 2420: a question for a lawyer before any public listing
       (Play production is one; skill, decision 5).
 
 ## Legal position
