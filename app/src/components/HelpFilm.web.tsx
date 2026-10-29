@@ -57,11 +57,13 @@ export function HelpFilm({
     <View
       ref={host}
       testID="help-film"
-      style={[styles.frame, { backgroundColor: t.bg.inset }, size]}
+      style={[styles.frame, { backgroundColor: t.bg.inset, borderColor: t.border.strong }, size]}
     />
   );
 }
 
 const styles = StyleSheet.create({
-  frame: { borderRadius: radius.md, overflow: 'hidden' },
+  // A border, because a film of the app sits inside the app: without one, the
+  // phone cut on a computer reads as part of the screen around it.
+  frame: { borderRadius: radius.md, borderWidth: 1, overflow: 'hidden' },
 });

@@ -16,8 +16,6 @@
  * first films of the sister app sounded like, and why they read as stiff.
  * Read a new line aloud before rendering it.
  */
-import { cardId } from './world.mjs';
-
 /** A small PDF to attach: a supplier's quote. */
 const QUOTE = {
   name: 'IMG_20261026_114502.pdf',
@@ -27,9 +25,6 @@ const QUOTE = {
       '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n',
   ),
 };
-
-const board = (id) => `b/${id}`;
-const card = (boardId, key) => `c/${cardId(boardId, key)}`;
 
 export const TUTORIALS = [
   // ---------------------------------------------------------------- everyone
@@ -181,7 +176,7 @@ export const TUTORIALS = [
         },
       },
       {
-        say: 'On a computer, you see all the columns side by side, from To Do across to Done.',
+        say: 'On a computer, you see every column side by side, from the first all the way across to Done.',
         cut: 'computer',
         do: (t) => t.highlight(t.id('board-columns')),
       },
@@ -213,7 +208,7 @@ export const TUTORIALS = [
   {
     id: 'card',
     as: 'omar',
-    start: board('fundraising'),
+    start: (w) => w.board('fundraising'),
     steps: [
       {
         say: 'Tap a card to open it. Everything about the card is in one place.',
@@ -277,7 +272,7 @@ export const TUTORIALS = [
   {
     id: 'comments',
     as: 'omar',
-    start: card('fundraising', 'letter'),
+    start: (w) => w.card('fundraising', 'letter'),
     steps: [
       {
         say: 'Every card has its own conversation. Scroll down to Comments to see what everyone has said.',
@@ -323,7 +318,7 @@ export const TUTORIALS = [
   {
     id: 'attachments',
     as: 'omar',
-    start: card('fundraising', 'caterer'),
+    start: (w) => w.card('fundraising', 'caterer'),
     steps: [
       {
         say: 'You can put files on a card, like a quote, a photo of a receipt, or a signed form.',
@@ -361,7 +356,7 @@ export const TUTORIALS = [
   {
     id: 'subtasks',
     as: 'omar',
-    start: card('fundraising', 'letter'),
+    start: (w) => w.card('fundraising', 'letter'),
     steps: [
       {
         say: "Some jobs are easier in smaller pieces. That's what subtasks are for.",
@@ -403,7 +398,7 @@ export const TUTORIALS = [
   {
     id: 'moving',
     as: 'omar',
-    start: board('fundraising'),
+    start: (w) => w.board('fundraising'),
     steps: [
       { say: "Let's move a card along. There are a couple of ways to do it.", do: (t) => t.wait(600) },
       {
@@ -443,7 +438,7 @@ export const TUTORIALS = [
       {
         say: 'And to get back to the board, tap its name at the top of the card.',
         do: async (t) => {
-          await t.tap(t.btn(/^Open board Fundraising 2026/));
+          await t.tap(t.link(/^Open board Fundraising 2026/));
           await t.waitFor(t.card('Book the venue'));
         },
       },
@@ -452,7 +447,7 @@ export const TUTORIALS = [
   {
     id: 'archiving',
     as: 'omar',
-    start: board('fundraising'),
+    start: (w) => w.board('fundraising'),
     steps: [
       {
         say: "When a card's done with but you'd like to keep it, archive it. It comes off the board, but nothing is lost.",
@@ -482,7 +477,7 @@ export const TUTORIALS = [
       },
       {
         say: "Here's everything that's been archived on this board, with the most recent first.",
-        do: (t) => t.highlight(t.card('Pick the date')),
+        do: (t) => t.highlight(t.text('Pick the date')),
       },
       {
         say: 'Tap restore, and it goes straight back onto the board.',
@@ -501,7 +496,7 @@ export const TUTORIALS = [
   {
     id: 'bulk',
     as: 'omar',
-    start: board('fundraising'),
+    start: (w) => w.board('fundraising'),
     steps: [
       {
         say: 'To deal with several cards at once, press and hold one of them.',
@@ -517,8 +512,8 @@ export const TUTORIALS = [
         say: 'To deal with several cards at once, tick the box on each one you want.',
         cut: 'computer',
         do: async (t) => {
-          await t.tap(t.btn('Select Order the printed programmes'));
-          await t.tap(t.btn('Select Write the thank-you cards'));
+          await t.tap(t.checkbox('Select Order the printed programmes'));
+          await t.tap(t.checkbox('Select Write the thank-you cards'));
         },
       },
       {
@@ -539,7 +534,7 @@ export const TUTORIALS = [
         },
       },
       {
-        say: "Let's send these to another board. Tap this button, then choose the board, and the column.",
+        say: "Let's send these to another board. Tap this button, then pick the board and the column you want.",
         do: async (t) => {
           await t.tap(t.btn('Copy or move to another board'));
           await t.select(t.label('Destination board'), 'Weekend School');
@@ -669,17 +664,17 @@ export const TUTORIALS = [
         say: "Alerts is where you'll find everything you've been told about.",
         do: async (t) => {
           await t.tap(t.btn(/^Alerts/));
-          await t.waitFor(t.btn(/mentioned you on Draft the donor letter$/));
+          await t.waitFor(t.btn(/Sara mentioned you on .Draft the donor letter/));
         },
       },
       {
         say: "You'll hear about it when someone gives you a card, or mentions you in a comment. Unread ones stand out, so you can see what's new.",
-        do: (t) => t.highlight(t.btn(/mentioned you on Draft the donor letter$/)),
+        do: (t) => t.highlight(t.btn(/Sara mentioned you on .Draft the donor letter/)),
       },
       {
         say: 'Tap one, and it takes you straight to the card.',
         do: async (t) => {
-          await t.tap(t.btn(/mentioned you on Draft the donor letter$/));
+          await t.tap(t.btn(/Sara mentioned you on .Draft the donor letter/));
           await t.waitFor(t.btn('Share card'));
           await t.wait(900);
           await t.tap(t.btn('Back'));
@@ -740,7 +735,7 @@ export const TUTORIALS = [
         },
       },
       {
-        say: "Say what's wrong in your own words, and which board, card or person it's about.",
+        say: "Tell them what's wrong in your own words, and which board, card or person it's about.",
         do: (t) =>
           t.type(
             t.label('What or who are you reporting, and what is wrong?'),
@@ -797,7 +792,7 @@ export const TUTORIALS = [
   {
     id: 'board-settings',
     as: 'sara',
-    start: board('weekend-school'),
+    start: (w) => w.board('weekend-school'),
     steps: [
       {
         say: 'If you own a board, you can change how it works. Tap the gear to open its settings.',
@@ -830,7 +825,7 @@ export const TUTORIALS = [
       },
       {
         say: 'And to change the order, drag a column up or down by its handle.',
-        do: (t) => t.highlight(t.btn('Drag to reorder')),
+        do: (t) => t.highlight(t.label('Drag to reorder')),
       },
       {
         say: "A column can only be deleted once it's empty, so no cards go missing. You'll find delete on the board itself, right by the column's name.",
@@ -848,10 +843,10 @@ export const TUTORIALS = [
   {
     id: 'board-people',
     as: 'sara',
-    start: board('weekend-school'),
+    start: (w) => w.board('weekend-school'),
     steps: [
       {
-        say: "A board is only seen by the people on it. To add someone, open the board's settings.",
+        say: "Only the people on a board can see it. To add someone, open the board's settings.",
         do: async (t) => {
           await t.tap(t.btn('Board settings'));
           await t.scrollTo(t.btn(/^Add someone/));
@@ -862,7 +857,8 @@ export const TUTORIALS = [
         do: async (t) => {
           await t.tap(t.btn(/^Add someone/));
           await t.tap(t.btn('Add Faisal to this board'));
-          await t.tap(t.btn('Done'));
+          // The picker closes by itself once nobody is left to add.
+          await t.tapIfShown(t.btn('Done'));
         },
       },
       {
@@ -870,7 +866,7 @@ export const TUTORIALS = [
         do: (t) => t.tap(t.switch('Owner of this board: Omar')),
       },
       {
-        say: "You'll always be asked to confirm, so a stray tap never changes anything.",
+        say: "You'll always be asked to confirm, so an accidental tap never changes anything.",
         do: (t) => t.wait(1200),
       },
       {
@@ -890,7 +886,7 @@ export const TUTORIALS = [
   {
     id: 'board-archive',
     as: 'sara',
-    start: board('fundraising'),
+    start: (w) => w.board('fundraising'),
     steps: [
       {
         say: "Anyone on a board can archive a card, which keeps it safe. But only the board's owners can delete one for good.",
@@ -900,14 +896,14 @@ export const TUTORIALS = [
         say: "To delete a card, open the board's archived cards.",
         do: async (t) => {
           await t.tap(t.btn('Archived cards'));
-          await t.waitFor(t.card('Raffle prizes from last year'));
+          await t.waitFor(t.text('Raffle prizes from last year'));
         },
       },
       {
         say: "Then tap the red bin. You'll be asked to make sure, because a deleted card, with its comments and files, can't be brought back.",
         do: async (t) => {
           await t.tap(t.btn('Delete Raffle prizes from last year permanently'));
-          await t.waitGone(t.card('Raffle prizes from last year'));
+          await t.waitGone(t.text('Raffle prizes from last year'));
         },
       },
       {
@@ -947,13 +943,13 @@ export const TUTORIALS = [
         say: "When someone signs in for the first time, they wait for an admin to let them in, and you'll get an alert about it.",
         do: async (t) => {
           await t.tap(t.btn(/^Alerts/));
-          await t.highlight(t.btn(/Amina is waiting for approval$/));
+          await t.highlight(t.btn(/Amina is waiting for approval/));
         },
       },
       {
         say: 'Tap the alert to go straight to People. You can also get there from More.',
         do: async (t) => {
-          await t.tap(t.btn(/Amina is waiting for approval$/));
+          await t.tap(t.btn(/Amina is waiting for approval/));
           await t.waitFor(t.btn('Approve'));
         },
       },
@@ -1017,7 +1013,7 @@ export const TUTORIALS = [
   {
     id: 'labels',
     as: 'faisal',
-    start: card('fundraising', 'date'),
+    start: (w) => w.card('fundraising', 'date'),
     steps: [
       {
         say: 'Labels are shared by every board, so a label means the same thing wherever you see it.',
@@ -1030,7 +1026,7 @@ export const TUTORIALS = [
       {
         say: "Renaming, recolouring and deleting labels is for admins, since it changes cards on every board. You'll find them in any board's settings.",
         do: async (t) => {
-          await t.tap(t.btn(/^Open board Fundraising 2026/));
+          await t.tap(t.link(/^Open board Fundraising 2026/));
           await t.tap(t.btn('Board settings'));
           await t.scrollTo(t.btn('Rename label Events'));
         },

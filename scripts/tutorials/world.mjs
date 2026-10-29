@@ -135,8 +135,20 @@ const LABELS = [
   ['volunteers', 'Volunteers', '#4E7A43'],
 ];
 
-/** The card id a film opens by link: `/c/<id>`. */
-export const cardId = (boardId, key) => `${boardId}-${key}`;
+/**
+ * IDS FRESH FOR EVERY WORLD. Emptying Firestore deletes the last world's
+ * cards, and each deletion starts `onCardDeleted`, which checks the card is
+ * gone and then deletes it with everything under it. Run late — after this
+ * world has written a card of the same id — it deleted the new card: a film
+ * found a column one card short, or a card with no comments. So every world
+ * names its boards and cards afresh, and a late cleanup can only reach a
+ * document that is already gone.
+ */
+let generation = '';
+/** A board's id in this world: the one a film opens by link, `/b/<id>`. */
+const boardId = (base) => `${base}-${generation}`;
+/** A card's id in this world: `/c/<id>`. */
+const cardId = (base, key) => `${boardId(base)}-${key}`;
 
 /** Every account the world needs, by name → uid. Made once; Auth keeps them across worlds. */
 async function accounts() {
@@ -166,7 +178,7 @@ async function writeStats(uids) {
   const today = todayInOrgTz();
   const actorsFor = (n) => [uids.faisal, uids.sara, uids.omar].slice(0, n);
   const months = new Map();
-  const boardMonths = new Map(BOARDS.map((b) => [b.id, new Map()]));
+  const boardMonths = new Map(BOARDS.map((b) => [boardId(b.id), new Map()]));
   for (let i = 365; i >= 1; i--) {
     const day = addDays(today, -i);
     const dow = new Date(`${day}T12:00:00Z`).getUTCDay();
@@ -188,7 +200,7 @@ async function writeStats(uids) {
       const take = (total, rest) => (last ? rest : Math.min(rest, Math.floor(total * shares[idx])));
       const part = { created: take(created, left.created), archived: take(archived, left.archived), comments: take(comments, left.comments) };
       left = { created: left.created - part.created, archived: left.archived - part.archived, comments: left.comments - part.comments };
-      const bm = boardMonths.get(b.id);
+      const bm = boardMonths.get(boardId(b.id));
       if (!bm.has(month)) bm.set(month, {});
       bm.get(month)[dd] = { cardsCreated: part.created, cardsArchived: part.archived, comments: part.comments, actors: idx === 0 ? actors : [] };
     });
@@ -202,10 +214,11 @@ async function writeStats(uids) {
   await batch.commit();
 }
 
-/** A fresh guide world. Returns who is who, for the films. */
+/** A fresh guide world. Returns who is who, and where its boards and cards are, for the films. */
 export async function buildWorld() {
   const uids = await accounts();
   await emptyFirestore();
+  generation = Date.now().toString(36);
   // Claims first: a profile written before them would show the old role to a
   // session that refreshes in between.
   for (const [who, p] of Object.entries(PEOPLE)) {
@@ -235,7 +248,7 @@ export async function buildWorld() {
   const today = todayInOrgTz();
   for (const b of BOARDS) {
     const profiles = Object.fromEntries(b.members.map((m) => [uids[m], { displayName: PEOPLE[m].name, email: email(m) }]));
-    await db.doc(`boards/${b.id}`).set({
+    await db.doc(`boards/${boardId(b.id)}`).set({
       name: b.name,
       description: '',
       archived: false,
@@ -254,7 +267,7 @@ export async function buildWorld() {
         const by = uids[b.createdBy];
         const at = t0 + i * 60000;
         await db.doc(`cards/${cardId(b.id, key)}`).set({
-          boardId: b.id,
+          boardId: boardId(b.id),
           title,
           description: x.description ?? '',
           columnId,
@@ -286,7 +299,7 @@ export async function buildWorld() {
   }
   // The triggers' share — counts, activity, alerts — lands within seconds.
   await new Promise((r) => setTimeout(r, 6000));
-  return uids;
+  return { uids, board: (base) => `b/${boardId(base)}`, card: (base, key) => `c/${cardId(base, key)}` };
 }
 
 /** A person's access set from outside the app, as an admin's tap would: claims, profile, and the stamp that refreshes a live session. */
@@ -301,7 +314,7 @@ export async function setAccess(uid, { role, status, rulesAccepted }) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const uids = await buildWorld();
-  console.log(`guide world built: ${Object.keys(uids).join(', ')}`);
+  const { uids, board } = await buildWorld();
+  console.log(`guide world built: ${Object.keys(uids).join(', ')}; Fundraising is /${board('fundraising')}`);
   process.exit(0);
 }

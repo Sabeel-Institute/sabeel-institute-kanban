@@ -605,7 +605,10 @@ node scripts/tutorials/publish.mjs --from $S/films  # every film, or none
    (`world.mjs`): Firestore emptied and written afresh with the Admin SDK —
    three boards, labels, comments, a year of Stats, and Amina waiting for
    approval — and the accounts' claims reset, so what one film changes is not
-   in the next. The accounts themselves are the ones `scripts/dev.sh web`'s
+   in the next. Each world gives its boards and cards fresh ids, and a film
+   opens them through the world (`start: (w) => w.card(...)`): emptying
+   Firestore starts `onCardDeleted` for every old card, and one that ran
+   after the new world was written deleted the new card of the same id. The accounts themselves are the ones `scripts/dev.sh web`'s
    seed makes; Auth keeps them across worlds. Each film signs in off camera in
    a browser context of its own. The browser's `confirm` dialogs are drawn into
    the page, since a dialog the browser paints is not in the video; the dev

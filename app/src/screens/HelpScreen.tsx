@@ -44,8 +44,8 @@ export function HelpScreen() {
         <IconAction icon="arrow-back" label="Back" onPress={nav.pop} />
       </Row>
       <Body>
-        Short films of the app at work. Each one comes in two versions, on a phone and
-        on a computer, with captions.
+        Short films of the app at work. Each one comes in two versions: on a phone and
+        on a computer.
       </Body>
       {SECTIONS.map(({ audience, title }) => (
         <Fragment key={audience}>

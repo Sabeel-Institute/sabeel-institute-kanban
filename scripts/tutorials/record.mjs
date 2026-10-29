@@ -228,6 +228,8 @@ function helpers(page, variant, world) {
     // Locators, by what a person sees: a control's name, a field's label, words on screen.
     btn: (name) => visible(page.getByRole('button', { name, exact: typeof name === 'string' })),
     switch: (name) => visible(page.getByRole('switch', { name, exact: true })),
+    link: (name) => visible(page.getByRole('link', { name, exact: typeof name === 'string' })),
+    checkbox: (name) => visible(page.getByRole('checkbox', { name, exact: true })),
     radio: (name) => visible(page.getByRole('radio', { name, exact: true })),
     label: (name) => visible(page.getByLabel(name, { exact: true })),
     placeholder: (text) => visible(page.getByPlaceholder(text, { exact: true })),
@@ -247,6 +249,9 @@ function helpers(page, variant, world) {
     waitGone: (loc, timeout = 20000) => loc.waitFor({ state: 'hidden', timeout }),
     tap: async (loc, { times = 1 } = {}) => {
       for (let i = 0; i < times; i++) await press(loc);
+    },
+    tapIfShown: async (loc) => {
+      if (await loc.isVisible().catch(() => false)) await press(loc);
     },
     /** The touch or the click drawn on a control, without pressing it: the Google button, whose popup is not the app. */
     fakeTap: async (loc) => {
@@ -380,8 +385,7 @@ async function film(browsers, tut, variant) {
     }
     return seconds(wav);
   });
-  const uids = await buildWorld();
-  const world = { uids, setAccess };
+  const world = { ...(await buildWorld()), setAccess };
   if (tut.before) await tut.before(world);
   const dir = join(OUT, '.raw');
   mkdirSync(dir, { recursive: true });
@@ -404,7 +408,8 @@ async function film(browsers, tut, variant) {
     await signIn(context, tut.as);
     const page = await context.newPage();
     const born = Date.now();
-    await page.goto(new URL(tut.start, WEB).href, { waitUntil: 'domcontentloaded' });
+    const start = typeof tut.start === 'function' ? tut.start(world) : tut.start;
+    await page.goto(new URL(start, WEB).href, { waitUntil: 'domcontentloaded' });
     // Whichever the film starts on: a list, a board, a card, or the sign-in screen.
     await page
       .getByRole('button', { name: tut.as ? 'More' : 'Sign in with Google', exact: true })
