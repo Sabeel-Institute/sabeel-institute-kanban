@@ -18,7 +18,7 @@ import {
   type BoardColumn,
   type BoardDoc,
 } from '@sabeel/shared';
-import { db, functions } from './firebase';
+import { auth, db, functions } from './firebase';
 import { useLiveDoc, useLiveQuery } from './liveQuery';
 import type { SessionUser } from './session';
 import { createViewStore } from './viewState';
@@ -166,7 +166,17 @@ export async function updateBoard(
   // the full incoming document.
   const snap = await getDoc(doc(db, 'boards', boardId));
   const createdBy = snap.data()?.createdBy;
-  await updateDoc(doc(db, 'boards', boardId), { ...patch, createdBy });
+  await updateDoc(doc(db, 'boards', boardId), { ...patch, createdBy, ...changeStamp() });
+}
+
+/**
+ * Who is making this change, for the board's history. Rules accept the stamp
+ * only from the person it names, so the history can name them.
+ */
+function changeStamp(): { updatedBy: string; updatedAt: number } {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('Sign in first.');
+  return { updatedBy: uid, updatedAt: Date.now() };
 }
 
 /**
@@ -228,6 +238,7 @@ export async function setBoardOwner(
   await updateDoc(doc(db, 'boards', boardId), {
     boardOwnerUids: isOwner ? arrayUnion(uid) : arrayRemove(uid),
     createdBy: snap.data()?.createdBy,
+    ...changeStamp(),
   });
 }
 

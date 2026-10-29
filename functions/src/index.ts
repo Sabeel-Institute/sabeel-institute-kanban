@@ -21,6 +21,7 @@ export { countLabelUsage, deleteLabel } from './labels';
 export { onCommentWritten } from './comments';
 export { onCardWritten } from './activity';
 export { onCardBoardCount } from './boardCardCount';
+export { onBoardWritten } from './boardHistory';
 export { onCardDeleted } from './cleanup';
 export {
   finalizeAttachment,

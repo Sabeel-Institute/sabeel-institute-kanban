@@ -63,6 +63,12 @@ testing, and on iPhones through TestFlight:
 - Comments with @mentions — the picker opens **at the caret**, like code
   completion, rather than above the field — per-card **comment subscriptions**,
   and a tamper-proof per-card activity history.
+- **A board's own history**, at the bottom of Board settings for everyone on
+  the board: who created, renamed, archived or restored it, who added or
+  removed whom, who made someone an owner, and what happened to its columns.
+  Server-written like a card's. History from before it existed was recovered
+  from the daily backups and the member callables' logs; most of those lines
+  name nobody, because nothing recorded who.
 - Notifications: in-app inbox with unread badge, per-event preferences,
   per-board mute, and a daily due-soon sweep. An alert can be put **back to
   unread** to deal with later — which notifies nobody, because push is sent when

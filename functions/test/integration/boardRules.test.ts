@@ -710,3 +710,124 @@ describe('deleting a board', () => {
     await assertFails(deleteDoc(doc(ctx('owner1', 'member'), 'boards/b_member')));
   });
 });
+
+/**
+ * The stamp the board's history names people by (functions/src/boardHistory.ts).
+ * A change either stamps itself with its writer or leaves the stamp alone — the
+ * second for app builds older than the history, whose writes must keep working.
+ */
+describe('the change stamp', () => {
+  it('an owner stamps a change with themselves', async () => {
+    await assertSucceeds(
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), {
+        name: 'Stamped',
+        updatedBy: 'owner1',
+        updatedAt: 1000,
+      }),
+    );
+  });
+
+  it('an older app that leaves the stamp alone still saves', async () => {
+    await env.withSecurityRulesDisabled(async (c) => {
+      await updateDoc(doc(c.firestore(), 'boards/b_member'), { updatedBy: 'owner1', updatedAt: 5 });
+    });
+    await assertSucceeds(
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), { name: 'Unstamped' }),
+    );
+  });
+
+  it('nobody stamps a change with someone else', async () => {
+    await assertFails(
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), {
+        name: 'Framed',
+        updatedBy: 'member1',
+        updatedAt: 1000,
+      }),
+    );
+    // An admin either.
+    await assertFails(
+      updateDoc(doc(ctx('admin1', 'admin'), 'boards/b_member'), {
+        name: 'Framed',
+        updatedBy: 'owner1',
+        updatedAt: 1000,
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(ctx('admin1', 'admin'), 'boards/b_member'), {
+        name: 'Fair',
+        updatedBy: 'admin1',
+        updatedAt: 1000,
+      }),
+    );
+  });
+
+  // Moving the name without the time would credit this change to an earlier one.
+  it('a new name on the stamp needs a new time with it', async () => {
+    await env.withSecurityRulesDisabled(async (c) => {
+      await updateDoc(doc(c.firestore(), 'boards/b_two'), { updatedBy: 'second1', updatedAt: 5 });
+    });
+    await assertFails(
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_two'), { name: 'X', updatedBy: 'owner1' }),
+    );
+    await assertFails(
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_two'), {
+        name: 'X',
+        updatedBy: 'owner1',
+        updatedAt: 'later',
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_two'), {
+        name: 'X',
+        updatedBy: 'owner1',
+        updatedAt: 6,
+      }),
+    );
+  });
+
+  it('a new board does not carry one', async () => {
+    const db = ctx('org1', 'organizer');
+    const board = baseBoard({ createdBy: 'org1', memberUids: ['org1'], boardOwnerUids: ['org1'] });
+    await assertFails(
+      setDoc(doc(db, 'boards/b_new'), { ...board, updatedBy: 'org1', updatedAt: 1 }),
+    );
+    await assertSucceeds(setDoc(doc(db, 'boards/b_new'), board));
+  });
+});
+
+describe("a board's history", () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (c) => {
+      await setDoc(doc(c.firestore(), 'boards/b_member/activity/e1'), {
+        type: 'renamed',
+        at: 1,
+        actorUid: 'owner1',
+        actorName: 'Owner',
+        from: 'A',
+        to: 'B',
+      });
+    });
+  });
+
+  it('every member reads it, owner or not', async () => {
+    await assertSucceeds(getDoc(doc(ctx('member1', 'member'), 'boards/b_member/activity/e1')));
+    await assertSucceeds(getDocs(collection(ctx('owner1', 'member'), 'boards/b_member/activity')));
+  });
+
+  it('an admin reads it on a board they are not on', async () => {
+    await assertSucceeds(getDocs(collection(ctx('admin1', 'admin'), 'boards/b_member/activity')));
+  });
+
+  it('nobody else reads it', async () => {
+    await assertFails(getDocs(collection(ctx('org1', 'organizer'), 'boards/b_member/activity')));
+    await assertFails(getDoc(doc(ctx('member1', 'member', 'disabled'), 'boards/b_member/activity/e1')));
+  });
+
+  it('nobody writes it, admins included', async () => {
+    const entry = { type: 'archived', at: 2, actorUid: 'owner1' };
+    await assertFails(setDoc(doc(ctx('owner1', 'member'), 'boards/b_member/activity/e2'), entry));
+    await assertFails(setDoc(doc(ctx('admin1', 'admin'), 'boards/b_member/activity/e2'), entry));
+    await assertFails(updateDoc(doc(ctx('admin1', 'admin'), 'boards/b_member/activity/e1'), { to: 'C' }));
+    await assertFails(deleteDoc(doc(ctx('admin1', 'admin'), 'boards/b_member/activity/e1')));
+  });
+});

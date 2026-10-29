@@ -103,6 +103,9 @@ export const removeBoardMember = onCall({ secrets: [sentryDsn] }, guarded(async 
     // rules cannot catch it either: this batch is an Admin SDK write and bypasses
     // them, which is exactly why there is no subset rule to lean on.
     boardOwnerUids: FieldValue.arrayRemove(uid),
+    // Who did it, for the board's history (boardHistory.ts).
+    updatedBy: auth.uid,
+    updatedAt: Date.now(),
   });
   for (const card of assigned.docs) {
     batch.update(card.ref, {
@@ -346,6 +349,9 @@ export const addBoardMember = onCall({ secrets: [sentryDsn] }, guarded(async (re
         displayName: (person.data()?.displayName as string) ?? '',
         email: (person.data()?.email as string) ?? '',
       },
+      // Who did it, for the board's history (boardHistory.ts).
+      updatedBy: auth.uid,
+      updatedAt: Date.now(),
     });
     logger.info('Added board member', { boardId, uid, actorUid: auth.uid });
   }

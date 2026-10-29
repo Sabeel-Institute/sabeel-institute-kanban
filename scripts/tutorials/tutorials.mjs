@@ -828,15 +828,22 @@ export const TUTORIALS = [
         do: (t) => t.highlight(t.label('Drag to reorder')),
       },
       {
+        say: "Right at the bottom there's the board's history. Everything you just did is already there, with your name on it.",
+        do: async (t) => {
+          await t.scrollTo(t.text('History'));
+          await t.highlight(t.text(/added the column “Waiting on parents”/, false));
+        },
+      },
+      {
+        say: "People who don't own the board see this screen too, with the members and the history, so they know who to ask, and who changed what.",
+        do: (t) => t.wait(400),
+      },
+      {
         say: "A column can only be deleted once it's empty, so no cards go missing. You'll find delete on the board itself, right by the column's name.",
         do: async (t) => {
           await t.tap(t.btn('Back'));
           await t.highlight(t.btn(/^Delete column /));
         },
-      },
-      {
-        say: "People who don't own the board see the same screen, with just the list of members, so they know who to ask.",
-        do: (t) => t.wait(400),
       },
     ],
   },
@@ -911,7 +918,7 @@ export const TUTORIALS = [
         do: (t) => t.tap(t.btn('Back')),
       },
       {
-        say: "Boards themselves are never deleted. When one's finished, open its settings, scroll to the bottom, and tap Archive board.",
+        say: "Boards themselves are never deleted. When one's finished, open its settings, scroll down, and tap Archive board.",
         do: async (t) => {
           await t.tap(t.btn('Board settings'));
           await t.scrollTo(t.btn('Archive board'));

@@ -133,6 +133,17 @@ export interface BoardDoc {
   activeCardCount: number;
   createdAt: number;
   createdBy: string;
+  /**
+   * Who last changed the board, and when, so its history can name them.
+   *
+   * Rules accept a change only if it either stamps both — `updatedBy` the
+   * writer, `updatedAt` a new value — or leaves both alone. The second arm is
+   * for app builds older than the history, which do not know the stamp; their
+   * changes are recorded without a name rather than refused. The callables
+   * stamp too, with the caller. Absent on a board nobody has changed since.
+   */
+  updatedAt?: number;
+  updatedBy?: string;
 }
 
 // ---- Cards -----------------------------------------------------------------
@@ -299,6 +310,61 @@ export type ActivityType =
   | 'attached'
   /** A file was removed. `from` carries its name. */
   | 'detached';
+
+/**
+ * One change to a board itself — its name, archiving, who is on it, who owns
+ * it, its columns. A card's history is separate (`ActivityType`).
+ */
+export type BoardActivityType =
+  | 'created'
+  /** `from`/`to` carry the old and new name. */
+  | 'renamed'
+  | 'archived'
+  | 'restored'
+  /** The subject joined: added by someone else, or joined themselves. */
+  | 'memberAdded'
+  /** The subject came off: removed by someone else, or left. */
+  | 'memberRemoved'
+  | 'ownerAdded'
+  | 'ownerRemoved'
+  /** `to` carries the column's name. */
+  | 'columnAdded'
+  /** `from` carries the column's name. */
+  | 'columnRemoved'
+  /** `from`/`to` carry the old and new name. */
+  | 'columnRenamed'
+  | 'columnsReordered';
+
+/**
+ * An entry in a board's history, at `boards/{boardId}/activity/{id}`.
+ * Server-written only, like a card's activity.
+ *
+ * NAMES ARE STORED, not resolved when shown. A board's members can read only
+ * its own `memberProfiles`, and the people a history is most often about — the
+ * person removed, the admin who is not on the board, the column since deleted —
+ * are exactly the ones that resolve to nothing later.
+ */
+export interface BoardActivityDoc {
+  type: BoardActivityType;
+  /** When it happened — or, with `since`, the latest it can have happened. */
+  at: number;
+  /**
+   * Who did it. Absent when nothing recorded who: a change from an app build
+   * older than the history, or one recovered from backups taken before it.
+   */
+  actorUid?: string;
+  actorName?: string;
+  /** Whom a member or owner entry is about. */
+  subjectUid?: string;
+  subjectName?: string;
+  from?: string;
+  to?: string;
+  /**
+   * Set only on a change recovered from backups: it happened after `since` and
+   * by `at`, and nothing narrows it further.
+   */
+  since?: number;
+}
 
 // ---- Stats -----------------------------------------------------------------
 

@@ -211,6 +211,20 @@ card may hold**: the 10 MB limit is per file, so cost is bounded only by the
 budget alert. Both are fine for fewer than fifty colleagues; neither survives
 contact with untrusted users.
 
+## A board's history
+
+Added 2026-10-29: `onBoardWritten` diffs every board write (`diffBoard`) into
+`boards/{id}/activity`, which everyone on the board reads at the foot of Board
+settings. **Who did it is the `updatedBy`/`updatedAt` stamp**, named only when
+the write moved it. Rules accept a new stamp only from the person it names, or
+a write that leaves it alone: builds before 0.15.0 do not know the stamp, and
+refusing them would break board settings for whoever has not updated. Their
+changes name nobody. **Anything that writes a board stamps it** — client
+writes through `updateBoard`/`setBoardOwner`, the member callables with the
+caller — or its change is recorded as nobody's. Names are stored on entries,
+not resolved: the people a board's history is about are often no longer on
+it.
+
 ## Descriptions and comments are rich text
 
 - **MARKDOWN, restricted to FIVE elements** (changed 2026-07-30, reversing the
