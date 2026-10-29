@@ -417,6 +417,21 @@ the team.
 
 ## Deploy log
 
+### 2026-10-29 — Board history — v0.15.0
+
+- **Every board has a history.** At the bottom of Board settings, everyone
+  on the board can see who created, renamed, archived or restored it, who
+  added or removed whom, who made someone an owner or stopped being one,
+  and which columns were added, removed, renamed or reordered.
+- **History from before this release was recovered** from the institute's
+  daily backups and the server's records. Those lines are dated, some to
+  a span of a day or two, and most name nobody: at the time, nothing
+  recorded who made a change.
+- A change made from an out-of-date copy of the app still saves, and shows
+  in the history without a name.
+- Dates in a card's history now follow Houston time, so a change made in
+  the evening no longer shows the next day's date.
+
 ### 2026-10-29 — Help films — v0.14.0
 
 - **Help films.** More → Help has short narrated films of the app at work:
