@@ -188,7 +188,7 @@ export function BulkBar({
         <>
           <Hint>Copy or move the selection to another board</Hint>
           <Hint>
-            Labels are cleared, and anyone not on the destination board is
+            Labels come along, and anyone not on the destination board is
             unassigned.
           </Hint>
           {otherBoards.length === 0 ? (
