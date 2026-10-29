@@ -147,43 +147,33 @@ would need is not bundled; it was removed with dark mode.)
 If a vector version (SVG/PDF) exists, add it alongside — the PNG will soften on
 large displays and at print sizes.
 
-## The app icons — one mark, one badge per app
+## The app icon
 
-Three Sabeel apps share one identity, so they share one generator:
-`scripts/make-app-icons.py` (kanban, time tracker, class recordings). Run it
-from this repo; `--repo` points it at a sibling.
+Every Sabeel app's icon comes from the brand repository's generator,
+`skills/sabeel-brand/tools/make-app-icons.py` in
+[Sabeel-Institute/brand](https://github.com/Sabeel-Institute/brand) (the
+`sabeel-brand` skill, "The apps' icons"), which writes it into this
+repository. Nothing in it is edited by hand:
 
-**The mark is the brand, the badge says which app.** Warm Ivory canvas, the
-calligraphy low, a Dark Raspberry disc above-right carrying an ivory glyph — a
-board, a stopwatch, a microphone. Raspberry is spent on the badge alone, which
-keeps the icon inside its ~20% share.
+```sh
+uv run skills/sabeel-brand/tools/make-app-icons.py kanban --repo ../sabeel-institute-kanban   # in the brand checkout
+uv run skills/sabeel-brand/tools/make-app-icons.py kanban --repo ../sabeel-institute-kanban --check
+```
 
-**The wordmark is dropped**, unlike the sign-in lockup. At the 48dp a launcher
-draws, "SABEEL INSTITUTE" is a smudge, and it costs the calligraphy the size it
-needs to be recognisable. Source is `docs/brand/sabeel-mark.png` — the lockup
-with the text removed.
+Kanban's icon is the staff apps' family: the calligraphy before 2026-09-28,
+black, on Warm Ivory, with a Dark Raspberry badge carrying an ivory board.
+The badge says which app (the Time Tracker's carries a stopwatch); raspberry
+is spent on the badge alone. The wordmark is dropped, since at the 48dp a
+launcher draws it is a smudge. The generator's `--check` proves no ink leaves
+the circle every launcher keeps and the badge hides no calligraphy, and that
+the files here are what it makes.
 
-**The geometry is measured, and the script re-proves it on every run** (it exits
-non-zero if either invariant breaks, so these numbers cannot rot):
-
-- Nothing outside **radius 341** of the 1024 canvas. An adaptive icon's
-  foreground fills the whole 108dp layer and only the central 72dp survives the
-  mask — 66.67%, *not* the ~68% that "roughly two thirds" suggests. Getting this
-  wrong costs 9px of real badge edge to a circular mask.
-- **Zero calligraphy hidden** by the badge, counted by rendering with and
-  without it.
-
-Badge 410px (40% of the icon), mark centred at y=637, badge bearing 38°. Each is
-at its limit: 418px cuts the sweep, cy=643 puts the descender outside the
-circle, 36° hides 12px. Mark and badge both land 338 from centre — the
-composition is pressed against the same circle from two directions.
-
-**Do not regenerate these with a bare `expo prebuild`.** All three repos commit
-`android/`, so the script writes the native mipmaps directly. Prebuild defaults
-to *clean* — it deletes and recreates the native folder — so an unscoped run
-takes `build.gradle` with it, and this repo's release signing and Sentry setup.
-It only clears the platforms named by `--platform`, which is why
-`--platform ios` is safe. See `docs/IOS-BUILD.md`.
+**Do not regenerate the icon with a bare `expo prebuild`.** This repository
+commits `android/`, so the generator writes the native mipmaps directly.
+Prebuild defaults to *clean*: it deletes and recreates the native folder, so
+an unscoped run takes `build.gradle` with it, and this repository's release
+signing and Sentry setup. It only clears the platforms named by
+`--platform`, which is why `--platform ios` is safe. See `docs/IOS-BUILD.md`.
 
 ## How this is enforced in code
 
