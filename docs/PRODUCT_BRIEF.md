@@ -155,6 +155,14 @@ boards/{boardId}
   name, description, archived: bool, createdAt, createdBy
   columns: [ { id, name } ]                      # embedded: few, rarely changed
   memberUids: [uid, …]                           # for `array-contains` queries
+  updatedAt?, updatedBy?                         # who changed it last, for its history: a change stamps
+                                                 # both (rules hold updatedBy to the writer) or leaves both
+
+boards/{boardId}/activity/{entryId}              # the board's own history
+  type: created|renamed|archived|restored|memberAdded|memberRemoved|ownerAdded|ownerRemoved
+        |columnAdded|columnRemoved|columnRenamed|columnsReordered
+  at, actorUid?, actorName?, subjectUid?, subjectName?, from?, to?, since?
+  # Written ONLY by the onBoardWritten trigger. Names are stored, not looked up.
 
 labels/{labelId}                                 # ORG-WIDE: one set, every board shares it
   name, color                                    # color from LABEL_COLORS; rules check the hex shape
@@ -583,6 +591,33 @@ comments, newest first.
   100% noise and nobody reads it.
 - Retention matches cards: kept indefinitely.
 
+### A board's own history
+
+At the bottom of Board settings, for everyone who can see the board: who
+created it, renamed it, archived or restored it, added or removed whom, made
+or unmade an owner, and added, removed, renamed or reordered its columns.
+
+- **One writer.** The `onBoardWritten` trigger diffs every board write
+  (`diffBoard` in `@sabeel/shared`) into `boards/{id}/activity`. Client edits
+  and the member callables both land as board writes, so neither writes
+  history itself. Removing an owner from the board is one entry, not a
+  removal plus a lost ownership.
+- **Who did it is the `updatedBy`/`updatedAt` stamp**, and only when the
+  write moved it (`boardChangeActor`). Rules accept a new stamp only from the
+  person it names, or a write that leaves the stamp alone. The second is for
+  app builds older than the history, so their changes save and are recorded
+  with nobody named. A new board names its creator.
+- **Names are stored on the entry**: a member can read only the board's own
+  profiles, and the people a history is about — someone removed, an admin
+  not on the board, a deleted column — would resolve to nothing later.
+- **Entries from before the history** were recovered once, with
+  `since`/`at` bounding when each happened: from the daily backups, the
+  point-in-time window and the member callables' logs. The logs name who
+  added or removed someone; nothing else from that time records who made a
+  change, so those entries name nobody.
+- Entry ids come from the event id, so a repeated delivery overwrites rather
+  than duplicates.
+
 ## Rules invariants
 
 Deny-by-default.
@@ -628,7 +663,9 @@ Deny-by-default.
   the admin-only `setUserAccess` callable.
 - Comment `authorUid` must equal `request.auth.uid`; edits restricted to the
   author; deletes to the author, an owner of that board, or an admin.
-- **`activity` is read-only to all clients** — trigger-written only.
+- **`activity` is read-only to all clients** — trigger-written only. So is
+  a board's history, `boards/{id}/activity`, which its members and admins
+  read.
 
 ## Notifications
 

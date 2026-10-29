@@ -598,6 +598,21 @@ try {
       .isVisible()
       .catch(() => false)),
   );
+  // The board's history is hers to read too, and it names who did what: the
+  // column the admin added (a client write) and her own joining (a callable).
+  check(
+    'a non-owner reads the board history, naming who changed what',
+    await sara
+      .getByText(/ added the column “Blocked”/)
+      .first()
+      .waitFor({ timeout: 25000 })
+      .then(() => true)
+      .catch(() => false),
+  );
+  check(
+    'including someone added through the server',
+    await sara.getByText(/ added sara ·/i).first().isVisible().catch(() => false),
+  );
   await sara.screenshot({ path: join(SHOTS, 'p2-member-roster-light.png'), fullPage: true });
   await sara.getByRole('button', { name: 'Back' }).first().click();
   await sara.getByText('To Do').first().waitFor({ timeout: 15000 });
@@ -630,6 +645,15 @@ try {
 
   await saraOwnerToggle.click();
   check('an accepted one does', await switchReads(saraOwnerToggle, true));
+  check(
+    'and the board history records it',
+    await admin
+      .getByText(/ made sara an owner ·/i)
+      .first()
+      .waitFor({ timeout: 25000 })
+      .then(() => true)
+      .catch(() => false),
+  );
   await admin.screenshot({ path: join(SHOTS, 'p2-owners-light.png'), fullPage: true });
 
   // Live, with no reload: this is a board write, so her open app sees it.

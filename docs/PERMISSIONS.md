@@ -69,6 +69,11 @@ Everyone else on a board opens the same screen and gets **the member list,
 read-only**, with owners marked. That answers "who do I ask to add someone?"
 without a trip to an admin — which is what it used to take.
 
+**The board's history is for everyone on the board**, at the bottom of that
+same screen, and for admins: who renamed or archived it, who added or removed
+whom, who made someone an owner, what happened to its columns. Nobody writes
+it but the server, so nobody can edit or forge a line of it.
+
 ### The creator is protected
 
 The person who created a board cannot be removed from `boardOwnerUids` by

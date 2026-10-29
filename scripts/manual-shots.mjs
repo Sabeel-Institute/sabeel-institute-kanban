@@ -156,6 +156,16 @@ async function enrich() {
     await child.ref.update({ parentId: parent.id, updatedAt: Date.now(), updatedBy: uid });
   }
 
+  // One line of the board's history as it reads when it was recovered from
+  // backups rather than recorded: nobody named, and a span of days. The seed's
+  // own changes, made through the screens, supply the recorded lines.
+  await db.doc(`boards/${boardId}/activity/manual-recovered`).set({
+    type: 'columnRemoved',
+    from: 'Ideas',
+    since: Date.now() - 41 * 86400000,
+    at: Date.now() - 40 * 86400000,
+  });
+
   console.log(`  enriched ${touched} cards (overdue / today / +3d / +5d / +21d) + 1 subtask\n`);
 }
 
@@ -330,6 +340,17 @@ const SHOTS = {
     const members = p.getByText(/^Members \(/).first();
     await members.waitFor({ timeout: 30000 });
     await members.scrollIntoViewIfNeeded();
+    await p.waitForTimeout(900);
+  },
+  // The board's history, at the foot of settings: scrolled so its heading
+  // sits at the top and the lines fill the rest.
+  history: async (p) => {
+    await openBoard(p);
+    await p.getByRole('button', { name: 'Board settings' }).click();
+    const heading = p.getByText('History', { exact: true });
+    await heading.waitFor({ timeout: 30000 });
+    await p.getByText(/created the board/).first().waitFor({ timeout: 30000 });
+    await heading.evaluate((el) => el.scrollIntoView({ block: 'start' }));
     await p.waitForTimeout(900);
   },
   // The member list as somebody who does NOT own the board: owners marked, and

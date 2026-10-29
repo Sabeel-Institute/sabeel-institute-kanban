@@ -282,6 +282,29 @@ service cloud.firestore {
           && incoming().get('memberProfiles', {}) == existing().get('memberProfiles', {});
       }
 
+      /**
+       * WHO CHANGED THE BOARD, for its history (functions/src/boardHistory.ts).
+       *
+       * A change either stamps itself — `updatedBy` the writer, `updatedAt` a
+       * new number — or leaves the stamp exactly as it was. The trigger names
+       * `updatedBy` only when `updatedAt` moved, so the first arm is what
+       * makes a named entry trustworthy, and nobody can stamp a change with
+       * someone else's uid.
+       *
+       * The second arm keeps app builds older than the history working: they
+       * do not know the stamp, and refusing their writes would break board
+       * settings for whoever has not updated yet. Their changes are recorded
+       * with nobody named. The cost is that a current build could also leave
+       * the stamp alone and go unnamed — never misnamed.
+       */
+      function stampsChange() {
+        return (incoming().get('updatedBy', null) == request.auth.uid
+                && incoming().get('updatedAt', null) is number
+                && incoming().get('updatedAt', null) != existing().get('updatedAt', null))
+          || (incoming().get('updatedBy', null) == existing().get('updatedBy', null)
+              && incoming().get('updatedAt', null) == existing().get('updatedAt', null));
+      }
+
       // Admins see every board; everyone else sees only boards they are on. For
       // a LIST query, `isAdmin()` does not depend on document data, so an admin's
       // unconstrained query is provably safe; everyone else's must carry
@@ -337,9 +360,10 @@ service cloud.firestore {
       allow update: if ownsBoard(existing())
         && keepsCreator()
         && membershipIsServerOnly()
+        && stampsChange()
         && incoming().keys().hasOnly(['name', 'description', 'archived', 'columns',
             'columnIds', 'memberUids', 'memberProfiles', 'boardOwnerUids',
-            'activeCardCount', 'createdAt', 'createdBy'])
+            'activeCardCount', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
         && incoming().get('boardOwnerUids', []) is list
         && incoming().createdBy == existing().createdBy
         // History, not state. Neither is the client's to rewrite.
@@ -360,6 +384,17 @@ service cloud.firestore {
       // Boards archive, never hard-delete — far too much accumulated work to
       // expose a destroy button for. `archived` is a field, set via update.
       allow delete: if false;
+    }
+
+    // ---- Board history ----
+    // Read-only to every client, like a card's activity: written by the
+    // onBoardWritten trigger alone, so "Sara archived the board" means the
+    // server saw Sara do it. Everyone who can see the board can read it.
+    match /boards/{boardId}/activity/{entryId} {
+      allow get, list: if isActive()
+        && (isAdmin()
+            || request.auth.uid in get(/databases/$(database)/documents/boards/$(boardId)).data.memberUids);
+      allow create, update, delete: if false;
     }
 
     // ---- Labels (org-wide) ----

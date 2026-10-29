@@ -611,7 +611,7 @@ and only an admin can change that.
 Open a board and tap its **settings** (the gear — along the bottom on a phone,
 in the header in a browser). If you don't own the board the icon is a **group of
 people** instead and says **Board members**: the same screen with the member list
-and nothing else.
+and the board's history, and nothing else.
 
 <div class="pair">
   <figure class="ph"><img src="manual/img/roster-phone.png" alt="The member list as somebody who does not own the board, on a phone"><figcaption>The same on a phone</figcaption></figure>
@@ -661,6 +661,7 @@ From here:
   anything happens. See below.
 - **Archive** — hides the board from everyone's list. Boards are never deleted
   outright.
+- **History** — what has happened to the board itself, newest first. See below.
 
 ### Letting somebody else run the board
 
@@ -699,6 +700,30 @@ member: an owner of the board adds you, and an owner takes you off. **Leave** is
 on your own row in *Members* if you own the board. (Admins are the exception,
 since they can open any board's settings; a board they haven't joined shows a
 **Join this board** button at the top of *Members*.)
+
+### The board's history
+
+<div class="pair">
+  <figure class="ph"><img src="manual/img/history-phone.png" alt="The History section at the bottom of Board settings on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="wd"><img src="manual/img/history-wide.png" alt="The History section at the bottom of Board settings in a browser"><figcaption>In a browser</figcaption></figure>
+</div>
+
+At the bottom of the screen, **History** lists what has happened to the board
+itself, newest first, and who did it: who created it, renamed it, archived or
+restored it; who added or removed whom; who made someone an owner or stopped
+being one; which columns were added, removed, renamed or reordered. Everyone on
+the board sees it, owners or not. What happens to a card is in that card's own
+history, on the card.
+
+Nobody can edit or delete a line of it. The newest twenty show first; **Show
+older** brings in the next twenty.
+
+Some lines name nobody — *The board was archived* rather than *Sara archived
+the board*. Those changes were made before the app recorded who made them, and
+pieced together afterwards from the institute's daily backups; a time such as
+*between 2026-08-12 and 2026-08-13* means the change happened somewhere in that
+span. A change made from an out-of-date copy of the app also names nobody, so
+keep the app up to date.
 
 ## 2.3 Archiving a board
 
@@ -946,6 +971,10 @@ Board **settings → Members** → turn on the switch on their row → confirm.
 **…find out who runs a board I'm on?** *(anyone)*
 Open the board → **Board members** — or **Board settings**, if you are one of
 them. Same screen; owners are marked on it either way.
+
+**…find out who archived a board, or who added or removed someone?** *(anyone on the board)*
+Open the board's settings (**Board members** if you don't own it) → **History**,
+at the bottom.
 
 **…hand a board on when I created it?** *(needs an admin)*
 Ask an admin. Only they can take ownership off whoever created a board — the

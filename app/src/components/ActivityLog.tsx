@@ -7,6 +7,7 @@ import {
   type BoardColumn,
 } from '@sabeel/shared';
 import { db } from '../firebase';
+import { when } from '../activityTime';
 import { useLiveQuery } from '../liveQuery';
 import type { BoardMemberProfile } from '../boards';
 import { Hint, Row, Spinner } from './ui';
@@ -26,15 +27,6 @@ interface Entry {
   at: number;
   from?: string;
   to?: string;
-}
-
-function when(ms: number): string {
-  const mins = Math.floor((Date.now() - ms) / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return new Date(ms).toISOString().slice(0, 10);
 }
 
 /**

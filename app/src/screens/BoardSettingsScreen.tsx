@@ -52,6 +52,7 @@ import {
   Toggle,
 } from '../components/ui';
 import { confirmAction } from '../confirm';
+import { BoardHistory } from '../components/BoardHistory';
 import { ColumnNameEditor } from '../components/ColumnNameEditor';
 import { ReorderList } from '../components/ReorderList';
 import { radius, space, useTheme } from '../theme';
@@ -752,6 +753,13 @@ export function BoardSettingsScreen({
           </Card>
         </>
       ) : null}
+
+      {/* For everyone who can see the board, like the roster: who changed
+          what is as much a member's question as an owner's. */}
+      <Heading>History</Heading>
+      <Card>
+        <BoardHistory boardId={boardId} />
+      </Card>
     </Screen>
   );
 }
