@@ -767,9 +767,9 @@ factory rather than being silently dropped.
   testflight=true`). **Never hand-bump versions.** Store decisions — tracks,
   testers, App Review — are `docs/STORE-RELEASE.md`.
 - **Android ships through Google Play** (decided 2026-08-02), release-signed:
-  internal testing now, to the account-wide "Sabeel staff" email list
-  (`docs/DEPLOY.md` § Testers); public production is the destination
-  (decided 2026-10-16, `docs/STORE-RELEASE.md`).
+  internal testing, to the account-wide "Sabeel staff" email list
+  (`docs/DEPLOY.md` § Testers), and that is the destination: only the LMS goes
+  to production (decided 2026-10-29, `docs/STORE-RELEASE.md`).
   `npx sabeel-ci release --ship` publishes the Android workflow's bundle
   through the Publish Android workflow; on this machine, `npm run build:aab`
   (`sabeel-ci build-aab`) builds a bundle and `npx sabeel-ci publish-play

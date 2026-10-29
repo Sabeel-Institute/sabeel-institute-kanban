@@ -733,21 +733,22 @@ which only the GitHub upload job reads ("Builds on GitHub").
 
 ## Getting it to testers, and the login gate
 
-**Internal TestFlight is the channel now; Unlisted App Distribution, after App
-Review, is the route** (decided 2026-08-18). The submission, the review account
-and every store decision are in `docs/STORE-RELEASE.md`.
+**Internal TestFlight is the channel, and stays it** (decided 2026-10-29): only
+the LMS goes to the App Store. The review account and every store decision are
+in `docs/STORE-RELEASE.md`.
 
 - **Internal TestFlight.** Faisal and core developers — people who genuinely
   belong on the App Store Connect team. No Beta App Review; builds land minutes
   after processing. The group **"Sabeel Kanban Internal"** has access to all
   builds, so each upload reaches it with no further step.
-- **Unlisted App Distribution.** A normal App Store app that is not searchable
-  and appears in no category, chart or recommendation, reachable only by direct
-  link. No user cap, all App Store regions, managed and unmanaged devices alike,
-  and **no expiry**. Colleagues need no App Store Connect account, no MDM
-  enrolment and no redemption code — just the link. Apple asks that an unlisted
-  app carry its own access control, and this one does: `@oursabeel.com`-only
-  sign-in, enforced server-side, with admin approval on top.
+- **Unlisted App Distribution** is the LMS's route, not Kanban's. A normal App
+  Store app that is not searchable and appears in no category, chart or
+  recommendation, reachable only by direct link. No user cap, all App Store
+  regions, managed and unmanaged devices alike, and **no expiry**. Colleagues
+  need no App Store Connect account, no MDM enrolment and no redemption code —
+  just the link. Apple asks that an unlisted app carry its own access control,
+  and Kanban has one: `@oursabeel.com`-only sign-in, enforced server-side, with
+  admin approval on top.
 
 ### Adding a tester
 

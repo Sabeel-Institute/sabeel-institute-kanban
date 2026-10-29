@@ -15,7 +15,7 @@ Roles, not people: whoever holds a role today grants it.
 |---|---|---|
 | Firebase / Google Cloud project `sabeel-institute-kanban` | Owner | `firebase deploy`, `functions:secrets:set`, and the scripts run with `GCLOUD_PROJECT=…` (gcloud ADC) |
 | Google Play Console, the Sabeel developer account | user on this app with **Release apps to testing tracks** and **Manage testing tracks and edit tester lists** | the Testers tab, App content, the app-signing fingerprints |
-| App Store Connect, the Sabeel Institute team | **Admin** or **App Manager** on this app; the **Account Holder** files the unlisted-distribution request | TestFlight testers, App Review submissions |
+| App Store Connect, the Sabeel Institute team | **Admin** or **App Manager** on this app | TestFlight testers |
 | GitHub `Sabeel-Institute/sabeel-institute-kanban` | write; repository administrators manage Actions secrets | pushing branches and `npx sabeel-ci release`'s pull request (only the organization owner merges into `main` and creates release tags, so `release --ship` is the owner's), `gh workflow run` |
 | Sentry, the Sabeel org | member of the three Kanban projects | DSNs, the build token, triage |
 | The vault owner | — | every file in `docs/SECRETS.md` § Build and publish credentials |
@@ -400,10 +400,10 @@ Set up already; for a new service account, all of it in consoles:
 ### Testers: the "Sabeel staff" list
 
 Internal testing is this app's Play track, and `sabeel-ci publish-play`
-publishes to it alone; public production is the destination, released from Play Console
-(`docs/STORE-RELEASE.md`). Who gets each internal release is an account-wide
-Play Console **email list**, "Sabeel staff", shared by every app on the
-developer account:
+publishes to it alone; internal testing is also where Kanban stays, since only
+the LMS goes to production (`docs/STORE-RELEASE.md`). Who gets each internal
+release is an account-wide Play Console **email list**, "Sabeel staff", shared
+by every app on the developer account:
 
 1. Play Console → this app → *Testing → Internal testing → **Testers*** → tick
    **Sabeel staff** → *Save*. A list that exists but is not ticked on the track

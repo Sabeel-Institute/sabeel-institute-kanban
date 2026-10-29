@@ -148,7 +148,7 @@ and the app's admin-approval gate are separate.
 
 ---
 
-## D2. iOS — registered and on TestFlight; App Review is next
+## D2. iOS — registered and on TestFlight
 
 An iOS app was registered in the **right Firebase project**
 (`sabeel-institute-kanban`) but with the **wrong bundle id**:
@@ -188,12 +188,13 @@ creation**.
       `.p8` that uploads builds rather than delivering pushes. Both download
       exactly once and both are real secrets; both are in the vault
       (`docs/SECRETS.md`).
-- [x] **Distribution route: Unlisted App Distribution** (decided 2026-08-18).
-      The Apple Developer account is an **Organization** account under Sabeel
-      Institute, so the Account Holder files the unlisted request and listings
-      carry the institute's name. Internal TestFlight is the channel until App
-      Review. Reasoning and the alternatives rejected: `docs/IOS-BUILD.md`;
-      the submission: `docs/STORE-RELEASE.md`.
+- [x] **Distribution route: internal TestFlight** (decided 2026-10-29). Only
+      the LMS goes to the App Store, unlisted; Kanban is staff-only and stays
+      on TestFlight. The Apple Developer account is an **Organization**
+      account under Sabeel Institute, so if the app were ever submitted, the
+      Account Holder would file the unlisted request and listings would carry
+      the institute's name. Reasoning and the alternatives rejected:
+      `docs/IOS-BUILD.md`; the store decisions: `docs/STORE-RELEASE.md`.
 - [x] **Apple Distribution certificate for GitHub builds** (2026-10-15). One
       certificate, shared by Kanban, the LMS and the time tracker; its key,
       `.p12` and the App Store profiles are in
@@ -295,9 +296,6 @@ Two more worth reusing:
    that date the gates in `sabeel-ci build-ios` stop every GitHub build in seconds
    with "expired"; a Mac is unaffected (it signs automatically). Steps:
    `docs/IOS-BUILD.md` § Renewal.
-7. [ ] **App Review, then unlisted distribution**, against build 14 or later —
-   build 14 carries the Next and Go keys on the email sign-in.
-   `docs/STORE-RELEASE.md` owns the steps; none starts before Faisal says so.
 
 **Answered 2026-08-15, and nothing goes under `ios.entitlements`.** The question
 was whether the `aps-environment` entitlement survives a prebuild. It does, and
@@ -354,8 +352,8 @@ SDKs are wired by hand instead — see `docs/SECRETS.md`.
 ## F. Release signing and Play
 
 The upload key, Play App Signing and the fingerprints are set up. Android is on
-Play internal testing now; public production is the destination
-(`docs/STORE-RELEASE.md`).
+Play internal testing, which is its destination: only the LMS goes to
+production (decided 2026-10-29, `docs/STORE-RELEASE.md`).
 
 - [x] **The upload keystore exists**: `~/.config/sabeel-kanban/sabeel-kanban-upload.jks`,
       read through `keystore.properties` beside it (or the file
@@ -684,13 +682,13 @@ questionnaire first and debug the phone never.**
       shown to strangers, the outcome is the everyone/all-ages rating. The app
       stops being "Unrated" once it propagates.
 - [ ] Whatever else **App content** lists — privacy policy, data safety, ads,
-      target audience. The answers are in `docs/STORE-RELEASE.md`.
+      target audience — only if the app is ever submitted to production. The
+      answers are in `docs/STORE-RELEASE.md`.
 
 ## M. Privacy
 
 - [ ] **Confirm `privacy@oursabeel.com` exists** (a Workspace group, two
-      admins). It is published in the privacy policy, on the support page, and
-      in the App Store listing.
+      admins). It is published in the privacy policy and on the support page.
 - [ ] **Read the privacy policy** at
       https://sabeel-institute-kanban.web.app/privacy. It is short. Three things
       in it are commitments you are making: a **30-day** response to deletion
