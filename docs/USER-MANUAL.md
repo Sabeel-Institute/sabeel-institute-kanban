@@ -102,7 +102,7 @@ A slim navigation bar is always in reach — **along the bottom on a phone**, an
 - **Alerts** — what you've been told about; a badge shows how many are unread,
   and a screen reader says the number too.
 - **More** — everything that isn't a place you go often: **Stats** (admins),
-  **People** (admins), **Report a problem**, **Privacy policy** and **Sign out**. It also shows the version of
+  **People** (admins), **Help**, **Report a problem**, **Privacy policy** and **Sign out**. It also shows the version of
   the app you're running, which is the first thing to quote if something looks
   wrong.
 
@@ -540,7 +540,29 @@ should be stopped, report them, and an administrator can remove them from the
 app. If @mentions are what bothers you, you can turn mention notifications off
 altogether in **Alerts → Settings**.
 
-## 1.11 Signing out
+## 1.11 Help — short films
+
+<div class="pair">
+  <figure class="ph"><img src="manual/img/help-phone.png" alt="The list of help films on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="wd"><img src="manual/img/help-wide.png" alt="The list of help films in a browser"><figcaption>In a browser</figcaption></figure>
+</div>
+
+**More → Help** lists short narrated films of the app at work, one for each
+thing people do in it: signing in, a board, a card, comments, attachments,
+search, alerts and the rest, then running a board, then the admins' screens.
+Everyone sees every film, so a member can see what an owner or an admin does
+and knows whom to ask.
+
+Each film comes in two versions, **on a phone** and **on a computer**, because
+the two layouts differ. A film opens on the version for the screen you're
+watching on; the two icons above it switch to the other. In a browser a film
+has captions; in the phone app, tap the film for its controls and full
+screen.
+
+The films show a made-up institute, not your boards, and they play over the
+internet, so on a slow connection give one a moment to start.
+
+## 1.12 Signing out
 
 **More → Sign out** (in the navigation bar). Signing out clears your session on
 this phone or browser and stops it receiving that account's notifications. The
@@ -808,6 +830,10 @@ history there is; only the current day is worked out live.
 ---
 
 # Part 4 — "How do I…?" quick answers
+
+**…see how something is done?**
+**More → Help**, and pick the film. Each one comes as it looks on a phone and on
+a computer.
 
 **…get in for the first time?**
 Sign in with your @oursabeel.com Google account, then wait on the approval screen

@@ -565,6 +565,69 @@ drops mid-run, a stale build stays on the device). Confirm with
 `adb shell dumpsys package com.sabeelinstitute.kanban.debug | grep versionName` before
 trusting a native screenshot.
 
+### The help films
+
+More → Help plays short narrated films of the app at work, one per thing
+people do in it, each made twice: at a phone's 390 px (touches drawn as
+ripples) and at a computer's 1440 px (the pointer drawn as a dot that travels
+to what it clicks). The list is `HELP_VIDEOS` in `@sabeel/shared`;
+`scripts/tutorials/tutorials.mjs` scripts each one — who it signs in as, where
+it starts, and for every step the line said and what is done while it is
+said — and `record.mjs` refuses to run if the two lists disagree.
+
+```sh
+S=/tmp/help-films                                  # anywhere outside the repo
+node scripts/tutorials/lines.mjs > $S/lines.json
+uv run scripts/tutorials/tts.py --model 1.7B --speaker aiden --lines $S/lines.json --out $S/wav
+uv run scripts/tutorials/asr_check.py --lines $S/lines.json --wav $S/wav
+scripts/dev.sh web                                 # emulators + dev server + the accounts
+node scripts/tutorials/record.mjs --wav $S/wav --out $S/films [--only id,id] [--variant phone]
+node scripts/tutorials/publish.mjs --from $S/films  # every film, or none
+```
+
+1. **Narration.** `tts.py` renders each line with Qwen3-TTS (1.7B
+   CustomVoice, speaker Aiden, a warm conversational instruction): a built-in
+   voice on this machine's CPU, about six seconds per second of speech, with
+   nothing cloned and nothing sent anywhere. Each WAV keeps the words it was
+   rendered from beside it (`<id>.txt`), so a reworded line is rendered again
+   on the next run, and `record.mjs` refuses narration that is not its
+   step's words. `asr_check.py` transcribes every line with Whisper and flags
+   one whose transcript strays from its script: delete its WAV and render it
+   again. **Run neither beside the dev stack**: the TTS model peaks near
+   12 GB, Whisper near 3 GB, and with the emulators and a browser up as well
+   they run a 15 GB machine out of memory.
+2. **Write the lines the way a colleague talks you through a screen**: whole
+   sentences, "you", contractions, and the reason where it helps. Never
+   labels read out in a row. Read a new line aloud before rendering it.
+3. **Recording.** `record.mjs` films the dev server, never an export (an
+   export draws no dev sign-in row), in the browser itself (`channel:
+   'chromium'`). Before every film it rebuilds the guide world
+   (`world.mjs`): Firestore emptied and written afresh with the Admin SDK —
+   three boards, labels, comments, a year of Stats, and Amina waiting for
+   approval — and the accounts' claims reset, so what one film changes is not
+   in the next. The accounts themselves are the ones `scripts/dev.sh web`'s
+   seed makes; Auth keeps them across worlds. Each film signs in off camera in
+   a browser context of its own. The browser's `confirm` dialogs are drawn into
+   the page, since a dialog the browser paints is not in the video; the dev
+   sign-in row and the build stamp are hidden. **The phone cut is filmed from
+   a browser launched at `--force-device-scale-factor=2`**: a context's
+   `deviceScaleFactor` sharpens screenshots, not video. A step with `cut` is
+   in that cut alone, for what the two layouts do differently. Edit nothing
+   under `app/` while it films: the dev server reloads the page on every
+   change. A failed step leaves `.failed-<film>-<cut>.png` beside the films.
+4. **Encoding** is for phones on mobile data: H.264 High at level 4.1,
+   `-tune animation -preset slower -crf 28`, 24 frames a second, and the
+   speech mono at 64 kbps.
+5. **Publishing.** The films are not in git and do not ship with the app.
+   `publish.mjs` deploys every film's MP4 and captions to their own Hosting
+   site, `HELP_FILMS_ORIGIN` (`sabeel-kanban-help`), in one deploy; it checks
+   the whole set is there first, since a Hosting deploy replaces the site, and
+   reads every file back afterwards. The site sends `Access-Control-Allow-Origin:
+   *`, which the website's caption track needs, and answers range requests,
+   which an iPhone's player needs. Deploy Web never touches it.
+
+Re-record a film, and publish, whenever a screen it shows changes.
+
 ## A five-minute tour
 
 With the emulators running and the app open:

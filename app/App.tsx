@@ -41,6 +41,7 @@ import { SearchScreen } from './src/screens/SearchScreen';
 import { UsersScreen } from './src/screens/UsersScreen';
 import { StatsScreen } from './src/screens/StatsScreen';
 import { ReportScreen } from './src/screens/ReportScreen';
+import { HelpFilmScreen, HelpScreen } from './src/screens/HelpScreen';
 import {
   Body,
   Card,
@@ -124,6 +125,10 @@ function renderScreen(route: Route, user: SessionUser) {
       );
     case 'report':
       return <ReportScreen />;
+    case 'help':
+      return <HelpScreen />;
+    case 'helpFilm':
+      return <HelpFilmScreen key={route.id} id={route.id} />;
     default:
       return <BoardsScreen user={user} />;
   }

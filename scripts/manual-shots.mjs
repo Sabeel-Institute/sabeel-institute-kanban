@@ -354,6 +354,14 @@ const SHOTS = {
     );
     await p.waitForTimeout(600);
   },
+  // Help: the list of films, every one for everyone, under its three headings.
+  help: async (p) => {
+    await nav(p, 'Boards');
+    await p.getByRole('button', { name: 'More' }).click();
+    await p.getByRole('button', { name: 'Help', exact: true }).click();
+    await p.getByTestId('help-film-board').waitFor({ timeout: 30000 });
+    await p.waitForTimeout(600);
+  },
   // The breakdown only exists while a bar is SELECTED, so it needs its own
   // shot. The seed can leave a quiet chart with nothing to tap, in which case
   // this photographs the chart alone rather than failing the whole run.
