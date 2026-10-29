@@ -40,7 +40,10 @@ export const onBoardWritten = onDocumentWritten(
     const actorName = actorUid
       ? ((await db.doc(`users/${actorUid}`).get()).data()?.displayName as string | undefined)
       : undefined;
-    const at = Date.parse(event.time);
+    // When the board was written, to the millisecond: the history is ordered
+    // by it. Not `event.time`, which the emulator gives in whole seconds, so
+    // two changes in one second tied and fell back on the entries' random ids.
+    const at = event.data?.after?.updateTime?.toMillis() ?? Date.parse(event.time);
     const idBase = event.id.replace(/[^A-Za-z0-9_-]/g, '_');
 
     const batch = db.batch();

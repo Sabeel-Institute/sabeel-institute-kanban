@@ -37,6 +37,13 @@ const board = (over: Record<string, unknown> = {}) => ({
 
 type Entry = BoardActivityDoc & { id: string };
 
+/**
+ * A board id no earlier attempt used. `--retry` re-runs a failed test, and
+ * re-creating the same board is an UPDATE to the trigger, which would add
+ * entries to the history the retry then counts.
+ */
+const freshBoard = (name: string) => `${name}_${Date.now().toString(36)}`;
+
 async function history(boardId: string): Promise<Entry[]> {
   const snap = await adminDb().collection(`boards/${boardId}/activity`).orderBy('at').get();
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as BoardActivityDoc) }));
@@ -61,20 +68,22 @@ afterAll(async () => {
 
 describe('board history', () => {
   it('records a new board as created by its creator', async () => {
-    await adminDb().doc('boards/bh_new').set(board());
-    const [created] = await historyOf('bh_new', 1);
+    const fresh = freshBoard('bh_new');
+    await adminDb().doc(`boards/${fresh}`).set(board());
+    const [created] = await historyOf(fresh, 1);
     expect(created).toMatchObject({ type: 'created', actorUid: SARA, actorName: 'Sara' });
     expect(created.at).toBeGreaterThan(0);
   });
 
   it('names the person on a stamped change, by their name now', async () => {
-    await adminDb().doc('boards/bh_rename').set(board());
-    await historyOf('bh_rename', 1);
+    const rename = freshBoard('bh_rename');
+    await adminDb().doc(`boards/${rename}`).set(board());
+    await historyOf(rename, 1);
     // An admin who is not on the board: the name comes from their account.
     await adminDb()
-      .doc('boards/bh_rename')
+      .doc(`boards/${rename}`)
       .update({ name: 'Fundraising 2027', updatedBy: ADMIN, updatedAt: 10 });
-    const h = await historyOf('bh_rename', 2);
+    const h = await historyOf(rename, 2);
     expect(h[1]).toMatchObject({
       type: 'renamed',
       actorUid: ADMIN,
@@ -87,21 +96,23 @@ describe('board history', () => {
   // An app older than the history leaves the stamp alone. The uid still on it
   // belongs to an earlier change, so the entry names nobody.
   it('names nobody when the stamp did not move', async () => {
-    await adminDb().doc('boards/bh_old').set(board({ updatedBy: SARA, updatedAt: 5 }));
-    await historyOf('bh_old', 1);
-    await adminDb().doc('boards/bh_old').update({ archived: true });
-    const h = await historyOf('bh_old', 2);
+    const old = freshBoard('bh_old');
+    await adminDb().doc(`boards/${old}`).set(board({ updatedBy: SARA, updatedAt: 5 }));
+    await historyOf(old, 1);
+    await adminDb().doc(`boards/${old}`).update({ archived: true });
+    const h = await historyOf(old, 2);
     expect(h[1].type).toBe('archived');
     expect(h[1].actorUid).toBeUndefined();
     expect(h[1].actorName).toBeUndefined();
   });
 
   it('writes one entry per change in a write, and nothing for the card count', async () => {
-    await adminDb().doc('boards/bh_cols').set(board());
-    await historyOf('bh_cols', 1);
-    await adminDb().doc('boards/bh_cols').update({ activeCardCount: 4 });
+    const cols = freshBoard('bh_cols');
+    await adminDb().doc(`boards/${cols}`).set(board());
+    await historyOf(cols, 1);
+    await adminDb().doc(`boards/${cols}`).update({ activeCardCount: 4 });
     await adminDb()
-      .doc('boards/bh_cols')
+      .doc(`boards/${cols}`)
       .update({
         columns: [
           { id: 'c2', name: 'Finished' },
@@ -111,7 +122,7 @@ describe('board history', () => {
         updatedBy: SARA,
         updatedAt: 20,
       });
-    const h = await historyOf('bh_cols', 4);
+    const h = await historyOf(cols, 4);
     expect(h).toHaveLength(4);
     expect(h.slice(1).map((e) => [e.type, e.from, e.to])).toEqual(
       expect.arrayContaining([
@@ -125,13 +136,14 @@ describe('board history', () => {
   });
 
   it('records people added and removed through the callables, by whoever did it', async () => {
-    await adminDb().doc('boards/bh_people').set(board());
-    await historyOf('bh_people', 1);
+    const people = freshBoard('bh_people');
+    await adminDb().doc(`boards/${people}`).set(board());
+    await historyOf(people, 1);
     const sara = await idTokenFor(SARA);
 
-    const added = await callFunction('addBoardMember', { boardId: 'bh_people', uid: OMAR }, sara);
+    const added = await callFunction('addBoardMember', { boardId: people, uid: OMAR }, sara);
     expect(added.status).toBe(200);
-    const h = await historyOf('bh_people', 2);
+    const h = await historyOf(people, 2);
     expect(h[1]).toMatchObject({
       type: 'memberAdded',
       actorUid: SARA,
@@ -143,12 +155,12 @@ describe('board history', () => {
     // Made an owner first, so the removal also takes ownership away — which
     // is one event, not two.
     await adminDb()
-      .doc('boards/bh_people')
+      .doc(`boards/${people}`)
       .update({ boardOwnerUids: [SARA, OMAR], updatedBy: SARA, updatedAt: 30 });
-    await historyOf('bh_people', 3);
-    const removed = await callFunction('removeBoardMember', { boardId: 'bh_people', uid: OMAR }, sara);
+    await historyOf(people, 3);
+    const removed = await callFunction('removeBoardMember', { boardId: people, uid: OMAR }, sara);
     expect(removed.status).toBe(200);
-    const after = await historyOf('bh_people', 4);
+    const after = await historyOf(people, 4);
     expect(after[2]).toMatchObject({ type: 'ownerAdded', subjectUid: OMAR, subjectName: 'Omar' });
     expect(after[3]).toMatchObject({
       type: 'memberRemoved',
@@ -158,6 +170,6 @@ describe('board history', () => {
     });
     // Nothing further arrives.
     await new Promise((r) => setTimeout(r, 1500));
-    expect(await history('bh_people')).toHaveLength(4);
+    expect(await history(people)).toHaveLength(4);
   });
 });
