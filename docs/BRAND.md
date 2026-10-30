@@ -160,13 +160,17 @@ uv run skills/sabeel-brand/tools/make-app-icons.py kanban --repo ../sabeel-insti
 uv run skills/sabeel-brand/tools/make-app-icons.py kanban --repo ../sabeel-institute-kanban --check
 ```
 
-Kanban's icon is the staff apps' family: the calligraphy before 2026-09-28,
-black, on Warm Ivory, with a Dark Raspberry badge carrying an ivory board.
-The badge says which app (the Time Tracker's carries a stopwatch); raspberry
-is spent on the badge alone. The wordmark is dropped, since at the 48dp a
-launcher draws it is a smudge. The generator's `--check` proves no ink leaves
-the circle every launcher keeps and the badge hides no calligraphy, and that
-the files here are what it makes.
+Kanban's icon is the Sabeel apps' family: the calligraphy before
+2026-09-28, black, on Warm Ivory, with a Dark Raspberry badge carrying an
+ivory board. The badge says which app (the LMS's carries a mortarboard, the
+Time Tracker's a stopwatch); raspberry is spent on the badge alone. The
+wordmark is dropped, since at the 48dp a launcher draws it is a smudge.
+Android's adaptive foreground keeps the composition inside the central 72dp
+a launcher shows; the square icon (the iPhone, an older launcher, a browser
+tab) shows the whole tile, so it is drawn 1.35 times larger. The generator's
+`--check` proves no ink leaves the circle every launcher keeps, the badge
+hides no calligraphy and the square icon stays clear of its corners, and
+that the files here are what it makes.
 
 **Do not regenerate the icon with a bare `expo prebuild`.** This repository
 commits `android/`, so the generator writes the native mipmaps directly.
