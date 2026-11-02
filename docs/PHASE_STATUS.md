@@ -417,6 +417,13 @@ the team.
 
 ## Deploy log
 
+### 2026-11-02 — The current Sabeel logo — v0.15.1
+
+- Sign-in and the user manual's cover show the institute's current logo:
+  the calligraphy in raspberry and gold above SABEEL INSTITUTE.
+- The app's icon on an iPhone and in a browser tab is drawn larger, with
+  less empty border around it.
+
 ### 2026-10-29 — Board history — v0.15.0
 
 - **Every board has a history.** At the bottom of Board settings, everyone
