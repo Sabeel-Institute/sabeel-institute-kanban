@@ -76,9 +76,9 @@ export function SignInScreen() {
         */}
         <View style={styles.logoPlate}>
           <Image
-            // The dark (ivory) calligraphy on warm ivory. No tint or plate: a
-            // flat tintColor would throw away the gold accent strokes. The app
-            // is light-only, so the single asset is all we need.
+            // The main lockup on warm ivory. No tint or plate: a flat
+            // tintColor would recolour the mark and throw away its gold and
+            // taupe. The app is light-only, so the single asset is all we need.
             source={sabeelLogo}
             style={styles.logo}
             resizeMode="contain"
@@ -217,7 +217,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     marginBottom: space.md,
   },
-  logo: { width: 260, height: 130 },
+  // The stacked lockup draws 187 x 150 in this box; INSTITUTE needs about
+  // 130 px of height to read.
+  logo: { width: 260, height: 150 },
   wrap: { flexWrap: 'wrap' },
   build: { marginTop: space.lg, alignItems: 'center', gap: space.xs },
 });

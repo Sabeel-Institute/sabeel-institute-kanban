@@ -128,24 +128,23 @@ and shifts no layout.
 
 ## The logo
 
-Source: `docs/brand/sabeel-logo.png`, copied to `app/assets/logo.png`, which
-is what the app bundles and what `npx sabeel-ci render-manual` puts on the
-manual's cover (the path every Sabeel app uses).
+The designer's stacked lockup (2026-09-28): Arabic calligraphy reading
+*Sabeel* in raspberry with a gold stroke, above **SABEEL** in raspberry and
+**INSTITUTE** in taupe. `docs/brand/sabeel-logo.png` is
+`skills/sabeel-brand/logo/sabeel-logo.png` from
+[Sabeel-Institute/brand](https://github.com/Sabeel-Institute/brand), and
+`app/assets/logo.png` is that file scaled to 1200 px wide: what the app
+bundles and what `npx sabeel-ci render-manual` puts on the manual's cover
+(the path every Sabeel app uses).
 
-Arabic calligraphy reading *Sabeel* with gold accent strokes, alongside the
-wordmark. One rule follows from its construction:
-
-**One asset, no plate and no tint.** `sabeel-logo.png` — dark calligraphy with
-gold accents — ships with transparency and sits directly on the warm-ivory
-canvas. A flat `tintColor` would recolour the whole mark and **throw the gold
-away**. (The app is light-only, so the ivory-on-dark reverse mark a dark theme
-would need is not bundled; it was removed with dark mode.)
-- **It appears on the sign-in screen only.** Inside the app the brand is carried
-  by the palette. A logo repeated on every screen is chrome, and on a phone it
-  costs space the board needs.
-
-If a vector version (SVG/PDF) exists, add it alongside — the PNG will soften on
-large displays and at print sizes.
+**One asset, no plate and no tint.** The main version ships with transparency
+and sits directly on the warm-ivory canvas. A flat `tintColor` would recolour
+the whole mark and **throw the gold and taupe away**. The app is light-only,
+so the brand's reverse version, for a dark or raspberry field, is not bundled.
+- **It appears on the sign-in screen only**, 150 px tall: INSTITUTE reads from
+  about 130 px. Inside the app the brand is carried by the palette. A logo
+  repeated on every screen is chrome, and on a phone it costs space the board
+  needs.
 
 ## The app icon
 
