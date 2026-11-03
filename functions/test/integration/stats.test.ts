@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { STATS_ALL_SCOPE, todayInOrgTz } from '@sabeel/shared';
+import { STATS_ALL_SCOPE, todayInOrgTz, UNKNOWN_ACTOR } from '@sabeel/shared';
 import { recordStat } from '../../src/stats';
 import { adminDb, makeUser, shutdown, waitFor } from './emulatorClient';
 
@@ -136,6 +136,14 @@ describe('recordStat', () => {
 
   it('writes nothing at all when there is no board', async () => {
     await expect(recordStat('', MIDDAY, { comments: 1 }, 'u1')).resolves.toBeUndefined();
+  });
+
+  it('never counts a change nobody can be named for as a person', async () => {
+    const scope = 'st_unknown';
+    await recordStat(scope, MIDDAY, { comments: 1 }, UNKNOWN_ACTOR);
+    const day = await bucket(scope, '2026-07', '28');
+    expect(day.comments).toBe(1);
+    expect(day.actors).toBeUndefined();
   });
 
   it('skips zero deltas but still records the actor', async () => {

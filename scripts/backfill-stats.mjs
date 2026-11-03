@@ -37,7 +37,7 @@
  */
 import { initializeApp, applicationDefault } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { ORG_TIMEZONE, STATS_ALL_SCOPE } from '@sabeel/shared';
+import { ORG_TIMEZONE, STATS_ALL_SCOPE, UNKNOWN_ACTOR } from '@sabeel/shared';
 // The SAME day-key helper the live counters use. This script exists to repair
 // drift in those counters, so a second implementation of the rule could only
 // ever file the repair on different days than the thing it repairs — and it
@@ -82,7 +82,7 @@ function add(boardId, ms, field, by, actorUid) {
   for (const scope of [boardId, STATS_ALL_SCOPE]) {
     const b = dayBucket(scope, dayKey);
     if (field) b[field] = (b[field] ?? 0) + by;
-    if (actorUid) b.actors.add(actorUid);
+    if (actorUid && actorUid !== UNKNOWN_ACTOR) b.actors.add(actorUid);
   }
 }
 

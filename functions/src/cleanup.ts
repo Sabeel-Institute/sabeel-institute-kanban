@@ -4,9 +4,8 @@ import { logger } from 'firebase-functions/v2';
 import { guardedEvent, reportError, sentryDsn } from './sentry';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
-import type { AttachmentDoc } from '@sabeel/shared';
+import { UNKNOWN_ACTOR, type AttachmentDoc } from '@sabeel/shared';
 import { recordStat } from './stats';
-import { UNKNOWN_ACTOR } from './activity';
 
 /**
  * Delete a card's `comments` and `activity` when the card itself is deleted, and

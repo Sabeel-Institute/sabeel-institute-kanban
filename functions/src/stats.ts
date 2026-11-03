@@ -1,7 +1,7 @@
 import './setup';
 import { logger } from 'firebase-functions/v2';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import { STATS_ALL_SCOPE, todayInOrgTz, type StatsDay } from '@sabeel/shared';
+import { STATS_ALL_SCOPE, todayInOrgTz, UNKNOWN_ACTOR, type StatsDay } from '@sabeel/shared';
 import { reportError } from './sentry';
 
 /**
@@ -93,7 +93,9 @@ export async function recordStat(
     for (const [k, v] of Object.entries(delta)) {
       if (typeof v === 'number' && v !== 0) day[k] = FieldValue.increment(v);
     }
-    if (actorUid) day.actors = FieldValue.arrayUnion(actorUid);
+    // A change nobody can be named for (a subtask unlinked by a deleted
+    // parent) is somebody's work, but not a person to count.
+    if (actorUid && actorUid !== UNKNOWN_ACTOR) day.actors = FieldValue.arrayUnion(actorUid);
     if (Object.keys(day).length === 0) return;
 
     const bytesStored = (delta.bytesAdded ?? 0) - (delta.bytesRemoved ?? 0);

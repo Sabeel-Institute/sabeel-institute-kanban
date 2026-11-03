@@ -3,14 +3,8 @@ import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { logger } from 'firebase-functions/v2';
 import { guardedEvent, sentryDsn } from './sentry';
 import { getFirestore } from 'firebase-admin/firestore';
-import { diffCard, type CardSnapshot } from '@sabeel/shared';
+import { diffCard, UNKNOWN_ACTOR, type CardSnapshot } from '@sabeel/shared';
 import { recordStat } from './stats';
-
-/**
- * The actor of a change nobody can be named for. Not a uid, so every name
- * lookup reads it as "Someone" and nobody is mistaken for its author.
- */
-export const UNKNOWN_ACTOR = 'unknown';
 
 /**
  * Card history, written by the server so it cannot be forged.
