@@ -417,6 +417,25 @@ the team.
 
 ## Deploy log
 
+### 2026-11-03 — Fixes to following cards — v0.16.1
+
+- A copy of the app older than 0.15.0 can no longer change a board, so
+  every change in a board's history names who made it. Phones from 0.13.1
+  on stop at the update screen first; older ones never check for it.
+- A large batch of changes at once, such as archiving a whole column, goes
+  out over a few minutes instead of risking lost notifications.
+- When a card is deleted, the people following its subtasks hear that
+  someone removed them from another card, rather than a name that had
+  nothing to do with it.
+- A notification about a subtask on another board says "another card"
+  rather than showing its title.
+- A column's watchers are told who actually moved or restored a card into
+  it.
+- A card's bell shows only to people on its board. An admin looking at a
+  board they aren't on got an error from it.
+- A column's bell waits until your watched columns have loaded.
+- Notification settings say where a column's bell is on a phone.
+
 ### 2026-11-03 — Following cards and watching columns — v0.16.0
 
 - **Subscribing to a card means hearing about everything on it**: new
