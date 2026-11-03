@@ -417,6 +417,30 @@ the team.
 
 ## Deploy log
 
+### 2026-11-03 — Following cards and watching columns — v0.16.0
+
+- **Subscribing to a card means hearing about everything on it**: new
+  comments, and every change its activity records (moved, renamed, a new
+  due date, a file attached and so on). Cards assigned to you work the
+  same way.
+- **You're subscribed to the cards you make.** The bell beside a new
+  card's title is on; tap it before adding if you'd rather not. Cards you
+  made before this release were subscribed for you, except those imported
+  from ClickUp.
+- **Watch a column** with the bell on its header (on a phone, in the row
+  along the bottom) to hear whenever a card arrives in it. Watching a
+  column doesn't subscribe you to its cards.
+- **Changes arrive together.** Once a card has been quiet for two minutes,
+  you get one notification listing what changed, so a run of edits buzzes
+  your phone once. Comments, mentions and being assigned still arrive
+  straight away.
+- An archived card sends one last notification and is quiet until it's
+  restored.
+- Notification settings list the new kinds. "A comment on a card you
+  follow" replaces the two comment switches, and stays off if you had
+  turned both off. "A card assigned to you was moved" is now part of "A
+  card you follow changes".
+
 ### 2026-11-02 — The current Sabeel logo — v0.15.1
 
 - Sign-in and the user manual's cover show the institute's current logo:
