@@ -440,6 +440,9 @@ the team.
   follow" replaces the two comment switches, and stays off if you had
   turned both off. "A card assigned to you was moved" is now part of "A
   card you follow changes".
+- Phones on an older version show an update screen until they install
+  this one, since their settings and bells would describe the old
+  notifications.
 
 ### 2026-11-02 — The current Sabeel logo — v0.15.1
 
