@@ -159,16 +159,20 @@ disabling the account is the block, by decision.
 - **Assignees must be board members**, rules-enforced. This is what makes the
   cross-board "My Work" collection-group query legal without a parent lookup —
   breaking it breaks My Work's security model.
-- **Subscribing to a card means subscribing to its COMMENTS** (added 2026-07-28,
-  narrowing the older "no watchers" decision rather than overturning it). Nothing
-  else about the card notifies a subscriber — notifying on every change was
-  considered and dropped, because `myCardMoved` already ships off for firing
-  constantly and ten more triggers beside it would be worse. An assignee may also
-  subscribe, which is how the interest survives being unassigned.
+- **Subscribing to a card means hearing about EVERYTHING on it** (Faisal,
+  2026-11-02, widening the comments-only subscriptions of 2026-07-28): every
+  comment and every change its history records. The creator starts subscribed;
+  assignees hear the same without being written into `subscriberUids`. What
+  keeps that from being noise is the BURST: change notices collect in
+  `pendingNotices/{cardId}` and go out once the card has been quiet for two
+  minutes, so a run of saves chimes once. Never send a change notice from the
+  write itself. `docs/PRODUCT_BRIEF.md` § Notifications is the full statement,
+  column watching included.
   **`subscriberUids` is a grant of READ** — the card read rule has a subscriber
   arm so the cross-board query needs no per-row board lookup — so it carries
   every constraint `assigneeUids` does: members only, cleared by
-  `removeBoardMember`, filtered on a cross-board move, and absent from a copy.
+  `removeBoardMember` and filtered on a cross-board move. A copy carries only
+  the person who made it, like any new card.
 - **Labels are ORG-WIDE, not per board** (changed 2026-07-27). One `labels/{id}`
   collection every board shares; a card's `labelIds` mean the same thing wherever
   the card is, so a cross-board move and copy **carry them** — the old code

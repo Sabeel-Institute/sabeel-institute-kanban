@@ -41,12 +41,12 @@ in the app.
 | Card extras | **Comments with @mentions**, **per-card activity history**. |
 | Cross-board view | **"My Work"** — every card assigned to me across every board, sorted by due date. First-class screen, and the phone's default landing surface. |
 | Due dates | **All-day dates only** (`YYYY-MM-DD`), no time-of-day, no start dates. |
-| Card subscriptions | **Comments only.** Anyone who can see a card may subscribe to its comment thread (2026-07-28). Assignees are unaffected and may also subscribe, which keeps the interest after they are unassigned. Not "watchers": no other change notifies. |
+| Card subscriptions | **Everything on the card** (2026-11-02, widening the comments-only subscriptions of 2026-07-28). A subscriber hears about every comment and every change the card's history records. The creator is subscribed from the start (a bell beside the new card's title, on unless they turn it off), and anyone who can see a card may subscribe or unsubscribe with its bell. Assignees hear the same without being subscribed; subscribing as well keeps the interest after they are unassigned. See "Notifications". |
 | Labels | **Org-wide.** One set every board shares (changed 2026-07-27; they were per board). Any active member may add one; **admins** rename and delete (narrowed 2026-08-16 — the effect is org-wide, so the authority is). |
 | Description format | **Markdown, restricted to five elements** — bold, italic, bullet list, ordered list, link (changed 2026-07-30). Both editors are WYSIWYG, so markdown is storage the user never sees. See "Rich text". |
 | Search | **Global across the boards you belong to**, client-side matching. See "Search". |
 | Notifications | Push **plus an in-app inbox** with an unread badge. |
-| Watchers | **No general watchers.** Narrowed rather than overturned on 2026-07-28: you may subscribe to a card's COMMENTS (row above), and beyond that only assignment and @mention notify. Notifying on every change was considered and dropped. |
+| Column watching | **Arrivals only** (2026-11-02). A board member may watch a column and is told when a card arrives in it: moved in, created in it, or restored into it. Watching a column does not subscribe you to its cards, and a card leaving a column notifies no one. |
 | WIP limits | **None.** Dropped from the model. |
 | Column deletion | **Blocked until the column is empty**, made painless by multi-select bulk actions. |
 | Bulk actions | **Multi-select cards** → move, archive, delete, assign. |
@@ -139,8 +139,10 @@ users/{uid}
   displayName, email, photoUrl
   status: pending|active|rejected|disabled
   role:   member|organizer|admin
-  notifyPrefs: { mention: bool, assigned: bool, dueSoon: bool, … }
+  notifyPrefs: { mention: bool, assigned: bool, comment: bool, … }
   mutedBoardIds: [boardId, …]
+  watchedColumns: ['boardId/columnId', …]        # columns whose arrivals notify me; self-written,
+                                                 # board membership checked when a notice is sent
   favoriteBoardIds: [boardId, …]
   recentBoardIds: [boardId, …]                   # client-maintained, capped at 10
   unreadNotifCount
@@ -176,8 +178,8 @@ cards/{cardId}                                   # TOP-LEVEL collection; keyed t
                                                  # `packages/shared/src/richtext.ts` is the one definition
   columnId, rank: string
   assigneeUids: [uid, …]                         # MUST be members of boardId's board (rule-enforced)
-  subscriberUids: [uid, …]                       # comment subscribers. SAME membership rule, and for a sharper
-                                                 # reason: the read rule has a subscriber arm, so this grants read
+  subscriberUids: [uid, …]                       # subscribers: every comment and change. SAME membership rule, and for a
+                                                 # sharper reason: the read rule has a subscriber arm, so this grants read
   dueDate?: string                               # 'YYYY-MM-DD' — an all-day date, NOT a timestamp
   priority: none|low|med|high|urgent
   labelIds: [id, …], archived: bool, archivedAt?  # ids into labels/*; survive a cross-board move
@@ -191,9 +193,18 @@ cards/{cardId}/comments/{commentId}              # under the CARD, so they trave
 
 cards/{cardId}/activity/{activityId}
   type: created|moved|assigned|unassigned|due|priority|labels|edited|archived
+        |subtaskOf|subtask|attached|detached
   actorUid, at, from?, to?
-  # Written ONLY by a Firestore trigger. Clients have no write access at all,
-  # so the log cannot be forged or edited.
+  # Written ONLY by the server (the card trigger, and the attachment callables
+  # for the two file types). Clients have no write access at all, so the log
+  # cannot be forged or edited.
+
+pendingNotices/{cardId}                          # a card's changes waiting to be announced; one doc per card
+  boardId, firstAt, lastAt, sendAt
+  entries: { [activityId]: { type, actorUid, at, from?, to? } }
+  # Server-only: no client reads or writes it. Every new activity entry lands
+  # here, keyed by its id so a retried trigger cannot add it twice, and the
+  # notice sweep sends and deletes the doc once `sendAt` passes.
 ```
 
 ```
@@ -310,7 +321,8 @@ archived, rank)` for the board view, `(boardId, assigneeUids array-contains)` fo
 board-member removal, `(boardId, subscriberUids array-contains)` for the
 unsubscribe half of that same removal, and `(archived, dueDate)` for the due-soon
 sweep. My Work itself needs only the automatic single-field array-contains
-indexes on `assigneeUids` and `subscriberUids`.
+indexes on `assigneeUids` and `subscriberUids`, and notices likewise only the
+automatic ones on `pendingNotices.sendAt` and `users.watchedColumns`.
 The emulator does not enforce composite indexes — verify in production (see
 `docs/INHERITED-STACK.md`, lesson 6, and `scripts/probe-indexes.mjs`).
 
@@ -643,6 +655,13 @@ Deny-by-default.
 - **Card delete requires ownership of that card's board.** Members may only set
   `archived: true`. Applies to bulk operations identically.
 - `users/{uid}/notifications` is trigger-written; the client may only flip `read`.
+- `pendingNotices` has no client access at all.
+- A user may write their own `watchedColumns`: a list of at most 200
+  `boardId/columnId` strings. Rules cannot check membership of every board an
+  array names, so the server does, when it sends: an arrival goes only to
+  members of the card's board, and an entry for a board you are not on yields
+  nothing. `removeBoardMember` clears the removed person's entries for that
+  board.
 - Board create: `role in [organizer, admin]`. Settings, membership, ownership and
   archive: ownership of that board.
 - `columnId` on a card must match a column that exists on the board — clients
@@ -653,7 +672,8 @@ Deny-by-default.
   rule has a subscriber arm too, so subscribing IS a grant of read. Without the
   membership rule, adding your own uid to any card whose id you learned would be
   a way into a board you are not on. `removeBoardMember` clears it alongside
-  `assigneeUids`, a cross-board move filters it, and a copy starts without it.
+  `assigneeUids`, a cross-board move filters it, and a copy starts with only the
+  person who made it, as any new card does.
 - A card is also readable by anyone in its own `assigneeUids` or
   `subscriberUids`, which is what makes both cross-board queries legal without a
   parent lookup. Neither arm widens access — both lists are constrained to board
@@ -671,22 +691,78 @@ Deny-by-default.
 
 Push via FCM (`expo-notifications`), with a **per-user preference toggle for every
 event type** and a **per-board mute**. Notification noise is the fastest way for
-this app to become as annoying as the thing it replaced, so the default set is
-deliberately small:
+this app to become as annoying as the thing it replaced, so what reaches someone
+follows from what they chose to follow, and changes are announced once per burst
+of editing rather than once per save (decided 2026-11-02):
 
-| Event | Who gets it | Default |
-|---|---|---|
-| You were @mentioned in a comment | the mentioned user | on |
-| A card was assigned to you | the new assignee | on |
-| A comment on a card assigned to you | the assignees | on |
-| A card assigned to you is due soon | the assignees | on |
-| A card assigned to you was moved | the assignees | **off** |
-| A new user is awaiting approval | all admins | on |
+| Event (`notifyPrefs` key) | Who gets it | Sent | Default |
+|---|---|---|---|
+| You were @mentioned in a comment (`mention`) | the person mentioned | at once | on |
+| A card was assigned to you (`assigned`) | the new assignee | at once | on |
+| A comment on a card you follow (`comment`) | the card's followers | at once | on |
+| A card you follow changed (`cardChanged`) | the card's followers, and anyone the burst unassigned | once the card is quiet | on |
+| A card arrived in a column you watch (`columnArrival`) | that column's watchers | once the card is quiet | on |
+| A card assigned to you is due soon (`dueSoon`) | the assignees | 08:00 in `ORG_TIMEZONE` | on |
+| A new user is awaiting approval (`newUserPending`) | all admins | at once | on |
+
+**A card's followers are its subscribers and its assignees.** Being assigned
+makes you a follower without writing you into `subscriberUids`. Only assignees
+get due-soon reminders and find the card in My Work's Assigned list; a
+subscriber who is not assigned finds it under Subscribed. One event reaches each
+person once, through the first of mention, assignment, following and watching
+that applies to them.
+
+**A change is anything the card's history records:** a column move, an edit to
+the title or description, the due date, priority, labels, someone assigned or
+unassigned, a file attached or detached, a subtask link, archiving and
+restoring. A reorder within a column is not recorded and notifies no one.
+Notices are worded from the same entries the history shows, so the two cannot
+disagree.
+
+**Changes are announced per burst, not per save.** Each save is its own write,
+so a push per write would chime once per save: editing a title, then the
+description, then attaching a file would buzz a phone three times, and replacing
+the notification in the tray afterwards does not take the chimes back. So every
+new activity entry is collected in `pendingNotices/{cardId}`, and a sweep that
+runs every minute sends a card's notice once two minutes pass with no new entry,
+or ten minutes after its first entry while someone keeps editing. Each recipient
+gets one push and one inbox entry naming what changed, and only what OTHERS
+changed: when two people edit a card together, each hears about the other's
+part. A newly assigned person's own assignment is left out of their notice,
+having gone out at once. Comments, mentions and assignment stay immediate: each
+is a single action, and someone may be waiting for an answer.
+
+**A column arrival is decided when the notice is sent,** against the card as it
+is then: not archived, and in this burst it was created, restored, or moved from
+a column other than the one it is in now (its earliest move's `from`). A card
+dragged through a column on its way elsewhere tells that column's watchers
+nothing. Watching is per column, from a bell on the column header, and it never
+subscribes the watcher to the card: the notice opens the card, whose bell does
+that.
+
+**Archived cards are dormant.** The burst that archives a card is still sent, as
+its last notice. After that nothing on the card notifies anyone, comments and
+mentions included, until it is restored, which notifies its followers and its
+column's watchers. Subscriptions survive archiving untouched; My Work's
+Subscribed list hides archived cards meanwhile. Nothing on an archived board
+notifies at all.
+
+**Being unassigned** sends that burst's notice to the person taken off, their
+last unless they also subscribe.
+
+**Recipients must be members of the card's board when a notice is sent.**
+Subscribers and assignees are by rule; column watchers and people unassigned in
+the burst are checked. So someone removed from a board stops hearing about it at
+once, and no notice carries a card's title to a person who could not open it.
+
+**Every card's creator is subscribed** unless they turned it off, cards made
+before 2026-11-02 included (`scripts/subscribe-creators.mjs` added them once),
+with two exceptions: cards imported from ClickUp, whose recorded creator is
+whoever ran the import (they carry a `sourceId`), and cards whose creator is no
+longer on the board.
 
 Everything is opt-out per event, plus mute-this-board (`mutedBoardIds` on the user
-doc). Nothing notifies the actor about their own action. **Confirm this list
-before the notifications phase** — it's the one area where I've proposed rather
-than been told.
+doc). Nothing notifies the actor about their own action.
 
 **Delivery is push + an in-app inbox.** Every notification is written to
 `users/{uid}/notifications` by the same trigger that sends the push, so a
@@ -700,10 +776,6 @@ already moving in front of the person; the decision reverses that. On Android th
 app's notification handler already presented a foreground push; on web the
 service worker now shows every push itself rather than letting the Firebase
 SDK's worker hand a focused tab's push to a page that never drew it.
-
-There are no watchers: you are notified because a card is assigned to you or
-someone @mentioned you. Anyone wanting to track a card subscribes to its comments,
-or assigns themselves alongside the doer.
 
 Due-soon timing and timezone need a decision at Phase 8. The time tracker's
 work-local timezone machinery is deliberately NOT being copied; due dates are
@@ -931,10 +1003,8 @@ card counts and these numbers have to agree.
 
 ## Open questions
 
-- ~~**Notification event list**~~ — **settled and shipped.** `myCardMoved` is
-  off by default because it fires constantly on a busy board; that is also why
-  subscribing to a card was later narrowed to its *comments* rather than adding
-  ten more triggers beside it.
+- ~~**Notification event list**~~ — **settled.** Following cards, watching
+  columns and per-burst notices, 2026-11-02; see "Notifications".
 - ~~**Due-soon timing**~~ — **settled.** `dueSoonReminders` runs on `0 8 * * *`
   in `ORG_TIMEZONE`, which is `America/Chicago` (Houston, where the team is —
   not the sibling time-tracker's, which deliberately has no org timezone at all).
