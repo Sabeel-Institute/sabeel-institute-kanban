@@ -1,4 +1,5 @@
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
+import { FieldValue } from 'firebase-admin/firestore';
 import { NOTICE_MAX_WAIT_MS, watchKey } from '@sabeel/shared';
 import { adminDb, makeUser, shutdown, waitFor } from './emulatorClient';
 import { runNoticeSweep } from '../../src/notices';
@@ -155,6 +156,40 @@ describe('a burst of changes', () => {
     await runNoticeSweep(later());
     const sent = await inbox(FAY, C, 'cardChanged');
     expect(sent.map((n) => n.text)).toEqual(['“Budget”: Ada attached plan.pdf']);
+  });
+});
+
+describe('a sweep out of claiming time', () => {
+  it('leaves the cards it has not claimed for the next sweep', async () => {
+    const C = 'ns_budget';
+    await seed(C, { subscriberUids: [FAY] });
+    await edit(C, { title: 'Budget late' });
+    await waitForPending(C, 1);
+
+    // Out of time before the first card: nothing claimed, so nothing lost.
+    expect(await runNoticeSweep(later(), 0)).toEqual({ cards: 0, sent: 0 });
+    expect(await pendingEntries(C)).toBe(1);
+
+    await runNoticeSweep(later());
+    expect(await inbox(FAY, C, 'cardChanged')).toHaveLength(1);
+  });
+});
+
+describe('a subtask on another board', () => {
+  it('is "another card" in the notice, never its title', async () => {
+    // A parent moved to another board on its own leaves its child pointing at
+    // it, and unlinking the child is offered for exactly that case. The
+    // child's followers are not on the parent's board.
+    const P = 'ns_far_parent';
+    const C = 'ns_far_child';
+    await adminDb().doc(`cards/${P}`).set(card({ boardId: 'ns_elsewhere', title: 'Secret plan' }));
+    await seed(C, { subscriberUids: [FAY], parentId: P });
+
+    await edit(C, { parentId: FieldValue.delete() });
+    await waitForPending(C, 1);
+    await runNoticeSweep(later());
+    const sent = await inbox(FAY, C, 'cardChanged');
+    expect(sent.map((n) => n.text)).toEqual(['“Budget”: Ada removed this from another card']);
   });
 });
 

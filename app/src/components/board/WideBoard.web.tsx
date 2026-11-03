@@ -286,6 +286,8 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   // alone, so an admin visiting a board they are not on gets neither bell.
   const isMember = board.data?.memberUids.includes(user.uid) ?? false;
   const watched = useWatchedColumns(user);
+  // The bells stay disabled until the list is ready: `?? []` reads a list
+  // still loading, or one that failed, as watching nothing.
   const watching = (columnId: string) =>
     (watched.data ?? []).includes(watchKey(boardId, columnId));
   // Org-wide, not from the board: labels are one set for the whole team.
@@ -634,6 +636,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
                     <WatchColumnBell
                       columnName={col.name}
                       watching={watching(col.id)}
+                      busy={watched.status !== 'ready'}
                       onPress={() =>
                         runReporting(() =>
                           setColumnWatched(user, boardId, col.id, !watching(col.id)),

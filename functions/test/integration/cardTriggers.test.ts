@@ -107,6 +107,17 @@ describe('onCardDeleted unlinks subtasks', () => {
 
     const other = await adminDb().doc('cards/ct_other').get();
     expect(other.data()?.parentId).toBe('someone_else');
+
+    // The unlink names nobody: MGR last edited the child but deleted nothing,
+    // and the entry's actor is also who its followers are told did it.
+    const entry = await waitFor('unlink activity', async () => {
+      const snap = await adminDb()
+        .collection('cards/ct_kid1/activity')
+        .where('type', '==', 'subtaskOf')
+        .get();
+      return snap.docs.map((d) => d.data()).find((d) => d.to === undefined);
+    });
+    expect(entry.actorUid).toBe('unknown');
   });
 
   it('still unlinks the survivors when a child was deleted at the same time', () =>

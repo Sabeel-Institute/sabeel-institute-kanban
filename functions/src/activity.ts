@@ -7,6 +7,12 @@ import { diffCard, type CardSnapshot } from '@sabeel/shared';
 import { recordStat } from './stats';
 
 /**
+ * The actor of a change nobody can be named for. Not a uid, so every name
+ * lookup reads it as "Someone" and nobody is mistaken for its author.
+ */
+export const UNKNOWN_ACTOR = 'unknown';
+
+/**
  * Card history, written by the server so it cannot be forged.
  *
  * Clients have no write access to `activity` at all (see firestore.rules), which
@@ -33,7 +39,7 @@ export const onCardWritten = onDocumentWritten(
 
     const { cardId } = event.params;
     const boardId = (after?.boardId ?? before?.boardId ?? '') as string;
-    const actorUid = (after?.updatedBy ?? after?.createdBy ?? 'unknown') as string;
+    const actorUid = (after?.updatedBy ?? after?.createdBy ?? UNKNOWN_ACTOR) as string;
     const at = Date.now();
 
     const db = getFirestore();

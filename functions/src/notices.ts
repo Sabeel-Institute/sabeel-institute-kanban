@@ -34,6 +34,11 @@ import { deliver, loadRecipients, type Notice } from './notifications';
 
 const db = () => getFirestore();
 
+/** How long a sweep claims cards before delivering, well inside its timeout. */
+const SWEEP_CLAIM_MS = 30_000;
+/** The sweep's timeout: delivery after a full claiming window has minutes. */
+const SWEEP_TIMEOUT_SECONDS = 300;
+
 /**
  * Every new history entry joins its card's pending notice, whoever wrote it:
  * the card trigger, the subtask mirror onto a parent, the attachment
@@ -70,12 +75,22 @@ export const onActivityNotice = onDocumentCreated(
  * The collection holds only cards edited in the last ten minutes, so reading
  * all of it is cheaper than keeping an index on a due time that every new
  * entry would have to move.
+ *
+ * Claiming stops at `claimUntil` (by the wall clock), and whatever is claimed
+ * by then is delivered. A sweep stopped by its timeout would lose every card
+ * it had claimed, since delivery comes last; a backlog (an archive of a whole
+ * column, the pile after an outage) instead goes out over several minutes,
+ * each card still due when the next sweep reaches it.
  */
-export async function runNoticeSweep(now: number): Promise<{ cards: number; sent: number }> {
+export async function runNoticeSweep(
+  now: number,
+  claimUntil = Date.now() + SWEEP_CLAIM_MS,
+): Promise<{ cards: number; sent: number }> {
   const pending = await db().collection('pendingNotices').get();
   const notices: Notice[] = [];
   let cards = 0;
   for (const doc of pending.docs) {
+    if (Date.now() >= claimUntil) break;
     const entries = Object.values((doc.data().entries ?? {}) as Record<string, NoticeEntry>);
     if (!noticeDue(entries, now)) continue;
 
@@ -151,6 +166,7 @@ async function noticesFor(cardId: string, entries: NoticeEntry[]): Promise<Notic
     ...entries.filter((e) => e.type === 'assigned' || e.type === 'unassigned').map((e) => e.to ?? ''),
   ]);
   const cardTitleFor = await titlesFor(
+    boardId,
     entries
       .filter((e) => e.type === 'subtask' || e.type === 'subtaskOf')
       .flatMap((e) => [e.to ?? '', e.from ?? '']),
@@ -219,19 +235,36 @@ async function namesFor(uids: readonly string[]): Promise<(uid: string) => strin
   return (uid) => names.get(uid) ?? 'Someone';
 }
 
-/** Titles for the cards subtask entries name, read once each. */
-async function titlesFor(cardIds: readonly string[]): Promise<(cardId: string) => string> {
+/**
+ * Titles for the cards subtask entries name, read once each, and only for
+ * cards on this board. Everyone told is a member of it, so those they can
+ * open; a parent or child that has since moved to another board stays
+ * "another card", as the card's own history shows it to someone not on that
+ * board.
+ */
+async function titlesFor(
+  boardId: string,
+  cardIds: readonly string[],
+): Promise<(cardId: string) => string> {
   const unique = [...new Set(cardIds)].filter(Boolean);
   const snaps = unique.length
     ? await db().getAll(...unique.map((id) => db().doc(`cards/${id}`)))
     : [];
-  const titles = new Map(snaps.map((s) => [s.id, s.data()?.title as string | undefined]));
+  const titles = new Map(
+    snaps
+      .filter((s) => s.data()?.boardId === boardId)
+      .map((s) => [s.id, s.data()?.title as string | undefined]),
+  );
   // Unquoted, as the card's history shows it (CardScreen's `cardTitleFor`).
   return (id) => titles.get(id) ?? 'another card';
 }
 
 export const noticeSweep = onSchedule(
-  { schedule: 'every 1 minutes', secrets: [sentryDsn, ...PUSH_SECRETS] },
+  {
+    schedule: 'every 1 minutes',
+    timeoutSeconds: SWEEP_TIMEOUT_SECONDS,
+    secrets: [sentryDsn, ...PUSH_SECRETS],
+  },
   guardedEvent(async () => {
     const { cards, sent } = await runNoticeSweep(Date.now());
     if (cards > 0) logger.info('notice sweep', { cards, sent });

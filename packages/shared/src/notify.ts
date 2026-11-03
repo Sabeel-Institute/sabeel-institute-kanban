@@ -46,7 +46,8 @@ export const NOTIFY_EVENTS: NotifyEventSpec[] = [
   {
     event: 'columnArrival',
     label: 'A card arrives in a column you watch',
-    description: 'Watch a column from the bell on its header.',
+    description:
+      "Watch a column with its bell: on the column's header, or on a phone, in the row along the bottom.",
     defaultOn: true,
   },
   {
