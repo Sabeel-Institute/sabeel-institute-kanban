@@ -1770,11 +1770,15 @@ try {
     `panel never moved to "${UNSUPPORTED}" after the permission changed`,
   );
 
-  const movedDefaultOff = await sara
-    .getByText('A card assigned to you was moved')
-    .first()
-    .isVisible();
-  check('the high-frequency event is listed and defaults off', movedDefaultOff);
+  // The two burst events are new, and on for someone who never chose.
+  for (const label of ['A card you follow changes', 'A card arrives in a column you watch']) {
+    const toggle = sara.getByRole('switch', { name: label });
+    const on = await toggle
+      .waitFor({ timeout: 15000 })
+      .then(() => toggle.isChecked())
+      .catch(() => false);
+    check(`"${label}" is listed and on by default`, on);
+  }
   await sara.screenshot({ path: join(SHOTS, 'p10-notify-settings-light.png'), fullPage: true });
 
   await sara.getByRole('button', { name: 'Inbox' }).click();
