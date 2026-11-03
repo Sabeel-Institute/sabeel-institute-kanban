@@ -136,6 +136,13 @@ export function isKnownActivityType(value: unknown): value is ActivityType {
   );
 }
 
+/**
+ * The actor of a change nobody can be named for. Not a uid, so every name
+ * lookup reads it as "Someone", nobody is mistaken for its author, and Stats
+ * never counts it as a person.
+ */
+export const UNKNOWN_ACTOR = 'unknown';
+
 /** Human-readable line for the timeline. `nameFor` resolves uids. */
 export function describeActivity(
   entry: { type: ActivityType; from?: string; to?: string },

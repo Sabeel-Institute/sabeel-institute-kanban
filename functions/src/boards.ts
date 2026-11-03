@@ -100,7 +100,8 @@ export const removeBoardMember = onCall({ secrets: [sentryDsn] }, guarded(async 
   // ever answer is clutter, and it counts against their watch limit.
   const userRef = db.doc(`users/${uid}`);
   const watched = ((await userRef.get()).data()?.watchedColumns as string[] | undefined) ?? [];
-  const stillWatched = watched.filter((k) => !watchKeyOnBoard(k, boardId));
+  // Removed by value, so a column they watch elsewhere in the meantime stays.
+  const watchedHere = watched.filter((k) => watchKeyOnBoard(k, boardId));
 
   const batch = db.batch();
   batch.update(boardRef, {
@@ -135,8 +136,8 @@ export const removeBoardMember = onCall({ secrets: [sentryDsn] }, guarded(async 
     // in the card's history or in the Search browse order.
     batch.update(card.ref, { subscriberUids: FieldValue.arrayRemove(uid) });
   }
-  if (stillWatched.length !== watched.length) {
-    batch.update(userRef, { watchedColumns: stillWatched });
+  if (watchedHere.length > 0) {
+    batch.update(userRef, { watchedColumns: FieldValue.arrayRemove(...watchedHere) });
   }
 
   await batch.commit();

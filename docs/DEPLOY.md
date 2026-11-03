@@ -703,15 +703,19 @@ release exists.
 Every Android and iPhone build reads `config/app.minVersionCode` before sign-in
 and shows an update screen (opening Google Play or TestFlight) when its own
 versionCode, its version's code, is below it. The iPhone build carries the same
-number. After a release that older builds can no longer run against (a rules
-change refusing a listener they still open), raise the floor by hand:
+number. Raise the floor by hand after a release that older builds can no
+longer run against (a rules change refusing a listener they still open), or
+one that leaves an older build describing the app wrongly (settings switches
+the server no longer reads, a bell that promises less than subscribing now
+means):
 
 ```bash
 node scripts/set-min-version.mjs <X.Y.Z>   # the oldest version to keep
 ```
 
 It is a decision, not a deploy step: nothing raises it for you, and nothing
-shows until it is raised. Builds from before the gate existed never read it.
+shows until it is raised. Builds before 0.13.1, which added the gate, never
+read it, and nothing on the server can tell them apart from a current build.
 The web app has no floor; the site always serves the current bundle.
 
 ## Rollback

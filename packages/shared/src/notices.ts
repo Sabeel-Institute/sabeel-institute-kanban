@@ -235,7 +235,19 @@ export function arrivalOf(
     lastOf(list, (e) => e.type === 'archived' && e.to === 'false') ??
     created ??
     list[list.length - 1];
-  return { kind: created ? 'created' : restored ? 'restored' : 'moved', actorUid: by.actorUid };
+  // The verb is that same person's, so the line never pairs one person's name
+  // with another's action ("Omar restored it" when Sara restored and Omar moved).
+  const kind: ArrivalKind =
+    by.type === 'moved'
+      ? 'moved'
+      : by.type === 'archived'
+        ? 'restored'
+        : created
+          ? 'created'
+          : restored
+            ? 'restored'
+            : 'moved';
+  return { kind, actorUid: by.actorUid };
 }
 
 /** The line a column's watcher gets. */

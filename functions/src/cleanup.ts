@@ -4,7 +4,7 @@ import { logger } from 'firebase-functions/v2';
 import { guardedEvent, reportError, sentryDsn } from './sentry';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
-import type { AttachmentDoc } from '@sabeel/shared';
+import { UNKNOWN_ACTOR, type AttachmentDoc } from '@sabeel/shared';
 import { recordStat } from './stats';
 
 /**
@@ -142,9 +142,14 @@ export const onCardDeleted = onDocumentDeleted(
     // returned — measured, not assumed. The window this closes is only the narrow
     // one where a child is deleted concurrently by someone else mid-sweep. Cheap
     // insurance against a failure whose signature would be silent and permanent.
+    //
+    // The unlink is stamped as nobody's. The history entry it makes, and the
+    // notice its followers get, take their actor from `updatedBy`, which would
+    // otherwise still name whoever last edited the child; and a delete trigger
+    // cannot know who deleted the parent.
     const results = await Promise.allSettled(
       children.docs.map((child) =>
-        child.ref.update({ parentId: FieldValue.delete() }),
+        child.ref.update({ parentId: FieldValue.delete(), updatedBy: UNKNOWN_ACTOR }),
       ),
     );
     const failed = results.filter((r) => r.status === 'rejected').length;

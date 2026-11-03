@@ -220,6 +220,36 @@ describe('arrivalOf', () => {
     expect(arrivalOf(burst, { columnId: 'review', archived: true })).toBeNull();
   });
 
+  it('pairs the name with that person’s own action', () => {
+    // Sara restores it, Omar moves it into Review: Omar moved it.
+    const restoredThenMoved = [
+      e('archived', 'sara', T, { from: 'true', to: 'false' }),
+      e('moved', 'omar', T + 1, { from: 'todo', to: 'review' }),
+    ];
+    expect(arrivalOf(restoredThenMoved, live('review'))).toEqual({
+      kind: 'moved',
+      actorUid: 'omar',
+    });
+    // Sara adds it to To Do, Omar moves it into Review: the same.
+    const createdThenMoved = [
+      e('created', 'sara', T),
+      e('moved', 'omar', T + 1, { from: 'todo', to: 'review' }),
+    ];
+    expect(arrivalOf(createdThenMoved, live('review'))).toEqual({
+      kind: 'moved',
+      actorUid: 'omar',
+    });
+    // Restored, then edited in place: still the restore, and its restorer.
+    const restoredThenEdited = [
+      e('archived', 'sara', T, { from: 'true', to: 'false' }),
+      e('due', 'omar', T + 1),
+    ];
+    expect(arrivalOf(restoredThenEdited, live('todo'))).toEqual({
+      kind: 'restored',
+      actorUid: 'sara',
+    });
+  });
+
   it('names the last person to move it in, not the first to touch it', () => {
     const burst = [
       e('due', 'omar', T),

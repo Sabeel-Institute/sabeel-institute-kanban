@@ -41,7 +41,7 @@ in the app.
 | Card extras | **Comments with @mentions**, **per-card activity history**. |
 | Cross-board view | **"My Work"** — every card assigned to me across every board, sorted by due date. First-class screen, and the phone's default landing surface. |
 | Due dates | **All-day dates only** (`YYYY-MM-DD`), no time-of-day, no start dates. |
-| Card subscriptions | **Everything on the card** (2026-11-02, widening the comments-only subscriptions of 2026-07-28). A subscriber hears about every comment and every change the card's history records. The creator is subscribed from the start (a bell beside the new card's title, on unless they turn it off), and anyone who can see a card may subscribe or unsubscribe with its bell. Assignees hear the same without being subscribed; subscribing as well keeps the interest after they are unassigned. See "Notifications". |
+| Card subscriptions | **Everything on the card** (2026-11-02, widening the comments-only subscriptions of 2026-07-28). A subscriber hears about every comment and every change the card's history records. The creator is subscribed from the start (a bell beside the new card's title, on unless they turn it off), and anyone on the board may subscribe or unsubscribe with its bell. Assignees hear the same without being subscribed; subscribing as well keeps the interest after they are unassigned. See "Notifications". |
 | Labels | **Org-wide.** One set every board shares (changed 2026-07-27; they were per board). Any active member may add one; **admins** rename and delete (narrowed 2026-08-16 — the effect is org-wide, so the authority is). |
 | Description format | **Markdown, restricted to five elements** — bold, italic, bullet list, ordered list, link (changed 2026-07-30). Both editors are WYSIWYG, so markdown is storage the user never sees. See "Rich text". |
 | Search | **Global across the boards you belong to**, client-side matching. See "Search". |
@@ -615,10 +615,11 @@ or unmade an owner, and added, removed, renamed or reordered its columns.
   history itself. Removing an owner from the board is one entry, not a
   removal plus a lost ownership.
 - **Who did it is the `updatedBy`/`updatedAt` stamp**, and only when the
-  write moved it (`boardChangeActor`). Rules accept a new stamp only from the
-  person it names, or a write that leaves the stamp alone. The second is for
-  app builds older than the history, so their changes save and are recorded
-  with nobody named. A new board names its creator.
+  write moved it (`boardChangeActor`). Rules refuse a board update unless it
+  carries a new stamp naming the writer, so every client change is named and
+  app builds older than the history cannot save a board. A server write that
+  leaves the stamp alone is recorded with nobody named. A new board names its
+  creator.
 - **Names are stored on the entry**: a member can read only the board's own
   profiles, and the people a history is about — someone removed, an admin
   not on the board, a deleted column — would resolve to nothing later.

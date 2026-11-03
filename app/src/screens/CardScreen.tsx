@@ -170,6 +170,9 @@ export function CardScreen({
    *  assignee already hears about everything on it, and subscribing as well is
    *  what makes the interest survive being unassigned. */
   const subscribed = c.subscriberUids.includes(user.uid);
+  // Only a member may subscribe: rules hold subscribers to the board's members,
+  // and an admin can open a card on a board they are not on.
+  const isMember = b.memberUids.includes(user.uid);
   // Only board members may be assigned — the rule the My Work query depends on.
   // Sourced from the board doc so non-admins (who cannot list users) still see
   // who they can assign.
@@ -235,13 +238,15 @@ export function CardScreen({
           {note ? <Hint>{note}</Hint> : null}
           {/* Subscribing means hearing about everything on the card: its
               comments and every change its history records. */}
-          <IconAction
-            icon={subscribed ? 'notifications-active' : 'notifications-none'}
-            label={subscribed ? 'Unsubscribe from this card' : 'Subscribe to this card'}
-            accent={subscribed}
-            disabled={busy}
-            onPress={() => run(() => subscribeToCard(cardId, user, !subscribed))}
-          />
+          {isMember || subscribed ? (
+            <IconAction
+              icon={subscribed ? 'notifications-active' : 'notifications-none'}
+              label={subscribed ? 'Unsubscribe from this card' : 'Subscribe to this card'}
+              accent={subscribed}
+              disabled={busy}
+              onPress={() => run(() => subscribeToCard(cardId, user, !subscribed))}
+            />
+          ) : null}
           <IconAction icon="share" label="Share card" onPress={onShare} />
           <IconAction icon="arrow-back" label="Back" onPress={nav.pop} />
         </View>
@@ -386,7 +391,7 @@ export function CardScreen({
                 // No bell in this row, which is already three controls wide on
                 // a phone; the subtask is a card its creator made, so they
                 // follow it, and its own bell turns that off.
-                subscribe: b.memberUids.includes(user.uid),
+                subscribe: isMember,
               });
               await updateCard(newId, { parentId: cardId }, user);
             })

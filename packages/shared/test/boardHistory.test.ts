@@ -139,8 +139,9 @@ describe('boardChangeActor', () => {
     expect(boardChangeActor(before, { ...before, name: 'X', updatedAt: 2 })).toBe('sara');
   });
 
-  // An app older than the history leaves the stamp alone: the uid on it is
-  // whoever changed the board BEFORE, and must not be credited with this.
+  // A write that leaves the stamp alone (a server script; the rules refuse it
+  // from a client): the uid on it is whoever changed the board BEFORE, and
+  // must not be credited with this.
   it('names nobody when the stamp did not move', () => {
     const before = board({ updatedAt: 1, updatedBy: 'sara' });
     expect(boardChangeActor(before, { ...before, name: 'X' })).toBeUndefined();

@@ -3,7 +3,7 @@ import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { logger } from 'firebase-functions/v2';
 import { guardedEvent, sentryDsn } from './sentry';
 import { getFirestore } from 'firebase-admin/firestore';
-import { diffCard, type CardSnapshot } from '@sabeel/shared';
+import { diffCard, UNKNOWN_ACTOR, type CardSnapshot } from '@sabeel/shared';
 import { recordStat } from './stats';
 
 /**
@@ -33,7 +33,7 @@ export const onCardWritten = onDocumentWritten(
 
     const { cardId } = event.params;
     const boardId = (after?.boardId ?? before?.boardId ?? '') as string;
-    const actorUid = (after?.updatedBy ?? after?.createdBy ?? 'unknown') as string;
+    const actorUid = (after?.updatedBy ?? after?.createdBy ?? UNKNOWN_ACTOR) as string;
     const at = Date.now();
 
     const db = getFirestore();

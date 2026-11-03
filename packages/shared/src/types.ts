@@ -142,11 +142,10 @@ export interface BoardDoc {
   /**
    * Who last changed the board, and when, so its history can name them.
    *
-   * Rules accept a change only if it either stamps both — `updatedBy` the
-   * writer, `updatedAt` a new value — or leaves both alone. The second arm is
-   * for app builds older than the history, which do not know the stamp; their
-   * changes are recorded without a name rather than refused. The callables
-   * stamp too, with the caller. Absent on a board nobody has changed since.
+   * Rules accept a client change only if it stamps both: `updatedBy` the
+   * writer, `updatedAt` a new value. App builds older than the history do not
+   * know the stamp, so their changes are refused. The callables stamp too,
+   * with the caller. Absent on a board nobody has changed since.
    */
   updatedAt?: number;
   updatedBy?: string;
@@ -356,8 +355,9 @@ export interface BoardActivityDoc {
   /** When it happened — or, with `since`, the latest it can have happened. */
   at: number;
   /**
-   * Who did it. Absent when nothing recorded who: a change from an app build
-   * older than the history, or one recovered from backups taken before it.
+   * Who did it. Absent when nothing recorded who: a server write that left
+   * the stamp alone, a change an app build older than the history made before
+   * the rules required the stamp, or one recovered from backups.
    */
   actorUid?: string;
   actorName?: string;
