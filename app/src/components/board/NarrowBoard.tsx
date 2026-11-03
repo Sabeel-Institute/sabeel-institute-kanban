@@ -27,12 +27,13 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import {
+  type BoardColumn,
   canManageBoard,
   columnDeleteBlocked,
   columnsPatch,
-  subtaskCounts,
-  type BoardColumn,
   type Label,
+  subtaskCounts,
+  watchKey,
 } from '@sabeel/shared';
 import {
   cardsInColumn,
@@ -61,6 +62,8 @@ import {
   Title,
 } from '../ui';
 import { AddCardForm } from './AddCardForm';
+import { WatchColumnBell } from './Bells';
+import { setColumnWatched, useWatchedColumns } from '../../notifications';
 import { useLabels } from '../../labels';
 import { radius, space, useTheme } from '../../theme';
 import { KeyboardSticky } from '../KeyboardSticky';
@@ -184,6 +187,13 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
   // users, so reading the directory here would show every non-admin a
   // permission-denied banner and leave them unable to assign anyone.
   const members = board.data?.members ?? NO_MEMBERS;
+  // Only a member may subscribe to a card or watch a column: rules hold
+  // subscribers to members, and the notice sweep sends arrivals to members
+  // alone, so an admin visiting a board they are not on gets neither bell.
+  const isMember = board.data?.memberUids.includes(user.uid) ?? false;
+  const watched = useWatchedColumns(user);
+  const watching = (columnId: string) =>
+    (watched.data ?? []).includes(watchKey(boardId, columnId));
   // Org-wide, not from the board: labels are one set for the whole team.
   const allLabels = useLabels();
   const labels = allLabels.data ?? NO_LABELS;
@@ -264,7 +274,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
 
   // The title comes from `AddCardForm`, already trimmed and non-empty — the
   // draft lives there so typing one does not re-render the board.
-  async function addCard(columnId: string, title: string) {
+  async function addCard(columnId: string, title: string, subscribe: boolean) {
     setAdding(false);
     await run(() =>
       createCard({
@@ -273,6 +283,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
         title,
         user,
         columnCards: byColumn.get(columnId) ?? [],
+        subscribe,
       }),
     );
   }
@@ -630,7 +641,8 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
                         hoisting the draft back onto the board — hoisting it is
                         what made every keystroke re-render every column. */}
                     <AddCardForm
-                      onAdd={(title) => addCard(col.id, title)}
+                      onAdd={(title, subscribe) => addCard(col.id, title, subscribe)}
+                      canSubscribe={isMember}
                       onCancel={() => setAdding(false)}
                     />
                   </Panel>
@@ -649,6 +661,16 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
                   <View style={styles.grow}>
                     <Button label="+ Add card" onPress={() => setAdding(true)} />
                   </View>
+                  {isMember ? (
+                    <WatchColumnBell
+                      columnName={col.name}
+                      watching={watching(col.id)}
+                      busy={busy}
+                      onPress={() =>
+                        run(() => setColumnWatched(user, boardId, col.id, !watching(col.id)))
+                      }
+                    />
+                  ) : null}
                   {canManage ? (
                     <IconAction
                       icon="delete-outline"

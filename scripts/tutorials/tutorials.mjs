@@ -193,15 +193,27 @@ export const TUTORIALS = [
         do: (t) => t.tap(t.btn('+ Add card')),
       },
       {
-        say: "Give it a short title, and press Enter. That's all there is to it.",
-        do: async (t) => {
-          await t.type(t.placeholder('Card title'), 'Invite local businesses');
-          await t.press('Enter');
-        },
+        say: 'Give it a short title.',
+        do: (t) => t.type(t.placeholder('Card title'), 'Invite local businesses'),
+      },
+      {
+        say: "The bell beside it is already on, so you'll hear about anything that happens on your new card. Tap it if you'd rather not.",
+        do: (t) => t.highlight(t.btn('Subscribe to this card')),
+      },
+      {
+        say: "Then press Enter. That's all there is to it.",
+        do: (t) => t.press('Enter'),
       },
       {
         say: 'And there it is. Tap any card to open it and see everything about it.',
         do: (t) => t.highlight(t.card('Invite local businesses')),
+      },
+      {
+        say: "And if you'd like to know whenever a card lands in a column, tap the bell on that column. You won't follow every card in it. You'll just hear when a new one arrives.",
+        do: async (t) => {
+          await t.tap(t.btn('Watch To Do'));
+          await t.waitFor(t.btn('Stop watching To Do'));
+        },
       },
     ],
   },
@@ -306,11 +318,11 @@ export const TUTORIALS = [
         do: (t) => t.highlight(t.btn('Edit comment')),
       },
       {
-        say: "If you'd like to hear about new comments on a card that isn't yours, tap the bell at the top to follow it. Tap it again whenever you want to stop.",
+        say: "If you'd like to keep up with a card that isn't yours, tap the bell at the top. You'll hear about new comments, and about anything that changes on it. Tap it again whenever you want to stop.",
         do: async (t) => {
           await t.scroll(-2000);
-          await t.tap(t.btn('Subscribe to comments'));
-          await t.waitFor(t.btn('Unsubscribe from comments'));
+          await t.tap(t.btn('Subscribe to this card'));
+          await t.waitFor(t.btn('Unsubscribe from this card'));
         },
       },
     ],
@@ -668,7 +680,7 @@ export const TUTORIALS = [
         },
       },
       {
-        say: "You'll hear about it when someone gives you a card, or mentions you in a comment. Unread ones stand out, so you can see what's new.",
+        say: "You'll hear about it when someone gives you a card or mentions you, and when something changes on a card you follow. Unread ones stand out, so you can see what's new.",
         do: (t) => t.highlight(t.btn(/Sara mentioned you on .Draft the donor letter/)),
       },
       {

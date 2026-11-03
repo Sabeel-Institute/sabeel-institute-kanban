@@ -28,10 +28,13 @@ export type UserStatus = 'pending' | 'active' | 'rejected' | 'disabled';
 export type NotifyEvent =
   | 'mention'
   | 'assigned'
-  | 'commentOnMyCard'
-  | 'commentOnSubscribed'
+  /** A new comment on a card you follow: subscribed to, or assigned. */
+  | 'comment'
+  /** A burst of changes to a card you follow, sent once the card is quiet. */
+  | 'cardChanged'
+  /** A card arrived in a column you watch. */
+  | 'columnArrival'
   | 'dueSoon'
-  | 'myCardMoved'
   | 'newUserPending';
 
 export interface UserDoc {
@@ -44,6 +47,9 @@ export interface UserDoc {
   role: Role;
   notifyPrefs: Partial<Record<NotifyEvent, boolean>>;
   mutedBoardIds: string[];
+  /** Columns whose arrivals notify me, as `watchKey(boardId, columnId)`.
+   *  Absent until the first watch. */
+  watchedColumns?: string[];
   favoriteBoardIds: string[];
   recentBoardIds: string[];
   unreadNotifCount: number;
@@ -177,8 +183,9 @@ export interface CardDoc {
    */
   assigneeUids: string[];
   /**
-   * Who has subscribed to this card's COMMENTS. Not "watchers" — nothing else
-   * about the card notifies them (see docs/PRODUCT_BRIEF.md).
+   * Who has subscribed to this card: they hear about every comment and every
+   * change its history records (docs/PRODUCT_BRIEF.md § Notifications). The
+   * creator starts here unless they turned the new card's bell off.
    *
    * Subject to the same board-membership rule as `assigneeUids`, and for a
    * sharper reason: the card read rule has a subscriber arm, so subscribing is

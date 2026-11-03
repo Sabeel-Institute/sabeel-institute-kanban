@@ -1,5 +1,6 @@
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import { FieldValue } from 'firebase-admin/firestore';
+import { watchKey } from '@sabeel/shared';
 import {
   adminDb,
   callFunction,
@@ -184,5 +185,21 @@ describe('removeBoardMember activity attribution', () => {
       const subs = (snap.data()?.subscriberUids ?? []) as string[];
       return subs.includes(MEM) ? undefined : true;
     });
+  });
+
+  it('clears the columns they watched on that board, and only that board', async () => {
+    await adminDb()
+      .doc('boards/ct_b1')
+      .update({ memberUids: FieldValue.arrayUnion(MEM) });
+    await adminDb()
+      .doc(`users/${MEM}`)
+      .update({ watchedColumns: [watchKey('ct_b1', 'c1'), watchKey('ct_other', 'c1')] });
+
+    const token = await idTokenFor(MGR);
+    const res = await callFunction('removeBoardMember', { boardId: 'ct_b1', uid: MEM }, token);
+    expect(res.status).toBe(200);
+
+    const user = await adminDb().doc(`users/${MEM}`).get();
+    expect(user.data()?.watchedColumns).toEqual([watchKey('ct_other', 'c1')]);
   });
 });

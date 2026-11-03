@@ -30,12 +30,15 @@ import { useSelection } from '../../useSelection';
 import { createAutoScroller } from './autoScroll';
 import { BulkBar } from '../BulkBar';
 import { IconAction, LoadError } from '../ui';
+import { NewCardBell, WatchColumnBell } from './Bells';
+import { setColumnWatched, useWatchedColumns } from '../../notifications';
 import {
   CARD_TITLE_MAX,
   canManageBoard,
   columnDeleteBlocked,
   columnsPatch,
   subtaskCounts,
+  watchKey,
   type BoardColumn,
   type Label,
 } from '@sabeel/shared';
@@ -178,18 +181,23 @@ function CardTile({
 function WebAddCardForm({
   onAdd,
   onCancel,
+  canSubscribe,
 }: {
-  /** Called with a trimmed, non-empty title. */
-  onAdd: (title: string) => void;
+  /** Called with a trimmed, non-empty title, and whether to subscribe to it. */
+  onAdd: (title: string, subscribe: boolean) => void;
   onCancel: () => void;
+  /** Whether the bell is offered: only a member of the board may subscribe. */
+  canSubscribe: boolean;
 }) {
   const t = useWebTheme();
   const [title, setTitle] = useState('');
+  // Unmount-scoped like the draft, so every new composer starts subscribed.
+  const [subscribe, setSubscribe] = useState(true);
 
   function submit() {
     const trimmed = title.trim();
     if (!trimmed) return;
-    onAdd(trimmed);
+    onAdd(trimmed, canSubscribe && subscribe);
   }
 
   return (
@@ -214,9 +222,14 @@ function WebAddCardForm({
           color: t.text.primary,
         }}
       />
-      <button onClick={submit} style={primaryBtn(t)}>
-        Add card
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: space.sm }}>
+        <button onClick={submit} style={primaryBtn(t)}>
+          Add card
+        </button>
+        {canSubscribe ? (
+          <NewCardBell on={subscribe} onToggle={() => setSubscribe((on) => !on)} />
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -268,6 +281,13 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
 
   // From the BOARD, not the user directory — only admins may list users.
   const members = board.data?.members ?? NO_MEMBERS;
+  // Only a member may subscribe to a card or watch a column: rules hold
+  // subscribers to members, and the notice sweep sends arrivals to members
+  // alone, so an admin visiting a board they are not on gets neither bell.
+  const isMember = board.data?.memberUids.includes(user.uid) ?? false;
+  const watched = useWatchedColumns(user);
+  const watching = (columnId: string) =>
+    (watched.data ?? []).includes(watchKey(boardId, columnId));
   // Org-wide, not from the board: labels are one set for the whole team.
   const allLabels = useLabels();
   const labels = allLabels.data ?? NO_LABELS;
@@ -326,7 +346,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
 
   // The title comes from `WebAddCardForm`, already trimmed and non-empty — the
   // draft lives there so typing one does not re-render the board.
-  async function addCard(columnId: string, title: string) {
+  async function addCard(columnId: string, title: string, subscribe: boolean) {
     setAdding(null);
     try {
       await createCard({
@@ -335,6 +355,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         title,
         user,
         columnCards: byColumn.get(columnId) ?? [],
+        subscribe,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -606,15 +627,30 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
                   run={runReporting}
                   onEditingChange={(on) => setRenamingCol(on ? col.id : null)}
                 />
-                {canManage && renamingCol !== col.id ? (
-                  <button
-                    onClick={() => askRemoveColumn(col)}
-                    aria-label={`Delete column ${col.name}`}
-                    style={{ ...btn(t), fontSize: 12 }}
-                  >
-                    ✕
-                  </button>
-                ) : null}
+                {/* Together at the right: the header spaces its children
+                    apart, and a third one would sit in the middle. */}
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  {isMember && renamingCol !== col.id ? (
+                    <WatchColumnBell
+                      columnName={col.name}
+                      watching={watching(col.id)}
+                      onPress={() =>
+                        runReporting(() =>
+                          setColumnWatched(user, boardId, col.id, !watching(col.id)),
+                        )
+                      }
+                    />
+                  ) : null}
+                  {canManage && renamingCol !== col.id ? (
+                    <button
+                      onClick={() => askRemoveColumn(col)}
+                      aria-label={`Delete column ${col.name}`}
+                      style={{ ...btn(t), fontSize: 12 }}
+                    >
+                      ✕
+                    </button>
+                  ) : null}
+                </div>
               </div>
 
               <div
@@ -691,7 +727,8 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
 
               {adding === col.id ? (
                 <WebAddCardForm
-                  onAdd={(title) => void addCard(col.id, title)}
+                  onAdd={(title, subscribe) => void addCard(col.id, title, subscribe)}
+                  canSubscribe={isMember}
                   onCancel={() => setAdding(null)}
                 />
               ) : (

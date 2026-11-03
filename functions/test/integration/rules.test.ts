@@ -7,6 +7,8 @@ import {
 } from '@firebase/rules-unit-testing';
 import { readFileSync } from 'node:fs';
 import {
+  arrayRemove,
+  arrayUnion,
   doc,
   collection,
   getDoc,
@@ -18,7 +20,13 @@ import {
   serverTimestamp,
   where,
 } from 'firebase/firestore';
-import { EMULATOR_PROJECT_ID, PASSWORD_SIGN_IN_EMAIL, RULES_VERSION } from '@sabeel/shared';
+import {
+  EMULATOR_PROJECT_ID,
+  MAX_WATCHED_COLUMNS,
+  PASSWORD_SIGN_IN_EMAIL,
+  RULES_VERSION,
+  watchKey,
+} from '@sabeel/shared';
 import { firestoreHostPort } from './emulatorHosts';
 
 let env: RulesTestEnvironment;
@@ -290,6 +298,38 @@ describe('preference self-writes', () => {
         mutedBoardIds: ['b1'],
       }),
     );
+  });
+
+  it('an active user may watch columns, up to the limit', async () => {
+    const db = ctx('member1', 'member', 'active');
+    await assertSucceeds(
+      updateDoc(doc(db, 'users/member1'), { watchedColumns: arrayUnion(watchKey('b1', 'c1')) }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(db, 'users/member1'), { watchedColumns: arrayRemove(watchKey('b1', 'c1')) }),
+    );
+    const full = Array.from({ length: MAX_WATCHED_COLUMNS }, (_, i) => watchKey('b1', `c${i}`));
+    await assertSucceeds(updateDoc(doc(db, 'users/member1'), { watchedColumns: full }));
+    // One past the limit, and a list that is not a list, are both refused.
+    await assertFails(
+      updateDoc(doc(db, 'users/member1'), { watchedColumns: arrayUnion(watchKey('b1', 'one-more')) }),
+    );
+    await assertFails(updateDoc(doc(db, 'users/member1'), { watchedColumns: 'b1/c1' }));
+    await assertSucceeds(updateDoc(doc(db, 'users/member1'), { watchedColumns: [] }));
+  });
+
+  it('nobody may watch columns on someone else’s behalf', async () => {
+    const db = ctx('member1', 'member', 'active');
+    await assertFails(
+      updateDoc(doc(db, 'users/org1'), { watchedColumns: [watchKey('b1', 'c1')] }),
+    );
+  });
+
+  it('no client reads or writes a pending notice', async () => {
+    // Server-only: the sweep's queue of a card's unannounced changes.
+    const db = ctx('admin1', 'admin', 'active');
+    await assertFails(getDoc(doc(db, 'pendingNotices/any')));
+    await assertFails(setDoc(doc(db, 'pendingNotices/any'), { entries: {} }));
   });
 
   it('an active user may NOT write a pushTokens field on their user doc', async () => {

@@ -112,7 +112,17 @@ service cloud.firestore {
       function selfWritableOnly() {
         return request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['favoriteBoardIds', 'recentBoardIds', 'mutedBoardIds',
-                    'notifyPrefs', 'unreadNotifCount']);
+                    'notifyPrefs', 'unreadNotifCount', 'watchedColumns']);
+      }
+      // The columns whose arrivals notify you. Naming a column on a board you
+      // are not on gains nothing: the notice sweep sends arrivals to that
+      // board's members only, which rules could not check here anyway — they
+      // cannot look up every board the list names. So the rule only bounds
+      // the list (MAX_WATCHED_COLUMNS in @sabeel/shared).
+      function watchesBounded() {
+        return !('watchedColumns' in request.resource.data)
+          || (request.resource.data.watchedColumns is list
+              && request.resource.data.watchedColumns.size() <= 200);
       }
 
       // Your own doc: needed even while pending, so the gate screen can show
@@ -126,7 +136,8 @@ service cloud.firestore {
       // Preferences only, on your own doc, once you are approved.
       allow update: if isActive()
         && request.auth.uid == userId
-        && selfWritableOnly();
+        && selfWritableOnly()
+        && watchesBounded();
 
       // Accounts are created by the auth trigger and never deleted by clients.
       allow create, delete: if false;

@@ -7,45 +7,37 @@ import {
 } from '../src/notify';
 
 describe('the default event set', () => {
-  it('ships the high-frequency event OFF', () => {
-    // "A card you own was moved" fires constantly on an active board, and is
-    // how notification fatigue starts.
-    expect(DEFAULT_NOTIFY_PREFS.myCardMoved).toBe(false);
-  });
-
-  it('ships the ones people actually need ON', () => {
-    expect(DEFAULT_NOTIFY_PREFS.mention).toBe(true);
-    expect(DEFAULT_NOTIFY_PREFS.assigned).toBe(true);
-    expect(DEFAULT_NOTIFY_PREFS.dueSoon).toBe(true);
-  });
-
-  it('ships subscribed-comments ON, because subscribing is already a choice', () => {
-    // Unlike `myCardMoved`, whose volume is set by how busy the boards are,
-    // this one is bounded by how many cards you deliberately subscribed to.
-    expect(DEFAULT_NOTIFY_PREFS.commentOnSubscribed).toBe(true);
+  it('ships every event ON', () => {
+    // Card events reach only people who chose the card or its column, and a run
+    // of changes is one notice, so no event needs to start off to stay quiet.
+    expect(NOTIFY_EVENTS.every((e) => e.defaultOn)).toBe(true);
   });
 
   it('stays small — every addition is a tax on attention', () => {
-    // Raised from 6 to 7 on 2026-07-28 for `commentOnSubscribed`, and the point
-    // of this assertion is that raising it has to be a decision rather than a
-    // side effect. The justification: subscribing to a card's comments is the
-    // only way a non-assignee could follow a discussion at all, and the wider
-    // "notify me on every change" version was considered and dropped precisely
-    // to keep this number from climbing.
+    // Seven since 2026-11-02, when the two comment events became one and the
+    // move event became `cardChanged` beside `columnArrival`. Raising it has to
+    // be a decision rather than a side effect.
     expect(NOTIFY_EVENTS.length).toBeLessThanOrEqual(7);
+  });
+
+  it('defaults are derived from the list, so a new event cannot ship without one', () => {
+    expect(Object.keys(DEFAULT_NOTIFY_PREFS).sort()).toEqual(
+      NOTIFY_EVENTS.map((e) => e.event).sort(),
+    );
   });
 });
 
 describe('notificationText', () => {
-  it('reads the same for a comment however you came to care about the card', () => {
-    // The recipient does not need to be told WHY they are hearing about it.
-    const args = { actorName: 'Sara', cardTitle: 'Fix signup' };
-    expect(notificationText({ ...args, event: 'commentOnSubscribed' })).toBe(
-      notificationText({ ...args, event: 'commentOnMyCard' }),
-    );
-    expect(notificationText({ ...args, event: 'commentOnSubscribed' })).toBe(
+  it('words a comment the same however you came to follow the card', () => {
+    expect(notificationText({ event: 'comment', actorName: 'Sara', cardTitle: 'Fix signup' })).toBe(
       'Sara commented on \u201cFix signup\u201d',
     );
+  });
+
+  it('has a line for every event', () => {
+    for (const { event } of NOTIFY_EVENTS) {
+      expect(notificationText({ event, actorName: 'Sara', cardTitle: 'Fix signup' })).toBeTruthy();
+    }
   });
 });
 
@@ -80,13 +72,13 @@ describe('shouldNotify', () => {
     // Treating undefined as "off" would mean nobody is notified until they
     // visit the settings screen.
     expect(shouldNotify({ ...base, prefs: {} })).toBe(true);
-    expect(shouldNotify({ ...base, event: 'myCardMoved', prefs: {} })).toBe(false);
   });
 
-  it('respects an explicit opt-IN for a default-off event', () => {
-    expect(
-      shouldNotify({ ...base, event: 'myCardMoved', prefs: { myCardMoved: true } }),
-    ).toBe(true);
+  it('ignores a preference for an event that no longer exists', () => {
+    // Accounts still carry keys from before 2026-11-02 (`myCardMoved` and the
+    // two comment events); they decide nothing.
+    const prefs = { myCardMoved: false, commentOnMyCard: false } as Record<string, boolean>;
+    expect(shouldNotify({ ...base, event: 'comment', prefs })).toBe(true);
   });
 
   it('respects a muted board', () => {
