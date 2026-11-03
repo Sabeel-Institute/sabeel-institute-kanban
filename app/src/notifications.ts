@@ -1,4 +1,6 @@
 import {
+  arrayRemove,
+  arrayUnion,
   collection,
   doc,
   increment,
@@ -10,7 +12,7 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
-import type { NotifyEvent } from '@sabeel/shared';
+import { watchKey, type NotifyEvent } from '@sabeel/shared';
 import { db } from './firebase';
 import { useLiveDoc, useLiveQuery } from './liveQuery';
 import type { Route } from './nav';
@@ -282,4 +284,33 @@ export async function setBoardMuted(
     ? Array.from(new Set([...current, boardId]))
     : current.filter((id) => id !== boardId);
   await updateDoc(doc(db, 'users', user.uid), { mutedBoardIds: next });
+}
+
+// ---- Column watches -------------------------------------------------------
+
+/** The columns I watch, as `watchKey`s, from my own user doc. */
+export function useWatchedColumns(user: SessionUser) {
+  return useLiveDoc<string[]>(
+    () => doc(db, 'users', user.uid),
+    [user.uid],
+    'watched-columns',
+    (d) => (d?.data.watchedColumns as string[] | undefined) ?? [],
+  );
+}
+
+/**
+ * Watch or stop watching a column. `arrayUnion`/`arrayRemove` rather than
+ * writing the whole list back, so watching columns from two devices at once
+ * cannot lose one.
+ */
+export async function setColumnWatched(
+  user: SessionUser,
+  boardId: string,
+  columnId: string,
+  on: boolean,
+): Promise<void> {
+  const key = watchKey(boardId, columnId);
+  await updateDoc(doc(db, 'users', user.uid), {
+    watchedColumns: on ? arrayUnion(key) : arrayRemove(key),
+  });
 }

@@ -240,7 +240,8 @@ export const GOOGLE_WEB_CLIENT_ID =
  *
  * `pushTokens` is deliberately absent: device tokens rotate constantly, and every
  * device re-registers its token on next launch, so a drop is neither alarming nor
- * permanent — counting it would only add noise to the signal.
+ * permanent — counting it would only add noise to the signal. So is
+ * `pendingNotices`, a queue the notice sweep empties every few minutes by design.
  */
 export const COLLECTIONS = {
   users: 'root',

@@ -144,8 +144,8 @@ export function MyWorkScreen({ user }: { user: SessionUser }) {
             ? 'Nothing is assigned to you right now.'
             : `${total} card${total === 1 ? '' : 's'} assigned to you across all your boards.`
           : total === 0
-            ? 'You have not subscribed to any cards. Open a card and use the bell to follow its comments.'
-            : `${total} card${total === 1 ? '' : 's'} whose comments you follow.`}
+            ? 'You have not subscribed to any cards. Open a card and use the bell to hear about everything on it.'
+            : `${total} card${total === 1 ? '' : 's'} you subscribe to.`}
       </Hint>
 
       {groups.map((g) => (

@@ -38,7 +38,7 @@ export interface Card {
   columnId: string;
   rank: string;
   assigneeUids: string[];
-  /** Who subscribed to this card's comments. See CardDoc.subscriberUids. */
+  /** Who subscribed to this card. See CardDoc.subscriberUids. */
   subscriberUids: string[];
   dueDate?: string;
   priority: Priority;
@@ -174,6 +174,12 @@ export async function createCard(params: {
   user: SessionUser;
   /** Existing cards in the target column, so the new one lands at the bottom. */
   columnCards: readonly Card[];
+  /**
+   * Subscribe the creator: the bell beside a new card's title, on unless they
+   * turn it off. Only for a member of the board — rules hold subscribers to
+   * members, and an admin may create a card on a board they are not on.
+   */
+  subscribe: boolean;
 }): Promise<string> {
   const last = params.columnCards[params.columnCards.length - 1] ?? null;
   const now = Date.now();
@@ -184,6 +190,7 @@ export async function createCard(params: {
     columnId: params.columnId,
     rank: rankBetween(last?.rank ?? null, null),
     assigneeUids: [],
+    subscriberUids: params.subscribe ? [params.user.uid] : [],
     priority: 'none',
     labelIds: [],
     archived: false,
@@ -221,18 +228,17 @@ export async function updateCard(
 }
 
 /**
- * Subscribe to (or unsubscribe from) a card's comments.
+ * Subscribe to (or unsubscribe from) a card: its comments and every change.
  *
  * Deliberately NOT routed through `updateCard`, and the difference is the point:
  * this writes `updatedBy` because the rules pin it to the writer, but leaves
  * `updatedAt` alone. Subscribing is not an edit to the work.
  *
  * That combination is what keeps it invisible where it should be. `diffCard`
- * does not look at `subscriberUids`, so no activity entry is written; the
- * notify trigger only reacts to assignment and column changes, so nothing is
- * sent; and leaving `updatedAt` untouched keeps the card out of the top of
- * Search's newest-first browse order. Following a conversation should not look
- * like doing work on it.
+ * does not look at `subscriberUids`, so no activity entry is written and no
+ * notice goes to anyone; and leaving `updatedAt` untouched keeps the card out
+ * of the top of Search's newest-first browse order. Following a card should
+ * not look like doing work on it.
  */
 export async function subscribeToCard(
   cardId: string,
@@ -520,9 +526,10 @@ export async function bulkCopyToBoard(params: {
       archived: false,
       commentCount: 0,
       attachmentCount: 0,
-      // No subscribers: a copy has no comments, so there is no conversation to
-      // have subscribed to. Same reasoning as commentCount above.
-      subscriberUids: [],
+      // Whoever made the copy, as on any new card, and only them: the source's
+      // subscribers chose the SOURCE. Only if they are on the destination
+      // board, which rules require of every subscriber.
+      subscriberUids: keepMembers([params.user.uid], params.destMemberUids),
       // NOTE: `parentId` is deliberately absent — a copy is a new, independent
       // card and must not inherit a subtask link to the SOURCE board's parent.
       // This literal is untyped, so nothing but this comment stops someone

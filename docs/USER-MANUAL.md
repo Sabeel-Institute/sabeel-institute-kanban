@@ -135,10 +135,18 @@ Each card shows, at a glance: its **title**, a **priority badge**, its **labels*
 its **due date** (red if overdue), and the **people assigned** (as name chips) —
 so you can read a card without opening it. A card with no priority set shows no
 badge. Tap **+ Add card** at the bottom of a column, type a title, press Enter —
-that's a new card.
+that's a new card. The **bell** beside the title is on, so you're subscribed to the
+card you make and hear about everything on it (see **Subscribe**, below); tap it
+before adding if you'd rather not.
+
+Each column has a **bell** too: **watch** a column to be told whenever a card
+arrives in it — moved in, added to it or restored from the archive. Watching a
+column doesn't subscribe you to its cards; open one from the notification and use
+its own bell if you want to follow it. A card that passes through on its way to
+another column doesn't count.
 
 **On a phone the row along the bottom holds everything else**: beside **+ Add
-card** are icons to delete the column (owners of the board only), open the
+card** are icons to watch the column, delete it (owners of the board only), open the
 board's **archived cards**, and open the board's **settings** — or, if you do not
 own it, its **members**, which is the same screen without the controls. They sit
 there rather than in the header so the board's name has the top row to itself.
@@ -208,12 +216,19 @@ Tap any card to open the full view.
 
   The list closes when you click away, and picking a name never loses your place
   in the box.
-- **Subscribe** — the **bell** in the card's header. Tap it to hear about new
-  comments on a card even when it isn't assigned to you; tap again to stop. It
-  turns solid while you're subscribed. Subscribing is about the *conversation* —
-  nothing else on the card notifies you. A card assigned to you already sends you
-  its comments, but subscribing as well means you keep hearing about it if you're
+- **Subscribe** — the **bell** in the card's header. Tap it to hear about
+  everything on a card even when it isn't assigned to you: new comments, and any
+  change its activity records — moved, renamed, a new due date, a file attached
+  and so on. Tap again to stop. It turns solid while you're subscribed, and it's
+  already on for cards you made yourself. A card assigned to you already tells you
+  all of this, but subscribing as well means you keep hearing about it if you're
   later unassigned.
+
+  Changes come **together, not one by one**: once someone has finished with a card
+  for two minutes, you get one notification listing what they changed, so a run of
+  edits buzzes your phone once. Comments and mentions arrive straight away.
+  Archiving a card sends one last notification; after that it's quiet until
+  someone restores it.
 
   You can edit your own comment with the **pencil**, and the **@** works there
   too — mention someone in an edit and they're told, once. Correcting the wording
@@ -466,8 +481,11 @@ cutting the list short. Tap a result to open the card.
 
 **Alerts** shows everything you've been told about, so nothing is lost if a phone
 notification is missed or swiped away. You're alerted when a card is **assigned**
-to you, when someone **@mentions** you in a comment, and — for admins — when a
-**new account** is waiting. Unread items are outlined; tap one to go straight to
+to you, when someone **@mentions** you in a comment, when there's a new comment or
+a change on a card you **follow** (one you're assigned to or subscribed to), when a
+card arrives in a column you **watch**, and — for admins — when a **new account**
+is waiting. If several arrive at once, your phone shows one notification and
+Alerts has each of them. Unread items are outlined; tap one to go straight to
 what it is about — the card for a card alert, **People** for an account waiting
 for approval. A notification shows whether the app is open, in the background
 or closed — on a phone and in a browser alike. Tapping it on your phone's lock
@@ -495,9 +513,8 @@ the list stays worth reading. Nothing is lost by it — a card keeps its own
 comments and activity permanently.
 
 The **gear** opens notification settings, where each kind of notification has an
-on/off switch and you can **mute** individual boards with the bell. One kind is
-off by default — "a card assigned to you was moved" — because on a busy board it
-fires constantly. **You are never notified about your own actions.**
+on/off switch and you can **mute** individual boards with the bell. **You are never
+notified about your own actions.**
 
 Push notifications need the device's own permission. The app offers to set it up
 once, on the Boards screen after you sign in — or you can open the **gear** here
@@ -919,7 +936,11 @@ separately, because a card in the archive is one no board will show you.
 
 **…follow a card that isn't mine?**
 Open it → the **bell** in the header. It appears under **My work → Subscribed**,
-and you'll hear about new comments.
+and you'll hear about its comments and changes.
+
+**…know when a card lands in a column?**
+The **bell** on the column (on a phone, in the row along the bottom) → you're
+told whenever a card arrives in it.
 
 **…find every card with a particular label?**
 **Search → Filters → Labels**, and pick one. Pick more than one and you get cards

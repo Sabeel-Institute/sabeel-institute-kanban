@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
+  type BoardColumn,
   canManageBoard,
   columnDeleteBlocked,
   columnsPatch,
-  subtaskCounts,
-  type BoardColumn,
   type Label,
+  subtaskCounts,
+  watchKey,
 } from '@sabeel/shared';
 import {
   archiveCard,
@@ -36,6 +37,8 @@ import {
   Title,
 } from '../ui';
 import { AddCardForm } from './AddCardForm';
+import { WatchColumnBell } from './Bells';
+import { setColumnWatched, useWatchedColumns } from '../../notifications';
 import { useLabels } from '../../labels';
 import { radius, space, useTheme } from '../../theme';
 import { useAction } from '../../useAction';
@@ -79,6 +82,13 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
 
   const columns = board.data?.columns ?? NO_COLUMNS;
   const members = board.data?.members ?? NO_MEMBERS;
+  // Only a member may subscribe to a card or watch a column: rules hold
+  // subscribers to members, and the notice sweep sends arrivals to members
+  // alone, so an admin visiting a board they are not on gets neither bell.
+  const isMember = board.data?.memberUids.includes(user.uid) ?? false;
+  const watched = useWatchedColumns(user);
+  const watching = (columnId: string) =>
+    (watched.data ?? []).includes(watchKey(boardId, columnId));
   // Org-wide, not from the board: labels are one set for the whole team.
   const allLabels = useLabels();
   const labels = allLabels.data ?? NO_LABELS;
@@ -96,7 +106,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
 
   // The title comes from `AddCardForm`, already trimmed and non-empty — the
   // draft lives there so typing one does not re-render the board.
-  async function addCard(columnId: string, title: string) {
+  async function addCard(columnId: string, title: string, subscribe: boolean) {
     setAdding(null);
     await run(() =>
       createCard({
@@ -105,6 +115,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         title,
         user,
         columnCards: byColumn.get(columnId) ?? [],
+        subscribe,
       }),
     );
   }
@@ -281,14 +292,28 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
                   run={run}
                   onEditingChange={(on) => setRenamingCol(on ? col.id : null)}
                 />
-                {canManage && renamingCol !== col.id ? (
-                  <IconAction
-                    icon="delete-outline"
-                    label={`Delete column ${col.name}`}
-                    danger
-                    onPress={() => askRemoveColumn(col)}
-                  />
-                ) : null}
+                {/* Together at the right: the row spaces its children apart,
+                    and a third one would sit in the middle. */}
+                <Row>
+                  {isMember && renamingCol !== col.id ? (
+                    <WatchColumnBell
+                      columnName={col.name}
+                      watching={watching(col.id)}
+                      busy={busy}
+                      onPress={() =>
+                        run(() => setColumnWatched(user, boardId, col.id, !watching(col.id)))
+                      }
+                    />
+                  ) : null}
+                  {canManage && renamingCol !== col.id ? (
+                    <IconAction
+                      icon="delete-outline"
+                      label={`Delete column ${col.name}`}
+                      danger
+                      onPress={() => askRemoveColumn(col)}
+                    />
+                  ) : null}
+                </Row>
               </Row>
 
               <ScrollView style={styles.fill} keyboardShouldPersistTaps="handled">
@@ -330,7 +355,8 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
 
               {adding === col.id ? (
                 <AddCardForm
-                  onAdd={(title) => addCard(col.id, title)}
+                  onAdd={(title, subscribe) => addCard(col.id, title, subscribe)}
+                  canSubscribe={isMember}
                   onCancel={() => setAdding(null)}
                 />
               ) : (

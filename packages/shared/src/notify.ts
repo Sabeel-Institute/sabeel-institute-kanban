@@ -4,8 +4,10 @@ import type { NotifyEvent } from './types';
  * Who gets told what, and when they have opted out.
  *
  * Notification volume is the fastest way for this app to become as annoying as
- * the thing it replaced, so the default set is deliberately small and the one
- * high-frequency event ships OFF.
+ * the thing it replaced. What keeps it bounded is that every card event reaches
+ * only people who chose the card (subscribed, or took it on by being assigned)
+ * or chose its column, and that a run of changes is announced once
+ * (`notices.ts`), not once per save.
  */
 
 export interface NotifyEventSpec {
@@ -29,19 +31,22 @@ export const NOTIFY_EVENTS: NotifyEventSpec[] = [
     defaultOn: true,
   },
   {
-    event: 'commentOnMyCard',
-    label: 'A comment on a card assigned to you',
-    description: 'Discussion on work you own.',
+    event: 'comment',
+    label: 'A comment on a card you follow',
+    description: 'Cards you subscribe to, and cards assigned to you.',
     defaultOn: true,
   },
   {
-    event: 'commentOnSubscribed',
-    label: 'A comment on a card you subscribe to',
+    event: 'cardChanged',
+    label: 'A card you follow changes',
     description:
-      'Discussion on a card you chose to follow, even if it is not assigned to you.',
-    // ON by default, unlike `myCardMoved`: subscribing is already an opt-in you
-    // made card by card, so the volume is bounded by your own choices rather
-    // than by how busy the boards are.
+      'Moved, edited, given a date, a file and so on. Sent once someone has finished, not per change.',
+    defaultOn: true,
+  },
+  {
+    event: 'columnArrival',
+    label: 'A card arrives in a column you watch',
+    description: 'Watch a column from the bell on its header.',
     defaultOn: true,
   },
   {
@@ -49,13 +54,6 @@ export const NOTIFY_EVENTS: NotifyEventSpec[] = [
     label: 'A card assigned to you is due soon',
     description: 'A morning reminder before the due date.',
     defaultOn: true,
-  },
-  {
-    event: 'myCardMoved',
-    label: 'A card assigned to you was moved',
-    description:
-      'Off by default: on an active board this fires constantly, and it is how notification fatigue starts.',
-    defaultOn: false,
   },
   {
     event: 'newUserPending',
@@ -111,13 +109,17 @@ export function notificationText(params: {
       return `${params.actorName} mentioned you on ${card}`;
     case 'assigned':
       return `${params.actorName} assigned you ${card}`;
-    case 'commentOnMyCard':
-    case 'commentOnSubscribed':
+    case 'comment':
       return `${params.actorName} commented on ${card}`;
+    // The two burst notices are worded from their entries (`notices.ts`) and
+    // always pass their own text; these are the shape a caller without the
+    // entries falls back to.
+    case 'cardChanged':
+      return `${params.actorName} changed ${card}`;
+    case 'columnArrival':
+      return `${params.actorName} moved ${card} into a column you watch`;
     case 'dueSoon':
       return `${card} is due soon`;
-    case 'myCardMoved':
-      return `${params.actorName} moved ${card}`;
     case 'newUserPending':
       return `${params.actorName} is waiting for approval`;
   }

@@ -76,39 +76,39 @@ describe('onCommentCreated notifications', () => {
     });
     expect(mention.type).toBe('mention');
 
-    const onMyCard = await waitFor('commentOnMyCard entry', async () => {
-      const e = await inbox(ASSIGNEE, 'commentOnMyCard');
+    const onMyCard = await waitFor('comment entry for the assignee', async () => {
+      const e = await inbox(ASSIGNEE, 'comment');
       return e.length ? e[0] : undefined;
     });
-    expect(onMyCard.type).toBe('commentOnMyCard');
+    expect(onMyCard.text).toContain('commented on');
 
     // Never notify yourself.
     const authorAll = await adminDb().collection(`users/${AUTHOR}/notifications`).get();
     expect(authorAll.empty).toBe(true);
   });
 
-  it('a mention wins over the assignee notification — no double-notify', async () => {
+  it('a mention wins over the follower notification — no double-notify', async () => {
     await clearInbox(ASSIGNEE);
-    // The author mentions the ASSIGNEE. They should get a mention, and NOT also a
-    // commentOnMyCard for the same comment.
+    // The author mentions the ASSIGNEE. They should get a mention, and NOT also
+    // a comment notification for the same comment.
     await comment('over to you @Cara', [ASSIGNEE]);
 
     await waitFor('assignee mention', async () => {
       const e = await inbox(ASSIGNEE, 'mention');
       return e.length ? e[0] : undefined;
     });
-    // The mention has landed; the dedup means no commentOnMyCard was written.
-    const onMyCard = await inbox(ASSIGNEE, 'commentOnMyCard');
-    expect(onMyCard).toHaveLength(0);
+    // Give the follower branch every chance to fire before asserting absence.
+    await new Promise((r) => setTimeout(r, 2500));
+    expect(await inbox(ASSIGNEE, 'comment')).toHaveLength(0);
   });
 });
 
-describe('subscribers hear about comments', () => {
+describe('followers hear about comments', () => {
   it('notifies someone who subscribed but is not assigned', async () => {
     await clearInbox(SUBSCRIBER);
     await comment('any thoughts?', []);
-    const entries = await waitFor('commentOnSubscribed entry', async () => {
-      const got = await inbox(SUBSCRIBER, 'commentOnSubscribed');
+    const entries = await waitFor('comment entry', async () => {
+      const got = await inbox(SUBSCRIBER, 'comment');
       return got.length > 0 ? got : undefined;
     });
     expect(entries[0].text).toContain('commented on');
@@ -122,39 +122,23 @@ describe('subscribers hear about comments', () => {
       const got = await inbox(SUBSCRIBER, 'mention');
       return got.length > 0 ? got : undefined;
     });
-    // Give the subscriber branch every chance to fire before asserting absence.
     await new Promise((r) => setTimeout(r, 2500));
-    expect(await inbox(SUBSCRIBER, 'commentOnSubscribed')).toHaveLength(0);
+    expect(await inbox(SUBSCRIBER, 'comment')).toHaveLength(0);
   });
 
-  it('sends ONE notification to someone assigned AND subscribed — the SUBSCRIBED one', async () => {
-    // The per-card choice outranks the blanket default. Someone who turned off
-    // "comments on cards assigned to me" and then subscribed to this one is
-    // saying "just this one"; the other order would send them nothing.
+  it('sends ONE notification to someone assigned AND subscribed', async () => {
     await adminDb()
       .doc('cards/nt_card')
       .update({ subscriberUids: [SUBSCRIBER, ASSIGNEE] });
     await clearInbox(ASSIGNEE);
     await comment('status?', []);
-    await waitFor('the subscribed entry', async () => {
-      const got = await inbox(ASSIGNEE, 'commentOnSubscribed');
+    await waitFor('the comment entry', async () => {
+      const got = await inbox(ASSIGNEE, 'comment');
       return got.length > 0 ? got : undefined;
     });
     await new Promise((r) => setTimeout(r, 2500));
-    expect(await inbox(ASSIGNEE, 'commentOnMyCard')).toHaveLength(0);
+    expect(await inbox(ASSIGNEE, 'comment')).toHaveLength(1);
     await adminDb().doc('cards/nt_card').update({ subscriberUids: [SUBSCRIBER] });
-  });
-
-  it('still sends the assignee event when they have NOT subscribed', async () => {
-    // The positive control for the exclusion above: without it this would be
-    // the only assignee path and the swap could silently break it.
-    await clearInbox(ASSIGNEE);
-    await comment('plain assignee case', []);
-    const got = await waitFor('the assignee entry', async () => {
-      const e = await inbox(ASSIGNEE, 'commentOnMyCard');
-      return e.length > 0 ? e : undefined;
-    });
-    expect(got).toHaveLength(1);
   });
 
   it('never notifies the person who wrote the comment', async () => {
@@ -164,11 +148,57 @@ describe('subscribers hear about comments', () => {
     await clearInbox(AUTHOR);
     await comment('thinking out loud', []);
     await waitFor('someone else to have been told', async () => {
-      const got = await inbox(SUBSCRIBER, 'commentOnSubscribed');
+      const got = await inbox(SUBSCRIBER, 'comment');
       return got.length > 0 ? got : undefined;
     });
-    expect(await inbox(AUTHOR, 'commentOnSubscribed')).toHaveLength(0);
+    expect(await inbox(AUTHOR, 'comment')).toHaveLength(0);
     await adminDb().doc('cards/nt_card').update({ subscriberUids: [SUBSCRIBER] });
+  });
+});
+
+describe('an archived card is dormant', () => {
+  // Archiving a card puts it away: nothing on it notifies anyone, mentions
+  // included, until it is restored (docs/PRODUCT_BRIEF.md § Notifications).
+  it('writes no notification for a comment or a mention on an archived card', async () => {
+    const C = 'nt_dormant_card';
+    await adminDb().doc(`cards/${C}`).set({
+      boardId: 'nt_b1',
+      title: 'Put away',
+      description: '',
+      columnId: 'c1',
+      rank: 'W',
+      assigneeUids: [ASSIGNEE],
+      subscriberUids: [SUBSCRIBER],
+      priority: 'none',
+      labelIds: [],
+      archived: true,
+      commentCount: 0,
+      createdAt: 1,
+      createdBy: AUTHOR,
+      updatedAt: 1,
+      updatedBy: AUTHOR,
+    });
+    await Promise.all([clearInbox(MENTIONED), clearInbox(SUBSCRIBER)]);
+    await adminDb()
+      .collection(`cards/${C}/comments`)
+      .add({ authorUid: AUTHOR, body: 'still here @Ben?', mentionUids: [MENTIONED], createdAt: Date.now() });
+
+    // The control, on a live card: proves the trigger was running, so the
+    // empty inboxes below are silence rather than a no-op.
+    await comment('control @Ben', [MENTIONED]);
+    await waitFor('control mention landed', async () => {
+      const e = await inbox(MENTIONED, 'mention');
+      return e.length ? e[0] : undefined;
+    });
+    await waitFor('control comment landed', async () => {
+      const e = await inbox(SUBSCRIBER, 'comment');
+      return e.length ? e[0] : undefined;
+    });
+
+    for (const uid of [MENTIONED, SUBSCRIBER]) {
+      const all = await adminDb().collection(`users/${uid}/notifications`).get();
+      expect(all.docs.filter((d) => d.data().cardId === C)).toHaveLength(0);
+    }
   });
 });
 
@@ -186,8 +216,8 @@ describe('mentioning someone by EDITING a comment', () => {
   it('notifies someone first mentioned in an edit', async () => {
     await Promise.all([clearInbox(MENTIONED), clearInbox(ASSIGNEE)]);
     const ref = await post('no mention here', []);
-    await waitFor('commentOnMyCard from the create', async () => {
-      const e = await inbox(ASSIGNEE, 'commentOnMyCard');
+    await waitFor('the comment entry from the create', async () => {
+      const e = await inbox(ASSIGNEE, 'comment');
       return e.length ? e[0] : undefined;
     });
     expect(await inbox(MENTIONED, 'mention')).toHaveLength(0);
@@ -215,8 +245,8 @@ describe('mentioning someone by EDITING a comment', () => {
     await ref.update({ body: 'hello @Ben — typo fixed', mentionUids: [MENTIONED], editedAt: Date.now() });
     await new Promise((r) => setTimeout(r, 4000));
     expect(await inbox(MENTIONED, 'mention')).toHaveLength(0);
-    // And an edit is not a new comment, so assignees hear nothing either.
-    expect(await inbox(ASSIGNEE, 'commentOnMyCard')).toHaveLength(0);
+    // And an edit is not a new comment, so followers hear nothing either.
+    expect(await inbox(ASSIGNEE, 'comment')).toHaveLength(0);
   });
 });
 

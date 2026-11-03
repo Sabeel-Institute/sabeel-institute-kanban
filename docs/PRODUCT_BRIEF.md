@@ -200,11 +200,11 @@ cards/{cardId}/activity/{activityId}
   # cannot be forged or edited.
 
 pendingNotices/{cardId}                          # a card's changes waiting to be announced; one doc per card
-  boardId, firstAt, lastAt, sendAt
   entries: { [activityId]: { type, actorUid, at, from?, to? } }
   # Server-only: no client reads or writes it. Every new activity entry lands
-  # here, keyed by its id so a retried trigger cannot add it twice, and the
-  # notice sweep sends and deletes the doc once `sendAt` passes.
+  # here, keyed by its id so a retried trigger cannot add it twice. The notice
+  # sweep reads the whole (small) collection each minute, claims a doc that is
+  # due by deleting it on an unchanged update time, then sends.
 ```
 
 ```
@@ -321,8 +321,8 @@ archived, rank)` for the board view, `(boardId, assigneeUids array-contains)` fo
 board-member removal, `(boardId, subscriberUids array-contains)` for the
 unsubscribe half of that same removal, and `(archived, dueDate)` for the due-soon
 sweep. My Work itself needs only the automatic single-field array-contains
-indexes on `assigneeUids` and `subscriberUids`, and notices likewise only the
-automatic ones on `pendingNotices.sendAt` and `users.watchedColumns`.
+indexes on `assigneeUids` and `subscriberUids`, and column arrivals only the
+automatic one on `users.watchedColumns`.
 The emulator does not enforce composite indexes — verify in production (see
 `docs/INHERITED-STACK.md`, lesson 6, and `scripts/probe-indexes.mjs`).
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CARD_TITLE_MAX } from '@sabeel/shared';
 import { Button, Row, TextField } from '../ui';
+import { NewCardBell } from './Bells';
 
 /**
  * The "+ Add card" composer, shared by both native board layouts.
@@ -31,12 +32,17 @@ import { Button, Row, TextField } from '../ui';
 export function AddCardForm({
   onAdd,
   onCancel,
+  canSubscribe,
 }: {
-  /** Called with a trimmed, non-empty title. */
-  onAdd: (title: string) => void;
+  /** Called with a trimmed, non-empty title, and whether to subscribe to it. */
+  onAdd: (title: string, subscribe: boolean) => void;
   onCancel: () => void;
+  /** Whether the bell is offered: only a member of the board may subscribe. */
+  canSubscribe: boolean;
 }) {
   const [title, setTitle] = useState('');
+  // Unmount-scoped like the draft, so every new composer starts subscribed.
+  const [subscribe, setSubscribe] = useState(true);
 
   // One path for both the Add button and the keyboard's submit, so they cannot
   // drift. An empty title is a no-op rather than a disabled button, which is
@@ -44,7 +50,7 @@ export function AddCardForm({
   function submit() {
     const trimmed = title.trim();
     if (!trimmed) return;
-    onAdd(trimmed);
+    onAdd(trimmed, canSubscribe && subscribe);
   }
 
   return (
@@ -60,6 +66,9 @@ export function AddCardForm({
       <Row>
         <Button label="Add" onPress={submit} />
         <Button label="Cancel" variant="secondary" onPress={onCancel} />
+        {canSubscribe ? (
+          <NewCardBell on={subscribe} onToggle={() => setSubscribe((on) => !on)} />
+        ) : null}
       </Row>
     </>
   );

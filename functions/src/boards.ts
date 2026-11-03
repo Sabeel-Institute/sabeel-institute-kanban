@@ -4,7 +4,12 @@ import { guarded, sentryDsn } from './sentry';
 import { logger } from 'firebase-functions/v2';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import type { BoardDoc } from '@sabeel/shared';
-import { canAdministerUsers, canManageBoard, canUnseatCreator } from '@sabeel/shared';
+import {
+  canAdministerUsers,
+  canManageBoard,
+  canUnseatCreator,
+  watchKeyOnBoard,
+} from '@sabeel/shared';
 import { actorOf } from './actor';
 
 /**
@@ -90,6 +95,13 @@ export const removeBoardMember = onCall({ secrets: [sentryDsn] }, guarded(async 
     .where('subscriberUids', 'array-contains', uid)
     .get();
 
+  // …and the columns they watch here. Not an access question — the notice
+  // sweep sends arrivals to board members only — but an entry nothing can
+  // ever answer is clutter, and it counts against their watch limit.
+  const userRef = db.doc(`users/${uid}`);
+  const watched = ((await userRef.get()).data()?.watchedColumns as string[] | undefined) ?? [];
+  const stillWatched = watched.filter((k) => !watchKeyOnBoard(k, boardId));
+
   const batch = db.batch();
   batch.update(boardRef, {
     memberUids: FieldValue.arrayRemove(uid),
@@ -122,6 +134,9 @@ export const removeBoardMember = onCall({ secrets: [sentryDsn] }, guarded(async 
     // a property of the work, so removing one is not an edit anybody should see
     // in the card's history or in the Search browse order.
     batch.update(card.ref, { subscriberUids: FieldValue.arrayRemove(uid) });
+  }
+  if (stillWatched.length !== watched.length) {
+    batch.update(userRef, { watchedColumns: stillWatched });
   }
 
   await batch.commit();

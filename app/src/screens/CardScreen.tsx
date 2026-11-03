@@ -166,10 +166,9 @@ export function CardScreen({
   const today = todayInOrgTz();
   const overdue = c.dueDate !== undefined && c.dueDate < today;
 
-  /** Whether I follow this card's comments. Assignment does NOT imply it — an
-   *  assignee already hears about comments through `commentOnMyCard`, and
-   *  subscribing separately is what makes the interest survive being
-   *  unassigned. */
+  /** Whether I subscribe to this card. Assignment does NOT imply it — an
+   *  assignee already hears about everything on it, and subscribing as well is
+   *  what makes the interest survive being unassigned. */
   const subscribed = c.subscriberUids.includes(user.uid);
   // Only board members may be assigned — the rule the My Work query depends on.
   // Sourced from the board doc so non-admins (who cannot list users) still see
@@ -234,14 +233,11 @@ export function CardScreen({
         </View>
         <View style={styles.headerActions}>
           {note ? <Hint>{note}</Hint> : null}
-          {/* Subscribing is about the COMMENTS, so the label says so — a bare
-              "Subscribe" would imply you hear about every field on the card,
-              which was considered and deliberately not built. */}
+          {/* Subscribing means hearing about everything on the card: its
+              comments and every change its history records. */}
           <IconAction
             icon={subscribed ? 'notifications-active' : 'notifications-none'}
-            label={
-              subscribed ? 'Unsubscribe from comments' : 'Subscribe to comments'
-            }
+            label={subscribed ? 'Unsubscribe from this card' : 'Subscribe to this card'}
             accent={subscribed}
             disabled={busy}
             onPress={() => run(() => subscribeToCard(cardId, user, !subscribed))}
@@ -387,6 +383,10 @@ export function CardScreen({
                 title: childTitle,
                 user,
                 columnCards: cardsInColumn(boardCards.data ?? [], c.columnId),
+                // No bell in this row, which is already three controls wide on
+                // a phone; the subtask is a card its creator made, so they
+                // follow it, and its own bell turns that off.
+                subscribe: b.memberUids.includes(user.uid),
               });
               await updateCard(newId, { parentId: cardId }, user);
             })

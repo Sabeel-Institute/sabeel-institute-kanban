@@ -3,7 +3,12 @@ import { onDocumentCreated, onDocumentWritten } from 'firebase-functions/v2/fire
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions/v2';
 import { guardedEvent, sentryDsn } from './sentry';
-import { getFirestore, FieldValue, type DocumentReference } from 'firebase-admin/firestore';
+import {
+  getFirestore,
+  FieldValue,
+  type DocumentReference,
+  type WriteBatch,
+} from 'firebase-admin/firestore';
 import {
   NOTIFICATION_RETENTION_DAYS,
   ORG_TIMEZONE,
@@ -28,7 +33,7 @@ import { PUSH_SECRETS, send, type Delivery } from './messaging';
 
 const db = () => getFirestore();
 
-interface Recipient {
+export interface Recipient {
   uid: string;
   status?: string;
   prefs?: Partial<Record<NotifyEvent, boolean>>;
@@ -36,7 +41,7 @@ interface Recipient {
   displayName?: string;
 }
 
-async function loadRecipients(uids: readonly string[]): Promise<Recipient[]> {
+export async function loadRecipients(uids: readonly string[]): Promise<Recipient[]> {
   const unique = [...new Set(uids)].filter(Boolean);
   if (unique.length === 0) return [];
 
@@ -75,9 +80,12 @@ async function nameOf(uid: string): Promise<string> {
 }
 
 /**
- * Write the inbox entry and send the push. Preferences, board mutes, account
- * status and the never-notify-yourself rule are all applied by `shouldNotify`
- * in shared, which is unit-tested exhaustively.
+ * Write the inbox entries and send the push for one event. Preferences, board
+ * mutes, account status and the never-notify-yourself rule are all applied by
+ * `shouldNotify` in shared, which is unit-tested exhaustively.
+ *
+ * `text` overrides the event's stock wording, for a caller that words the
+ * notice itself.
  */
 async function notify(params: {
   event: NotifyEvent;
@@ -87,6 +95,7 @@ async function notify(params: {
   boardId: string;
   cardId?: string;
   cardTitle?: string;
+  text?: string;
 }): Promise<void> {
   // An ARCHIVED board is put away, and nothing on it should still be buzzing
   // people's phones. Checked here, in the one place every notification passes
@@ -95,48 +104,96 @@ async function notify(params: {
   // to any, so an empty boardId skips the lookup rather than failing on it.
   if (params.boardId && (await boardIsArchived(params.boardId))) return;
 
-  const text = notificationText({
-    event: params.event,
-    actorName: params.actorName,
-    cardTitle: params.cardTitle,
-  });
-
-  const targets = params.recipients.filter((r) =>
-    shouldNotify({
+  const text =
+    params.text ??
+    notificationText({
       event: params.event,
-      recipientUid: r.uid,
-      actorUid: params.actorUid,
-      boardId: params.boardId,
-      prefs: r.prefs,
-      mutedBoardIds: r.mutedBoardIds,
-      status: r.status,
-    }),
-  );
-  if (targets.length === 0) return;
+      actorName: params.actorName,
+      cardTitle: params.cardTitle,
+    });
 
-  // The inbox id is kept per recipient because the push carries it: tapping a
+  await deliver(
+    params.recipients
+      .filter((r) =>
+        shouldNotify({
+          event: params.event,
+          recipientUid: r.uid,
+          actorUid: params.actorUid,
+          boardId: params.boardId,
+          prefs: r.prefs,
+          mutedBoardIds: r.mutedBoardIds,
+          status: r.status,
+        }),
+      )
+      .map((r) => ({
+        uid: r.uid,
+        event: params.event,
+        text,
+        actorUid: params.actorUid,
+        boardId: params.boardId,
+        cardId: params.cardId,
+      })),
+  );
+}
+
+/** One inbox entry for one person, already cleared by `shouldNotify`. */
+export interface Notice {
+  uid: string;
+  event: NotifyEvent;
+  text: string;
+  actorUid: string;
+  boardId: string;
+  cardId?: string;
+}
+
+/** Writes per batch, under Firestore's 500. */
+const BATCH_WRITES = 450;
+
+/**
+ * Write each notice to its recipient's inbox, then push: ONE push per person
+ * however many notices they have here, so a sweep that announces twenty cards
+ * someone moved at once chimes once. The push carries the first notice and
+ * says how many more are waiting; the inbox has every one.
+ */
+export async function deliver(notices: readonly Notice[]): Promise<void> {
+  if (notices.length === 0) return;
+
+  // The inbox id is kept per notice because the push carries it: tapping a
   // notification marks THAT entry read, so acting on a push takes the badge down
   // like acting in the app does. Without it someone taps the push, deals with
   // the card, and Alerts still insists there is 1 unread.
-  const batch = db().batch();
-  const notifIdByUid = new Map<string, string>();
-  for (const r of targets) {
-    const ref = db().collection(`users/${r.uid}/notifications`).doc();
-    notifIdByUid.set(r.uid, ref.id);
-    batch.set(ref, {
-      type: params.event,
-      boardId: params.boardId,
-      ...(params.cardId ? { cardId: params.cardId } : {}),
-      actorUid: params.actorUid,
-      text,
-      read: false,
-      at: Date.now(),
-    });
-    batch.update(db().doc(`users/${r.uid}`), {
-      unreadNotifCount: FieldValue.increment(1),
-    });
+  const notifIdOf = new Map<Notice, string>();
+  const byUid = new Map<string, Notice[]>();
+  const writes: Array<(b: WriteBatch) => void> = [];
+  const at = Date.now();
+  for (const n of notices) {
+    const ref = db().collection(`users/${n.uid}/notifications`).doc();
+    notifIdOf.set(n, ref.id);
+    byUid.set(n.uid, [...(byUid.get(n.uid) ?? []), n]);
+    writes.push((b) =>
+      b.set(ref, {
+        type: n.event,
+        boardId: n.boardId,
+        ...(n.cardId ? { cardId: n.cardId } : {}),
+        actorUid: n.actorUid,
+        text: n.text,
+        read: false,
+        at,
+      }),
+    );
   }
-  await batch.commit();
+  for (const [uid, theirs] of byUid) {
+    writes.push((b) =>
+      b.update(db().doc(`users/${uid}`), {
+        unreadNotifCount: FieldValue.increment(theirs.length),
+      }),
+    );
+  }
+  for (let i = 0; i < writes.length; i += BATCH_WRITES) {
+    const batch = db().batch();
+    for (const write of writes.slice(i, i + BATCH_WRITES)) write(batch);
+    await batch.commit();
+  }
 
   // Push is best-effort and must never fail the inbox write above: a device
   // token goes stale the moment someone reinstalls the app, and that is not a
@@ -146,8 +203,9 @@ async function notify(params: {
   // field makes that a read-modify-write race between two phones; a document per
   // token cannot collide, and rules can grant a user write access to their own
   // tokens without opening up the rest of their user document.
+  const people = [...byUid];
   const tokenSnaps = await Promise.all(
-    targets.map((r) => db().collection(`users/${r.uid}/pushTokens`).get()),
+    people.map(([uid]) => db().collection(`users/${uid}/pushTokens`).get()),
   );
 
   // One message per DEVICE: the payload differs per recipient, because it
@@ -155,14 +213,17 @@ async function notify(params: {
   // delivery — a token that turns out dead has to be traced back to the
   // document to delete.
   const refOf = new Map<Delivery, DocumentReference>();
-  const deliveries = targets.flatMap((r, i) =>
-    tokenSnaps[i].docs.map((d) => {
+  const deliveries = people.flatMap(([, theirs], i) => {
+    const first = theirs[0];
+    const body =
+      theirs.length === 1 ? first.text : `${first.text} (and ${theirs.length - 1} more in Alerts)`;
+    return tokenSnaps[i].docs.map((d) => {
       const delivery: Delivery = {
         token: d.id,
         device: d.data() as PushTokenDoc,
         message: {
           title: 'Sabeel Kanban',
-          body: text,
+          body,
           // `type` is what lets a tapped notification open the right screen. It
           // is the only routing signal a `newUserPending` carries — that event
           // has no board and no card, so without it the tap has nowhere to go
@@ -170,17 +231,17 @@ async function notify(params: {
           // inbox document written above; the client maps both through one
           // `routeForNotification`.
           data: {
-            type: params.event,
-            boardId: params.boardId,
-            ...(params.cardId ? { cardId: params.cardId } : {}),
-            notifId: notifIdByUid.get(r.uid) ?? '',
+            type: first.event,
+            boardId: first.boardId,
+            ...(first.cardId ? { cardId: first.cardId } : {}),
+            notifId: notifIdOf.get(first) ?? '',
           },
         },
       };
       refOf.set(delivery, d.ref);
       return delivery;
-    }),
-  );
+    });
+  });
   if (deliveries.length === 0) return;
 
   // Never throws (messaging.ts says why), so the inbox written above stands
@@ -203,7 +264,7 @@ async function notify(params: {
 }
 
 /**
- * A comment: notifies mentioned people, and the card's assignees.
+ * A comment: notifies mentioned people, and the card's followers.
  *
  * Written, not created. An @mention typed while EDITING a comment is a real
  * mention — the app re-derives `mentionUids` on every edit — and a create-only
@@ -215,9 +276,12 @@ async function notify(params: {
  *  - Mentions notify whoever is NEWLY named. Diffing against the previous
  *    mention list is what stops an edit from re-paging everyone already in the
  *    comment, so fixing a typo does not buzz the whole thread again.
- *  - `commentOnMyCard` fires on CREATE only. Editing a comment is not a new
- *    comment, and telling assignees "Sara commented" because Sara corrected a
- *    word would be noise of exactly the kind this app avoids.
+ *  - `comment` fires on CREATE only. Editing a comment is not a new comment,
+ *    and telling followers "Sara commented" because Sara corrected a word
+ *    would be noise of exactly the kind this app avoids.
+ *
+ * Immediate, unlike a card's other changes (notices.ts): a comment is one
+ * action, and someone may be waiting for the answer.
  */
 export const onCommentNotify = onDocumentWritten(
   {
@@ -241,8 +305,11 @@ export const onCommentNotify = onDocumentWritten(
     if (!created && newlyMentioned.length === 0) return;
 
     // boardId is now a field on the card, not the path — read it from the card
-    // (which we fetch anyway for title/assignees). It gates the board-mute check.
+    // (which we fetch anyway for title/followers). It gates the board-mute check.
     const card = await db().doc(`cards/${cardId}`).get();
+    // An archived card is DORMANT: nothing on it notifies anyone, mentions
+    // included, until it is restored (docs/PRODUCT_BRIEF.md § Notifications).
+    if (card.data()?.archived === true) return;
     const boardId = (card.data()?.boardId as string) ?? '';
     const cardTitle = card.data()?.title as string | undefined;
     const assignees = (card.data()?.assigneeUids as string[]) ?? [];
@@ -251,7 +318,7 @@ export const onCommentNotify = onDocumentWritten(
     const actorName = await nameOf(authorUid);
 
     // A mention wins over the generic comment notification, so being both
-    // mentioned and an assignee does not produce two pushes for one comment.
+    // mentioned and a follower does not produce two pushes for one comment.
     await notify({
       event: 'mention',
       recipients: await loadRecipients(newlyMentioned),
@@ -264,36 +331,14 @@ export const onCommentNotify = onDocumentWritten(
 
     if (!created) return;
 
-    // Precedence: mention, then SUBSCRIBER, then assignee. Each group excludes
-    // the ones above it, so a person who is mentioned AND subscribed AND
-    // assigned gets exactly ONE notification for one comment — caring about a
-    // card in more ways must not mean being told more times.
-    //
-    // Subscription outranks assignment deliberately, and the order matters
-    // because each event has its own preference. Subscribing is a per-card
-    // choice someone made by hand; "a comment on a card assigned to you" is a
-    // blanket default. Someone with many assignments who turns that default off
-    // and then taps the bell on ONE card is saying "just this one" — with the
-    // order reversed they would get nothing at all, and the bell would be a
-    // control that silently does nothing. The message text is identical either
-    // way, so nothing else can tell the difference.
-    const subscribedOnly = subscribers.filter((u) => !mentionUids.includes(u));
-    await notify({
-      event: 'commentOnSubscribed',
-      recipients: await loadRecipients(subscribedOnly),
-      actorUid: authorUid,
-      actorName,
-      boardId,
-      cardId,
-      cardTitle,
-    });
-
-    const assignedOnly = assignees.filter(
-      (u) => !mentionUids.includes(u) && !subscribers.includes(u),
+    // Followers are subscribers and assignees alike, once each: caring about
+    // a card in more ways must not mean being told more times.
+    const followers = [...new Set([...subscribers, ...assignees])].filter(
+      (u) => !mentionUids.includes(u),
     );
     await notify({
-      event: 'commentOnMyCard',
-      recipients: await loadRecipients(assignedOnly),
+      event: 'comment',
+      recipients: await loadRecipients(followers),
       actorUid: authorUid,
       actorName,
       boardId,
@@ -303,54 +348,42 @@ export const onCommentNotify = onDocumentWritten(
   }),
 );
 
-/** Assignment and moves on a card someone owns. */
+/**
+ * Assignment, at once: work just became yours. Every other change a card's
+ * followers hear about goes out per burst, through the notice sweep
+ * (notices.ts), never from the write itself.
+ */
 export const onCardNotify = onDocumentWritten(
   { document: 'cards/{cardId}', secrets: [sentryDsn, ...PUSH_SECRETS] },
   guardedEvent(async (event) => {
     const before = event.data?.before?.data();
     const after = event.data?.after?.data();
     if (!after) return;
+    // Dormant, as above. A write that restores a card and assigns it is live
+    // by `after`, so the assignee is still told.
+    if (after.archived === true) return;
 
     const { cardId } = event.params;
-    // boardId is a field now. Note: a cross-board move changes it AND columnId,
-    // so remaining assignees (members of both boards) get the 'myCardMoved'
-    // notification below; assignees dropped by the move are simply removed from
-    // `after.assigneeUids` and get nothing (the intended "drop silently" behaviour).
+    // A cross-board move changes boardId; anyone it drops from the card is
+    // removed from `assigneeUids` rather than newly in it, so gets nothing here.
     const boardId = (after.boardId as string) ?? '';
     const actorUid = (after.updatedBy ?? after.createdBy ?? '') as string;
     if (!actorUid) return;
 
-    const actorName = await nameOf(actorUid);
-    const cardTitle = after.title as string | undefined;
-
     const beforeAssignees = (before?.assigneeUids as string[]) ?? [];
     const afterAssignees = (after.assigneeUids as string[]) ?? [];
     const newlyAssigned = afterAssignees.filter((u) => !beforeAssignees.includes(u));
+    if (newlyAssigned.length === 0) return;
 
-    if (newlyAssigned.length > 0) {
-      await notify({
-        event: 'assigned',
-        recipients: await loadRecipients(newlyAssigned),
-        actorUid,
-        actorName,
-        boardId,
-        cardId,
-        cardTitle,
-      });
-    }
-
-    // Default OFF: on an active board this fires constantly.
-    if (before && before.columnId !== after.columnId) {
-      await notify({
-        event: 'myCardMoved',
-        recipients: await loadRecipients(afterAssignees),
-        actorUid,
-        actorName,
-        boardId,
-        cardId,
-        cardTitle,
-      });
-    }
+    await notify({
+      event: 'assigned',
+      recipients: await loadRecipients(newlyAssigned),
+      actorUid,
+      actorName: await nameOf(actorUid),
+      boardId,
+      cardId,
+      cardTitle: after.title as string | undefined,
+    });
   }),
 );
 

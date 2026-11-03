@@ -36,4 +36,5 @@ export {
   dueSoonReminders,
   pruneNotifications,
 } from './notifications';
+export { onActivityNotice, noticeSweep } from './notices';
 export { healthCheck } from './health';

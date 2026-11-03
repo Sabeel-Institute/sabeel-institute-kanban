@@ -1563,11 +1563,11 @@ try {
       .catch(() => false)),
   );
 
-  await sara.getByRole('button', { name: 'Subscribe to comments' }).click();
+  await sara.getByRole('button', { name: 'Subscribe to this card' }).click();
   check(
     'subscribing flips the control to unsubscribe',
     await sara
-      .getByRole('button', { name: 'Unsubscribe from comments' })
+      .getByRole('button', { name: 'Unsubscribe from this card' })
       .waitFor({ timeout: 20000 })
       .then(() => true)
       .catch(() => false),
