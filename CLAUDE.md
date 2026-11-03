@@ -220,10 +220,10 @@ contact with untrusted users.
 Added 2026-10-29: `onBoardWritten` diffs every board write (`diffBoard`) into
 `boards/{id}/activity`, which everyone on the board reads at the foot of Board
 settings. **Who did it is the `updatedBy`/`updatedAt` stamp**, named only when
-the write moved it. Rules accept a new stamp only from the person it names, or
-a write that leaves it alone: builds before 0.15.0 do not know the stamp, and
-refusing them would break board settings for whoever has not updated. Their
-changes name nobody. **Anything that writes a board stamps it** — client
+the write moved it. Rules refuse a board update without a new stamp naming the
+writer, so builds before 0.15.0, which do not know the stamp, cannot save a
+board (Faisal, 2026-11-03: "I want everyone to update"); changes they made
+before then name nobody. **Anything that writes a board stamps it** — client
 writes through `updateBoard`/`setBoardOwner`, the member callables with the
 caller — or its change is recorded as nobody's. Names are stored on entries,
 not resolved: the people a board's history is about are often no longer on

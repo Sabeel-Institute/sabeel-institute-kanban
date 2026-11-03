@@ -257,10 +257,13 @@ describe('the board document', () => {
       });
     });
     const board = doc(fs('owner1', 'member'), 'boards/b1');
-    await assertFails(updateDoc(board, { labels: [{ id: 'l1', name: 'X', color: '#83114F' }] }));
+    const stamp = (at: number) => ({ updatedBy: 'owner1', updatedAt: at });
+    await assertFails(
+      updateDoc(board, { ...stamp(2), labels: [{ id: 'l1', name: 'X', color: '#83114F' }] }),
+    );
     // The same write without the stale field goes through, so it is the field
     // being refused and not the update.
-    await assertSucceeds(updateDoc(board, { name: 'Ops renamed' }));
+    await assertSucceeds(updateDoc(board, { ...stamp(3), name: 'Ops renamed' }));
   });
 });
 

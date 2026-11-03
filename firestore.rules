@@ -296,24 +296,18 @@ service cloud.firestore {
       /**
        * WHO CHANGED THE BOARD, for its history (functions/src/boardHistory.ts).
        *
-       * A change either stamps itself — `updatedBy` the writer, `updatedAt` a
-       * new number — or leaves the stamp exactly as it was. The trigger names
-       * `updatedBy` only when `updatedAt` moved, so the first arm is what
-       * makes a named entry trustworthy, and nobody can stamp a change with
-       * someone else's uid.
-       *
-       * The second arm keeps app builds older than the history working: they
-       * do not know the stamp, and refusing their writes would break board
-       * settings for whoever has not updated yet. Their changes are recorded
-       * with nobody named. The cost is that a current build could also leave
-       * the stamp alone and go unnamed — never misnamed.
+       * Every change stamps itself: `updatedBy` the writer, `updatedAt` a new
+       * number. The trigger names `updatedBy` only when `updatedAt` moved, so
+       * this is what makes every client change named and the name
+       * trustworthy: nobody can stamp a change with someone else's uid, or
+       * leave the stamp alone and go unnamed. App builds older than the
+       * history (before 0.15.0) do not know the stamp, so their board saves
+       * are refused.
        */
       function stampsChange() {
-        return (incoming().get('updatedBy', null) == request.auth.uid
-                && incoming().get('updatedAt', null) is number
-                && incoming().get('updatedAt', null) != existing().get('updatedAt', null))
-          || (incoming().get('updatedBy', null) == existing().get('updatedBy', null)
-              && incoming().get('updatedAt', null) == existing().get('updatedAt', null));
+        return incoming().get('updatedBy', null) == request.auth.uid
+          && incoming().get('updatedAt', null) is number
+          && incoming().get('updatedAt', null) != existing().get('updatedAt', null);
       }
 
       // Admins see every board; everyone else sees only boards they are on. For

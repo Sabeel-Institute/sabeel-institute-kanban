@@ -49,7 +49,15 @@ function ctx(uid: string, role: string, status = 'active') {
     .firestore();
 }
 
-const baseBoard = (over: Record<string, unknown> = {}) => ({
+/**
+ * The change stamp the app puts on every board update. Every update here
+ * carries one, so an update a test expects refused is refused for the
+ * reason it names, never for a missing stamp.
+ */
+let stampClock = 1_000_000;
+const stamp = (uid: string) => ({ updatedBy: uid, updatedAt: ++stampClock });
+
+const baseBoard =(over: Record<string, unknown> = {}) => ({
   name: 'Fundraising',
   description: '',
   archived: false,
@@ -323,6 +331,7 @@ describe('updating a board', () => {
     const db = ctx('owner1', 'member');
     await assertSucceeds(
       updateDoc(doc(db, 'boards/b_member'), {
+        ...stamp('owner1'),
         name: 'Renamed',
         columns: [
           { id: 'c1', name: 'To Do' },
@@ -338,29 +347,44 @@ describe('updating a board', () => {
     // Stated as its own assertion because it is the point of the model: running
     // one board takes no rank, and confers none.
     await assertSucceeds(
-      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), { name: 'Still fine' }),
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), {
+        ...stamp('owner1'),
+        name: 'Still fine',
+      }),
     );
   });
 
   it('a MEMBER of the board who is not an owner cannot edit it', async () => {
     await assertFails(
-      updateDoc(doc(ctx('member1', 'member'), 'boards/b_member'), { name: 'Hijacked' }),
+      updateDoc(doc(ctx('member1', 'member'), 'boards/b_member'), {
+        ...stamp('member1'),
+        name: 'Hijacked',
+      }),
     );
     // Only ownership was in the way.
     await assertSucceeds(
-      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), { name: 'Hijacked' }),
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), {
+        ...stamp('owner1'),
+        name: 'Hijacked',
+      }),
     );
   });
 
   it('an ORGANIZER who is not on the board cannot edit it', async () => {
     await assertFails(
-      updateDoc(doc(ctx('org1', 'organizer'), 'boards/b_other'), { name: 'Nope' }),
+      updateDoc(doc(ctx('org1', 'organizer'), 'boards/b_other'), {
+        ...stamp('org1'),
+        name: 'Nope',
+      }),
     );
   });
 
   it('an admin edits a board they are not a member of', async () => {
     await assertSucceeds(
-      updateDoc(doc(ctx('admin1', 'admin'), 'boards/b_other'), { name: 'Admin renamed' }),
+      updateDoc(doc(ctx('admin1', 'admin'), 'boards/b_other'), {
+        ...stamp('admin1'),
+        name: 'Admin renamed',
+      }),
     );
   });
 
@@ -375,7 +399,10 @@ describe('updating a board', () => {
       );
     });
     await assertFails(
-      updateDoc(doc(ctx('ghost1', 'member'), 'boards/b_ghost'), { name: 'Nope' }),
+      updateDoc(doc(ctx('ghost1', 'member'), 'boards/b_ghost'), {
+        ...stamp('ghost1'),
+        name: 'Nope',
+      }),
     );
   });
 
@@ -389,6 +416,7 @@ describe('updating a board', () => {
     // board it is describing.
     await assertFails(
       updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), {
+        ...stamp('owner1'),
         activeCardCount: 999,
       }),
     );
@@ -396,19 +424,26 @@ describe('updating a board', () => {
 
   it('createdAt cannot be rewritten', async () => {
     await assertFails(
-      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), { createdAt: 999 }),
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), {
+        ...stamp('owner1'),
+        createdAt: 999,
+      }),
     );
   });
 
   it('archived must be a boolean', async () => {
     await assertFails(
-      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), { archived: 'yes' }),
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), {
+        ...stamp('owner1'),
+        archived: 'yes',
+      }),
     );
   });
 
   it('authorship cannot be rewritten', async () => {
     await assertFails(
       updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), {
+        ...stamp('owner1'),
         createdBy: 'owner1_impostor',
       }),
     );
@@ -416,7 +451,10 @@ describe('updating a board', () => {
 
   it('archiving is an update, and owners may do it', async () => {
     await assertSucceeds(
-      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), { archived: true }),
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), {
+        ...stamp('owner1'),
+        archived: true,
+      }),
     );
   });
 
@@ -426,6 +464,7 @@ describe('updating a board', () => {
     // organizer cannot even read `b_other`, let alone write themselves onto it.
     await assertFails(
       updateDoc(doc(ctx('org1', 'organizer'), 'boards/b_other'), {
+        ...stamp('org1'),
         memberUids: ['someone_else', 'org1'],
         createdBy: 'someone_else',
       }),
@@ -436,6 +475,7 @@ describe('updating a board', () => {
     // The escalation path this model has to close.
     await assertFails(
       updateDoc(doc(ctx('member1', 'member'), 'boards/b_other'), {
+        ...stamp('member1'),
         memberUids: ['someone_else', 'member1'],
       }),
     );
@@ -446,6 +486,7 @@ describe('updating a board', () => {
     // the removeBoardMember callable is for.
     await assertFails(
       updateDoc(doc(ctx('member1', 'member'), 'boards/b_member'), {
+        ...stamp('member1'),
         memberUids: ['owner1'],
       }),
     );
@@ -454,6 +495,7 @@ describe('updating a board', () => {
   it('an inactive owner cannot update', async () => {
     await assertFails(
       updateDoc(doc(ctx('owner1', 'member', 'disabled'), 'boards/b_member'), {
+        ...stamp('owner1'),
         name: 'Nope',
       }),
     );
@@ -471,6 +513,7 @@ describe('granting and revoking ownership', () => {
   it('an owner promotes another member', async () => {
     await assertSucceeds(
       updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), {
+        ...stamp('owner1'),
         boardOwnerUids: ['owner1', 'member1'],
       }),
     );
@@ -479,6 +522,7 @@ describe('granting and revoking ownership', () => {
   it('an owner demotes another owner', async () => {
     await assertSucceeds(
       updateDoc(doc(ctx('second1', 'member'), 'boards/b_two'), {
+        ...stamp('second1'),
         boardOwnerUids: ['owner1'],
       }),
     );
@@ -487,6 +531,7 @@ describe('granting and revoking ownership', () => {
   it('a plain member cannot promote themselves', async () => {
     await assertFails(
       updateDoc(doc(ctx('member1', 'member'), 'boards/b_member'), {
+        ...stamp('member1'),
         boardOwnerUids: ['owner1', 'member1'],
       }),
     );
@@ -495,12 +540,14 @@ describe('granting and revoking ownership', () => {
   it('another owner cannot demote the CREATOR', async () => {
     await assertFails(
       updateDoc(doc(ctx('second1', 'member'), 'boards/b_two'), {
+        ...stamp('second1'),
         boardOwnerUids: ['second1'],
       }),
     );
     // Only the creator's protection was in the way — demoting anyone else works.
     await assertSucceeds(
       updateDoc(doc(ctx('second1', 'member'), 'boards/b_two'), {
+        ...stamp('second1'),
         boardOwnerUids: ['owner1'],
       }),
     );
@@ -510,6 +557,7 @@ describe('granting and revoking ownership', () => {
     // Authority is `member AND owner`, so taking away either one unseats them.
     await assertFails(
       updateDoc(doc(ctx('second1', 'member'), 'boards/b_two'), {
+        ...stamp('second1'),
         memberUids: ['second1'],
         boardOwnerUids: ['second1'],
       }),
@@ -529,6 +577,7 @@ describe('granting and revoking ownership', () => {
   it('nor remove the creator from the board while LEAVING them an owner', async () => {
     await assertFails(
       updateDoc(doc(ctx('second1', 'member'), 'boards/b_two'), {
+        ...stamp('second1'),
         memberUids: ['second1'],
         boardOwnerUids: ['owner1', 'second1'],
       }),
@@ -540,6 +589,7 @@ describe('granting and revoking ownership', () => {
     // admin request on the rare handover.
     await assertFails(
       updateDoc(doc(ctx('owner1', 'member'), 'boards/b_two'), {
+        ...stamp('owner1'),
         boardOwnerUids: ['second1'],
       }),
     );
@@ -548,6 +598,7 @@ describe('granting and revoking ownership', () => {
   it('an admin can demote the creator', async () => {
     await assertSucceeds(
       updateDoc(doc(ctx('admin1', 'admin'), 'boards/b_two'), {
+        ...stamp('admin1'),
         boardOwnerUids: ['second1'],
       }),
     );
@@ -562,7 +613,10 @@ describe('granting and revoking ownership', () => {
    */
   it('a board whose creator was already demoted is still editable', async () => {
     await assertSucceeds(
-      updateDoc(doc(ctx('second1', 'member'), 'boards/b_demoted'), { name: 'Carries on' }),
+      updateDoc(doc(ctx('second1', 'member'), 'boards/b_demoted'), {
+        ...stamp('second1'),
+        name: 'Carries on',
+      }),
     );
   });
 
@@ -590,7 +644,10 @@ describe('granting and revoking ownership', () => {
       );
     });
     await assertSucceeds(
-      updateDoc(doc(ctx('second1', 'member'), 'boards/b_stray'), { name: 'Still editable' }),
+      updateDoc(doc(ctx('second1', 'member'), 'boards/b_stray'), {
+        ...stamp('second1'),
+        name: 'Still editable',
+      }),
     );
   });
 });
@@ -626,6 +683,7 @@ describe('membership does not change from a client, in either direction', () => 
     // permitted and the read feeding it was not.
     await assertFails(
       updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), {
+        ...stamp('owner1'),
         memberUids: ['owner1', 'member1', 'second1'],
       }),
     );
@@ -634,6 +692,7 @@ describe('membership does not change from a client, in either direction', () => 
   it('nor REMOVE one — that is removeBoardMember’s job', async () => {
     await assertFails(
       updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), {
+        ...stamp('owner1'),
         memberUids: ['owner1'],
       }),
     );
@@ -642,6 +701,7 @@ describe('membership does not change from a client, in either direction', () => 
   it('nor remove THEMSELVES, which would strand their own assignments', async () => {
     await assertFails(
       updateDoc(doc(ctx('second1', 'member'), 'boards/b_two'), {
+        ...stamp('second1'),
         memberUids: ['owner1'],
         boardOwnerUids: ['owner1'],
       }),
@@ -654,6 +714,7 @@ describe('membership does not change from a client, in either direction', () => 
     // write went. A board broken past that is a script's job, not a screen's.
     await assertFails(
       updateDoc(doc(ctx('admin1', 'admin'), 'boards/b_member'), {
+        ...stamp('admin1'),
         memberUids: ['owner1'],
       }),
     );
@@ -665,6 +726,7 @@ describe('membership does not change from a client, in either direction', () => 
     // owner could put any name or address against a uid.
     await assertFails(
       updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), {
+        ...stamp('owner1'),
         memberProfiles: { member1: { displayName: 'Someone Else', email: 'evil@example.com' } },
       }),
     );
@@ -674,7 +736,10 @@ describe('membership does not change from a client, in either direction', () => 
     // The positive control that matters: `updateDoc` merges field-by-field, so a
     // rename carries the stored membership through and must not trip this.
     await assertSucceeds(
-      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), { name: 'Renamed' }),
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), {
+        ...stamp('owner1'),
+        name: 'Renamed',
+      }),
     );
   });
 });
@@ -683,6 +748,7 @@ describe('a board with no owner list at all', () => {
   it('is administrable by an admin, who can repair it', async () => {
     await assertSucceeds(
       updateDoc(doc(ctx('admin1', 'admin'), 'boards/b_legacy'), {
+        ...stamp('admin1'),
         boardOwnerUids: ['owner1'],
       }),
     );
@@ -690,10 +756,16 @@ describe('a board with no owner list at all', () => {
 
   it('is administrable by nobody else, including its creator', async () => {
     await assertFails(
-      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_legacy'), { name: 'Nope' }),
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_legacy'), {
+        ...stamp('owner1'),
+        name: 'Nope',
+      }),
     );
     await assertFails(
-      updateDoc(doc(ctx('org1', 'organizer'), 'boards/b_legacy'), { name: 'Nope' }),
+      updateDoc(doc(ctx('org1', 'organizer'), 'boards/b_legacy'), {
+        ...stamp('org1'),
+        name: 'Nope',
+      }),
     );
   });
 
@@ -713,8 +785,7 @@ describe('deleting a board', () => {
 
 /**
  * The stamp the board's history names people by (functions/src/boardHistory.ts).
- * A change either stamps itself with its writer or leaves the stamp alone — the
- * second for app builds older than the history, whose writes must keep working.
+ * Every change stamps itself with its writer and a new time.
  */
 describe('the change stamp', () => {
   it('an owner stamps a change with themselves', async () => {
@@ -727,12 +798,20 @@ describe('the change stamp', () => {
     );
   });
 
-  it('an older app that leaves the stamp alone still saves', async () => {
+  // An app older than the history leaves the stamp alone. Even with the stamp
+  // already naming the writer, the change would be recorded as nobody's.
+  it('a change that leaves the stamp alone is refused', async () => {
     await env.withSecurityRulesDisabled(async (c) => {
       await updateDoc(doc(c.firestore(), 'boards/b_member'), { updatedBy: 'owner1', updatedAt: 5 });
     });
-    await assertSucceeds(
+    await assertFails(
       updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), { name: 'Unstamped' }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), {
+        ...stamp('owner1'),
+        name: 'Unstamped',
+      }),
     );
   });
 

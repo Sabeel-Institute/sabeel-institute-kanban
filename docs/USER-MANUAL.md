@@ -739,8 +739,8 @@ Some lines name nobody — *The board was archived* rather than *Sara archived
 the board*. Those changes were made before the app recorded who made them, and
 pieced together afterwards from the institute's daily backups; a time such as
 *between 2026-08-12 and 2026-08-13* means the change happened somewhere in that
-span. A change made from an out-of-date copy of the app also names nobody, so
-keep the app up to date.
+span. Changes made from an out-of-date copy of the app before 3 November 2026
+name nobody too; an out-of-date copy can no longer change a board.
 
 ## 2.3 Archiving a board
 

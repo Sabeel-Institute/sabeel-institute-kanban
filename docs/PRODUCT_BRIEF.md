@@ -615,10 +615,11 @@ or unmade an owner, and added, removed, renamed or reordered its columns.
   history itself. Removing an owner from the board is one entry, not a
   removal plus a lost ownership.
 - **Who did it is the `updatedBy`/`updatedAt` stamp**, and only when the
-  write moved it (`boardChangeActor`). Rules accept a new stamp only from the
-  person it names, or a write that leaves the stamp alone. The second is for
-  app builds older than the history, so their changes save and are recorded
-  with nobody named. A new board names its creator.
+  write moved it (`boardChangeActor`). Rules refuse a board update unless it
+  carries a new stamp naming the writer, so every client change is named and
+  app builds older than the history cannot save a board. A server write that
+  leaves the stamp alone is recorded with nobody named. A new board names its
+  creator.
 - **Names are stored on the entry**: a member can read only the board's own
   profiles, and the people a history is about — someone removed, an admin
   not on the board, a deleted column — would resolve to nothing later.

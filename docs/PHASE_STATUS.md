@@ -443,6 +443,10 @@ the team.
 - Phones on an older version show an update screen until they install
   this one, since their settings and bells would describe the old
   notifications.
+- Deployed the same day, after the release: a copy of the app older than
+  0.15.0 can no longer change a board, so every change in a board's
+  history names who made it. Phones from 0.13.1 on stop at the update
+  screen first; older ones never check for it.
 
 ### 2026-11-02 — The current Sabeel logo — v0.15.1
 

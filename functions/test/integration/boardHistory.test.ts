@@ -93,8 +93,9 @@ describe('board history', () => {
     });
   });
 
-  // An app older than the history leaves the stamp alone. The uid still on it
-  // belongs to an earlier change, so the entry names nobody.
+  // A write that leaves the stamp alone (a server script; the rules refuse it
+  // from a client). The uid still on it belongs to an earlier change, so the
+  // entry names nobody.
   it('names nobody when the stamp did not move', async () => {
     const old = freshBoard('bh_old');
     await adminDb().doc(`boards/${old}`).set(board({ updatedBy: SARA, updatedAt: 5 }));
