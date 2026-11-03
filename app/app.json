@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sabeel Kanban",
     "slug": "sabeel-institute-kanban",
-    "version": "0.15.1",
+    "version": "0.16.0",
     "orientation": "portrait",
     "scheme": "sabeelkanban",
     "userInterfaceStyle": "light",
@@ -15,7 +15,7 @@
     ],
     "ios": {
       "bundleIdentifier": "com.sabeelinstitute.kanban",
-      "buildNumber": "15001",
+      "buildNumber": "16000",
       "supportsTablet": false,
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
