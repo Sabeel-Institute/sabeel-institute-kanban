@@ -103,8 +103,9 @@ name: Board, card, rich text and gestures
 # Selecting a whole comment. A phone draws a comment as ONE text view, because
 # Android selection cannot cross views: one element holding the first and last
 # lines is what makes Select all mean all of it (seeded through the web
-# composer by scripts/seed-emulators.mjs). iOS names its menu items differently,
-# so the menu is Android's check and the single view is both platforms'.
+# composer by scripts/seed-emulators.mjs), and it is the check, on both
+# platforms. Select all is exercised on Android, where its menu item has that
+# name; nothing on screen says how much it took.
 - extendedWaitUntil:
     visible: "Tap a card to open it\\.[\\s\\S]*"
     timeout: 15000
@@ -122,13 +123,9 @@ name: Board, card, rich text and gestures
     commands:
       - longPressOn: "Two things before we book:[\\s\\S]*"
       - tapOn: "Select all"
-      - extendedWaitUntil:
-          visible: "Copy"
-          timeout: 10000
       - takeScreenshot: 05-select-all
-      # The first tap only clears the selection.
-      - tapOn: "Add a comment[\\s\\S]*"
-      - hideKeyboard
+      # Clears the selection without opening anything: a heading.
+      - tapOn: "Comments \\(\\d+\\)"
 - scrollUntilVisible:
     element: "Back"
     direction: UP

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { htmlToMarkdown, markdownToHtml, richDocToDisplayHtml } from '../src/richtextHtml';
+import {
+  decodeDisplayHref,
+  htmlToMarkdown,
+  markdownToHtml,
+  richDocToDisplayHtml,
+} from '../src/richtextHtml';
 import { extractMentions, mentionInsertion } from '../src/mentions';
 import {
   normalizeMarkdown,
@@ -290,8 +295,51 @@ describe('the display HTML the phones render', () => {
     expect(display('a  b   c')).toBe('<html><p>a \u00A0b \u00A0\u00A0c</p></html>');
   });
 
-  it('keeps a soft break inside a paragraph', () => {
-    expect(display('first\nsecond')).toBe('<html><p>first<br>second</p></html>');
+  it('keeps a space at the start of a line, and a run across a bold mark', () => {
+    const doc: RichDoc = [
+      { kind: 'paragraph', content: [{ kind: 'text', text: ' x' }] },
+      {
+        kind: 'paragraph',
+        content: [
+          { kind: 'text', text: 'a ' },
+          { kind: 'bold', content: [{ kind: 'text', text: ' b' }] },
+        ],
+      },
+    ];
+    expect(richDocToDisplayHtml(doc)).toBe('<html><p>\u00A0x</p><br><p>a <b>\u00A0b</b></p></html>');
+  });
+
+  it('draws each line of a paragraph as a paragraph of its own, never a <br> inside one', () => {
+    // iOS makes <br> a newline only beside another tag, so text<br>text ran the
+    // two lines together on an iPhone.
+    expect(display('first\nsecond')).toBe('<html><p>first</p><p>second</p></html>');
+    expect(display('first\nsecond')).not.toMatch(/[^>]<br>[^<]/);
+  });
+
+  it('closes and reopens a bold or a link that spans a line break', () => {
+    const doc: RichDoc = [
+      {
+        kind: 'paragraph',
+        content: [
+          { kind: 'bold', content: [{ kind: 'text', text: 'one\ntwo' }] },
+          { kind: 'link', href: 'https://example.org', content: [{ kind: 'text', text: 'x\ny' }] },
+        ],
+      },
+    ];
+    expect(richDocToDisplayHtml(doc)).toBe(
+      '<html><p><b>one</b></p><p><b>two</b><a href="https://example.org">x</a></p>' +
+        '<p><a href="https://example.org">y</a></p></html>',
+    );
+  });
+
+  it('hands back exactly the address that was written, once decoded', () => {
+    for (const href of ['https://example.org/f?a=1&b=2', 'https://example.org/a"b<c>', 'https://x.org/&amp;']) {
+      const html = richDocToDisplayHtml([
+        { kind: 'paragraph', content: [{ kind: 'link', href, content: [{ kind: 'text', text: 'go' }] }] },
+      ]);
+      const written = /href="([^"]*)"/.exec(html)![1];
+      expect(decodeDisplayHref(written)).toBe(href);
+    }
   });
 
   it('types the markers of a list with a right-to-left item', () => {
@@ -316,7 +364,7 @@ describe('the display HTML the phones render', () => {
       z ^= z + Math.imul(z ^ (z >>> 7), z | 61);
       return ((z ^ (z >>> 14)) >>> 0) / 4294967296;
     };
-    const WORDS = ['plain', 'a<b', 'x&y', '"quoted"', 'snake_case', '[bracket]', 'c*d', '\\', '@sara', 'الله'];
+    const WORDS = ['plain', 'a<b', 'x&y', '"quoted"', 'snake_case', '[bracket]', 'c*d', '\\', '@sara', 'الله', 'line\nbreak'];
     const flatten = (nodes: RichInline[]): string =>
       nodes.map((n) => (n.kind === 'text' ? n.text : flatten(n.content))).join('');
     const unescape = (s: string) =>
@@ -344,7 +392,9 @@ describe('the display HTML the phones render', () => {
         return { kind: roll < 0.75 ? ('bullets' as const) : ('numbers' as const), items };
       });
       const words = (d: RichDoc) =>
-        d.flatMap((b) => (b.kind === 'paragraph' ? [flatten(b.content)] : b.items.map(flatten)));
+        d.flatMap((b) =>
+          (b.kind === 'paragraph' ? [flatten(b.content)] : b.items.map(flatten)).flatMap((t) => t.split('\n')),
+        );
       // Through storage first, so this is the document a phone actually receives.
       const stored = parseRich(serializeRich(doc));
       const html = richDocToDisplayHtml(stored);
@@ -352,6 +402,8 @@ describe('the display HTML the phones render', () => {
         .replace(/^<html>|<\/html>$/g, '')
         .split(/<\/p>|<\/li>|<br>/)
         .map(unescape)
+        // A no-break space is a space someone typed, kept from collapsing.
+        .map((line) => line.replace(/\u00A0/g, ' '))
         // A typed marker is the one thing a phone adds to the words.
         .map((line) => line.replace(/^(\u2022|\d+\.) /, ''))
         .filter((line) => line !== '');

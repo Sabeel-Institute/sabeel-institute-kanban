@@ -32,9 +32,11 @@
  * round-trip suite enforces with seeded fuzz. Escape minimally and let the
  * property test find what the list missed.
  *
- * HTML is never produced or interpreted here. The parser emits typed nodes and
- * the renderer maps them to RN `Text`, so a description containing `<script>`
- * renders as literal characters — there is no sanitiser to get wrong.
+ * HTML is never produced or interpreted here. The parser emits typed nodes. In
+ * a browser the renderer maps them to RN `Text`, so a description containing
+ * `<script>` renders as literal characters with no sanitiser to get wrong; on a
+ * phone `richDocToDisplayHtml` writes HTML for a native view, and its escaping,
+ * tested in `richtextHtml.test.ts`, is what keeps those characters literal.
  */
 
 /** The five. Nothing outside this list exists anywhere in the pipeline. */

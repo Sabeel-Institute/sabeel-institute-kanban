@@ -59,81 +59,149 @@ function encodeEntities(s: string): string {
 
 // ---------------------------------------------------------------- markdown → HTML
 
-function inlineToHtml(nodes: RichInline[], text: (s: string) => string): string {
+function inlineToHtml(nodes: RichInline[]): string {
   return nodes
     .map((n) => {
       switch (n.kind) {
         case 'text':
           // A newline inside a paragraph is a soft break the editors express as
           // <br>. Without this a two-line paragraph collapses to one line.
-          return text(n.text).split('\n').join('<br>');
+          return encodeEntities(n.text).split('\n').join('<br>');
         case 'bold':
-          return `<b>${inlineToHtml(n.content, text)}</b>`;
+          return `<b>${inlineToHtml(n.content)}</b>`;
         case 'italic':
-          return `<i>${inlineToHtml(n.content, text)}</i>`;
+          return `<i>${inlineToHtml(n.content)}</i>`;
         case 'link':
           // An attribute value, so its quote has to be escaped as well: a `"` in
           // an address would otherwise end the attribute early.
-          return `<a href="${encodeEntities(n.href).replace(/"/g, '&quot;')}">${inlineToHtml(n.content, text)}</a>`;
+          return `<a href="${encodeHref(n.href)}">${inlineToHtml(n.content)}</a>`;
       }
     })
     .join('');
 }
 
-function blockToHtml(b: RichBlock, text: (s: string) => string): string {
-  switch (b.kind) {
-    case 'paragraph':
-      return `<p>${inlineToHtml(b.content, text)}</p>`;
-    case 'bullets':
-      return `<ul>${b.items.map((i) => `<li>${inlineToHtml(i, text)}</li>`).join('')}</ul>`;
-    case 'numbers':
-      return `<ol>${b.items.map((i) => `<li>${inlineToHtml(i, text)}</li>`).join('')}</ol>`;
-  }
-}
-
 export function markdownToHtml(markdown: string): string {
   return parseRich(markdown)
-    .map((b) => blockToHtml(b, encodeEntities))
+    .map((b) => {
+      switch (b.kind) {
+        case 'paragraph':
+          return `<p>${inlineToHtml(b.content)}</p>`;
+        case 'bullets':
+          return `<ul>${b.items.map((i) => `<li>${inlineToHtml(i)}</li>`).join('')}</ul>`;
+        case 'numbers':
+          return `<ol>${b.items.map((i) => `<li>${inlineToHtml(i)}</li>`).join('')}</ol>`;
+      }
+    })
     .join('');
 }
 
 /**
+ * An address as an attribute value: its quote escaped as well, or a `"` in it
+ * would end the attribute early. `decodeDisplayHref` is the inverse.
+ */
+function encodeHref(href: string): string {
+  return encodeEntities(href).replace(/"/g, '&quot;');
+}
+
+/**
+ * The address a phone hands back when a link is tapped, as it was before
+ * `encodeHref`. iOS returns the attribute as written, escapes included, so
+ * `?a=1&b=2` would open as `?a=1&amp;b=2`; Android decodes it already, and
+ * decoding twice would turn a literal `&amp;` in an address into `&`.
+ */
+export function decodeDisplayHref(href: string): string {
+  return href
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
+/**
  * The HTML a phone's native text view draws: the one thing here that IS
- * rendered, on Android and iOS only, and never by a browser.
+ * rendered, on Android and iOS only, and never by a browser. Escaping here is
+ * what keeps a typed `<script>` as characters on a phone.
  *
  * Takes the parsed document rather than markdown, so the phones draw what
  * `parseRichForDisplay` produced for the web too and the surfaces cannot
- * disagree about the words.
+ * disagree about the words. It differs from `markdownToHtml` in what the two
+ * platforms' parsers need in order to draw the same thing:
  *
- * Three things differ from `markdownToHtml`, all because this one is read:
  *  - `<html>` around the body sends it down the library's parser directly. Its
  *    normaliser exists for HTML from elsewhere, and everything here is ours.
- *  - `<br>` between blocks. A single text view has no margins to offer, and
- *    without it a paragraph runs straight into the list below it.
- *  - Runs of spaces survive. The parser collapses them as a browser would, so
- *    every space after the first becomes a no-break space, or a phone would show
- *    fewer spaces than the web and than the stored text.
- *
- * A list holding a right-to-left item is drawn as lines with typed markers. The
- * library paints a list marker off the canvas in a right-to-left paragraph
- * (`react-native-enriched-html` 1.1.1, both list spans on Android), so an Arabic
- * list would lose its bullets and, worse, its numbers. The whole list changes
- * rather than the one item, because a list split in two restarts its numbering.
- * Those lines give up the hanging indent and keep the marker in reading order.
+ *  - `<br>` BETWEEN blocks, where a single text view has no margins to offer.
+ *  - Each LINE of a paragraph is a `<p>` of its own, never a `<br>` inside one.
+ *    iOS turns `<br>` into a newline only beside another tag, so
+ *    `line<br>line` ran the two lines together there. A bold or a link that
+ *    spans the break is closed and reopened on each line.
+ *  - Spaces survive. Android collapses a space after a space or at the start
+ *    of a line, as a browser would, so each of those is a no-break space.
+ *  - A list holding a right-to-left item becomes lines with typed markers. The
+ *    library paints list markers off the canvas in a right-to-left paragraph
+ *    (1.1.1, both list spans on Android), so an Arabic list would lose its
+ *    bullets and its numbers. The whole list changes, because a list split in
+ *    two restarts its numbering, and gives up the hanging indent.
  */
 export function richDocToDisplayHtml(doc: RichDoc): string {
-  const text = (s: string) =>
-    encodeEntities(s).replace(/ {2,}/g, (run) => ` ${'\u00A0'.repeat(run.length - 1)}`);
-  const block = (b: RichBlock) => {
-    if (b.kind === 'paragraph' || !b.items.some(readsRightToLeft)) return blockToHtml(b, text);
-    return b.items
-      .map((item, i) => {
-        const marker = b.kind === 'bullets' ? '\u2022' : `${i + 1}.`;
-        return `<p>${marker} ${inlineToHtml(item, text)}</p>`;
-      })
-      .join('');
+  const line = (nodes: RichInline[], marker = '') =>
+    `<p>${displayInline(marker ? [{ kind: 'text', text: marker }, ...nodes] : nodes, { space: true })}</p>`;
+  const block = (b: RichBlock): string => {
+    if (b.kind === 'paragraph') return splitLines(b.content).map((l) => line(l)).join('');
+    if (b.items.some(readsRightToLeft)) {
+      return b.items
+        .map((item, i) => line(item, b.kind === 'bullets' ? '\u2022 ' : `${i + 1}. `))
+        .join('');
+    }
+    const tag = b.kind === 'bullets' ? 'ul' : 'ol';
+    return `<${tag}>${b.items.map((i) => `<li>${displayInline(i, { space: true })}</li>`).join('')}</${tag}>`;
   };
   return `<html>${doc.map(block).join('<br>')}</html>`;
+}
+
+/** A paragraph's inline nodes, one array per line, formatting reopened on each. */
+function splitLines(nodes: RichInline[]): RichInline[][] {
+  const lines: RichInline[][] = [[]];
+  const push = (n: RichInline) => lines[lines.length - 1].push(n);
+  for (const n of nodes) {
+    const parts: RichInline[][] =
+      n.kind === 'text'
+        ? n.text.split('\n').map((t) => (t ? [{ kind: 'text', text: t }] : []))
+        : splitLines(n.content).map((c) => (c.length ? [{ ...n, content: c }] : []));
+    parts.forEach((part, i) => {
+      if (i > 0) lines.push([]);
+      part.forEach(push);
+    });
+  }
+  return lines;
+}
+
+/**
+ * Inline nodes for the display HTML. `state.space` is whether the last
+ * character drawn was a space, or the line has only begun; a space then is a
+ * no-break space, which Android does not collapse. Carried across nodes, since
+ * `a ` then a bold ` b` is a run of two.
+ */
+function displayInline(nodes: RichInline[], state: { space: boolean }): string {
+  return nodes
+    .map((n) => {
+      switch (n.kind) {
+        case 'text': {
+          let out = '';
+          for (const ch of n.text) {
+            out += ch === ' ' && state.space ? '\u00A0' : ch;
+            state.space = ch === ' ';
+          }
+          return encodeEntities(out);
+        }
+        case 'bold':
+          return `<b>${displayInline(n.content, state)}</b>`;
+        case 'italic':
+          return `<i>${displayInline(n.content, state)}</i>`;
+        case 'link':
+          return `<a href="${encodeHref(n.href)}">${displayInline(n.content, state)}</a>`;
+      }
+    })
+    .join('');
 }
 
 /** Hebrew and the Arabic blocks, presentation forms included. */

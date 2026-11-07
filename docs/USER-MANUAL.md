@@ -218,8 +218,8 @@ Tap any card to open the full view.
   in the box.
 
   To copy from a comment or a description, **long-press** it on a phone, then
-  drag the handles or tap **Select all** to take the whole thing, lists
-  included.
+  drag the handles or tap **Select all** to take the whole thing. The words
+  are copied; bullets and list numbers are not.
 - **Subscribe** — the **bell** in the card's header. Tap it to hear about
   everything on a card even when it isn't assigned to you: new comments, and any
   change its activity records — moved, renamed, a new due date, a file attached
