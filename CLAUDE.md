@@ -281,6 +281,8 @@ it.
   reads has a `<br>` inside a paragraph: `richDocToDisplayHtml` and
   `markdownToPhoneEditorHtml` write each line as a `<p>`. A soft break edited on
   a phone therefore saves as a paragraph break, as Android's editor always did.
+  The same parser keeps open tags by name, so neither writes a mark inside the
+  same mark, and returns a tapped href still escaped (`decodeDisplayHref`).
 
 ## Brand, theme and UI conventions
 

@@ -28,6 +28,12 @@ import {
 
 const trip = (md: string) => htmlToMarkdown(markdownToHtml(md));
 
+describe('pasting a phone’s copied text', () => {
+  it('turns its no-break spaces back into spaces', () => {
+    expect(htmlToMarkdown('<p>a&#160;b\u00A0c&nbsp;d</p>')).toBe('a b c d');
+  });
+});
+
 describe('markdown to HTML and back', () => {
   it('round-trips each element', () => {
     for (const md of [
@@ -292,8 +298,49 @@ describe('the display HTML the phones render', () => {
     expect(html).toContain('&quot;');
   });
 
-  it('keeps a run of spaces, which the parser would otherwise collapse', () => {
-    expect(display('a  b   c')).toBe('<html><p>a \u00A0b \u00A0\u00A0c</p></html>');
+  it('keeps a run of spaces, ending each on an ordinary space to wrap at', () => {
+    expect(display('a  b   c')).toBe('<html><p>a\u00A0 b\u00A0\u00A0 c</p></html>');
+  });
+
+  it('writes a mark inside the same mark once, which iOS needs', () => {
+    // iOS keys open tags by name: an inner <i> ended the outer one's record, and
+    // the outer italic's other words came out upright.
+    const doc: RichDoc = [
+      {
+        kind: 'paragraph',
+        content: [
+          {
+            kind: 'italic',
+            content: [
+              {
+                kind: 'bold',
+                content: [
+                  { kind: 'italic', content: [{ kind: 'text', text: 'Urgent:' }] },
+                  { kind: 'text', text: ' call ' },
+                  { kind: 'italic', content: [{ kind: 'text', text: 'today' }] },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ];
+    expect(richDocToDisplayHtml(doc)).toBe('<html><p><i><b>Urgent: call today</b></i></p></html>');
+  });
+
+  it('types the markers of a list that a right-to-left phone could lay out right to left', () => {
+    // No strong letter at all takes the phone's own direction.
+    expect(display('- 10:30\n- 11:00')).toBe('<html><p>\u2022 10:30</p><p>\u2022 11:00</p></html>');
+    // A right-to-left mark is strong.
+    expect(display('- \u200Fabc')).toBe('<html><p>\u2022 \u200Fabc</p></html>');
+  });
+
+  it('keeps an empty list item open, so the gap after the list survives on Android', () => {
+    const doc: RichDoc = [
+      { kind: 'bullets', items: [[{ kind: 'text', text: 'a' }], []] },
+      { kind: 'paragraph', content: [{ kind: 'text', text: 'next' }] },
+    ];
+    expect(richDocToDisplayHtml(doc)).toBe('<html><ul><li>a</li><li>\u200B</li></ul><br><p>next</p></html>');
   });
 
   it('keeps a space at the start of a line, and a run across a bold mark', () => {
@@ -403,8 +450,9 @@ describe('the display HTML the phones render', () => {
         .replace(/^<html>|<\/html>$/g, '')
         .split(/<\/p>|<\/li>|<br>/)
         .map(unescape)
-        // A no-break space is a space someone typed, kept from collapsing.
-        .map((line) => line.replace(/\u00A0/g, ' '))
+        // A no-break space is a space someone typed, kept from collapsing; a
+        // zero-width space holds an empty list item open.
+        .map((line) => line.replace(/\u00A0/g, ' ').replace(/\u200B/g, ''))
         // A typed marker is the one thing a phone adds to the words.
         .map((line) => line.replace(/^(\u2022|\d+\.) /, ''))
         .filter((line) => line !== '');
@@ -426,6 +474,17 @@ describe('the HTML a phone editor opens with', () => {
 
   it('reopens a bold that spans the break', () => {
     expect(markdownToPhoneEditorHtml('**one\ntwo** three')).toBe('<p><b>one</b></p><p><b>two</b> three</p>');
+  });
+
+  it('writes a mark inside the same mark once, as the display does', () => {
+    const html = markdownToPhoneEditorHtml('***Urgent:* call *today***');
+    // No <i> opens while an <i> is open, and no <b> while a <b> is.
+    let depth = { b: 0, i: 0 };
+    for (const [, close, tag] of html.matchAll(/<(\/?)(b|i)>/g)) {
+      const t = tag as 'b' | 'i';
+      depth = { ...depth, [t]: depth[t] + (close ? -1 : 1) };
+      expect(depth[t], html).toBeLessThanOrEqual(1);
+    }
   });
 
   it('saves a soft break as a paragraph break, keeping every word', () => {

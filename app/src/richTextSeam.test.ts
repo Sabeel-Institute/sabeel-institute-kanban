@@ -45,6 +45,19 @@ describe('the native text view', () => {
     expect(parser).toMatch(/private static Integer currentOrderedListItemIndex/);
   });
 
+  it('still parses HTML on iOS the way richDocToDisplayHtml works around', () => {
+    // Each of these is a workaround in packages/shared/src/richtextHtml.ts. When
+    // one fails, upstream changed it: re-check that workaround on an iPhone.
+    const ios = read('ios/htmlParser/HtmlParser.mm');
+    // <br> becomes a newline only beside another tag: a <p> per line.
+    expect(ios).toMatch(/stringByAddingNewlinesToTag:@"<br>"/);
+    // An href is cut out of the attribute as written, escapes and all:
+    // decodeDisplayHref, on iOS only.
+    expect(ios).toMatch(/substringWithRange:NSMakeRange\(hrefRange\.location \+ 6,/);
+    // Open tags are kept by name: a mark is never written inside itself.
+    expect(ios).toMatch(/ongoingTags\[currentTagName\] = tagArr;/);
+  });
+
   it('still takes selectable and a link callback from JavaScript', () => {
     const spec = read('src/spec/EnrichedTextNativeComponent.ts');
     expect(spec).toMatch(/selectable: boolean/);
