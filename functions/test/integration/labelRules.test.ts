@@ -143,6 +143,11 @@ describe('creating a board label', () => {
   it('refuses a board that does not exist, and a boardId that is not a string', async () => {
     await assertFails(addDoc(collection(fs('member1', 'member'), 'labels'), label({ boardId: 'nope' })));
     await assertFails(addDoc(collection(fs('member1', 'member'), 'labels'), label({ boardId: 7 })));
+    // An empty one, even from an admin: the app would call it an institute
+    // label and the delete callable could not look its board up.
+    await assertFails(
+      addDoc(collection(fs('admin1', 'admin'), 'labels'), label({ boardId: '', createdBy: 'admin1' })),
+    );
     await assertSucceeds(addDoc(collection(fs('member1', 'member'), 'labels'), label({ boardId: 'b1' })));
   });
 
@@ -258,6 +263,8 @@ describe('renaming and recolouring', () => {
     await assertFails(updateDoc(doc(fs('admin1', 'admin'), 'labels/own'), { boardId: 'b2' }));
     await assertFails(updateDoc(doc(fs('admin1', 'admin'), 'labels/existing'), { boardId: 'b1' }));
     await assertFails(updateDoc(doc(fs('member1', 'member'), 'labels/existing'), { boardId: 'b1' }));
+    // An empty boardId is still a scope change, though it would read like none.
+    await assertFails(updateDoc(doc(fs('admin1', 'admin'), 'labels/existing'), { boardId: '' }));
     // The same writers changing what they may.
     await assertSucceeds(updateDoc(doc(fs('member1', 'member'), 'labels/own'), { name: 'Venue 2' }));
     await assertSucceeds(updateDoc(doc(fs('admin1', 'admin'), 'labels/existing'), { name: 'Blocked 2' }));

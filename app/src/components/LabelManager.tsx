@@ -217,7 +217,16 @@ export function LabelManager({
  * One list: institute labels first, locked, then the board's own with their
  * controls. Nothing explains the lock, by decision: the icon does.
  */
-export function BoardLabelsSection({ boardId, user }: { boardId: string; user: SessionUser }) {
+export function BoardLabelsSection({
+  boardId,
+  user,
+  canEdit,
+}: {
+  boardId: string;
+  user: SessionUser;
+  /** `canEditBoardLabels(user, board)`: the client mirror of `mayCurate()`. */
+  canEdit: boolean;
+}) {
   const labels = useLabels();
   const all = labels.data ?? [];
   const shown = labelsForBoard(all, boardId);
@@ -232,24 +241,28 @@ export function BoardLabelsSection({ boardId, user }: { boardId: string; user: S
         {institute.map((l) => (
           <LockedLabel key={l.id} label={l} />
         ))}
-        <LabelManager
-          boardId={boardId}
-          user={user}
-          labels={own}
-          known={labels.status === 'ready' ? shown : null}
-        />
+        {canEdit ? (
+          <LabelManager
+            boardId={boardId}
+            user={user}
+            labels={own}
+            known={labels.status === 'ready' ? shown : null}
+          />
+        ) : (
+          own.map((l) => <LockedLabel key={l.id} label={l} />)
+        )}
       </Card>
     </>
   );
 }
 
-/** An institute label on a board: listed so people know it exists, never edited here. */
+/** A label this person may not change here: listed so they know it exists. */
 function LockedLabel({ label }: { label: Label }) {
   const t = useTheme();
   return (
     <View
       accessible
-      accessibilityLabel={`${label.name}, set by admins`}
+      accessibilityLabel={`${label.name}, ${label.boardId ? 'locked' : 'set by admins'}`}
       style={[styles.between, styles.locked]}
     >
       <Row style={styles.grow}>

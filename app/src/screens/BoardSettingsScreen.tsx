@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import {
   BOARD_NAME_MAX,
+  canEditBoardLabels,
   canManageBoard,
   canUnseatCreator,
   columnsPatch,
@@ -270,7 +271,7 @@ export function BoardSettingsScreen({
       {/* For EVERYONE on the board, not only its owners: a board's own labels
           are anyone-on-the-board's to change, and the institute labels above
           them are locked for all. */}
-      <BoardLabelsSection boardId={boardId} user={user} />
+      <BoardLabelsSection boardId={boardId} user={user} canEdit={canEditBoardLabels(user, b)} />
 
       {/* Adding rides on the heading, and the candidate list opens on demand.
           It used to be a permanent second panel with a labelled Add per person,

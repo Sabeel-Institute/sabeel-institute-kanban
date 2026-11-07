@@ -288,6 +288,13 @@ describe('a board label', () => {
     expect((await labelRef('lb_adm_own').get()).exists).toBe(false);
   });
 
+  it('is reported gone, not refused, when a colleague deleted it first', async () => {
+    // The client counts not-found as done. A refusal would tell this member
+    // they may not delete something that is already gone.
+    const res = await callFunction('deleteLabel', { labelId: 'lb_already_gone' }, memToken);
+    expect(res.body.error?.status).toBe('NOT_FOUND');
+  });
+
   it('gives a plain member nothing over an institute label', async () => {
     await putLabel('lb_inst');
     const res = await callFunction('deleteLabel', { labelId: 'lb_inst' }, memToken);

@@ -3,7 +3,7 @@ import { onCall, HttpsError, type CallableRequest } from 'firebase-functions/v2/
 import { guarded, sentryDsn } from './sentry';
 import { logger } from 'firebase-functions/v2';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import { canCurateLabels, canEditBoardLabels } from '@sabeel/shared';
+import { canCurateLabels, canEditBoardLabels, canUseApp } from '@sabeel/shared';
 import { actorOf } from './actor';
 
 /**
@@ -32,8 +32,14 @@ const BATCH_LIMIT = 400;
  * Whether the caller may count or delete this label, which is its SCOPE's
  * question, the one `mayCurate()` asks in `firestore.rules`. An institute label
  * reaches every board, so it takes an admin; a board's own takes someone on
- * that board. A label that is not there is treated as an institute label, so
- * only an admin learns that it is missing.
+ * that board.
+ *
+ * A label that is not there is `not-found` for anyone allowed to use the app:
+ * every active account can read every label, so its absence tells nobody
+ * anything, and the race it comes from is ordinary. Someone deletes a board
+ * label a moment before a colleague does, and the colleague's client counts
+ * `not-found` as done; reported as "only an admin can change an institute
+ * label" it would have been a refusal about something that no longer exists.
  */
 async function requireCurator(
   request: CallableRequest<unknown>,
@@ -43,7 +49,12 @@ async function requireCurator(
   if (!auth) throw new HttpsError('unauthenticated', 'Sign in first.');
   const actor = actorOf(auth);
   const db = getFirestore();
-  const boardId = (await db.doc(`labels/${labelId}`).get()).data()?.boardId as string | undefined;
+  const label = await db.doc(`labels/${labelId}`).get();
+  if (!label.exists) {
+    if (!canUseApp(actor)) throw new HttpsError('permission-denied', 'Your account is not active.');
+    throw new HttpsError('not-found', 'No such label.');
+  }
+  const boardId = label.data()?.boardId as string | undefined;
   if (boardId === undefined) {
     if (!canCurateLabels(actor)) {
       throw new HttpsError('permission-denied', 'Only an admin can change an institute label.');

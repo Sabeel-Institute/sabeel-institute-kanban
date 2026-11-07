@@ -255,10 +255,18 @@ export function SearchScreen({ user }: { user: SessionUser }) {
   const labelsReady = allLabels.status === 'ready';
   const boardsReady = boards.status === 'ready';
 
+  // Against EVERY label, not the picker's list: that one also waits on the
+  // boards, and leaves out a board you have since left, so a live label would
+  // read "Deleted label" while the boards load or after you leave its board.
   const chosenLabels = useMemo(
     () =>
-      chipsForIds(labelIds, labelList, labelsReady ? 'Deleted label' : 'Label', sortLabels),
-    [labelList, labelIds, labelsReady],
+      chipsForIds(
+        labelIds,
+        allLabels.data ?? NO_LABELS,
+        labelsReady ? 'Deleted label' : 'Label',
+        sortLabels,
+      ),
+    [allLabels.data, labelIds, labelsReady],
   );
   const chosenBoard = chipsForIds(
     boardId ? [boardId] : [],

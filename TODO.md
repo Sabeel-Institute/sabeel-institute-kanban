@@ -20,6 +20,11 @@ Every label is an institute label (on every board) until it is given to a board.
 The release that adds board labels changes nothing on its own; this hands over
 the ones that should be a board's.
 
+- [ ] **Raise the version floor first**, to the release that adds board labels,
+      once it is on Play and TestFlight (`node scripts/set-min-version.mjs
+      <X.Y.Z>`). An older phone cannot add a label at all under the new rules
+      unless it is an admin's, and it offers every board's own labels on every
+      card, so a board label could land on another board's cards.
 - [ ] **Ask the admins which labels belong to one board.** For each: its exact
       name and, if more than one board uses it, the board that keeps it. Send it
       in chat or write the plan file yourself, OUTSIDE the repo (real names; the
@@ -28,10 +33,9 @@ the ones that should be a board's.
       is how many cards move to a copy: each one logs "changed the labels" and
       tells its followers.
 - [ ] **Apply it** with `--apply`.
-- [ ] **Raise the version floor** to that release once it is on Play and
-      TestFlight (`node scripts/set-min-version.mjs <X.Y.Z>`). An older phone's
-      `+` makes an institute label, which the new rules refuse for anyone but an
-      admin, and it offers every board's own labels.
+- [ ] **Re-record and publish the `labels` help film** (`docs/DEV-TOOLING.md`,
+      "The help films"). Its script describes two kinds of label; the published
+      film still says renaming is an admin's job in any board's settings.
 
 ## Play publishing from the command line — **DONE, verified 2026-08-29**
 

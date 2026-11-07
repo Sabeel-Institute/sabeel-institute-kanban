@@ -290,7 +290,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   // still loading, or one that failed, as watching nothing.
   const watching = (columnId: string) =>
     (watched.data ?? []).includes(watchKey(boardId, columnId));
-  // Org-wide, not from the board: labels are one set for the whole team.
+  // Every label, of both scopes: a card's chips resolve against the lot.
   const allLabels = useLabels();
   const labels = allLabels.data ?? NO_LABELS;
 

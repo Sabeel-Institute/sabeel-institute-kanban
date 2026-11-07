@@ -169,30 +169,50 @@ if (!apply) {
 }
 
 // ---- Write ------------------------------------------------------------------
-// Copies first, then the cards onto them, and the original's boardId LAST. A
-// failure part-way leaves the original an institute label, still shown on every
+// Copies first, then the cards onto them, and each original's boardId LAST. A
+// failure part-way leaves an original an institute label, still shown on every
 // board and on every card that carries it, and a re-run finishes the job.
-const BATCH_LIMIT = 400;
+//
+// A card is rewritten ONCE, in a transaction, with every replacement the plan
+// makes on it: a card carrying two labels that both move to copies would
+// otherwise have its first change undone by the second, and a colleague
+// editing its labels meanwhile would lose their change.
 for (const s of steps) {
   const { name, color, createdAt = 0, createdBy = '' } = s.label.data();
   for (const c of s.copies) {
     await db.doc(`labels/${c.copyId}`).set({ boardId: c.boardId, name, color, createdAt, createdBy });
-    for (let i = 0; i < c.cards.length; i += BATCH_LIMIT) {
-      const batch = db.batch();
-      for (const card of c.cards.slice(i, i + BATCH_LIMIT)) {
-        const ids = card.data().labelIds ?? [];
-        batch.update(card.ref, {
-          labelIds: [...new Set(ids.map((id) => (id === s.label.id ? c.copyId : id)))],
-          // The trigger names this person in the card's history, and in the
-          // notice its followers get.
-          updatedBy: actorUid,
-          updatedAt: Date.now(),
-        });
-      }
-      await batch.commit();
+  }
+}
+const swaps = new Map(); // card path → { ref, map: Map(original id → copy id) }
+for (const s of steps) {
+  for (const c of s.copies) {
+    for (const card of c.cards) {
+      const entry = swaps.get(card.ref.path) ?? { ref: card.ref, map: new Map() };
+      entry.map.set(s.label.id, c.copyId);
+      swaps.set(card.ref.path, entry);
     }
   }
-  await s.label.ref.update({ boardId: s.keep });
-  console.log(`done: "${name}"`);
 }
-console.log('\nApplied.');
+let moved = 0;
+for (const { ref, map } of swaps.values()) {
+  const changed = await db.runTransaction(async (tx) => {
+    const fresh = await tx.get(ref);
+    const ids = fresh.data()?.labelIds ?? [];
+    const next = [...new Set(ids.map((id) => map.get(id) ?? id))];
+    if (next.length === ids.length && next.every((id, i) => id === ids[i])) return false;
+    tx.update(ref, {
+      labelIds: next,
+      // The trigger names this person in the card's history, and in the
+      // notice its followers get.
+      updatedBy: actorUid,
+      updatedAt: Date.now(),
+    });
+    return true;
+  });
+  if (changed) moved += 1;
+}
+for (const s of steps) {
+  await s.label.ref.update({ boardId: s.keep });
+  console.log(`done: "${s.label.data().name}"`);
+}
+console.log(`\nApplied: ${moved} card(s) moved to a copy.`);

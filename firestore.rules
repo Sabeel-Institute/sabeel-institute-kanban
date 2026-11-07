@@ -409,7 +409,7 @@ service cloud.firestore {
     // changed by anyone on that board. `boardId` never changes once written.
     //
     // A COLLECTION, not an array on a config document, and that is what makes
-    // this block possible. Any active member may add a label, so concurrent
+    // this block possible. Anyone on a board may add a label, so concurrent
     // creates are the ordinary case — two people appending to one array field is
     // a lost write. And rules cannot iterate a list, so while labels lived on the
     // board the name cap was client-side only (see LABEL_NAME_MAX in
@@ -446,7 +446,8 @@ service cloud.firestore {
       allow create: if isActive()
         && label().keys().hasOnly(['boardId', 'name', 'color', 'createdAt', 'createdBy'])
         && label().keys().hasAll(['name', 'color', 'createdAt', 'createdBy'])
-        && (!('boardId' in label()) || label().boardId is string)
+        && (!('boardId' in label())
+            || (label().boardId is string && label().boardId.size() > 0))
         && mayCurate(label())
         && label().name is string
         && label().name.size() > 0
@@ -470,7 +471,9 @@ service cloud.firestore {
       // uneditable, which is a worse failure than the drift being prevented.
       allow update: if isActive()
         && mayCurate(existingLabel())
-        && label().get('boardId', '') == existingLabel().get('boardId', '')
+        // null, not '', as the default: '' would let a write ADD boardId: ''
+        // to an institute label, which matches its absent one.
+        && label().get('boardId', null) == existingLabel().get('boardId', null)
         && label().keys().hasOnly(['boardId', 'name', 'color', 'createdAt', 'createdBy'])
         && label().name is string
         && label().name.size() > 0

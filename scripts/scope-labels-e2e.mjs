@@ -6,8 +6,9 @@
  * The script runs by hand against production once, so nothing else exercises
  * it. This drives it as a real subprocess, since its refusals ARE exit codes, on
  * the cases that would otherwise go wrong quietly: a label on one board, one on
- * three, one on no card, one already scoped, a card carrying two of them, an
- * archived card, and a plan that is wrong in each way the script must refuse.
+ * three, one on no card, one already scoped, a card on which TWO planned labels
+ * both move to copies, an archived card, and a plan that is wrong in each way
+ * the script must refuse.
  *
  * Needs firestore only, and no Functions emulator: with triggers running, the
  * card rewrites would add history this file would have to reason about.
@@ -74,6 +75,7 @@ async function seed() {
   await l('sl_unused', 'Rehearsal unused');
   await l('sl_done', 'Rehearsal done', { boardId: 'sl_b2' });
   await l('sl_wide', 'Rehearsal wide');
+  await l('sl_also', 'Rehearsal also');
   await l('sl_twin_a', 'Rehearsal twin');
   await l('sl_twin_b', 'Rehearsal twin');
   const c = (id, boardId, labelIds, archived = false) =>
@@ -84,10 +86,17 @@ async function seed() {
   await c('sl_c3', 'sl_b1', ['sl_spread', 'sl_single']);
   await c('sl_c4', 'sl_b2', ['sl_spread', 'sl_wide'], true);
   await c('sl_c5', 'sl_b3', ['sl_spread']);
+  // TWO planned labels that both move to a copy on this card: b1 keeps both
+  // (sl_c6 and sl_c7 there), so this b3 card must end with both copies.
+  await c('sl_c6', 'sl_b1', ['sl_also']);
+  await c('sl_c7', 'sl_b1', ['sl_also']);
+  await c('sl_c8', 'sl_b3', ['sl_also', 'sl_spread', 'sl_wide']);
 }
 
 await seed();
-const before = JSON.stringify(await Promise.all(['sl_c1', 'sl_c2', 'sl_c3', 'sl_c4', 'sl_c5'].map((id) => read(card(id)))));
+const CARDS = ['sl_c1', 'sl_c2', 'sl_c3', 'sl_c4', 'sl_c5', 'sl_c6', 'sl_c7', 'sl_c8'];
+const snapshot = async () => JSON.stringify(await Promise.all(CARDS.map((id) => read(card(id)))));
+const before = await snapshot();
 
 // ---- Refusals: each exits non-zero and writes nothing ------------------------
 const refusals = [
@@ -109,7 +118,7 @@ for (const [what, args] of refusals) {
   const r = run(...args, '--apply');
   check(`refuses ${what}`, r.code !== 0, r.out.trim().split('\n').pop());
 }
-const untouched = JSON.stringify(await Promise.all(['sl_c1', 'sl_c2', 'sl_c3', 'sl_c4', 'sl_c5'].map((id) => read(card(id)))));
+const untouched = await snapshot();
 check('no refusal wrote to a card', untouched === before);
 check('no refusal scoped a label', !(await read(label('sl_spread'))).boardId && !(await read(label('sl_single'))).boardId);
 
@@ -119,6 +128,7 @@ const good = plan([
   { label: 'Rehearsal spread' },
   { label: 'Rehearsal unused', board: 'Rehearsal Three' },
   { label: 'Rehearsal done' },
+  { label: 'Rehearsal also' },
 ]);
 const dry = run(good, '--actor', 'sl-admin@oursabeel.com');
 check('a dry run succeeds', dry.code === 0, dry.out.trim().split('\n').pop());
@@ -139,15 +149,21 @@ const c4 = await read(card('sl_c4'));
 check('an archived card moves to its board’s copy', JSON.stringify(c4.labelIds) === JSON.stringify(['sl_spread_sl_b2', 'sl_wide']), JSON.stringify(c4.labelIds));
 check('and the change names the admin', c4.updatedBy === ADMIN);
 check('a card elsewhere moves too', JSON.stringify((await read(card('sl_c5'))).labelIds) === JSON.stringify(['sl_spread_sl_b3']));
+const c8 = (await read(card('sl_c8'))).labelIds;
+check(
+  'a card carrying two planned labels ends with both copies',
+  JSON.stringify(c8) === JSON.stringify(['sl_also_sl_b3', 'sl_spread_sl_b3', 'sl_wide']),
+  JSON.stringify(c8),
+);
 check('an unused label goes to the board named', (await read(label('sl_unused'))).boardId === 'sl_b3');
 check('a label already scoped is left alone', (await read(label('sl_done'))).boardId === 'sl_b2' && /already on Rehearsal Two; skipped/.test(applied.out));
 check('a label not in the plan stays an institute label', !(await read(label('sl_wide'))).boardId);
 
 // ---- Again: nothing left to do --------------------------------------------------
-const after = JSON.stringify(await Promise.all(['sl_c1', 'sl_c2', 'sl_c3', 'sl_c4', 'sl_c5'].map((id) => read(card(id)))));
+const after = await snapshot();
 const again = run(good, '--actor', 'sl-admin@oursabeel.com', '--apply');
 check('a second run succeeds', again.code === 0, again.out.trim().split('\n').pop());
-check('and changes nothing', after === JSON.stringify(await Promise.all(['sl_c1', 'sl_c2', 'sl_c3', 'sl_c4', 'sl_c5'].map((id) => read(card(id))))));
+check('and changes nothing', after === (await snapshot()));
 
 rmSync(dir, { recursive: true, force: true });
 const failed = results.filter((r) => !r.ok);

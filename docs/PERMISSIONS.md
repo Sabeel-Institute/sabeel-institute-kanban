@@ -67,9 +67,12 @@ thing on the fourth.
 
 **A board's own labels belong to everyone on it**, owners or not: anyone on the
 board adds, renames, recolours and deletes them, from the card's `+` and the
-board's Labels list. They reach that board's cards alone, so board membership is
-the whole authority, the same reasoning that lets anyone on a board remove an
-attachment. Admins can too, since they can open every board.
+board's Labels list. The app keeps them to that board's cards, so board
+membership is the whole authority, the same reasoning that lets anyone on a
+board remove an attachment. Admins can too, since they can open every board.
+Rules cannot look inside a card's `labelIds`, so that containment is the app's,
+not the rules': a build from before board labels ignores it until the version
+floor retires it.
 
 Everyone else on a board opens the same screen and gets **the member list,
 read-only**, with owners marked. That answers "who do I ask to add someone?"

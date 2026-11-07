@@ -40,9 +40,8 @@ export function CardFace({
    * never load a card's siblings.
    */
   subtaskCount?: number;
-  /** The org-wide label set. Not board-scoped — a card carries the same labels
-   *  wherever it lives, which is what lets My Work and Search render chips for
-   *  cards whose board they never load. */
+  /** Every label, of both scopes, which is what lets My Work and Search render
+   *  chips for cards whose board they never load. */
   labels: readonly Label[];
   boardMembers: readonly BoardMemberProfile[];
 }) {

@@ -191,7 +191,10 @@ disabling the account is the block, by decision.
   config doc: concurrent creates are the normal case, and an array field would
   lose writes. Uniqueness is case-insensitive, within what one board shows, and
   client-checked only: a simultaneous double-create, and an institute label
-  added under a name a board already uses, are accepted residuals.
+  added under a name a board already uses, are accepted residuals. So is "a
+  board's own label is only on its own cards": rules cannot look inside
+  `labelIds`, so it holds because the app keeps it, and a build from before
+  board labels does not. Raise the version floor before giving labels to boards.
 
 ## Attachments
 

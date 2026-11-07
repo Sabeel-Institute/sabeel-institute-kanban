@@ -83,8 +83,8 @@ export function CardScreen({
    * `useLiveQuery` reports `data: undefined` while loading AND on error, so the
    * `?? []` this used to carry turned "not known yet" into "there are no
    * labels" — and `validateLabelName` against an empty set waves every
-   * duplicate through. The result is a persistent org-wide label that only a
-   * admin can remove, created with no warning at all. Null here means the
+   * duplicate through. The result is a duplicate label created with no warning
+   * at all. Null here means the
    * create controls stay disabled until the check can mean something.
    */
   const knownLabels = labels.status === 'ready' ? labels.data : null;
@@ -588,7 +588,9 @@ export function CardScreen({
       {addingLabel ? (
         <NewLabelSheet
           knownLabels={knownLabels === null ? null : labelsForBoard(knownLabels, c.boardId)}
-          boardName={b.name}
+          // The label goes to the CARD's board. The screen's board comes from the
+          // route, which an old notification can still point at after a move.
+          boardName={b.id === c.boardId ? b.name : 'this card’s board'}
           busy={busy}
           onError={setError}
           onClose={() => setAddingLabel(false)}

@@ -102,6 +102,7 @@ export function AppNav({
       active={
         active === 'users' ||
         active === 'stats' ||
+        active === 'labels' ||
         active === 'report' ||
         active === 'help' ||
         active === 'helpFilm'
