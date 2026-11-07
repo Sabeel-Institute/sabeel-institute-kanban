@@ -1,7 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { htmlToMarkdown, markdownToHtml } from '../src/richtextHtml';
+import { htmlToMarkdown, markdownToHtml, richDocToDisplayHtml } from '../src/richtextHtml';
 import { extractMentions, mentionInsertion } from '../src/mentions';
-import { normalizeMarkdown, toPlainText } from '../src/richtext';
+import {
+  normalizeMarkdown,
+  parseRich,
+  parseRichForDisplay,
+  serializeRich,
+  toPlainText,
+  type RichDoc,
+  type RichInline,
+} from '../src/richtext';
 
 /**
  * The seam both editors speak.
@@ -240,5 +248,114 @@ describe('web and native mentions converge on the same stored markdown', () => {
   it('a handle the indicator is missing from resolves to NOBODY', () => {
     // The bug, stated as a test: this is exactly what native used to store.
     expect(extractMentions('hi sara there', roster)).toEqual([]);
+  });
+});
+
+/**
+ * What a phone draws. A browser never sees this HTML, but the phones do, so this
+ * is where a stray `<` or `"` in somebody's comment would become a rendering bug.
+ */
+describe('the display HTML the phones render', () => {
+  const display = (md: string) => richDocToDisplayHtml(parseRichForDisplay(md));
+
+  it('wraps the body so the library takes its direct parser', () => {
+    expect(display('hello')).toBe('<html><p>hello</p></html>');
+  });
+
+  it('puts one line break between blocks and none inside a list', () => {
+    expect(display('one\n\n- a\n- b\n\n1. c\n\ntwo')).toBe(
+      '<html><p>one</p><br><ul><li>a</li><li>b</li></ul><br><ol><li>c</li></ol><br><p>two</p></html>',
+    );
+  });
+
+  it('renders typed markup as the characters someone typed', () => {
+    expect(display('a < b & <script>alert(1)</script>')).toBe(
+      '<html><p>a &lt; b &amp; &lt;script&gt;alert(1)&lt;/script&gt;</p></html>',
+    );
+  });
+
+  it('makes a bare URL tappable, as the web renderer does', () => {
+    expect(display('see https://example.org/x now')).toBe(
+      '<html><p>see <a href="https://example.org/x">https://example.org/x</a> now</p></html>',
+    );
+  });
+
+  it('cannot let a quote in an address end the attribute', () => {
+    const html = display('[x](https://example.org/a"onclick="b)');
+    expect(html).not.toMatch(/href="[^"]*"onclick/);
+    expect(html).toContain('&quot;');
+  });
+
+  it('keeps a run of spaces, which the parser would otherwise collapse', () => {
+    expect(display('a  b   c')).toBe('<html><p>a \u00A0b \u00A0\u00A0c</p></html>');
+  });
+
+  it('keeps a soft break inside a paragraph', () => {
+    expect(display('first\nsecond')).toBe('<html><p>first<br>second</p></html>');
+  });
+
+  it('types the markers of a list with a right-to-left item', () => {
+    // The library paints list markers off the canvas in a right-to-left
+    // paragraph, so a real <ol> here would lose its numbers.
+    expect(display('1. واحد\n2. two')).toBe('<html><p>1. واحد</p><p>2. two</p></html>');
+    expect(display('- واحد\n- two')).toBe('<html><p>\u2022 واحد</p><p>\u2022 two</p></html>');
+  });
+
+  it('judges direction by the first strong character, as a text layout does', () => {
+    expect(display('- 12: واحد')).toBe('<html><p>\u2022 12: واحد</p></html>');
+    expect(display('- **واحد** two')).toBe('<html><p>\u2022 <b>واحد</b> two</p></html>');
+    // A left-to-right item with Arabic further along keeps the real list.
+    expect(display('- one واحد')).toBe('<html><ul><li>one واحد</li></ul></html>');
+  });
+
+  it('says the same words as the stored document, for 300 seeded documents', () => {
+    const mulberry = (seed: number) => () => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let z = seed;
+      z = Math.imul(z ^ (z >>> 15), z | 1);
+      z ^= z + Math.imul(z ^ (z >>> 7), z | 61);
+      return ((z ^ (z >>> 14)) >>> 0) / 4294967296;
+    };
+    const WORDS = ['plain', 'a<b', 'x&y', '"quoted"', 'snake_case', '[bracket]', 'c*d', '\\', '@sara', 'الله'];
+    const flatten = (nodes: RichInline[]): string =>
+      nodes.map((n) => (n.kind === 'text' ? n.text : flatten(n.content))).join('');
+    const unescape = (s: string) =>
+      s
+        .replace(/<[^>]*>/g, '')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&amp;/g, '&');
+
+    for (let seed = 1; seed <= 300; seed += 1) {
+      const rnd = mulberry(seed);
+      const pick = <T,>(xs: readonly T[]) => xs[Math.floor(rnd() * xs.length)];
+      const inline = (): RichInline[] => {
+        const text: RichInline = { kind: 'text', text: pick(WORDS) };
+        const roll = rnd();
+        if (roll < 0.2) return [text, { kind: 'text', text: ' ' }, { kind: 'bold', content: [{ kind: 'text', text: pick(WORDS) }] }];
+        if (roll < 0.4) return [{ kind: 'italic', content: [text] }];
+        return [text];
+      };
+      const doc: RichDoc = Array.from({ length: 1 + Math.floor(rnd() * 4) }, () => {
+        const roll = rnd();
+        if (roll < 0.5) return { kind: 'paragraph' as const, content: inline() };
+        const items = Array.from({ length: 1 + Math.floor(rnd() * 3) }, inline);
+        return { kind: roll < 0.75 ? ('bullets' as const) : ('numbers' as const), items };
+      });
+      const words = (d: RichDoc) =>
+        d.flatMap((b) => (b.kind === 'paragraph' ? [flatten(b.content)] : b.items.map(flatten)));
+      // Through storage first, so this is the document a phone actually receives.
+      const stored = parseRich(serializeRich(doc));
+      const html = richDocToDisplayHtml(stored);
+      const shown = html
+        .replace(/^<html>|<\/html>$/g, '')
+        .split(/<\/p>|<\/li>|<br>/)
+        .map(unescape)
+        // A typed marker is the one thing a phone adds to the words.
+        .map((line) => line.replace(/^(\u2022|\d+\.) /, ''))
+        .filter((line) => line !== '');
+      expect(shown, `seed ${seed}: ${html}`).toEqual(words(stored).filter((line) => line !== ''));
+    }
   });
 });

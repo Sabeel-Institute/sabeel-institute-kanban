@@ -254,12 +254,29 @@ it.
   was typed. If either editor rewrote a bare URL, the same keystrokes would store
   different bytes on a phone than in a browser — which is why `linkRegex={null}`
   on native and no AutoLink plugin on web.
-- **The editor is the ONLY thing split by platform.** Lexical on web,
-  `react-native-enriched-html` on Android, both behind one markdown-in/
-  markdown-out contract and one `richtextHtml` seam. The renderer, toolbar,
-  mention policy and converter are shared — `RichText` in particular must never
-  gain a `.web` sibling, or the two surfaces could disagree about what a card
-  says. `docs/RESEARCH-RICH-TEXT.md` records why, and what the spike measured.
+- **The editor and the last step of drawing are split by platform, and the
+  document never is.** Lexical on web, `react-native-enriched-html` on the
+  phones, both behind one markdown-in/markdown-out contract and one
+  `richtextHtml` seam. `RichText` parses once with `parseRichForDisplay` and
+  hands that document to `RichDocView`: `Text` blocks in a browser, the
+  library's `EnrichedText` on a phone (Faisal, 2026-11-07). Android selection
+  cannot cross text views, so a comment drawn as a `Text` per block selected one
+  paragraph at a time; one native view with real list spans is the only way to
+  get Select all and keep wrapped list lines indented. The parse must stay in
+  `RichText`, or the two surfaces could disagree about what a card says. The
+  library's web build must never load: it renders through `innerHTML` and
+  brings TipTap. Toolbar, mention policy and converter are shared.
+  `docs/RESEARCH-RICH-TEXT.md` records why the editor is split.
+- **`patches/` changes one line of that library: `fromHtml` is
+  `synchronized`.** Its Android parser keeps list state in static fields, and a
+  text view is parsed on the layout thread and the UI thread together.
+  Unpatched, five cold starts in fourteen drew a numbered list out of order
+  with phantom rows, and the editor shares the parser. `patch-package` applies
+  it on install, and `app/src/richTextSeam.test.ts` fails if it did not, or
+  once upstream no longer needs it. Two more of the library's habits are
+  answered in `richDocToDisplayHtml`: it paints list markers off the canvas in
+  a right-to-left paragraph, so a list holding an RTL item gets typed markers,
+  and it collapses runs of spaces, so those go in as no-break spaces.
 
 ## Brand, theme and UI conventions
 
@@ -612,7 +629,7 @@ Not for routine layout work. Use it for:
 
 | Seam | Why the browser cannot cover it |
 |---|---|
-| **The rich-text editor** | The only thing split by platform — Lexical vs `react-native-enriched-html` |
+| **Rich text** | The editor and the renderer's last step are split by platform — Lexical and `Text` vs `react-native-enriched-html` |
 | **Flex shrink / wrap / overflow** | Yoga ≠ CSS. See the bulk-bar rule above |
 | **Keyboard / IME** | Emulators misreport IME insets; `edgeToEdgeEnabled=true` makes `Keyboard` events no-ops |
 | **Gestures** | Long-press-to-select and the column swipe have no web path. The pager *layout* does render on web at 320px — it is the gestures that do not |

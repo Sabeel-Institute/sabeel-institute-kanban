@@ -2,7 +2,7 @@
  * The HTML seam — the ONLY thing either editor speaks.
  *
  * This HTML is never rendered in a browser and never stored. It exists so that
- * Lexical (web) and `react-native-enriched-html` (Android) can hand documents
+ * Lexical (web) and `react-native-enriched-html` (the phones) can hand documents
  * to us and take them back, while **markdown remains the single storage
  * format**. Both surfaces go through one converter, so the same keystrokes
  * produce byte-identical markdown from a phone and from a browser — which is
@@ -59,38 +59,99 @@ function encodeEntities(s: string): string {
 
 // ---------------------------------------------------------------- markdown → HTML
 
-function inlineToHtml(nodes: RichInline[]): string {
+function inlineToHtml(nodes: RichInline[], text: (s: string) => string): string {
   return nodes
     .map((n) => {
       switch (n.kind) {
         case 'text':
           // A newline inside a paragraph is a soft break the editors express as
           // <br>. Without this a two-line paragraph collapses to one line.
-          return encodeEntities(n.text).split('\n').join('<br>');
+          return text(n.text).split('\n').join('<br>');
         case 'bold':
-          return `<b>${inlineToHtml(n.content)}</b>`;
+          return `<b>${inlineToHtml(n.content, text)}</b>`;
         case 'italic':
-          return `<i>${inlineToHtml(n.content)}</i>`;
+          return `<i>${inlineToHtml(n.content, text)}</i>`;
         case 'link':
-          return `<a href="${encodeEntities(n.href)}">${inlineToHtml(n.content)}</a>`;
+          // An attribute value, so its quote has to be escaped as well: a `"` in
+          // an address would otherwise end the attribute early.
+          return `<a href="${encodeEntities(n.href).replace(/"/g, '&quot;')}">${inlineToHtml(n.content, text)}</a>`;
       }
     })
     .join('');
 }
 
+function blockToHtml(b: RichBlock, text: (s: string) => string): string {
+  switch (b.kind) {
+    case 'paragraph':
+      return `<p>${inlineToHtml(b.content, text)}</p>`;
+    case 'bullets':
+      return `<ul>${b.items.map((i) => `<li>${inlineToHtml(i, text)}</li>`).join('')}</ul>`;
+    case 'numbers':
+      return `<ol>${b.items.map((i) => `<li>${inlineToHtml(i, text)}</li>`).join('')}</ol>`;
+  }
+}
+
 export function markdownToHtml(markdown: string): string {
   return parseRich(markdown)
-    .map((b) => {
-      switch (b.kind) {
-        case 'paragraph':
-          return `<p>${inlineToHtml(b.content)}</p>`;
-        case 'bullets':
-          return `<ul>${b.items.map((i) => `<li>${inlineToHtml(i)}</li>`).join('')}</ul>`;
-        case 'numbers':
-          return `<ol>${b.items.map((i) => `<li>${inlineToHtml(i)}</li>`).join('')}</ol>`;
-      }
-    })
+    .map((b) => blockToHtml(b, encodeEntities))
     .join('');
+}
+
+/**
+ * The HTML a phone's native text view draws: the one thing here that IS
+ * rendered, on Android and iOS only, and never by a browser.
+ *
+ * Takes the parsed document rather than markdown, so the phones draw what
+ * `parseRichForDisplay` produced for the web too and the surfaces cannot
+ * disagree about the words.
+ *
+ * Three things differ from `markdownToHtml`, all because this one is read:
+ *  - `<html>` around the body sends it down the library's parser directly. Its
+ *    normaliser exists for HTML from elsewhere, and everything here is ours.
+ *  - `<br>` between blocks. A single text view has no margins to offer, and
+ *    without it a paragraph runs straight into the list below it.
+ *  - Runs of spaces survive. The parser collapses them as a browser would, so
+ *    every space after the first becomes a no-break space, or a phone would show
+ *    fewer spaces than the web and than the stored text.
+ *
+ * A list holding a right-to-left item is drawn as lines with typed markers. The
+ * library paints a list marker off the canvas in a right-to-left paragraph
+ * (`react-native-enriched-html` 1.1.1, both list spans on Android), so an Arabic
+ * list would lose its bullets and, worse, its numbers. The whole list changes
+ * rather than the one item, because a list split in two restarts its numbering.
+ * Those lines give up the hanging indent and keep the marker in reading order.
+ */
+export function richDocToDisplayHtml(doc: RichDoc): string {
+  const text = (s: string) =>
+    encodeEntities(s).replace(/ {2,}/g, (run) => ` ${'\u00A0'.repeat(run.length - 1)}`);
+  const block = (b: RichBlock) => {
+    if (b.kind === 'paragraph' || !b.items.some(readsRightToLeft)) return blockToHtml(b, text);
+    return b.items
+      .map((item, i) => {
+        const marker = b.kind === 'bullets' ? '\u2022' : `${i + 1}.`;
+        return `<p>${marker} ${inlineToHtml(item, text)}</p>`;
+      })
+      .join('');
+  };
+  return `<html>${doc.map(block).join('<br>')}</html>`;
+}
+
+/** Hebrew and the Arabic blocks, presentation forms included. */
+const RIGHT_TO_LEFT = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFC]/;
+
+/**
+ * The rule a text layout uses for a paragraph's direction: its first strong
+ * character. Digits and punctuation are neutral, and a letter with case is the
+ * cheap test for "strongly left-to-right" that needs no Unicode tables on Hermes.
+ */
+function readsRightToLeft(nodes: RichInline[]): boolean {
+  const flat = (ns: RichInline[]): string =>
+    ns.map((n) => (n.kind === 'text' ? n.text : flat(n.content))).join('');
+  for (const ch of flat(nodes)) {
+    if (RIGHT_TO_LEFT.test(ch)) return true;
+    if (ch.toLowerCase() !== ch.toUpperCase()) return false;
+  }
+  return false;
 }
 
 // ---------------------------------------------------------------- HTML → markdown

@@ -631,6 +631,20 @@ node scripts/tutorials/publish.mjs --from $S/films  # every film, or none
 
 Re-record a film, and publish, whenever a screen it shows changes.
 
+## Patched dependencies
+
+`patches/` holds `patch-package` patches, applied by the root `postinstall` on
+every `npm install` and `npm ci`. There is one, a single word in
+`react-native-enriched-html`'s Android parser: `fromHtml` becomes `synchronized`,
+because the parser keeps list state in static fields and a text view is parsed
+on two threads at once. `app/src/richTextSeam.test.ts` fails if it did not apply.
+
+When the library moves, `npm install` reports a patch that no longer applies. Read
+the new parser first: if its list state is no longer static, delete the patch and
+the test's second assertion; otherwise regenerate it with
+`npx patch-package react-native-enriched-html`. Either way, re-run the cold-start
+check on the emulator, since a warm re-open can look right with the bug intact.
+
 ## A five-minute tour
 
 With the emulators running and the app open:

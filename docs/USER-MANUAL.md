@@ -216,6 +216,10 @@ Tap any card to open the full view.
 
   The list closes when you click away, and picking a name never loses your place
   in the box.
+
+  To copy from a comment or a description, **long-press** it on a phone, then
+  drag the handles or tap **Select all** to take the whole thing, lists
+  included.
 - **Subscribe** — the **bell** in the card's header. Tap it to hear about
   everything on a card even when it isn't assigned to you: new comments, and any
   change its activity records — moved, renamed, a new due date, a file attached
