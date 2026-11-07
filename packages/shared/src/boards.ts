@@ -166,7 +166,9 @@ export function renameColumn(
 export const LABEL_NAME_MAX = 40;
 
 /**
- * Names are unique across the whole org, case-insensitively. Two labels
+ * Names are unique within what one board shows, case-insensitively: pass the
+ * institute labels and that board's own, or the institute labels alone for a
+ * new institute label. Two labels
  * differing only in case are indistinguishable on a card face — the chip shows
  * the name and nothing else — so the pair is unusable rather than merely untidy.
  *
@@ -201,8 +203,11 @@ export function newLabel(params: {
   color: string;
   createdBy: string;
   now: number;
+  /** The board that owns it, or `null` for an institute label. */
+  boardId: string | null;
 }): LabelDoc {
   return {
+    ...(params.boardId !== null ? { boardId: params.boardId } : {}),
     name: params.name.trim(),
     color: params.color,
     createdAt: params.now,
@@ -247,6 +252,45 @@ function sortKey(name: string): string {
 
 export function sortLabels<T extends { name: string }>(labels: readonly T[]): T[] {
   return [...labels].sort((a, b) => sortKey(a.name).localeCompare(sortKey(b.name)));
+}
+
+/**
+ * What a board offers: the institute labels first, then the board's own, each
+ * in `sortLabels` order. Another board's labels never appear, which is the
+ * point of having them.
+ */
+export function labelsForBoard<T extends { name: string; boardId?: string }>(
+  labels: readonly T[],
+  boardId: string,
+): T[] {
+  return [
+    ...sortLabels(labels.filter((l) => !l.boardId)),
+    ...sortLabels(labels.filter((l) => l.boardId === boardId)),
+  ];
+}
+
+/**
+ * A card's labels once it lands on another board, by a move or a copy.
+ *
+ * Institute labels come along, the source board's own stay behind, and an id
+ * that resolves to no label is dropped rather than carried as dead weight. One
+ * of the destination board's own is kept, which only a card that once lived
+ * there can hold.
+ *
+ * `labels` must be the LOADED list. Called with an empty one, because a list
+ * still loading read as "no labels", it would strip every label off the card;
+ * the callers wait for it.
+ */
+export function labelIdsAfterBoardChange(
+  labelIds: readonly string[],
+  labels: readonly { id: string; boardId?: string }[],
+  destBoardId: string,
+): string[] {
+  const byId = new Map(labels.map((l) => [l.id, l]));
+  return labelIds.filter((id) => {
+    const l = byId.get(id);
+    return l !== undefined && (!l.boardId || l.boardId === destBoardId);
+  });
 }
 
 /**

@@ -26,7 +26,7 @@ const OUT = resolve(ROOT, 'shots', 'sweep-report.html');
 
 /** Tour order, then anything new alphabetically after it. */
 const ORDER = [
-  'rules', 'boards', 'mywork', 'search', 'alerts', 'stats', 'people', 'more', 'report',
+  'rules', 'boards', 'mywork', 'search', 'alerts', 'stats', 'people', 'labels', 'more', 'report',
   'board', 'board-owner', 'board-member', 'roster-owner', 'roster-member',
   'board-longname', 'board-empty', 'bulk', 'card', 'card-editing', 'card-comment',
   'settings', 'archive',
@@ -61,12 +61,13 @@ const BLURB = {
   stats: 'Admin only. A pushed screen, so it needs its own way back.',
   'stats-detail': 'A bar selected, with its breakdown below the chart. The panel appends below the fold on a phone, so the screen scrolls it into view — the one thing reading the code cannot show.',
   people: 'Admin only — approvals and roles.',
+  labels: 'Admin only — the institute labels, More → Labels. The only place they change.',
   board: 'Columns on a wide screen, one swipeable column on a narrow one.',
   card: 'A card at rest: the description RENDERED, with its formatting applied.',
   'card-editing': 'The description EDITOR open — toolbar row plus Save/Cancel.',
   'card-comment': 'The comment composer in use, with Bold active.',
   'board-owner': 'The same board as an OWNER of it — delete-column and Board settings present, like an admin. Ownership is per board and has nothing to do with the org role.',
-  'board-member': 'The same board as a MEMBER who does not own it — no delete-column, and the settings icon becomes Board members. The archive stays, because members archive and so must un-archive.',
+  'board-member': 'The same board as a MEMBER who does not own it — no delete-column, and the settings icon becomes Members and labels. The archive stays, because members archive and so must un-archive.',
   'roster-owner': 'The member list as an OWNER: a toggle per person, and the creator\u2019s row locked, because only an admin may take ownership off whoever made the board.',
   'roster-member': 'The same list as a MEMBER \u2014 read-only, owners marked. It answers \u201cwho do I ask to add someone?\u201d, which used to be a question you could only put to an admin. Reachable by nobody in the admin tour, since an admin owns every board.',
   bulk: 'Selection mode, with the action bar floating over the board. Six 44px actions do not fit one row at 320px, so it wraps rather than pushing the page sideways.',

@@ -15,6 +15,7 @@ import { Select } from './Select';
 import type { Selection } from '../useSelection';
 import type { SessionUser } from '../session';
 import { useMyBoards, type BoardMemberProfile } from '../boards';
+import { useLabels } from '../labels';
 import { Body, Button, Caption, Hint, IconAction, Row } from './ui';
 import { radius, space, useTheme } from '../theme';
 import { toUserMessage } from '../errors';
@@ -60,12 +61,20 @@ export function BulkBar({
   const [destColumnId, setDestColumnId] = useState('');
   // The boards you could move/copy to (yours, or every board if you are an admin).
   const boards = useMyBoards(user);
+  // Every label, to tell a board's own from the institute's on a move. Copy and
+  // Move wait for it: an unloaded list would read as "no labels" and strip them.
+  const labels = useLabels();
 
   if (!selection.active) return null;
 
   const chosen = selection.selected;
   const otherBoards = (boards.data ?? []).filter((b) => b.id !== currentBoardId);
   const dest = otherBoards.find((b) => b.id === destBoardId);
+  const loadedLabels = labels.status === 'ready' ? labels.data : null;
+  // This board's own labels on the selection, which stay here on a move or copy.
+  const stayBehind = (loadedLabels ?? []).filter(
+    (l) => l.boardId === currentBoardId && chosen.some((c) => c.labelIds.includes(l.id)),
+  );
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -188,9 +197,12 @@ export function BulkBar({
         <>
           <Hint>Copy or move the selection to another board</Hint>
           <Hint>
-            Labels come along, and anyone not on the destination board is
-            unassigned.
+            Institute labels come along, this board’s own labels stay here, and
+            anyone not on the destination board is unassigned.
           </Hint>
+          {stayBehind.length > 0 ? (
+            <Hint>{`Staying here: ${stayBehind.map((l) => l.name).join(', ')}.`}</Hint>
+          ) : null}
           {otherBoards.length === 0 ? (
             <Hint>You are not on any other board.</Hint>
           ) : null}
@@ -233,6 +245,7 @@ export function BulkBar({
                   label="Copy"
                   variant="secondary"
                   busy={busy}
+                  disabled={loadedLabels === null}
                   onPress={() =>
                     run(() =>
                       bulkCopyToBoard({
@@ -240,6 +253,7 @@ export function BulkBar({
                         destBoardId: dest.id,
                         destColumnId,
                         destMemberUids: dest.memberUids,
+                        labels: loadedLabels ?? [],
                         user,
                       }),
                     )
@@ -249,6 +263,7 @@ export function BulkBar({
                   label="Move"
                   variant="primary"
                   busy={busy}
+                  disabled={loadedLabels === null}
                   onPress={() =>
                     run(() =>
                       bulkMoveToBoard({
@@ -256,6 +271,7 @@ export function BulkBar({
                         destBoardId: dest.id,
                         destColumnId,
                         destMemberUids: dest.memberUids,
+                        labels: loadedLabels ?? [],
                         user,
                       }),
                     )

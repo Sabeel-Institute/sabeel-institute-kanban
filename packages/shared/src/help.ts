@@ -50,7 +50,7 @@ export const HELP_VIDEOS: readonly HelpVideo[] = [
   { id: 'board-archive', audience: 'owner', title: 'Deleting cards and archiving a board', summary: 'Deleting a card for good, and putting a finished board away.' },
   { id: 'people', audience: 'admin', title: 'Approving people', summary: 'New accounts waiting for you, and letting them in.' },
   { id: 'roles', audience: 'admin', title: 'Roles and access', summary: 'Admin, organizer and member, and turning an account off.' },
-  { id: 'labels', audience: 'admin', title: 'Managing labels', summary: 'Renaming, recolouring and deleting labels for everyone.' },
+  { id: 'labels', audience: 'admin', title: 'Managing labels', summary: "The institute's labels for every board, and a board's own." },
   { id: 'stats', audience: 'admin', title: 'Stats', summary: 'How the boards are being used, and what is behind a bar.' },
 ];
 

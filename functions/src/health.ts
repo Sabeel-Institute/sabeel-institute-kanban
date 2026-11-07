@@ -80,10 +80,9 @@ const DROP_RULES: Record<string, DropRule> = {
   // zeroTolerance here would page on normal use.
   attachments: { minDrop: 5, fraction: 0.2 },
   notifications: { minDrop: 5, fraction: 0.2 },
-  // Tolerant on purpose, like attachments. The org-wide label set is meant to be
-  // CURATED — the 32 that arrived from the per-board arrays include several
-  // near-duplicates somebody is expected to prune in one sitting — so a normal
-  // tidy-up must not page anyone. Losing the whole set still would.
+  // Tolerant on purpose, like attachments. Labels are meant to be CURATED, by
+  // admins for the institute's and by anyone on a board for its own, so a normal
+  // tidy-up in one sitting must not page anyone. Losing the whole set still would.
   labels: { minDrop: 8, fraction: 0.34 },
 };
 

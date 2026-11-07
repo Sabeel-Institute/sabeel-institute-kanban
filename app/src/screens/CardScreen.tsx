@@ -4,6 +4,7 @@ import { Icon } from '../icons';
 import {
   PRIORITIES,
   canManageBoard,
+  labelsForBoard,
   priorityLabel,
   readableInkOn,
   todayInOrgTz,
@@ -74,8 +75,7 @@ export function CardScreen({
   // Board authority: permanently deleting a card, and moderating a comment,
   // belong to this board's owners rather than to a rank in the organisation.
   const canManage = canManageBoard(user, board.data);
-  // Org-wide. Every board offers the same labels, so this does not come from
-  // the board document any more.
+  // Every label; this card's board offers the institute labels and its own.
   const labels = useLabels();
   /**
    * The label list, but ONLY once we actually have it.
@@ -165,6 +165,18 @@ export function CardScreen({
 
   const today = todayInOrgTz();
   const overdue = c.dueDate !== undefined && c.dueDate < today;
+
+  /**
+   * What this card's picker offers: the institute labels and this board's own,
+   * plus any label the card already carries from elsewhere, so it still shows
+   * and can be taken off. An id that resolves to nothing has no chip at all.
+   */
+  const allLabels = labels.data ?? [];
+  const inScope = labelsForBoard(allLabels, c.boardId);
+  const offeredLabels = [
+    ...inScope,
+    ...allLabels.filter((l) => c.labelIds.includes(l.id) && !inScope.includes(l)),
+  ];
 
   /** Whether I subscribe to this card. Assignment does NOT imply it — an
    *  assignee already hears about everything on it, and subscribing as well is
@@ -511,7 +523,7 @@ export function CardScreen({
       <Heading>Labels</Heading>
       <Panel>
         <Row style={styles.wrap}>
-          {(labels.data ?? []).map((l) => {
+          {offeredLabels.map((l) => {
                 const on = c.labelIds.includes(l.id);
                 return (
                   <Pressable
@@ -568,14 +580,15 @@ export function CardScreen({
             onPress={() => setAddingLabel(true)}
           />
         </Row>
-        {labels.status === 'ready' && (labels.data ?? []).length === 0 ? (
-          <Hint>No labels yet. Add one with +, and every board gets it.</Hint>
+        {labels.status === 'ready' && offeredLabels.length === 0 ? (
+          <Hint>No labels yet. Add one with +.</Hint>
         ) : null}
       </Panel>
 
       {addingLabel ? (
         <NewLabelSheet
-          knownLabels={knownLabels}
+          knownLabels={knownLabels === null ? null : labelsForBoard(knownLabels, c.boardId)}
+          boardName={b.name}
           busy={busy}
           onError={setError}
           onClose={() => setAddingLabel(false)}
@@ -583,7 +596,7 @@ export function CardScreen({
             void run(async () => {
               // Created AND applied in one go — coining a label while looking at
               // a card means you want it on that card.
-              const id = await createLabel({ name, color, user });
+              const id = await createLabel({ name, color, user, boardId: c.boardId });
               await updateCard(cardId, { labelIds: [...c.labelIds, id] }, user);
               setAddingLabel(false);
             })

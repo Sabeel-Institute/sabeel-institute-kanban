@@ -29,6 +29,7 @@ import {
   canAdministerUsers,
   canCreateBoards,
   canUseApp,
+  canCurateLabels,
   canViewStats,
   hasAcceptedRules,
   sessionAccess,
@@ -426,5 +427,6 @@ export const sessionCan = {
   useApp: (u: SessionUser) => canUseApp(u),
   createBoards: (u: SessionUser) => canCreateBoards(u),
   viewStats: (u: SessionUser) => canViewStats(u),
+  curateLabels: (u: SessionUser) => canCurateLabels(u),
   administerUsers: (u: SessionUser) => canAdministerUsers(u),
 };

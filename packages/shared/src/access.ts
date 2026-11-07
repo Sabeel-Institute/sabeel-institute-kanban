@@ -171,12 +171,10 @@ export function canUseApp(actor: { status: UserStatus }): boolean {
 }
 
 /**
- * Who may CURATE the org-wide label set — rename, recolour, delete.
- *
- * Creating a label is deliberately not gated beyond `canUseApp`: it happens
- * while someone is looking at a card, and it is cheap and reversible. Deleting
- * is neither, because it strips the label off every card on every board — often
- * boards the deleter is not even a member of. Hence the asymmetry.
+ * Who may add, rename, recolour or delete an INSTITUTE label: one with no
+ * `boardId`, on every board. Changing one reaches cards on every board, often
+ * boards the person doing it is not a member of, so it takes an org-wide
+ * authority. A board's own labels are `canEditBoardLabels`.
  *
  * THIS BODY IS THE POINT OF THE FUNCTION, and it used to be
  * `return canManageBoards(actor)` — an alias, sitting under a docblock arguing
@@ -189,6 +187,24 @@ export function canUseApp(actor: { status: UserStatus }): boolean {
  */
 export function canCurateLabels(actor: { role: Role; status: UserStatus }): boolean {
   return actor.status === 'active' && actor.role === 'admin';
+}
+
+/**
+ * Who may add, rename, recolour or delete ONE BOARD's own label: anyone on that
+ * board, and admins. Its effect stops at that board's cards, so being on the
+ * board is the whole authority, owners or not; the same reasoning lets anyone on
+ * a board remove an attachment. `firestore.rules` states it as `mayCurate()`.
+ *
+ * Its own body, though it reads like `canAccessBoard` today, for the reason
+ * `canCurateLabels` gives: an alias would move with the other predicate.
+ */
+export function canEditBoardLabels(
+  actor: { uid: string; role: Role; status: UserStatus },
+  board: { memberUids?: readonly string[] },
+): boolean {
+  if (actor.status !== 'active') return false;
+  if (actor.role === 'admin') return true;
+  return (board.memberUids ?? []).includes(actor.uid);
 }
 
 /**

@@ -19,12 +19,13 @@ import { EMULATOR_PROJECT_ID, LABEL_COLORS, LABEL_NAME_MAX } from '@sabeel/share
 import { firestoreHostPort } from './emulatorHosts';
 
 /**
- * Rules for the org-wide `labels` collection.
+ * Rules for the `labels` collection and its two scopes.
  *
- * The asymmetry is the point and is what these tests exist to pin: ANY active
- * member may create a label, because coining one is cheap and happens while
- * looking at a card — but only an ADMIN may rename, recolour or delete one,
- * because those change what everybody else already sees.
+ * What these pin: a label's SCOPE decides who may add or change it. An
+ * institute label (no `boardId`) is on every board and is admin work. A board's
+ * own label is anyone on that board's, owner or not, and nobody else's. And
+ * `boardId` never moves, or a label could be carried into a scope its mover may
+ * change.
  *
  * `assertFails` passes when an operation fails for ANY reason, so every denial
  * here is paired with a positive control: the same write succeeding once the one
@@ -43,13 +44,20 @@ function ctx(uid: string, role: string, status = 'active') {
 
 const fs = (uid: string, role: string, status = 'active') => ctx(uid, role, status).firestore();
 
-const label = (over: Record<string, unknown> = {}) => ({
+/** An institute label: no `boardId`. */
+const institute = (over: Record<string, unknown> = {}) => ({
   name: 'Finance',
   color: LABEL_COLORS[0],
   createdAt: 1,
   createdBy: 'member1',
   ...over,
 });
+
+/**
+ * A label of board b1's own, which member1 is on. The default for the shape
+ * checks below, because it is the label an ordinary member may create.
+ */
+const label = (over: Record<string, unknown> = {}) => institute({ boardId: 'b1', ...over });
 
 beforeAll(async () => {
   env = await initializeTestEnvironment({
@@ -68,7 +76,15 @@ afterAll(async () => {
 beforeEach(async () => {
   await env.clearFirestore();
   await env.withSecurityRulesDisabled(async (c) => {
-    await setDoc(doc(c.firestore(), 'labels/existing'), label({ name: 'Blocked' }));
+    for (const [id, members] of [['b1', ['member1', 'owner1']], ['b2', ['other1']]] as const) {
+      await setDoc(doc(c.firestore(), `boards/${id}`), {
+        name: id,
+        memberUids: [...members],
+        boardOwnerUids: [members[members.length - 1]],
+      });
+    }
+    await setDoc(doc(c.firestore(), 'labels/existing'), institute({ name: 'Blocked' }));
+    await setDoc(doc(c.firestore(), 'labels/own'), label({ name: 'Venue' }));
   });
 });
 
@@ -87,11 +103,47 @@ describe('reading labels', () => {
   });
 });
 
-describe('creating a label', () => {
-  it('is allowed to an ordinary member', async () => {
-    await assertSucceeds(
-      addDoc(collection(fs('member1', 'member'), 'labels'), label()),
+describe('creating an institute label', () => {
+  it('is admin work, not organizer or member work', async () => {
+    await assertFails(addDoc(collection(fs('member1', 'member'), 'labels'), institute()));
+    await assertFails(
+      addDoc(collection(fs('org1', 'organizer'), 'labels'), institute({ createdBy: 'org1' })),
     );
+    // Only the role was in the way.
+    await assertSucceeds(
+      addDoc(collection(fs('admin1', 'admin'), 'labels'), institute({ createdBy: 'admin1' })),
+    );
+  });
+});
+
+describe('creating a board label', () => {
+  it('is allowed to anyone on that board, owner or not', async () => {
+    await assertSucceeds(addDoc(collection(fs('member1', 'member'), 'labels'), label()));
+    await assertSucceeds(
+      addDoc(collection(fs('owner1', 'member'), 'labels'), label({ createdBy: 'owner1' })),
+    );
+  });
+
+  it('is refused to someone not on that board', async () => {
+    await assertFails(
+      addDoc(collection(fs('other1', 'member'), 'labels'), label({ createdBy: 'other1' })),
+    );
+    // The same person, on their own board.
+    await assertSucceeds(
+      addDoc(collection(fs('other1', 'member'), 'labels'), label({ createdBy: 'other1', boardId: 'b2' })),
+    );
+  });
+
+  it('is allowed to an admin who is not on the board', async () => {
+    await assertSucceeds(
+      addDoc(collection(fs('admin1', 'admin'), 'labels'), label({ createdBy: 'admin1' })),
+    );
+  });
+
+  it('refuses a board that does not exist, and a boardId that is not a string', async () => {
+    await assertFails(addDoc(collection(fs('member1', 'member'), 'labels'), label({ boardId: 'nope' })));
+    await assertFails(addDoc(collection(fs('member1', 'member'), 'labels'), label({ boardId: 7 })));
+    await assertSucceeds(addDoc(collection(fs('member1', 'member'), 'labels'), label({ boardId: 'b1' })));
   });
 
   it('is refused to an account awaiting approval', async () => {
@@ -152,7 +204,7 @@ describe('creating a label', () => {
       ),
     );
     await assertFails(
-      addDoc(collection(fs('member1', 'member'), 'labels'), label({ boardId: 'b1' })),
+      addDoc(collection(fs('member1', 'member'), 'labels'), label({ archived: true })),
     );
     await assertSucceeds(
       addDoc(collection(fs('member1', 'member'), 'labels'), label({ createdAt: Date.now() })),
@@ -168,14 +220,14 @@ describe('creating a label', () => {
 
 describe('renaming and recolouring', () => {
   /**
-   * ADMIN work, not organizer work and not member work.
+   * Of an INSTITUTE label: admin work, not organizer work and not member work.
    *
-   * A label is org-wide: renaming one changes it on every card on every board,
+   * It is on every board: renaming one changes it on every card on every board,
    * including boards the editor is not on. That is an org-wide effect, so it
    * takes an org-wide authority — and owning a board grants no part of it, which
    * is precisely what a member promoted to run one board must NOT inherit.
    */
-  it('is admin work, not organizer or member work', async () => {
+  it('of an institute label is admin work, not organizer or member work', async () => {
     await assertFails(
       updateDoc(doc(fs('member1', 'member'), 'labels/existing'), { name: 'Renamed' }),
     );
@@ -186,6 +238,29 @@ describe('renaming and recolouring', () => {
     await assertSucceeds(
       updateDoc(doc(fs('admin1', 'admin'), 'labels/existing'), { name: 'Renamed' }),
     );
+  });
+
+  it('of a board label is anyone on that board, and admins', async () => {
+    await assertSucceeds(updateDoc(doc(fs('member1', 'member'), 'labels/own'), { name: 'Hall' }));
+    await assertSucceeds(updateDoc(doc(fs('owner1', 'member'), 'labels/own'), { color: LABEL_COLORS[2] }));
+    await assertSucceeds(updateDoc(doc(fs('admin1', 'admin'), 'labels/own'), { name: 'Hall booking' }));
+  });
+
+  it('of a board label is refused to someone not on that board', async () => {
+    await assertFails(updateDoc(doc(fs('other1', 'member'), 'labels/own'), { name: 'Mine now' }));
+    await assertSucceeds(updateDoc(doc(fs('member1', 'member'), 'labels/own'), { name: 'Still theirs' }));
+  });
+
+  it('never moves a label between scopes, an admin included', async () => {
+    // Into another board, out to the institute, and in from it: each would put
+    // the label where a different set of people may change it.
+    await assertFails(updateDoc(doc(fs('member1', 'member'), 'labels/own'), { boardId: 'b2' }));
+    await assertFails(updateDoc(doc(fs('admin1', 'admin'), 'labels/own'), { boardId: 'b2' }));
+    await assertFails(updateDoc(doc(fs('admin1', 'admin'), 'labels/existing'), { boardId: 'b1' }));
+    await assertFails(updateDoc(doc(fs('member1', 'member'), 'labels/existing'), { boardId: 'b1' }));
+    // The same writers changing what they may.
+    await assertSucceeds(updateDoc(doc(fs('member1', 'member'), 'labels/own'), { name: 'Venue 2' }));
+    await assertSucceeds(updateDoc(doc(fs('admin1', 'admin'), 'labels/existing'), { name: 'Blocked 2' }));
   });
 
   it('lets an admin recolour', async () => {
@@ -208,7 +283,7 @@ describe('renaming and recolouring', () => {
 
   it('will not let an admin smuggle in a new field or a bad colour', async () => {
     await assertFails(
-      updateDoc(doc(fs('admin1', 'admin'), 'labels/existing'), { boardId: 'b1' }),
+      updateDoc(doc(fs('admin1', 'admin'), 'labels/existing'), { archived: true }),
     );
     await assertFails(
       updateDoc(doc(fs('admin1', 'admin'), 'labels/existing'), { color: 'goldenrod' }),
@@ -233,6 +308,7 @@ describe('deleting a label', () => {
     // Not an oversight: deleting must also strip the id from every card that
     // carries it, and no client write can do that completely or record who did
     // it. The deleteLabel callable owns this. Same shape as attachments.
+    await assertFails(deleteDoc(doc(fs('member1', 'member'), 'labels/own')));
     await assertFails(deleteDoc(doc(fs('member1', 'member'), 'labels/existing')));
     await assertFails(deleteDoc(doc(fs('org1', 'organizer'), 'labels/existing')));
     await assertFails(deleteDoc(doc(fs('admin1', 'admin'), 'labels/existing')));

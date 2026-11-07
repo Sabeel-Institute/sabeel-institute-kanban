@@ -190,11 +190,19 @@ export function SearchScreen({ user }: { user: SessionUser }) {
   }, [boardIds, archivedOnly, boards.status]);
 
   // Sorted the way the rest of the app sorts labels, so an emoji-prefixed name
-  // files under its word rather than under the emoji.
-  const labelList = useMemo<NarrowItem[]>(
-    () => sortLabels([...(allLabels.data ?? NO_LABELS)]).map((l) => ({ id: l.id, name: l.name })),
-    [allLabels.data],
-  );
+  // files under its word rather than under the emoji. Institute labels, and the
+  // own labels of the boards you can search, each naming its board: two boards
+  // can each have a "Homework", and this is how you tell them apart.
+  const labelList = useMemo<NarrowItem[]>(() => {
+    const boardName = new Map((boards.data ?? []).map((b) => [b.id, b.name]));
+    return sortLabels([...(allLabels.data ?? NO_LABELS)])
+      .filter((l) => !l.boardId || boardName.has(l.boardId))
+      .map((l) => ({
+        id: l.id,
+        name: l.name,
+        ...(l.boardId ? { detail: boardName.get(l.boardId) } : {}),
+      }));
+  }, [allLabels.data, boards.data]);
 
   const boardList = useMemo<NarrowItem[]>(
     () =>

@@ -8,11 +8,8 @@ import { radius, useTheme } from '../theme';
 /**
  * Coining a label from a card, with the name and colour owned here.
  *
- * This is the ONE label affordance a plain member gets: Board Settings, where
- * labels are curated, opens for that board's owners alone, and renaming or
- * deleting one is admin-only besides. Needing either of them to coin a tag while
- * you are looking at the card it belongs on is exactly the friction that made
- * per-board labels get re-created everywhere.
+ * It is always the board's own: institute labels are made in More → Labels and
+ * nowhere else, admins included, so the sheet says which board it lands on.
  *
  * MOUNTED ONLY WHILE OPEN, so the draft is scoped to the sheet being open —
  * the same rule every other draft in this refactor follows. Held in the screen,
@@ -21,6 +18,7 @@ import { radius, useTheme } from '../theme';
  */
 export function NewLabelSheet({
   knownLabels,
+  boardName,
   busy,
   onError,
   onCreate,
@@ -29,6 +27,8 @@ export function NewLabelSheet({
   /** `null` until the label list has loaded — uniqueness cannot be judged
    *  against a set that has not arrived, so the button stays disabled. */
   knownLabels: readonly Label[] | null;
+  /** The board the new label belongs to, named in the sheet. */
+  boardName: string;
   busy: boolean;
   onError: (message: string) => void;
   /** Creates the label AND applies it; rejects if either write fails. */
@@ -41,7 +41,7 @@ export function NewLabelSheet({
 
   return (
     <Sheet visible title="New label" onClose={onClose}>
-      <Hint>Labels are shared by every board.</Hint>
+      <Hint>{`This label will only be on ${boardName}.`}</Hint>
       <TextField
         value={name}
         onChangeText={setName}

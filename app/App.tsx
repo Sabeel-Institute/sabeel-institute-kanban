@@ -39,6 +39,7 @@ import { MyWorkScreen } from './src/screens/MyWorkScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { SearchScreen } from './src/screens/SearchScreen';
 import { UsersScreen } from './src/screens/UsersScreen';
+import { LabelsScreen } from './src/screens/LabelsScreen';
 import { StatsScreen } from './src/screens/StatsScreen';
 import { ReportScreen } from './src/screens/ReportScreen';
 import { HelpFilmScreen, HelpScreen } from './src/screens/HelpScreen';
@@ -122,6 +123,12 @@ function renderScreen(route: Route, user: SessionUser) {
         <StatsScreen user={user} />
       ) : (
         <NotForYou what="Stats" />
+      );
+    case 'labels':
+      return sessionCan.curateLabels(user) ? (
+        <LabelsScreen user={user} />
+      ) : (
+        <NotForYou what="Institute labels" />
       );
     case 'report':
       return <ReportScreen />;

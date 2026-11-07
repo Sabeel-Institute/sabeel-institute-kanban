@@ -726,6 +726,30 @@ disaster recovery below — boards still archive rather than delete, and only a
 board's owners and admins may permanently remove cards, because prevention beats
 restoring.
 
+### Giving institute labels to boards
+
+Every label is an institute label until it has a `boardId`. To hand chosen
+ones to the boards that use them, write a plan file OUTSIDE the repo, since it
+holds real names:
+
+```json
+[{ "label": "Exact label name", "board": "Exact board name" }, { "label": "Another" }]
+```
+
+then read the dry run before applying it:
+
+```
+GCLOUD_PROJECT=sabeel-institute-kanban node scripts/scope-labels.mjs ~/plan.json --actor <admin email>
+GCLOUD_PROJECT=sabeel-institute-kanban node scripts/scope-labels.mjs ~/plan.json --actor <admin email> --apply
+```
+
+A label used on several boards stays with the named board, or the one with the
+most cards, and each other board gets a copy its cards move to. Every moved card
+logs "changed the labels" against the admin, and its followers get a notice, so
+the dry run's count of moved cards is the number to look at. It refuses rather
+than guesses, writes nothing until every entry checks out, and is safe to re-run.
+`scripts/scope-labels-e2e.mjs` rehearses it in CI.
+
 ### Restoring across the label migration
 
 A restore from a backup taken **before 2026-07-27** brings back boards that still

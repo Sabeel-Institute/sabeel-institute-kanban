@@ -114,10 +114,11 @@ export function AppNav({
   // per-board breakdown describes boards the reader may not be on.
   const canSeeStats = sessionCan.viewStats(user);
   const canSeePeople = sessionCan.administerUsers(user);
+  const canSeeLabels = sessionCan.curateLabels(user);
 
   const menu = (
     <Sheet visible={menuOpen} title="More" onClose={() => setMenuOpen(false)}>
-      {canSeeStats || canSeePeople ? <MenuSection label="Organisation" /> : null}
+      {canSeeStats || canSeeLabels || canSeePeople ? <MenuSection label="Organisation" /> : null}
       {canSeeStats ? (
         <SheetOption
           label="Stats"
@@ -125,6 +126,16 @@ export function AppNav({
           onPress={() => {
             setMenuOpen(false);
             nav.push({ name: 'stats' });
+          }}
+        />
+      ) : null}
+      {canSeeLabels ? (
+        <SheetOption
+          label="Labels"
+          detail="The institute labels every board shares"
+          onPress={() => {
+            setMenuOpen(false);
+            nav.push({ name: 'labels' });
           }}
         />
       ) : null}

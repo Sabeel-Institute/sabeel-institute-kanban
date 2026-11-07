@@ -23,6 +23,8 @@ import {
   type BoardColumn,
   type CardDoc,
   type Priority,
+  labelIdsAfterBoardChange,
+  type Label,
 } from '@sabeel/shared';
 import { db } from './firebase';
 import { useLiveDoc, useLiveQuery } from './liveQuery';
@@ -421,9 +423,10 @@ export async function bulkAssign(params: {
 //
 // A move is now just an `update` of `boardId` (the card doc, and its comments/
 // activity underneath it, stay put) — so any board member may do it and the
-// delete gate never applies. A copy is a fresh card. In both cases labels are
-// cleared (they belong to the source board) and assignees are filtered to
-// members of the destination (the invariant that keeps "My Work" secure). Rules
+// delete gate never applies. A copy is a fresh card. In both cases institute
+// labels come along and the source board's own stay behind
+// (`labelIdsAfterBoardChange`), and assignees are filtered to members of the
+// destination (the invariant that keeps "My Work" secure). Rules
 // enforce membership of both boards, the destination column, and the assignee
 // subset; the filtering here is what makes the write pass.
 
@@ -460,6 +463,8 @@ export async function bulkMoveToBoard(params: {
   destBoardId: string;
   destColumnId: string;
   destMemberUids: readonly string[];
+  /** Every label, LOADED: an unloaded list would strip every label. */
+  labels: readonly Label[];
   user: SessionUser;
 }): Promise<void> {
   const moving = [...params.cards].sort(compareRank);
@@ -479,10 +484,10 @@ export async function bulkMoveToBoard(params: {
       boardId: params.destBoardId,
       columnId: params.destColumnId,
       rank,
-      // `labelIds` is deliberately NOT reset. Labels are org-wide, so they mean
-      // the same thing on the destination; a move used to strip every one of
-      // them because the ids were board-local and would have resolved to
-      // nothing. Assignees still have to be filtered — membership IS per board.
+      // Institute labels mean the same on the destination; the source board's
+      // own do not exist there. Assignees are filtered too, since membership
+      // is per board.
+      labelIds: labelIdsAfterBoardChange(card.labelIds, params.labels, params.destBoardId),
       assigneeUids: keepMembers(card.assigneeUids, params.destMemberUids),
       // Subscribers get the SAME filter, and must: the read rule has a
       // subscriber arm, so carrying one across to a board they are not on would
@@ -504,6 +509,8 @@ export async function bulkCopyToBoard(params: {
   destBoardId: string;
   destColumnId: string;
   destMemberUids: readonly string[];
+  /** Every label, LOADED: an unloaded list would strip every label. */
+  labels: readonly Label[];
   user: SessionUser;
 }): Promise<void> {
   const copying = [...params.cards].sort(compareRank);
@@ -521,8 +528,8 @@ export async function bulkCopyToBoard(params: {
       rank,
       assigneeUids: keepMembers(card.assigneeUids, params.destMemberUids),
       priority: card.priority,
-      // Carried, like priority: a label means the same thing on any board.
-      labelIds: card.labelIds,
+      // Institute labels only, as on a move: the source board's own stay there.
+      labelIds: labelIdsAfterBoardChange(card.labelIds, params.labels, params.destBoardId),
       archived: false,
       commentCount: 0,
       attachmentCount: 0,

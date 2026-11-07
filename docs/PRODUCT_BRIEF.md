@@ -42,7 +42,7 @@ in the app.
 | Cross-board view | **"My Work"** — every card assigned to me across every board, sorted by due date. First-class screen, and the phone's default landing surface. |
 | Due dates | **All-day dates only** (`YYYY-MM-DD`), no time-of-day, no start dates. |
 | Card subscriptions | **Everything on the card** (2026-11-02, widening the comments-only subscriptions of 2026-07-28). A subscriber hears about every comment and every change the card's history records. The creator is subscribed from the start (a bell beside the new card's title, on unless they turn it off), and anyone on the board may subscribe or unsubscribe with its bell. Assignees hear the same without being subscribed; subscribing as well keeps the interest after they are unassigned. See "Notifications". |
-| Labels | **Org-wide.** One set every board shares (changed 2026-07-27; they were per board). Any active member may add one; **admins** rename and delete (narrowed 2026-08-16 — the effect is org-wide, so the authority is). |
+| Labels | **Two scopes** (2026-11-07). **Institute labels** are on every board, and only admins add, rename, recolour or delete them, in More → Labels. **A board's own labels** are on that board alone, and anyone on it changes them. A cross-board move or copy carries institute labels and leaves board labels behind. |
 | Description format | **Markdown, restricted to five elements** — bold, italic, bullet list, ordered list, link (changed 2026-07-30). Both editors are WYSIWYG, so markdown is storage the user never sees. See "Rich text". |
 | Search | **Global across the boards you belong to**, client-side matching. See "Search". |
 | Notifications | Push **plus an in-app inbox** with an unread badge. |
@@ -82,8 +82,8 @@ and neither fact implies the other.
 | Comment | ✓ | ✓ | ✓ |
 | **See every board** | | | ✓ |
 | **Create boards** | | ✓ | ✓ |
-| **Add a label** (org-wide) | ✓ | ✓ | ✓ |
-| Rename, recolour or delete a label | | | ✓ |
+| Add, rename, recolour or delete a **board's own** label (on a board they're on) | ✓ | ✓ | ✓ |
+| Add, rename, recolour or delete an **institute** label | | | ✓ |
 | Stats | | | ✓ |
 | **Approve/reject/disable user accounts** | | | ✓ |
 | **Change anyone's role** | | | ✓ |
@@ -166,7 +166,9 @@ boards/{boardId}/activity/{entryId}              # the board's own history
   at, actorUid?, actorName?, subjectUid?, subjectName?, from?, to?, since?
   # Written ONLY by the onBoardWritten trigger. Names are stored, not looked up.
 
-labels/{labelId}                                 # ORG-WIDE: one set, every board shares it
+labels/{labelId}                                 # one collection, two scopes
+  boardId?                                       # absent: an INSTITUTE label, on every board, admins only
+                                                 # present: that board's own; anyone on it; never changes
   name, color                                    # color from LABEL_COLORS; rules check the hex shape
   createdAt, createdBy                           # '' for the 32 migrated from board arrays
                                                  # a COLLECTION, not an array: any member may add one, and
@@ -182,7 +184,7 @@ cards/{cardId}                                   # TOP-LEVEL collection; keyed t
                                                  # sharper reason: the read rule has a subscriber arm, so this grants read
   dueDate?: string                               # 'YYYY-MM-DD' — an all-day date, NOT a timestamp
   priority: none|low|med|high|urgent
-  labelIds: [id, …], archived: bool, archivedAt?  # ids into labels/*; survive a cross-board move
+  labelIds: [id, …], archived: bool, archivedAt?  # ids into labels/*; a cross-board move keeps institute ones only
   commentCount                                   # denormalized for the card face
   parentId?                                      # the card this is a SUBTASK of — lives on the child, so the parent's list is derived
                                                  # board-scoped by convention (a cross-board move clears it); rules validate shape only

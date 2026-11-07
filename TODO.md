@@ -14,6 +14,25 @@ tells you the command to run.
 
 ---
 
+## Label scopes — waiting on the admins' list
+
+Every label is an institute label (on every board) until it is given to a board.
+The release that adds board labels changes nothing on its own; this hands over
+the ones that should be a board's.
+
+- [ ] **Ask the admins which labels belong to one board.** For each: its exact
+      name and, if more than one board uses it, the board that keeps it. Send it
+      in chat or write the plan file yourself, OUTSIDE the repo (real names; the
+      format is in `docs/DEPLOY.md` § Giving institute labels to boards).
+- [ ] **Read the dry run**, `--actor` set to your address. The number to look at
+      is how many cards move to a copy: each one logs "changed the labels" and
+      tells its followers.
+- [ ] **Apply it** with `--apply`.
+- [ ] **Raise the version floor** to that release once it is on Play and
+      TestFlight (`node scripts/set-min-version.mjs <X.Y.Z>`). An older phone's
+      `+` makes an institute label, which the new rules refuse for anyone but an
+      admin, and it offers every board's own labels.
+
 ## Play publishing from the command line — **DONE, verified 2026-08-29**
 
 All five steps below are ticked because they were *exercised*, not because

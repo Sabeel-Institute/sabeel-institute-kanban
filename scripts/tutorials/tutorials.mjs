@@ -1035,19 +1035,27 @@ export const TUTORIALS = [
     start: (w) => w.card('fundraising', 'date'),
     steps: [
       {
-        say: 'Labels are shared by every board, so a label means the same thing wherever you see it.',
+        say: "Labels come in two kinds. The institute's own are on every board, and each board can have a few of its own as well.",
         do: (t) => t.scrollTo(t.btn('New label')),
       },
       {
-        say: 'Anyone can add a new one from a card, using the plus next to the labels.',
+        say: 'Anyone on a board can add one from a card with the plus, and it belongs to that board.',
         do: (t) => t.highlight(t.btn('New label')),
       },
       {
-        say: "Renaming, recolouring and deleting labels is for admins, since it changes cards on every board. You'll find them in any board's settings.",
+        say: "In the board's settings, anyone on the board can rename, recolour or delete its own. The institute's have a lock, because they're changed in one place only.",
         do: async (t) => {
           await t.tap(t.link(/^Open board Fundraising 2026/));
           await t.tap(t.btn('Board settings'));
-          await t.scrollTo(t.btn('Rename label Events'));
+          await t.scrollTo(t.btn('Rename label Hall booking'));
+        },
+      },
+      {
+        say: "That place is for admins: More, then Labels. Whatever you change here changes on every board.",
+        do: async (t) => {
+          await t.tap(t.btn('More'));
+          await t.tap(t.btn(/^Labels/));
+          await t.waitFor(t.btn('Rename label Events'));
         },
       },
       {

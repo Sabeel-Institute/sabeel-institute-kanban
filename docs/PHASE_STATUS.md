@@ -45,9 +45,9 @@ testing, and on iPhones through TestFlight:
 - **Authority is two independent things** — an org role (member / organizer /
   admin) and per-board ownership. A plain member can own a board; only an admin
   sees a board they were not added to. `docs/PERMISSIONS.md` states it fully.
-- Boards with columns and membership; favourites and recents. **Labels are
-  org-wide**, one set every board shares — any member creates one, admins
-  rename, recolour and delete.
+- Boards with columns and membership; favourites and recents. **Labels in two
+  scopes**: institute labels on every board, which only admins change, in
+  More → Labels, and each board's own, which anyone on that board changes.
 - Cards with **rich-text** descriptions and comments — bold, italic, bullet
   list, ordered list and link, and deliberately nothing else. Both editors are
   WYSIWYG with a toolbar; markdown is the storage format and nobody types it.
@@ -117,8 +117,9 @@ See `docs/DEV-TOOLING.md` to run it, `docs/USER-MANUAL.md` for the user guide an
   re-fix: a signed URL already handed out keeps working for up to an hour after
   someone leaves a board, and there is no cap on how many files one card may
   hold. Both are fine below fifty colleagues; neither survives untrusted users.
-- **A simultaneous double-create can make two labels with the same name.**
-  Uniqueness is case-insensitive and checked on the client only.
+- **A simultaneous double-create can make two labels with the same name**, and
+  so can an admin adding an institute label under a name a board already uses
+  for its own. Uniqueness is case-insensitive and checked on the client only.
 - **The @mention popover works on Android, and `adb` cannot show you that.**
   Settled on a device 2026-08-29 with screen recordings: the list opens, is
   anchored at the caret, and draws over the sections below it. An earlier

@@ -2,19 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import {
   BOARD_NAME_MAX,
-  LABEL_COLORS,
-  canCurateLabels,
   canManageBoard,
   canUnseatCreator,
-  LABEL_NAME_MAX,
   columnsPatch,
-  describeLabelUsage,
   localId,
   validateBoardName,
   validateColumnName,
-  validateLabelName,
   type BoardColumn,
-  type Label,
 } from '@sabeel/shared';
 import {
   addBoardMember,
@@ -25,14 +19,6 @@ import {
   updateBoard,
   useBoard,
 } from '../boards';
-import {
-  countLabelUsage,
-  createLabel,
-  deleteLabel,
-  updateLabel,
-  useLabels,
-  type LabelUsage,
-} from '../labels';
 import type { SessionUser } from '../session';
 import { useNav } from '../nav';
 import {
@@ -55,6 +41,7 @@ import { confirmAction } from '../confirm';
 import { BoardHistory } from '../components/BoardHistory';
 import { ColumnNameEditor } from '../components/ColumnNameEditor';
 import { ReorderList } from '../components/ReorderList';
+import { BoardLabelsSection } from '../components/LabelManager';
 import { radius, space, useTheme } from '../theme';
 import { useAction } from '../useAction';
 
@@ -80,9 +67,6 @@ export function BoardSettingsScreen({
    * loads and `canManageBoard` takes that, returning false until it knows.
    */
   const canManage = canManageBoard(user, board.data);
-  // Curating the shared label set is ORG-wide and admin-only, so it is a
-  // different question from running this board and has to be asked separately.
-  const canCurate = canCurateLabels(user);
   // …and so is taking the board's CREATOR off it, which is the client mirror of
   // `keepsCreator()` in firestore.rules and of the check `removeBoardMember`
   // repeats. Named rather than inlined so the disabled controls below and the
@@ -111,20 +95,6 @@ export function BoardSettingsScreen({
       .catch(() => { if (live) setAddableFailed(true); });
     return () => { live = false; };
   }, [canManage, boardId]);
-  // Labels are org-wide. This section edits ONE set that every board shows —
-  // the copy below says so, because the screen it sits on does not.
-  const labels = useLabels();
-  /**
-   * The label list, but ONLY once we actually have it.
-   *
-   * `useLiveQuery` reports `data: undefined` while loading AND on error, so the
-   * `?? []` this used to carry turned "not known yet" into "there are no
-   * labels" — and `validateLabelName` against an empty set waves every
-   * duplicate through. The result is a persistent org-wide label that only a
-   * admin can remove, created with no warning at all. Null here means the
-   * create controls stay disabled until the check can mean something.
-   */
-  const knownLabels = labels.status === 'ready' ? labels.data : null;
   const t = useTheme();
 
   const { run, busy, error, setError } = useAction('boardSettings');
@@ -136,17 +106,6 @@ export function BoardSettingsScreen({
     null,
   );
   const [pendingCards, setPendingCards] = useState<number | 'unknown' | null>(null);
-  /** The label awaiting a delete confirmation, and how many cards carry it
-   *  (null and 'unknown' exactly as for the member removal above). A failed
-   *  count is NOT zero: "No cards use it" would call harmless a delete that
-   *  may strip the label from dozens. */
-  const [pendingLabel, setPendingLabel] = useState<Label | null>(null);
-  const [pendingLabelCards, setPendingLabelCards] = useState<LabelUsage | 'unknown' | null>(
-    null,
-  );
-  /** Which label is being renamed inline, and the text so far. */
-  const [renamingLabel, setRenamingLabel] = useState<string | null>(null);
-  const labelCountReq = useRef(0);
   /** Whether the "add someone" picker is open — its trigger is on the heading. */
   const [adding, setAdding] = useState(false);
   const countReq = useRef(0);
@@ -214,60 +173,6 @@ export function BoardSettingsScreen({
     return true;
   }
 
-  async function addLabel(name: string, color: string): Promise<boolean> {
-    if (knownLabels === null) return false;
-    const problem = validateLabelName(name, knownLabels);
-    if (problem) {
-      setError(problem);
-      return false;
-    }
-    let created = false;
-    await run(async () => {
-      await createLabel({ name, color, user });
-      created = true;
-    });
-    return created;
-  }
-
-  async function saveLabelName(label: Label, name: string): Promise<boolean> {
-    // Exclude the label being renamed, or "no change" fails its own uniqueness
-    // check — the same self-exclusion renameColumn needs.
-    if (knownLabels === null) return false;
-    const problem = validateLabelName(name, knownLabels, label.id);
-    if (problem) {
-      setError(problem);
-      return false;
-    }
-    // Closes only once the write lands, so a failed rename leaves the text on
-    // screen — the same commit timing ColumnNameEditor now has.
-    let saved = false;
-    await run(async () => {
-      await updateLabel(label.id, { name });
-      setRenamingLabel(null);
-      saved = true;
-    });
-    return saved;
-  }
-
-  /**
-   * Deleting a label takes it off every card on every board, so it asks first
-   * and says how many. Same shape as removing a member: open the dialog at once
-   * — the dialog IS the feedback — and drop the count in when the callable
-   * returns, ignoring a stale answer if the dialog has moved on.
-   */
-  function askDeleteLabel(label: Label) {
-    setPendingLabel(label);
-    setPendingLabelCards(null);
-    const req = ++labelCountReq.current;
-    countLabelUsage(label.id)
-      .then((n) => {
-        if (labelCountReq.current === req) setPendingLabelCards(n);
-      })
-      .catch(() => {
-        if (labelCountReq.current === req) setPendingLabelCards('unknown');
-      });
-  }
-
   async function renameBoard(name: string) {
     const problem = validateBoardName(name);
     if (problem) {
@@ -309,7 +214,7 @@ export function BoardSettingsScreen({
   return (
     <Screen width="read">
       <Row style={styles.between}>
-        <Title>{canManage ? 'Board settings' : 'Board members'}</Title>
+        <Title>{canManage ? 'Board settings' : 'Members and labels'}</Title>
         <IconAction icon="arrow-back" label="Back" onPress={nav.pop} />
       </Row>
 
@@ -359,148 +264,13 @@ export function BoardSettingsScreen({
             <AddColumnRow busy={busy} onAdd={addColumn} />
           </Card>
 
-          <Heading>Labels</Heading>
-          <Card>
-            {/* This screen is per-board and these labels are not, which is exactly
-                the misreading to head off: someone deletes one expecting it to
-                affect their board alone. */}
-            <Hint>
-              {canCurate
-                ? 'Labels are shared by every board. Adding, renaming or deleting one changes it everywhere.'
-                : 'Labels are shared by every board, so renaming and deleting them is an admin’s job. Anyone can add one.'}
-            </Hint>
-            {labels.status === 'loading' ? <Spinner label="Loading labels…" /> : null}
-            {(labels.data ?? []).length === 0 && labels.status === 'ready' ? (
-              <Hint>No labels yet.</Hint>
-            ) : null}
-            {(labels.data ?? []).map((l) =>
-              // `canCurate &&` for the same reason the confirmation panels carry
-              // their gate: only the pencil sets `renamingLabel`, and only an
-              // admin sees a pencil — but a demotion landing mid-rename would
-              // otherwise leave an editor whose Save the server now refuses.
-              canCurate && renamingLabel === l.id ? (
-                <LabelNameEditor
-                  key={l.id}
-                  label={l}
-                  busy={busy}
-                  ready={knownLabels !== null}
-                  onSave={(name) => saveLabelName(l, name)}
-                  onCancel={() => setRenamingLabel(null)}
-                />
-              ) : (
-                <Row key={l.id} style={styles.between}>
-                  {/* The NAME gives way; the actions never do. A label whose name
-                      is long — or that starts with an emoji, which people do —
-                      pushed the row wider than the screen and carried its own
-                      delete button off the right edge.
-
-                      Two lines rather than one: at 320px a single line clips
-                      "Waiting on Response" to "Waitin…", and a settings list you
-                      cannot read the names in is not much use. Wrapping costs a few
-                      pixels of height on the long ones only. */}
-                  <Row style={styles.grow}>
-                    <View style={[styles.swatch, { backgroundColor: l.color }]} />
-                    <Body numberOfLines={2}>{l.name}</Body>
-                  </Row>
-                  {/* ADMIN-ONLY, and not board authority: renaming or deleting a
-                      label reaches cards on every board, including boards this
-                      owner cannot open. Adding one below is open to everyone,
-                      which is the asymmetry the Hint above states. Owning a
-                      board used to imply this, and the controls stayed behind
-                      after it stopped — buttons the rules refuse. */}
-                  <Row style={styles.noShrink}>
-                    {!canCurate ? null : (
-                      <>
-                        {/* Recolouring in place: the swatch row below belongs to the
-                            NEW label being composed, so an existing one needs its own
-                            way to change, and cycling the palette is one tap rather
-                            than a second editor. */}
-                        <IconAction
-                          icon="palette"
-                          label={`Change colour of ${l.name}`}
-                          disabled={busy}
-                          onPress={() =>
-                            run(() =>
-                              updateLabel(l.id, {
-                                color:
-                                  LABEL_COLORS[
-                                    (LABEL_COLORS.indexOf(
-                                      l.color as (typeof LABEL_COLORS)[number],
-                                    ) +
-                                      1) %
-                                      LABEL_COLORS.length
-                                  ],
-                              }),
-                            )
-                          }
-                        />
-                        <IconAction
-                          icon="edit"
-                          // "Rename LABEL", not "Rename": `ColumnNameEditor` emits
-                          // `Rename ${name}` for a column on this same screen, so a
-                          // column and a label sharing a name — Finance, say — gave
-                          // two controls one accessible name. It is also the shape
-                          // `Delete label` beside it already uses.
-                          label={`Rename label ${l.name}`}
-                          disabled={busy}
-                          // No draft to seed: the editor mounts with the label's
-                          // current name and unmounts with whatever was typed.
-                          onPress={() => setRenamingLabel(l.id)}
-                        />
-                        <IconAction
-                          icon="delete-outline"
-                          label={`Delete label ${l.name}`}
-                          danger
-                          disabled={busy}
-                          onPress={() => askDeleteLabel(l)}
-                        />
-                      </>
-                    )}
-                  </Row>
-                </Row>
-              ),
-            )}
-            <AddLabelRow busy={busy} ready={knownLabels !== null} onAdd={addLabel} />
-          </Card>
-          {/* HERE, not with the other confirmations further down the screen. The
-              bin that opens this sits in the Labels card directly above; rendered
-              below Members it was off-screen on a phone, so tapping delete looked
-              like it had done nothing at all. */}
-          {canCurate && pendingLabel ? (
-            <Card>
-              <Body>
-                {pendingLabelCards === null
-                  ? `Delete “${pendingLabel.name}”? Checking how many cards use it…`
-                  : pendingLabelCards === 'unknown'
-                    ? `Delete “${pendingLabel.name}”? Could not check how many cards use it. It will be removed from all of them, across every board. This cannot be undone.`
-                    : `Delete “${pendingLabel.name}”? ${describeLabelUsage(pendingLabelCards)}${
-                      pendingLabelCards.active + pendingLabelCards.archived > 0
-                        ? ' It will be removed from all of them, across every board. This cannot be undone.'
-                        : ''
-                    }`}
-              </Body>
-              <Row>
-                <Button
-                  busy={busy}
-                  label="Delete"
-                  variant="danger"
-                  onPress={() =>
-                    run(async () => {
-                      await deleteLabel(pendingLabel.id);
-                      setPendingLabel(null);
-                    })
-                  }
-                />
-                <Button
-                  label="Cancel"
-                  variant="secondary"
-                  onPress={() => setPendingLabel(null)}
-                />
-              </Row>
-            </Card>
-          ) : null}
         </>
       ) : null}
+
+      {/* For EVERYONE on the board, not only its owners: a board's own labels
+          are anyone-on-the-board's to change, and the institute labels above
+          them are locked for all. */}
+      <BoardLabelsSection boardId={boardId} user={user} />
 
       {/* Adding rides on the heading, and the candidate list opens on demand.
           It used to be a permanent second panel with a labelled Add per person,
@@ -813,125 +583,6 @@ function AddColumnRow({
   );
 }
 
-/** The new-label row — name and colour — owning both, for the same reason. */
-function AddLabelRow({
-  busy,
-  ready,
-  onAdd,
-}: {
-  busy: boolean;
-  /** False until the label list has loaded; uniqueness cannot be judged yet. */
-  ready: boolean;
-  onAdd: (name: string, color: string) => Promise<boolean>;
-}) {
-  const t = useTheme();
-  const [name, setName] = useState('');
-  const [color, setColor] = useState<string>(LABEL_COLORS[0]);
-
-  async function submit() {
-    if (await onAdd(name, color)) setName('');
-  }
-
-  return (
-    <>
-      <TextField
-        value={name}
-        onChangeText={setName}
-        placeholder="New label name"
-        maxLength={LABEL_NAME_MAX}
-      />
-      {/* The + sits at the END of the colour row, where the flow finishes:
-          name it, colour it, add it. */}
-      <Row style={styles.addRow}>
-        <Row style={[styles.wrap, styles.grow]}>
-          {LABEL_COLORS.map((c) => (
-            <Pressable
-              key={c}
-              onPress={() => setColor(c)}
-              accessibilityRole="button"
-              accessibilityLabel={`Label colour ${c}`}
-            >
-              <View
-                style={[
-                  styles.swatch,
-                  styles.swatchPick,
-                  {
-                    backgroundColor: c,
-                    borderColor: color === c ? t.text.primary : 'transparent',
-                  },
-                ]}
-              />
-            </Pressable>
-          ))}
-        </Row>
-        <IconAction
-          icon="add"
-          label="Add label"
-          accent
-          disabled={busy || !name.trim() || !ready}
-          onPress={submit}
-        />
-      </Row>
-    </>
-  );
-}
-
-/**
- * Renaming one label in place.
- *
- * `ColumnNameEditor`'s state shape, but the draft used to sit OUTSIDE the
- * `labels.map` — so renaming one row re-rendered every other label, plus the
- * members list, the non-members list and the ReorderList of columns, on every
- * keystroke.
- *
- * Mounted only while its row is being renamed, so the lifecycle is the reset.
- */
-function LabelNameEditor({
-  label,
-  busy,
-  ready,
-  onSave,
-  onCancel,
-}: {
-  label: Label;
-  busy: boolean;
-  ready: boolean;
-  /** Resolves once the rename lands; rejects or returns false if refused, and
-   *  either way the field stays open holding what was typed. */
-  onSave: (name: string) => Promise<boolean>;
-  onCancel: () => void;
-}) {
-  const [draft, setDraft] = useState(label.name);
-
-  return (
-    <Row style={styles.between}>
-      <View style={[styles.swatch, { backgroundColor: label.color }]} />
-      <View style={styles.grow}>
-        <TextField
-          value={draft}
-          onChangeText={setDraft}
-          label={`New name for label ${label.name}`}
-          maxLength={LABEL_NAME_MAX}
-          autoFocus
-        />
-      </View>
-      <IconAction
-        icon="check"
-        label={`Save name for label ${label.name}`}
-        accent
-        disabled={busy || !draft.trim() || !ready}
-        onPress={() => void onSave(draft)}
-      />
-      <IconAction
-        icon="close"
-        label="Cancel rename"
-        disabled={busy}
-        onPress={onCancel}
-      />
-    </Row>
-  );
-}
-
 function BoardNameEditor({
   initial,
   onSave,
@@ -958,11 +609,8 @@ function BoardNameEditor({
 }
 
 const styles = StyleSheet.create({
-  /** Actions hold their width so a long name truncates instead of evicting them. */
-  noShrink: { flexShrink: 0 },
   between: { justifyContent: 'space-between' },
   grow: { flex: 1, gap: space.xs },
-  wrap: { flexWrap: 'wrap' },
   /** A tight gap: IconAction is a laid-out 44pt box, not slop. */
   addRow: { alignItems: 'center', gap: space.xs },
   picker: {
@@ -979,6 +627,4 @@ const styles = StyleSheet.create({
     marginBottom: space.xs,
     gap: space.xs,
   },
-  swatch: { width: 18, height: 18, borderRadius: radius.pill },
-  swatchPick: { width: 28, height: 28, borderWidth: 2 },
 });

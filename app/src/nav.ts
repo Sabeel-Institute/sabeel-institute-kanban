@@ -26,6 +26,7 @@ export type Route =
   | { name: 'search' }
   | { name: 'users' }
   | { name: 'stats' }
+  | { name: 'labels' }
   | { name: 'report' }
   | { name: 'help' }
   | { name: 'helpFilm'; id: string }

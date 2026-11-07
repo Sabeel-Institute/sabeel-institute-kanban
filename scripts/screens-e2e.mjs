@@ -191,11 +191,20 @@ await db.doc('labels/sw_l2').set({ name: 'Outreach', color: '#A8B89A', createdAt
 /*
  * A label shaped like the one that broke Board settings: an emoji prefix and a
  * name too long for the row. The name was not allowed to give way, so it pushed
- * its own delete button off the right edge of the screen.
+ * its own delete button off the right edge of the screen. A BOARD label, since
+ * those are the rows that carry the buttons on a board.
  */
 await db.doc('labels/sw_l3').set({
+  boardId: 'sw_board',
   name: '\u{1F535} Waiting on a much longer answer',
   color: '#3E6B8A',
+  createdAt: now,
+  createdBy: uid,
+});
+// And a long institute label: a LOCKED row on a board, with buttons in More → Labels.
+await db.doc('labels/sw_l4').set({
+  name: '\u{1F7E0} Waiting on the finance committee',
+  color: '#83114F',
   createdAt: now,
   createdBy: uid,
 });
@@ -515,7 +524,7 @@ async function rulesScreen(page, tag, width) {
 }
 
 // ---- The tour --------------------------------------------------------------
-const SCREENS = 22;
+const SCREENS = 23;
 
 async function tour(page, tag, width) {
   /**
@@ -653,6 +662,12 @@ async function tour(page, tag, width) {
     await nav('Boards');
     await page.getByRole('button', { name: 'More' }).click();
     await page.getByRole('button', { name: 'People' }).click();
+  });
+  await visit('labels', async () => {
+    await nav('Boards');
+    await page.getByRole('button', { name: 'More' }).click();
+    await page.getByRole('button', { name: /^Labels/ }).click();
+    await page.getByRole('button', { name: /^Rename label .*finance committee/ }).waitFor({ timeout: 20000 });
   });
 
   /**
@@ -960,7 +975,7 @@ async function tour(page, tag, width) {
       );
       return {
         settings: shown.some((e) => name(e) === 'Board settings'),
-        members: shown.some((e) => name(e) === 'Board members'),
+        members: shown.some((e) => name(e) === 'Members and labels'),
       };
     });
     check(
@@ -1075,7 +1090,7 @@ async function tour(page, tag, width) {
           deleteColumn: vis.some((e) => nm(e).startsWith('Delete column')),
           archived: vis.some((e) => nm(e) === 'Archived cards'),
           settings: vis.some((e) => nm(e) === 'Board settings'),
-          members: vis.some((e) => nm(e) === 'Board members'),
+          members: vis.some((e) => nm(e) === 'Members and labels'),
           bleed: document.documentElement.scrollWidth - window.innerWidth,
         };
       });
@@ -1093,7 +1108,7 @@ async function tour(page, tag, width) {
       // The roster ITSELF, at phone width, on both sides. It is a screen the
       // admin tour can never reach: an admin always owns every board, so the
       // read-only version renders for nobody who is looking.
-      await rp.getByRole('button', { name: wants.settings ? 'Board settings' : 'Board members' }).click();
+      await rp.getByRole('button', { name: wants.settings ? 'Board settings' : 'Members and labels' }).click();
       await rp.getByText('Members (3)').first().waitFor({ timeout: 20000 });
       const roster = await rp.evaluate(() => {
         const nm = (e) => (e.getAttribute('aria-label') || '').trim();
@@ -1107,30 +1122,38 @@ async function tour(page, tag, width) {
           toggles: vis('[role="switch"]').filter((e) => nm(e).startsWith('Owner of this board')).length,
           creatorLocked: creator ? creator.getAttribute('aria-disabled') === 'true' : null,
           ownerHints: (document.body.textContent || '').split('Owner').length - 1,
-          // Curating the shared labels is ADMIN work, not board authority. These
-          // controls sat inside the owner-gated Labels card and stayed there
-          // when curation narrowed — three buttons the rules refuse, on the
-          // screen of every board owner in the org.
-          labelEdits: vis('[role="button"]').filter((e) =>
-            /^(Rename label|Delete label|Change colour of) /.test(nm(e)),
+          // The board's own label carries its three controls for anyone on the
+          // board. An institute label carries NONE on a board, for anyone: it is
+          // a locked row, and its controls live in More → Labels alone.
+          boardLabelEdits: vis('[role="button"]').filter((e) =>
+            /^(Rename label|Delete label|Change colour of) .*much longer answer$/.test(nm(e)),
           ).length,
+          instituteLabelEdits: vis('[role="button"]').filter((e) =>
+            /^(Rename label|Delete label|Change colour of) (Finance|Outreach|.*finance committee)$/.test(nm(e)),
+          ).length,
+          locked: vis('[aria-label$=", set by admins"]').length,
           canAddLabel: vis('[role="button"]').some((e) => nm(e) === 'Add label'),
           bleed: document.documentElement.scrollWidth - window.innerWidth,
         };
       });
       // An owner gets a toggle per member and cannot demote the creator; a
-      // member gets no toggle at all and reads who to ask instead. NEITHER can
-      // rename or delete a shared label, and the owner can still add one.
+      // member gets no toggle at all and reads who to ask instead. BOTH may
+      // change and add the board's own labels, and NEITHER sees a control on an
+      // institute label, which is locked here.
+      const labelsOk =
+        roster.boardLabelEdits === 3 &&
+        roster.instituteLabelEdits === 0 &&
+        roster.locked === 3 &&
+        roster.canAddLabel;
       const rosterOk = wants.settings
         ? roster.title === 'settings' &&
           roster.toggles === 3 &&
           roster.creatorLocked === true &&
-          roster.labelEdits === 0 &&
-          roster.canAddLabel
+          labelsOk
         : roster.title === 'members' &&
           roster.toggles === 0 &&
           roster.ownerHints >= 2 &&
-          roster.labelEdits === 0;
+          labelsOk;
       check(
         `${tag} / the roster as ${role === 'owner' ? 'an owner' : 'a member'}`,
         rosterOk && roster.bleed <= 1,

@@ -204,9 +204,9 @@ Tap any card to open the full view.
   *Assignees* heading, then pick a name; the **remove-person** icon on a row
   unassigns them. They show as **name chips** on the card face, the card lands in
   each person's **My Work**, and they're notified.
-- **Labels** — a short vocabulary shared by **every** board, shown as coloured
-  **badges** on the card face. Press **+** to add one to the shared set and this
-  card at once.
+- **Labels** — coloured **badges** on the card face. The institute's labels are
+  on every board; the rest belong to this board alone. Press **+** to make a new
+  one for this board and put it on this card at once.
 - **Comments** — discuss the work, with the same five formatting buttons the
   description has. Type **@** to pull someone in and they're notified; that
   works anywhere in a sentence, not only at the end. A list of everyone on the
@@ -380,8 +380,9 @@ boards, then a column in it.
   description, priority, due date and labels, but **no comments, no history and
   no files**. A copy is new work, not a second pointer at the same work.
 
-**Labels come with both**, since they are shared by every board and mean the same
-thing wherever a card lands. Anyone **not a member of the destination board is
+**The institute's labels come with both**, since they mean the same thing on every
+board. **This board's own labels stay behind**, because the other board does not
+have them; the sheet names them before you confirm. Anyone **not a member of the destination board is
 unassigned**, though; the sheet tells you before you confirm.
 
 ## 1.7 My Work
@@ -632,8 +633,8 @@ and only an admin can change that.
 
 Open a board and tap its **settings** (the gear — along the bottom on a phone,
 in the header in a browser). If you don't own the board the icon is a **group of
-people** instead and says **Board members**: the same screen with the member list
-and the board's history, and nothing else.
+people** instead and says **Members and labels**: the same screen with the
+board's labels, the member list and the board's history, and nothing else.
 
 <div class="pair">
   <figure class="ph"><img src="manual/img/roster-phone.png" alt="The member list as somebody who does not own the board, on a phone"><figcaption>The same on a phone</figcaption></figure>
@@ -649,24 +650,25 @@ From here:
   once it's **empty**, so no cards vanish with it, and deleting one **asks first**
   because it cannot be undone. To clear a column quickly, select its cards and
   move or archive them in one go.
-- **Labels** — one vocabulary shared by **every board**, not just this one, so
-  anything you do to a label here changes it everywhere. The panel says so.
+- **Labels** — everything this board's cards can carry, and the one part of this
+  screen **everyone on the board** gets to change, owner or not.
 
-  **Anyone can add one**: open any card and press **+** beside its labels, and it
-  joins the shared set and lands on that card at the same time. **Only an admin
-  renames, recolours or deletes one** — a label is shared, so changing it reaches
-  cards on boards you may not even be able to open, and that is an organisation-
-  wide decision rather than a board one. If you own a board but are not an admin
-  you will see the labels listed with no controls beside them.
+  <div class="pair">
+    <figure class="ph"><img src="manual/img/boardlabels-phone.png" alt="A board's labels on a phone: institute labels with a lock, then the board's own with controls"><figcaption>On a phone</figcaption></figure>
+    <figure class="wd"><img src="manual/img/boardlabels-wide.png" alt="A board's labels in a browser"><figcaption>In a browser</figcaption></figure>
+  </div>
 
-  Admins get a **pencil** to rename, a **palette** to cycle the colour and a
-  **bin** to delete. Deleting asks first and tells you how many cards carry it,
-  because it comes off all of them.
+  The institute's labels come first, with a **lock**: they are on every board,
+  and only an admin changes them, in **More → Labels** (Part 3). Below them are
+  this board's own, and nobody else sees those. Each has a **pencil** to rename
+  it, a **palette** to cycle its colour and a **bin** to delete it; deleting asks
+  first and tells you how many cards carry it, because it comes off all of them.
+  Add one with the field at the bottom, or from any card with **+**.
 
   Colours come from a fixed palette so they stay readable on the app's warm
-  surfaces. Names are short by design, and two labels can't share a name even in
-  different capitals — a card face shows the name and nothing else, so "Urgent"
-  and "urgent" would be impossible to tell apart.
+  surfaces. Names are short by design, and two labels on one board can't share
+  a name even in different capitals — a card face shows the name and nothing
+  else, so "Urgent" and "urgent" would be impossible to tell apart.
 - **Members** — who can see the board. Tap the **add-person** icon beside the
   *Members* heading to see who else can be added, and tap a name to add them.
   Removing someone (the **remove-person** icon on their row) also **unassigns them
@@ -770,7 +772,7 @@ final and takes its comments and history with it. When in doubt, archive.
 
 # Part 3 — For admins
 
-Admins manage **people**, curate the shared **labels**, and read **Stats**. They
+Admins manage **people**, look after the **institute labels**, and read **Stats**. They
 can also open, run and join **every** board, whether or not they were added to
 it — the one exception to boards being private.
 
@@ -796,7 +798,7 @@ you want it:
 - **Member** — sees only the boards they've been added to.
 - **Organizer** — the same, plus **creating boards**. That is the only
   difference. They own the boards they create, and nothing on anyone else's.
-- **Admin** — everything: every board, the shared labels, Stats, and approving
+- **Admin** — everything: every board, the institute labels, Stats, and approving
   accounts and changing roles.
 - **Active** — turn off to **disable** an account. Whatever they have open
   switches to an "Account disabled" screen straight away, wherever they are, and
@@ -816,7 +818,24 @@ your own access** — that's what stops an admin locking themselves out.
 *Board settings → Members*, and is independent of the role above. An admin can
 open any board and give anybody ownership of it.
 
-## 3.3 Stats — how the boards are being used
+## 3.3 Institute labels
+
+<div class="pair">
+  <figure class="ph"><img src="manual/img/labels-phone.png" alt="The institute labels in More, then Labels, on a phone"><figcaption>On a phone</figcaption></figure>
+  <figure class="wd"><img src="manual/img/labels-wide.png" alt="The institute labels in a browser"><figcaption>In a browser</figcaption></figure>
+</div>
+
+Open **More → Labels**. These are the institute's labels, on every board, and
+this is the only place they change: on a board they show with a lock, for you
+too. Add one with the field at the bottom; a **pencil** renames, a **palette**
+cycles the colour, and a **bin** deletes. A change here reaches every card that
+carries the label, on boards you may not be on, so deleting asks first and
+tells you how many cards carry it, live and archived separately.
+
+A board's own labels are not here: anyone on that board looks after them, in
+its settings.
+
+## 3.4 Stats — how the boards are being used
 
 <div class="pair">
   <figure class="ph"><img src="manual/img/stats-phone.png" alt="Stats on a phone"><figcaption>On a phone</figcaption></figure>
@@ -930,14 +949,16 @@ Open the board → **settings** → Name. That screen is the only place that doe
 **…rename or add columns?** *(the board's owners)*
 Open the board → **settings** → Columns.
 
-**…add a label?** *(anyone)*
-Open any card → **+** beside its labels. Labels are shared by every board, so it
-appears everywhere at once.
+**…add a label?** *(anyone on the board)*
+Open any card → **+** beside its labels. It belongs to that board. A label for
+every board is an institute label: an admin adds it in **More → Labels**.
 
-**…rename or delete a label?** *(admins)*
-Open any board → **settings → Labels**. Deleting removes it from every card that
-carries it, and tells you how many first — counting live cards and archived ones
-separately, because a card in the archive is one no board will show you.
+**…rename or delete a label?** *(anyone on the board, for its own labels)*
+Open the board → **settings** (**Members and labels** if you don't own it) →
+**Labels**. Labels with a lock are the institute's: an admin changes those in
+**More → Labels**. Deleting removes the label from every card that carries it,
+and tells you how many first — counting live cards and archived ones separately,
+because a card in the archive is one no board will show you.
 
 **…follow a card that isn't mine?**
 Open it → the **bell** in the header. It appears under **My work → Subscribed**,
@@ -995,11 +1016,11 @@ Board **settings → Members** → add them. (They must be an approved account f
 Board **settings → Members** → turn on the switch on their row → confirm.
 
 **…find out who runs a board I'm on?** *(anyone)*
-Open the board → **Board members** — or **Board settings**, if you are one of
+Open the board → **Members and labels** — or **Board settings**, if you are one of
 them. Same screen; owners are marked on it either way.
 
 **…find out who archived a board, or who added or removed someone?** *(anyone on the board)*
-Open the board's settings (**Board members** if you don't own it) → **History**,
+Open the board's settings (**Members and labels** if you don't own it) → **History**,
 at the bottom.
 
 **…hand a board on when I created it?** *(needs an admin)*

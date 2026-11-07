@@ -392,7 +392,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
           control that does not say what it does. */}
       <IconAction
         icon={canManage ? 'settings' : 'group'}
-        label={canManage ? 'Board settings' : 'Board members'}
+        label={canManage ? 'Board settings' : 'Members and labels'}
         onPress={() => nav.push({ name: 'boardSettings', boardId })}
       />
     </>

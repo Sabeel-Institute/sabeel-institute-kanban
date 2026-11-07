@@ -20,9 +20,8 @@ it has accepted them, once (`acceptRules`; `docs/STORE-RELEASE.md` § 4).
 |---|---|---|---|
 | Use the app at all | ✓ | ✓ | ✓ |
 | Create a board | — | ✓ | ✓ |
-| Create a label | ✓ | ✓ | ✓ |
 | Report a problem (five an hour) | ✓ | ✓ | ✓ |
-| Rename, recolour or delete a label | — | — | ✓ |
+| Add, rename, recolour or delete an institute label | — | — | ✓ |
 | Stats | — | — | ✓ |
 | Approve accounts, change roles | — | — | ✓ |
 | See a board you were not added to | — | — | ✓ |
@@ -34,10 +33,11 @@ started, and only until somebody hands it elsewhere.
 **Only an admin sees every board.** Everyone else, organizers included, sees the
 boards they are a member of. There is no third case anywhere in the rules.
 
-**Label curation is admin-only** because a label is org-wide: renaming or
-deleting one changes cards on boards the person doing it may not even be able to
-open. Creating one is not gated beyond being active — it happens while somebody
-is looking at a card, it is cheap, and it is reversible by an admin.
+**Institute labels are admin work** because they are on every board: renaming
+or deleting one changes cards on boards the person doing it may not even be able
+to open. They change in More → Labels and nowhere else; on a board they are
+locked for everyone, admins included. A board's own labels are the board's
+business, below.
 
 **A password sign-in is a member, and only for one address** (Faisal,
 2026-10-15). The role a session acts with depends on how it signed in: through
@@ -64,6 +64,12 @@ board — is what lets you:
 
 It grants nothing anywhere else. Owning three boards and owning none are the same
 thing on the fourth.
+
+**A board's own labels belong to everyone on it**, owners or not: anyone on the
+board adds, renames, recolours and deletes them, from the card's `+` and the
+board's Labels list. They reach that board's cards alone, so board membership is
+the whole authority, the same reasoning that lets anyone on a board remove an
+attachment. Admins can too, since they can open every board.
 
 Everyone else on a board opens the same screen and gets **the member list,
 read-only**, with owners marked. That answers "who do I ask to add someone?"
@@ -171,7 +177,8 @@ One definition per rule, mirrored rather than duplicated:
 | Take the creator off a board | `keepsCreator()` in `firestore.rules`, repeated in `removeBoardMember` | `canUnseatCreator` — the creator's row is disabled |
 | Change a board's member list | `membershipIsServerOnly()` in `firestore.rules` refuses every client write; `canManageBoard` inside `addBoardMember` / `removeBoardMember` | the picker calls `listAddableUsers`, also `canManageBoard` |
 | See a board's contents | `onBoard()` in `firestore.rules` | `canAccessBoard(user, board)` |
-| Curate labels | `isAdmin()` in `firestore.rules`, `canCurateLabels` in `deleteLabel` | `canCurateLabels` |
+| Change an institute label | `mayCurate()` on a label without `boardId` in `firestore.rules`, `canCurateLabels` in `deleteLabel` / `countLabelUsage` | `canCurateLabels` |
+| Change a board's own label | `mayCurate()` on a label with `boardId` in `firestore.rules`, `canEditBoardLabels` in `deleteLabel` / `countLabelUsage` | `canEditBoardLabels` |
 | Stats | `isAdmin()` in `firestore.rules` | `canViewStats` |
 | Report a problem; accept the rules | `canUseApp` inside `reportProblem` and `acceptRules`; `reports/*` closed to every client in `firestore.rules` | the rules screen in `App.tsx`; Report a problem in More |
 | Administer accounts | `checkAccessChange` in `setUserAccess` | `canAdministerUsers` |

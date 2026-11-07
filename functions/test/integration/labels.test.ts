@@ -21,12 +21,15 @@ import {
  */
 const ADM = 'lb_adm';
 const MEM = 'lb_mem';
+/** On neither board. */
+const OUT = 'lb_out';
 /** A board the ADMIN is deliberately not a member of. */
 const BOARD_A = 'lb_board_a';
 const BOARD_B = 'lb_board_b';
 
 let admToken: string;
 let memToken: string;
+let outToken: string;
 
 const labelRef = (id: string) => adminDb().doc(`labels/${id}`);
 const cardRef = (id: string) => adminDb().doc(`cards/${id}`);
@@ -34,8 +37,14 @@ const cardRef = (id: string) => adminDb().doc(`cards/${id}`);
 const labelsOn = async (cardId: string) =>
   ((await cardRef(cardId).get()).data()?.labelIds ?? []) as string[];
 
-async function putLabel(id: string, name = 'Finance'): Promise<void> {
-  await labelRef(id).set({ name, color: '#83114F', createdAt: Date.now(), createdBy: MEM });
+async function putLabel(id: string, name = 'Finance', boardId?: string): Promise<void> {
+  await labelRef(id).set({
+    ...(boardId ? { boardId } : {}),
+    name,
+    color: '#83114F',
+    createdAt: Date.now(),
+    createdBy: MEM,
+  });
 }
 
 async function putCard(
@@ -63,11 +72,12 @@ async function putCard(
 }
 
 beforeAll(async () => {
-  // Curating labels is ADMIN work now: the effect is org-wide, so it takes an
-  // org-wide authority. Owning a board grants no part of it.
+  // An institute label is ADMIN work: the effect is org-wide, so it takes an
+  // org-wide authority. A board's own label is that board's (below).
   await makeUser({ uid: ADM, email: `${ADM}@oursabeel.com`, role: 'admin', status: 'active' });
   await makeUser({ uid: MEM, email: `${MEM}@oursabeel.com`, role: 'member', status: 'active' });
-  [admToken, memToken] = await Promise.all([idTokenFor(ADM), idTokenFor(MEM)]);
+  await makeUser({ uid: OUT, email: `${OUT}@oursabeel.com`, role: 'member', status: 'active' });
+  [admToken, memToken, outToken] = await Promise.all([idTokenFor(ADM), idTokenFor(MEM), idTokenFor(OUT)]);
 
   for (const [id, members] of [
     [BOARD_A, [MEM]],
@@ -239,5 +249,49 @@ describe('deleteLabel', () => {
     const second = await callFunction('deleteLabel', { labelId: 'lb_twice' }, admToken);
     expect(second.body.error?.status).toBe('NOT_FOUND');
     expect(await labelsOn('lb_twice_c')).toEqual([]);
+  });
+});
+
+/**
+ * A board's own label is that board's business: anyone on it may count it and
+ * delete it, and nobody else may, which is `mayCurate()` in firestore.rules.
+ */
+describe('a board label', () => {
+  it('is counted and deleted by a plain member of its board', async () => {
+    await putLabel('lb_own', 'Venue', BOARD_A);
+    await putCard('lb_own_c', BOARD_A, ['lb_own', 'lb_keep2']);
+
+    const count = await callFunction('countLabelUsage', { labelId: 'lb_own' }, memToken);
+    expect(count.body.result).toEqual({ active: 1, archived: 0 });
+    const res = await callFunction('deleteLabel', { labelId: 'lb_own' }, memToken);
+    expect(res.status).toBe(200);
+    expect((await labelRef('lb_own').get()).exists).toBe(false);
+    expect(await labelsOn('lb_own_c')).toEqual(['lb_keep2']);
+  });
+
+  it('is refused to someone not on its board, and survives', async () => {
+    await putLabel('lb_theirs', 'Venue', BOARD_A);
+    for (const fn of ['countLabelUsage', 'deleteLabel']) {
+      const res = await callFunction(fn, { labelId: 'lb_theirs' }, outToken);
+      expect(res.body.error?.status).toBe('PERMISSION_DENIED');
+    }
+    expect((await labelRef('lb_theirs').get()).exists).toBe(true);
+    // Only the board was in the way.
+    const asMember = await callFunction('countLabelUsage', { labelId: 'lb_theirs' }, memToken);
+    expect(asMember.status).toBe(200);
+  });
+
+  it('is deleted by an admin who is not on the board', async () => {
+    await putLabel('lb_adm_own', 'Venue', BOARD_B);
+    const res = await callFunction('deleteLabel', { labelId: 'lb_adm_own' }, admToken);
+    expect(res.status).toBe(200);
+    expect((await labelRef('lb_adm_own').get()).exists).toBe(false);
+  });
+
+  it('gives a plain member nothing over an institute label', async () => {
+    await putLabel('lb_inst');
+    const res = await callFunction('deleteLabel', { labelId: 'lb_inst' }, memToken);
+    expect(res.body.error?.status).toBe('PERMISSION_DENIED');
+    expect((await labelRef('lb_inst').get()).exists).toBe(true);
   });
 });
