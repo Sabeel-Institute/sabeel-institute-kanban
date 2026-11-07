@@ -276,7 +276,11 @@ it.
   once upstream no longer needs it. Two more of the library's habits are
   answered in `richDocToDisplayHtml`: it paints list markers off the canvas in
   a right-to-left paragraph, so a list holding an RTL item gets typed markers,
-  and it collapses runs of spaces, so those go in as no-break spaces.
+  and it collapses runs of spaces, so those go in as no-break spaces. Its iOS
+  parser makes `<br>` a newline only beside another tag, so nothing a phone
+  reads has a `<br>` inside a paragraph: `richDocToDisplayHtml` and
+  `markdownToPhoneEditorHtml` write each line as a `<p>`. A soft break edited on
+  a phone therefore saves as a paragraph break, as Android's editor always did.
 
 ## Brand, theme and UI conventions
 

@@ -3,6 +3,7 @@ import {
   decodeDisplayHref,
   htmlToMarkdown,
   markdownToHtml,
+  markdownToPhoneEditorHtml,
   richDocToDisplayHtml,
 } from '../src/richtextHtml';
 import { extractMentions, mentionInsertion } from '../src/mentions';
@@ -411,3 +412,37 @@ describe('the display HTML the phones render', () => {
     }
   });
 });
+
+/**
+ * What a phone editor opens with. iOS ran `line<br>line` into one line and
+ * saved it that way, so a phone editor never sees a `<br>` inside a paragraph.
+ */
+describe('the HTML a phone editor opens with', () => {
+  it('opens each line of a paragraph as a paragraph', () => {
+    expect(markdownToPhoneEditorHtml('Call the venue\nthen email Sara')).toBe(
+      '<p>Call the venue</p><p>then email Sara</p>',
+    );
+  });
+
+  it('reopens a bold that spans the break', () => {
+    expect(markdownToPhoneEditorHtml('**one\ntwo** three')).toBe('<p><b>one</b></p><p><b>two</b> three</p>');
+  });
+
+  it('saves a soft break as a paragraph break, keeping every word', () => {
+    // What Android's editor has always done with one; now iPhones do too.
+    expect(htmlToMarkdown(markdownToPhoneEditorHtml('a\nb'))).toBe('a\n\nb');
+  });
+
+  it('is the browser editor’s HTML exactly, wherever there is no soft break', () => {
+    for (const md of ['**bold** and *it*', '- one\n- two', '1. one\n2. two', 'p\n\n- l', '[x](https://e.org/a"b)', 'a < b & c']) {
+      expect(markdownToPhoneEditorHtml(md), md).toBe(markdownToHtml(md));
+    }
+  });
+
+  it('never puts a <br> inside a paragraph', () => {
+    for (const md of ['a\nb\nc', '*x\ny*', '[l\nm](https://e.org)', 'one\n\ntwo\nthree']) {
+      expect(markdownToPhoneEditorHtml(md), md).not.toContain('<br>');
+    }
+  });
+});
+

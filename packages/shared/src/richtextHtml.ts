@@ -80,18 +80,38 @@ function inlineToHtml(nodes: RichInline[]): string {
     .join('');
 }
 
+function listToHtml(b: RichBlock & { kind: 'bullets' | 'numbers' }): string {
+  const tag = b.kind === 'bullets' ? 'ul' : 'ol';
+  return `<${tag}>${b.items.map((i) => `<li>${inlineToHtml(i)}</li>`).join('')}</${tag}>`;
+}
+
+/** What the BROWSER editor (Lexical) opens with: a soft break is a `<br>`, which it keeps. */
 export function markdownToHtml(markdown: string): string {
   return parseRich(markdown)
-    .map((b) => {
-      switch (b.kind) {
-        case 'paragraph':
-          return `<p>${inlineToHtml(b.content)}</p>`;
-        case 'bullets':
-          return `<ul>${b.items.map((i) => `<li>${inlineToHtml(i)}</li>`).join('')}</ul>`;
-        case 'numbers':
-          return `<ol>${b.items.map((i) => `<li>${inlineToHtml(i)}</li>`).join('')}</ol>`;
-      }
-    })
+    .map((b) => (b.kind === 'paragraph' ? `<p>${inlineToHtml(b.content)}</p>` : listToHtml(b)))
+    .join('');
+}
+
+/**
+ * What a PHONE editor opens with: each line of a paragraph its own `<p>`, a
+ * bold or link that spans the break reopened on the next line.
+ *
+ * The phone editors have no line break inside a paragraph. iOS makes `<br>` a
+ * newline only beside another tag, so `line<br>line` opened as ONE line and
+ * saved that way: the words of a description ran together the first time an
+ * iPhone saved it. Android opens the `<br>` as a new line, which its editor
+ * saves as a new paragraph. So both now open what Android always saved: an
+ * edit on a phone turns a soft break into a paragraph break, and loses nothing.
+ */
+export function markdownToPhoneEditorHtml(markdown: string): string {
+  return parseRich(markdown)
+    .map((b) =>
+      b.kind === 'paragraph'
+        ? splitLines(b.content)
+            .map((line) => `<p>${inlineToHtml(line)}</p>`)
+            .join('')
+        : listToHtml(b),
+    )
     .join('');
 }
 
