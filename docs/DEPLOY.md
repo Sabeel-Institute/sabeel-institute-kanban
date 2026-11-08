@@ -716,7 +716,9 @@ node scripts/set-min-version.mjs <X.Y.Z>   # the oldest version to keep
 It is a decision, not a deploy step: nothing raises it for you, and nothing
 shows until it is raised. Builds before 0.13.1, which added the gate, never
 read it, and nothing on the server can tell them apart from a current build.
-The web app has no floor; the site always serves the current bundle.
+An open web tab that is signed in reads it too and offers Reload, which
+fetches the current bundle; so raise the floor only once the web is deployed, or a reload would
+fetch the same old bundle and show the screen again.
 
 ## Rollback
 

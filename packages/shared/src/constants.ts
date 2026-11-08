@@ -128,13 +128,13 @@ export const APP_ID = 'com.sabeelinstitute.kanban';
 export const APP_NAME = 'Sabeel Kanban';
 
 /**
- * The oldest phone build still allowed to run, read from `config/app` before
- * sign-in. A build below it shows the update screen in place of the app, so a
+ * The oldest build still allowed to run, read from `config/app` before sign-in,
+ * on the phones and in an open web tab. A build below it shows the update
+ * screen in place of the app (Reload, on the web), so a
  * release that older builds can no longer run against (a rules change that
  * refuses a listener they still open) can retire them, rather than leave them
  * failing with nothing on screen to say why. Raised by hand with
- * `scripts/set-min-version.mjs`. The web has no floor: the site always serves
- * the current bundle.
+ * `scripts/set-min-version.mjs`.
  */
 export const APP_CONFIG_COLLECTION = 'config';
 export const APP_CONFIG_DOC = 'app';

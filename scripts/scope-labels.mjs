@@ -16,15 +16,18 @@
 //
 // For each label:
 //   on one board      the label gets that board's id. No card changes.
-//   on several        the chosen board keeps it, and every other board that uses
+//   on several        the chosen board keeps it (named, or the one with the most
+//                     cards; a tie is refused), and every other board that uses
 //                     it gets its own copy (`<labelId>_<boardId>`), which its
 //                     cards are moved onto. Each moved card logs "changed the
 //                     labels" against --actor, and its followers hear about it.
 //
-// Dry run unless --apply. Every entry is checked before anything is written, and
-// the run stops on the first problem. Re-running is safe: copies have fixed ids,
-// moved cards no longer carry the old id, and a name that is on boards only is
-// reported and skipped.
+// Dry run unless --apply, which needs --actor. Every entry is checked before
+// anything is written, and the run stops on the first problem, including a board
+// that already has its own label of the same name. Re-running is safe and
+// finishes the job: a label already given to a board is taken up again, a copy
+// that exists is left as it is, and any card still holding the label away from
+// its board is moved.
 //
 //   # emulators
 //   FIRESTORE_EMULATOR_HOST=127.0.0.1:$(npx sabeel-ci ports firestore) \
@@ -117,18 +120,28 @@ function boardByName(name, where) {
 const steps = [];
 for (const [i, entry] of plan.entries()) {
   const where = `"${entry.label}"`;
-  // Institute labels only: once applied, the label and its copies all carry
-  // this name on their boards, and a second run must find nothing left to do.
   const named = labelSnap.docs.filter((l) => l.data().name === entry.label);
-  const hits = named.filter((l) => !l.data().boardId);
-  if (hits.length === 0 && named.length > 0) {
-    const on = named.map((l) => boardName.get(l.data().boardId) ?? l.data().boardId).join(', ');
-    console.log(`${where}: already on ${on}; skipped.`);
-    continue;
+  if (named.length === 0) fail(`${where}: no label has exactly this name.`);
+  const institute = named.filter((l) => !l.data().boardId);
+  // A copy this script made is `<original id>_<its board>`.
+  const isCopy = (l) => named.some((o) => o.id !== l.id && l.id === `${o.id}_${l.data().boardId}`);
+  let label;
+  let resumed = false;
+  if (institute.length > 1) {
+    fail(`${where}: ${institute.length} institute labels have this name. Delete or rename one first.`);
+  } else if (institute.length === 1) {
+    label = institute[0];
+  } else {
+    // Already a board's: a finished run, or one that stopped part-way. It is
+    // taken up again, so a re-run finishes the job and moves any card that
+    // picked the label up on another board since.
+    const originals = named.filter((l) => !isCopy(l));
+    if (originals.length !== 1) {
+      fail(`${where}: no institute label has this name, and ${originals.length} boards have one of their own. Nothing to decide between.`);
+    }
+    label = originals[0];
+    resumed = true;
   }
-  if (hits.length === 0) fail(`${where}: no label has exactly this name.`);
-  if (hits.length > 1) fail(`${where}: ${hits.length} institute labels have this name. Delete or rename one first.`);
-  const label = hits[0];
   const cards = (await db.collection('cards').where('labelIds', 'array-contains', label.id).get()).docs;
   const byBoard = new Map();
   for (const c of cards) {
@@ -136,19 +149,51 @@ for (const [i, entry] of plan.entries()) {
     byBoard.set(b, [...(byBoard.get(b) ?? []), c]);
   }
   let keep;
-  if (entry.board !== undefined) keep = boardByName(entry.board, `Plan entry ${i + 1}`);
-  else if (byBoard.size === 0) fail(`${where} is on no card. Name the board that keeps it.`);
-  else keep = [...byBoard.entries()].sort((a, b) => b[1].length - a[1].length)[0][0];
-  const copies = [...byBoard.entries()]
-    .filter(([b]) => b !== keep)
-    .map(([b, carrying]) => ({ boardId: b, copyId: `${label.id}_${b}`, cards: carrying }));
-  steps.push({ label, keep, copies, onKeep: byBoard.get(keep)?.length ?? 0 });
+  if (resumed) {
+    keep = label.data().boardId;
+    if (entry.board !== undefined && boardByName(entry.board, `Plan entry ${i + 1}`) !== keep) {
+      fail(`${where}: already given to ${boardName.get(keep) ?? keep}, not "${entry.board}".`);
+    }
+  } else if (entry.board !== undefined) {
+    keep = boardByName(entry.board, `Plan entry ${i + 1}`);
+  } else if (byBoard.size === 0) {
+    fail(`${where} is on no card. Name the board that keeps it.`);
+  } else {
+    const ranked = [...byBoard.entries()].sort((x, y) => y[1].length - x[1].length);
+    if (ranked.length > 1 && ranked[0][1].length === ranked[1][1].length) {
+      fail(
+        `${where}: ${boardName.get(ranked[0][0])} and ${boardName.get(ranked[1][0])} use it on as many cards. Name the board that keeps it.`,
+      );
+    }
+    keep = ranked[0][0];
+  }
+  const targets = [...byBoard.keys()].filter((b) => b !== keep);
+  // A board that already has its own label of this name, in any capitals,
+  // would end up with two that cannot be told apart.
+  for (const b of [keep, ...targets]) {
+    const clash = labelSnap.docs.find(
+      (l) =>
+        l.data().boardId === b &&
+        l.id !== label.id &&
+        l.id !== `${label.id}_${b}` &&
+        String(l.data().name).toLowerCase() === entry.label.toLowerCase(),
+    );
+    if (clash) {
+      fail(`${where}: ${boardName.get(b) ?? b} already has its own "${clash.data().name}". Delete or rename one first.`);
+    }
+  }
+  steps.push({ label, keep, resumed, byBoard, targets });
 }
 
+// The DISTINCT cards that move: a card carrying two planned labels is one card,
+// one history entry and one notice.
+const movingCards = new Set(
+  steps.flatMap((s) => s.targets.flatMap((b) => s.byBoard.get(b).map((c) => c.ref.path))),
+);
+
 let actorUid = null;
-const moving = steps.reduce((n, s) => n + s.copies.reduce((m, c) => m + c.cards.length, 0), 0);
-if (moving > 0) {
-  if (!actorEmail) fail(`${moving} card(s) would move to a copy. Name the admin doing it with --actor.`);
+if (apply) {
+  if (!actorEmail) fail('--apply needs --actor: moved cards name that admin in their history.');
   const users = await db.collection('users').where('email', '==', actorEmail).get();
   if (users.size !== 1) fail(`--actor ${actorEmail} matches ${users.size} user(s); it needs exactly one.`);
   if (users.docs[0].data().role !== 'admin') fail(`--actor ${actorEmail} is not an admin.`);
@@ -157,62 +202,97 @@ if (moving > 0) {
 
 // ---- Report -----------------------------------------------------------------
 for (const s of steps) {
-  console.log(`"${s.label.data().name}" → ${boardName.get(s.keep) ?? s.keep} (${s.onKeep} card(s) keep it as is)`);
-  for (const c of s.copies) {
-    console.log(`    copy for ${boardName.get(c.boardId) ?? c.boardId}: ${c.cards.length} card(s) move to it`);
+  const onKeep = s.byBoard.get(s.keep)?.length ?? 0;
+  console.log(
+    `"${s.label.data().name}" → ${boardName.get(s.keep) ?? s.keep}` +
+      `${s.resumed ? ' (already given; finishing)' : ''} (${onKeep} card(s) keep it as is)`,
+  );
+  for (const b of s.targets) {
+    console.log(`    copy for ${boardName.get(b) ?? b}: ${s.byBoard.get(b).length} card(s) move to it`);
   }
 }
-console.log(`\n${steps.length} label(s) to scope, ${moving} card(s) to move.`);
+console.log(`\n${steps.length} label(s), ${movingCards.size} card(s) to move.`);
 if (!apply) {
   console.log('Dry run: nothing written. Add --apply to do it.');
   process.exit(0);
 }
 
 // ---- Write ------------------------------------------------------------------
-// Copies first, then the cards onto them, and each original's boardId LAST. A
-// failure part-way leaves an original an institute label, still shown on every
-// board and on every card that carries it, and a re-run finishes the job.
-//
-// A card is rewritten ONCE, in a transaction, with every replacement the plan
-// makes on it: a card carrying two labels that both move to copies would
-// otherwise have its first change undone by the second, and a colleague
-// editing its labels meanwhile would lose their change.
-for (const s of steps) {
-  const { name, color, createdAt = 0, createdBy = '' } = s.label.data();
-  for (const c of s.copies) {
-    await db.doc(`labels/${c.copyId}`).set({ boardId: c.boardId, name, color, createdAt, createdBy });
-  }
-}
-const swaps = new Map(); // card path → { ref, map: Map(original id → copy id) }
-for (const s of steps) {
-  for (const c of s.copies) {
-    for (const card of c.cards) {
-      const entry = swaps.get(card.ref.path) ?? { ref: card.ref, map: new Map() };
-      entry.map.set(s.label.id, c.copyId);
-      swaps.set(card.ref.path, entry);
-    }
-  }
-}
-let moved = 0;
-for (const { ref, map } of swaps.values()) {
-  const changed = await db.runTransaction(async (tx) => {
-    const fresh = await tx.get(ref);
-    const ids = fresh.data()?.labelIds ?? [];
-    const next = [...new Set(ids.map((id) => map.get(id) ?? id))];
-    if (next.length === ids.length && next.every((id, i) => id === ids[i])) return false;
-    tx.update(ref, {
-      labelIds: next,
-      // The trigger names this person in the card's history, and in the
-      // notice its followers get.
-      updatedBy: actorUid,
-      updatedAt: Date.now(),
-    });
-    return true;
+// Copies, then each original's board, then a SWEEP that moves cards by what
+// they hold when it reaches them, not by what the read above saw. So a card
+// labelled or moved by a colleague while this runs still ends with the right
+// label, and a re-run, which takes each label up again, finishes anything a
+// stopped run left.
+
+/** Make a copy only if there is none: one a member has since renamed stays renamed. */
+async function ensureCopy(original, boardId) {
+  const ref = db.doc(`labels/${original.id}_${boardId}`);
+  const { name, color, createdAt = 0, createdBy = '' } = original.data();
+  await db.runTransaction(async (tx) => {
+    if (!(await tx.get(ref)).exists) tx.set(ref, { boardId, name, color, createdAt, createdBy });
   });
-  if (changed) moved += 1;
 }
+
+for (const s of steps) for (const b of s.targets) await ensureCopy(s.label, b);
 for (const s of steps) {
-  await s.label.ref.update({ boardId: s.keep });
-  console.log(`done: "${s.label.data().name}"`);
+  if (s.label.data().boardId !== s.keep) await s.label.ref.update({ boardId: s.keep });
 }
+
+const keepOf = new Map(steps.map((s) => [s.label.id, s]));
+let moved = 0;
+for (let pass = 1; pass <= 5; pass += 1) {
+  // Every card that holds a planned label away from its keeping board, once,
+  // however many planned labels it holds.
+  const due = new Map();
+  for (const s of steps) {
+    const holding = await db.collection('cards').where('labelIds', 'array-contains', s.label.id).get();
+    for (const c of holding.docs) if (c.data().boardId !== s.keep) due.set(c.ref.path, c.ref);
+  }
+  if (due.size === 0) break;
+  for (const ref of due.values()) {
+    const board = (await ref.get()).data()?.boardId;
+    if (!board) continue;
+    for (const s of steps) if (board !== s.keep) await ensureCopy(s.label, board);
+    const changed = await db.runTransaction(async (tx) => {
+      const card = (await tx.get(ref)).data();
+      if (!card) return false;
+      const ids = card.labelIds ?? [];
+      const next = [
+        ...new Set(
+          ids.map((id) => {
+            const s = keepOf.get(id);
+            return s && card.boardId !== s.keep ? `${id}_${card.boardId}` : id;
+          }),
+        ),
+      ];
+      if (next.length === ids.length && next.every((id, k) => id === ids[k])) return false;
+      // A card that changed board since it was read may have no copy on its new
+      // board yet: write nothing, and the next pass makes one and comes back.
+      for (const id of next.filter((x) => !ids.includes(x))) {
+        if (!(await tx.get(db.doc(`labels/${id}`))).exists) return false;
+      }
+      tx.update(ref, {
+        labelIds: next,
+        // The trigger names this person in the card's history, and in the
+        // notice its followers get.
+        updatedBy: actorUid,
+        updatedAt: Date.now(),
+      });
+      return true;
+    });
+    if (changed) moved += 1;
+  }
+}
+
+// What is left is a card on a board the label does not belong to. Say so.
+let left = 0;
+for (const s of steps) {
+  const holding = await db.collection('cards').where('labelIds', 'array-contains', s.label.id).get();
+  left += holding.docs.filter((c) => c.data().boardId !== s.keep).length;
+}
+for (const s of steps) console.log(`done: "${s.label.data().name}"`);
 console.log(`\nApplied: ${moved} card(s) moved to a copy.`);
+if (left > 0) {
+  console.error(`${left} card(s) still carry a label away from its board. Run it again.`);
+  process.exit(1);
+}

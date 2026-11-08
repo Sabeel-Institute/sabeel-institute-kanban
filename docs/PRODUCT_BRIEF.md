@@ -170,7 +170,7 @@ labels/{labelId}                                 # one collection, two scopes
   boardId?                                       # absent: an INSTITUTE label, on every board, admins only
                                                  # present: that board's own; anyone on it; never changes
   name, color                                    # color from LABEL_COLORS; rules check the hex shape
-  createdAt, createdBy                           # '' for the 32 migrated from board arrays
+  createdAt, createdBy                           # '' for those migrated from board arrays
                                                  # a COLLECTION, not an array: any member may add one, and
                                                  # two people appending to one array field is a lost write
 

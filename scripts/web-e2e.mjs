@@ -1990,7 +1990,8 @@ try {
    */
   const priorityChip = (word) => new RegExp(`^${word} priority filter,`);
   // `cross-board` is the one actually applied to a card, further up.
-  await pickInFilters('Labels', 'Filter by cross-board');
+  // A board's own label is announced with its board, as it is shown.
+  await pickInFilters('Labels', 'Filter by cross-board, Fundraising 2026');
   await admin.waitForTimeout(800);
   const oneLabel = await resultCount();
   check(
@@ -2002,8 +2003,16 @@ try {
   // `urgent-fix` is on NO card, which is what makes this discriminating: under
   // "any" the result is unchanged, under "all" it would collapse to zero. This
   // is the check that fails if the semantics are ever flipped.
-  await pickInFilters('Labels', 'Filter by urgent-fix');
+  await pickInFilters('Labels', 'Filter by urgent-fix, Fundraising 2026');
   await admin.waitForTimeout(300);
+  check(
+    'a board label’s filter chip names its board',
+    await admin
+      .getByRole('button', { name: /urgent-fix \(Fundraising 2026\)/ })
+      .first()
+      .isVisible()
+      .catch(() => false),
+  );
   const twoLabels = await resultCount();
   check(
     'a second label matches ANY of them rather than all',
@@ -2136,7 +2145,7 @@ try {
     );
     // Both picks read back as their own removable chip.
     // The active-filter chips say what tapping them DOES, and name their facet:
-    // the label set is org-wide, so a label called `Urgent` would otherwise answer
+    // any member may make a label, so one called `Urgent` would otherwise answer
     // to exactly the name the priority chip beside it does.
     const chips = await admin
       .getByRole('button', { name: /^Remove the (Urgent|High) priority filter$/ })
@@ -2319,6 +2328,28 @@ try {
   );
 
   await backToBoards(admin);
+
+  // ---- An open tab below the version floor -----------------------------------
+  // The web reads the floor too, or a tab left open from before a release would
+  // go on running the old bundle against the new rules.
+  await adminRun(`await db.doc('config/app').set({ minVersionCode: 999999999 });`);
+  check(
+    'an open tab below the version floor offers Reload',
+    await admin
+      .getByRole('button', { name: 'Reload', exact: true })
+      .waitFor({ timeout: 20000 })
+      .then(() => true)
+      .catch(() => false),
+  );
+  await adminRun(`await db.doc('config/app').delete();`);
+  check(
+    'and the app returns when the floor is lowered',
+    await admin
+      .getByRole('button', { name: 'New board' })
+      .waitFor({ timeout: 20000 })
+      .then(() => true)
+      .catch(() => false),
+  );
 
   // ---- Domain enforcement, from a real client -----------------------------
   // Sara's session is finished with — close it so this last context is not

@@ -104,6 +104,11 @@ const UPDATE = Platform.OS === 'ios'
   ? { label: 'Open TestFlight', url: 'itms-beta://' }
   : { label: 'Open Google Play', url: `https://play.google.com/store/apps/details?id=${APP_ID}` };
 
+/** A tab is updated by loading the page again: the site serves the current bundle. */
+function reloadPage() {
+  window.location.reload();
+}
+
 /**
  * A build the institute has retired (`useMinVersion`).
  *
@@ -117,14 +122,19 @@ export function UpdateScreen({ signedIn }: { signedIn: boolean }) {
       <Title>Update needed</Title>
       <Card>
         <Body>
-          This version of {APP_NAME} is out of date. Install the current one to
-          keep using the app; nothing on your boards is lost by updating.
+          {Platform.OS === 'web'
+            ? `This page is running an old version of ${APP_NAME}. Reload it to keep using the app; nothing on your boards is lost.`
+            : `This version of ${APP_NAME} is out of date. Install the current one to keep using the app; nothing on your boards is lost by updating.`}
         </Body>
       </Card>
-      <Button
-        label={UPDATE.label}
-        onPress={() => void Linking.openURL(UPDATE.url).catch(() => undefined)}
-      />
+      {Platform.OS === 'web' ? (
+        <Button label="Reload" onPress={reloadPage} />
+      ) : (
+        <Button
+          label={UPDATE.label}
+          onPress={() => void Linking.openURL(UPDATE.url).catch(() => undefined)}
+        />
+      )}
       {signedIn ? <Button label="Sign out" variant="secondary" onPress={signOut} /> : null}
       <Hint>
         Installed: v{BUILD_INFO.version} · {BUILD_INFO.commit}

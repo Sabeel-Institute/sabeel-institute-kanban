@@ -78,25 +78,38 @@ async function seed() {
   await l('sl_also', 'Rehearsal also');
   await l('sl_twin_a', 'Rehearsal twin');
   await l('sl_twin_b', 'Rehearsal twin');
+  await l('sl_tie', 'Rehearsal tie');
+  await l('sl_clash', 'Rehearsal clash');
+  // A member's own label on b2, named like the institute one in other capitals.
+  await l('sl_clash_own', 'rehearsal CLASH', { boardId: 'sl_b2' });
   const c = (id, boardId, labelIds, archived = false) =>
     card(id).set({ boardId, title: id, labelIds, archived, updatedBy: MEMBER, updatedAt: 1 });
   await c('sl_c1', 'sl_b1', ['sl_single', 'sl_wide']);
-  // The spread label: two cards on b1, one on b2 (archived) and one on b3, so b1 keeps it.
+  // The spread label: three cards on b1, two on b2 (one archived), two on b3, so
+  // b1 keeps it by count alone. sl_a0 sorts first and is on b2, so taking the
+  // first board read instead of the most-used one is caught.
+  await c('sl_a0', 'sl_b2', ['sl_spread']);
   await c('sl_c2', 'sl_b1', ['sl_spread']);
   await c('sl_c3', 'sl_b1', ['sl_spread', 'sl_single']);
+  await c('sl_c9', 'sl_b1', ['sl_spread']);
   await c('sl_c4', 'sl_b2', ['sl_spread', 'sl_wide'], true);
   await c('sl_c5', 'sl_b3', ['sl_spread']);
-  // TWO planned labels that both move to a copy on this card: b1 keeps both
-  // (sl_c6 and sl_c7 there), so this b3 card must end with both copies.
+  // TWO planned labels that both move to a copy on this card: b1 keeps both.
   await c('sl_c6', 'sl_b1', ['sl_also']);
   await c('sl_c7', 'sl_b1', ['sl_also']);
   await c('sl_c8', 'sl_b3', ['sl_also', 'sl_spread', 'sl_wide']);
+  // One card each on two boards: nothing to choose by.
+  await c('sl_t1', 'sl_b1', ['sl_tie']);
+  await c('sl_t2', 'sl_b2', ['sl_tie']);
+  await c('sl_k1', 'sl_b1', ['sl_clash']);
+  await c('sl_k2', 'sl_b2', ['sl_clash']);
 }
 
 await seed();
-const CARDS = ['sl_c1', 'sl_c2', 'sl_c3', 'sl_c4', 'sl_c5', 'sl_c6', 'sl_c7', 'sl_c8'];
+const CARDS = ['sl_a0', 'sl_c1', 'sl_c2', 'sl_c3', 'sl_c4', 'sl_c5', 'sl_c6', 'sl_c7', 'sl_c8', 'sl_c9'];
 const snapshot = async () => JSON.stringify(await Promise.all(CARDS.map((id) => read(card(id)))));
 const before = await snapshot();
+const ACTOR = ['--actor', 'sl-admin@oursabeel.com'];
 
 // ---- Refusals: each exits non-zero and writes nothing ------------------------
 const refusals = [
@@ -107,19 +120,20 @@ const refusals = [
   ['an entry with an unknown key', [plan([{ label: 'Rehearsal single', boards: 'x' }])]],
   ['a label named twice', [plan([{ label: 'Rehearsal single' }, { label: 'Rehearsal single' }])]],
   ['a name that matches no label', [plan([{ label: 'rehearsal single' }])]],
-  ['a name two labels share', [plan([{ label: 'Rehearsal twin' }])]],
+  ['a name two institute labels share', [plan([{ label: 'Rehearsal twin' }])]],
   ['a board nobody has', [plan([{ label: 'Rehearsal single', board: 'No Such Board' }])]],
   ['a board name two boards share', [plan([{ label: 'Rehearsal single', board: 'Rehearsal Twin' }])]],
   ['a label on no card, with no board named', [plan([{ label: 'Rehearsal unused' }])]],
-  ['cards to move with no --actor', [plan([{ label: 'Rehearsal spread' }])]],
+  ['a tie between two boards, with no board named', [plan([{ label: 'Rehearsal tie' }])]],
+  ['a board that already has its own label of that name', [plan([{ label: 'Rehearsal clash', board: 'Rehearsal One' }])]],
+  ['applying with no --actor', [plan([{ label: 'Rehearsal spread' }])]],
   ['an --actor who is not an admin', [plan([{ label: 'Rehearsal spread' }]), '--actor', 'sl-member@oursabeel.com']],
 ];
 for (const [what, args] of refusals) {
   const r = run(...args, '--apply');
   check(`refuses ${what}`, r.code !== 0, r.out.trim().split('\n').pop());
 }
-const untouched = await snapshot();
-check('no refusal wrote to a card', untouched === before);
+check('no refusal wrote to a card', (await snapshot()) === before);
 check('no refusal scoped a label', !(await read(label('sl_spread'))).boardId && !(await read(label('sl_single'))).boardId);
 
 // ---- A dry run reports and writes nothing -------------------------------------
@@ -130,24 +144,26 @@ const good = plan([
   { label: 'Rehearsal done' },
   { label: 'Rehearsal also' },
 ]);
-const dry = run(good, '--actor', 'sl-admin@oursabeel.com');
-check('a dry run succeeds', dry.code === 0, dry.out.trim().split('\n').pop());
-check('and names what each board gets', /copy for Rehearsal Two: 1 card/.test(dry.out) && /copy for Rehearsal Three: 1 card/.test(dry.out), dry.out);
+const dry = run(good);
+check('a dry run succeeds without --actor', dry.code === 0, dry.out.trim().split('\n').pop());
+check('and names what each board gets', /copy for Rehearsal Two: 2 card/.test(dry.out) && /copy for Rehearsal Three: 2 card/.test(dry.out), dry.out);
+// sl_a0, sl_c4, sl_c5 and sl_c8: sl_c8 holds two planned labels and is one card.
+check('and counts cards, not card-label pairs', /5 label\(s\), 4 card\(s\) to move/.test(dry.out), dry.out.trim().split('\n').pop());
 check('and writes nothing', !(await read(label('sl_spread'))).boardId && !(await label('sl_spread_sl_b2').get()).exists);
 
 // ---- Apply --------------------------------------------------------------------
-const applied = run(good, '--actor', 'sl-admin@oursabeel.com', '--apply');
+const applied = run(good, ...ACTOR, '--apply');
 check('applying succeeds', applied.code === 0, applied.out.trim().split('\n').pop());
 check('a label on one board is scoped to it', (await read(label('sl_single'))).boardId === 'sl_b1');
 check('a spread label stays with the board that uses it most', (await read(label('sl_spread'))).boardId === 'sl_b1');
 const copy2 = await read(label('sl_spread_sl_b2'));
 const copy3 = await read(label('sl_spread_sl_b3'));
 check('every other board gets a copy of its own', copy2?.boardId === 'sl_b2' && copy3?.boardId === 'sl_b3');
-check('a copy keeps the name and colour', copy2?.name === 'Rehearsal spread' && copy2?.color === '#83114F');
+check('a copy keeps the name, colour and history fields', copy2?.name === 'Rehearsal spread' && copy2?.color === '#83114F' && copy2?.createdAt === 1 && copy2?.createdBy === '');
 check('cards on the keeping board are not touched', (await read(card('sl_c2'))).updatedBy === MEMBER && (await read(card('sl_c3'))).updatedBy === MEMBER);
 const c4 = await read(card('sl_c4'));
 check('an archived card moves to its board’s copy', JSON.stringify(c4.labelIds) === JSON.stringify(['sl_spread_sl_b2', 'sl_wide']), JSON.stringify(c4.labelIds));
-check('and the change names the admin', c4.updatedBy === ADMIN);
+check('and the change names the admin, and is dated', c4.updatedBy === ADMIN && c4.updatedAt > 1);
 check('a card elsewhere moves too', JSON.stringify((await read(card('sl_c5'))).labelIds) === JSON.stringify(['sl_spread_sl_b3']));
 const c8 = (await read(card('sl_c8'))).labelIds;
 check(
@@ -156,14 +172,26 @@ check(
   JSON.stringify(c8),
 );
 check('an unused label goes to the board named', (await read(label('sl_unused'))).boardId === 'sl_b3');
-check('a label already scoped is left alone', (await read(label('sl_done'))).boardId === 'sl_b2' && /already on Rehearsal Two; skipped/.test(applied.out));
+check('a label already a board’s is taken up, not duplicated', (await read(label('sl_done'))).boardId === 'sl_b2' && /"Rehearsal done" → Rehearsal Two \(already given; finishing\)/.test(applied.out));
 check('a label not in the plan stays an institute label', !(await read(label('sl_wide'))).boardId);
+check('and reports what it moved', /Applied: 4 card\(s\) moved/.test(applied.out), applied.out.trim().split('\n').pop());
 
-// ---- Again: nothing left to do --------------------------------------------------
-const after = await snapshot();
-const again = run(good, '--actor', 'sl-admin@oursabeel.com', '--apply');
+// ---- Again, after the world moved on --------------------------------------------
+// A card that picked up the original on another board after the run (an old
+// app does that), on b3, whose copy a member has since renamed: the next run
+// must move the card onto that copy and leave the copy's name alone.
+await label('sl_spread_sl_b3').update({ name: 'Spread on three', color: '#3E6B8A' });
+await card('sl_late').set({ boardId: 'sl_b3', title: 'late', labelIds: ['sl_spread', 'sl_wide'], archived: false, updatedBy: MEMBER, updatedAt: 1 });
+const again = run(good, ...ACTOR, '--apply');
 check('a second run succeeds', again.code === 0, again.out.trim().split('\n').pop());
-check('and changes nothing', after === (await snapshot()));
+check('and moves a card labelled since', JSON.stringify((await read(card('sl_late'))).labelIds) === JSON.stringify(['sl_spread_sl_b3', 'sl_wide']));
+const renamed = await read(label('sl_spread_sl_b3'));
+check('and leaves a renamed copy as it was', renamed.name === 'Spread on three' && renamed.color === '#3E6B8A');
+const settled = await snapshot();
+const third = run(good, ...ACTOR, '--apply');
+check('a third run succeeds and changes nothing', third.code === 0 && settled === (await snapshot()) && /Applied: 0 card/.test(third.out), third.out.trim().split('\n').pop());
+const elsewhere = run(plan([{ label: 'Rehearsal spread', board: 'Rehearsal Two' }]), ...ACTOR, '--apply');
+check('refuses to give a label to a second board', elsewhere.code !== 0, elsewhere.out.trim().split('\n').pop());
 
 rmSync(dir, { recursive: true, force: true });
 const failed = results.filter((r) => !r.ok);

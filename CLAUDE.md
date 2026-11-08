@@ -194,7 +194,9 @@ disabling the account is the block, by decision.
   added under a name a board already uses, are accepted residuals. So is "a
   board's own label is only on its own cards": rules cannot look inside
   `labelIds`, so it holds because the app keeps it, and a build from before
-  board labels does not. Raise the version floor before giving labels to boards.
+  board labels does not: the release raises the version floor as soon as it is
+  on every surface (open web tabs read it too), before any label is given to a
+  board, and a phone before 0.13.1 never reads it.
 
 ## Attachments
 

@@ -206,7 +206,25 @@ for (const name of COLUMNS) {
 // Let the column writes settle: the settings controls disable while one is in
 // flight, and firing the next click into a disabled button just times out.
 await admin.waitForTimeout(2000);
-for (const label of ['urgent', 'donor-facing']) {
+// An institute label from the one place they are made, then a label of this
+// board's own in its settings.
+try {
+  await admin.getByRole('button', { name: 'More' }).first().click();
+  await admin.getByRole('button', { name: /^Labels/ }).click();
+  await admin.getByPlaceholder('New label name').waitFor({ timeout: 25000 });
+  if (!(await admin.getByText('urgent', { exact: true }).first().isVisible().catch(() => false))) {
+    await fillThen(admin, 'New label name', 'urgent', (o) =>
+      admin.getByRole('button', { name: 'Add label' }).click(o),
+    );
+    await admin.getByText('urgent', { exact: true }).first().waitFor({ timeout: 25000 });
+  }
+  // Back to Board settings, where the next label is the board's own.
+  await admin.getByRole('button', { name: 'Back' }).first().click();
+  await admin.getByPlaceholder('New column name').waitFor({ timeout: 25000 });
+} catch (e) {
+  console.warn('could not seed an institute label — continuing:', String(e).slice(0, 120));
+}
+for (const label of ['donor-facing']) {
   if (await admin.getByText(label).first().isVisible().catch(() => false)) continue;
   try {
     // Wait for the control to be ENABLED, not merely present. The settings

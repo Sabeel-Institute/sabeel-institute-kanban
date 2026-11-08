@@ -24,18 +24,22 @@ const BUILD_VERSION_CODE: number = versionCodeOf(BUILD_INFO.version);
  * The institute's floor lives in `config/app` and is read live, before anyone
  * signs in, so a build retired while it is open lands on the update screen at
  * once, and one opened after the fact never gets as far as a sign-in the rules
- * would then refuse. The web has no floor: the site serves the current bundle
- * to everyone.
+ * would then refuse. The web reads it too, once someone is signed in: the site
+ * serves the current bundle to every page load, but a tab left open runs the
+ * bundle it loaded until it reloads, and the update screen's button there is
+ * Reload. Not before sign-in, because a stale tab is a signed-in one, and a
+ * listener on the sign-in page would hold a connection open for nothing.
  *
  * NEVER LOCKS ANYONE OUT ON A READ THAT DID NOT ARRIVE. Offline, before the
  * first snapshot, with no document at all, or on an error, the floor is
  * unknown and the app runs: a gate that closed on a network fault would shut
  * out the people it is meant to help.
  */
-export function useMinVersion(): boolean {
+export function useMinVersion(signedIn: boolean): boolean {
+  const listen = Platform.OS !== 'web' || signedIn;
   const config = useLiveDoc(
-    () => (Platform.OS === 'web' ? null : doc(db, APP_CONFIG_COLLECTION, APP_CONFIG_DOC)),
-    [],
+    () => (listen ? doc(db, APP_CONFIG_COLLECTION, APP_CONFIG_DOC) : null),
+    [listen],
     'appConfig',
     (d) => {
       const code = d?.data.minVersionCode;

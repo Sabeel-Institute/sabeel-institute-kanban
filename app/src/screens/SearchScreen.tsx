@@ -55,9 +55,9 @@ const NO_MEMBERS: BoardMemberProfile[] = [];
  *
  * The four id- and value-shaped chips in the second row are not toggles: they
  * exist only while their filter is on, and a tap removes it. `FilterChip`'s
- * default `<label> filter, on` is therefore both less useful and AMBIGUOUS — the
- * label set is org-wide and any member may create one, so a label called
- * `Urgent` answers to exactly the name the priority chip beside it does, and a
+ * default `<label> filter, on` is therefore both less useful and AMBIGUOUS — any
+ * member may create a label, so a label called `Urgent` answers to exactly the
+ * name the priority chip beside it does, and a
  * board or a colleague could too. Naming the facet as well as the action makes
  * every chip in the row unique against the others, and against the Filters sheet
  * behind them. `Archived` and `Overdue` keep the default: those two really are
@@ -258,16 +258,16 @@ export function SearchScreen({ user }: { user: SessionUser }) {
   // Against EVERY label, not the picker's list: that one also waits on the
   // boards, and leaves out a board you have since left, so a live label would
   // read "Deleted label" while the boards load or after you leave its board.
-  const chosenLabels = useMemo(
-    () =>
-      chipsForIds(
-        labelIds,
-        allLabels.data ?? NO_LABELS,
-        labelsReady ? 'Deleted label' : 'Label',
-        sortLabels,
-      ),
-    [allLabels.data, labelIds, labelsReady],
-  );
+  // A board's own label carries its board's name: two boards can each have a
+  // "Homework", and two identical chips could not be told apart.
+  const chosenLabels = useMemo(() => {
+    const boardName = new Map((boards.data ?? []).map((b) => [b.id, b.name]));
+    const named = (allLabels.data ?? NO_LABELS).map((l) => {
+      const board = l.boardId ? boardName.get(l.boardId) : undefined;
+      return { id: l.id, name: board ? `${l.name} (${board})` : l.name };
+    });
+    return chipsForIds(labelIds, named, labelsReady ? 'Deleted label' : 'Label', sortLabels);
+  }, [allLabels.data, boards.data, labelIds, labelsReady]);
   const chosenBoard = chipsForIds(
     boardId ? [boardId] : [],
     boardList,

@@ -14,28 +14,43 @@ tells you the command to run.
 
 ---
 
-## Label scopes — waiting on the admins' list
+## Board labels — shipping them, then scoping the old ones
 
-Every label is an institute label (on every board) until it is given to a board.
-The release that adds board labels changes nothing on its own; this hands over
-the ones that should be a board's.
+Board labels exist the moment the release that adds them is live: a card's `+`
+makes one from then on. A build from before it offers every board's own labels
+on every card and can carry one to another board, and its `+` is refused for
+anyone but an admin. So the window between the backend going out and the floor
+going up is kept short, and closed before any old label is given to a board.
 
-- [ ] **Raise the version floor first**, to the release that adds board labels,
-      once it is on Play and TestFlight (`node scripts/set-min-version.mjs
-      <X.Y.Z>`). An older phone cannot add a label at all under the new rules
-      unless it is an admin's, and it offers every board's own labels on every
-      card, so a board label could land on another board's cards.
+**Shipping it** (in `docs/DEPLOY.md`'s order, with these four changes):
+
+- [ ] **Re-record and publish the `labels` help film first** (step 1b,
+      `docs/DEV-TOOLING.md` "The help films"): the published one says renaming
+      is an admin's job in any board's settings.
+- [ ] **Deploy the rules AND the functions after the release pull request is
+      merged**, immediately before `npx sabeel-ci release --ship`, not at the
+      start: that is when an old build's `+` starts being refused. Both, since
+      the new app's `+` is refused by the old rules.
+- [ ] **Ship comment selection (v0.16.2) on every surface first**, or ship the
+      two together as one release. `release` starts from main, so merging board
+      labels before v0.16.2 ships would put them in a release named for
+      comment selection.
+- [ ] **Raise the version floor to this release as soon as it is on Play,
+      TestFlight and the web** (`node scripts/set-min-version.mjs <X.Y.Z>`).
+      Open web tabs read it too and offer Reload. Phones before 0.13.1 never
+      read it: check Sentry's release health for any still in use.
+
+**Then scoping the old labels:**
+
 - [ ] **Ask the admins which labels belong to one board.** For each: its exact
       name and, if more than one board uses it, the board that keeps it. Send it
       in chat or write the plan file yourself, OUTSIDE the repo (real names; the
       format is in `docs/DEPLOY.md` § Giving institute labels to boards).
-- [ ] **Read the dry run**, `--actor` set to your address. The number to look at
-      is how many cards move to a copy: each one logs "changed the labels" and
-      tells its followers.
-- [ ] **Apply it** with `--apply`.
-- [ ] **Re-record and publish the `labels` help film** (`docs/DEV-TOOLING.md`,
-      "The help films"). Its script describes two kinds of label; the published
-      film still says renaming is an admin's job in any board's settings.
+- [ ] **Read the dry run.** The number to look at is how many cards move to a
+      copy: each one logs "changed the labels" and tells its followers.
+- [ ] **Apply it** with `--actor <your address> --apply`. It ends by saying
+      whether any card still holds a label away from its board; if so, run it
+      again.
 
 ## Play publishing from the command line — **DONE, verified 2026-08-29**
 

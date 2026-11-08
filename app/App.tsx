@@ -186,9 +186,10 @@ function SignedInRoutes({ user }: { user: SessionUser }) {
 
 function Routes() {
   const session = useSession();
-  // The institute's floor for phone builds, read before anything else: a
-  // retired build shows the update screen whether or not anyone is signed in.
-  const outdated = useMinVersion();
+  // The institute's floor, read before anything else on a phone, where a
+  // retired build shows the update screen whether or not anyone is signed in;
+  // in a browser once someone is (see minVersion.ts).
+  const outdated = useMinVersion(session.state === 'signed-in');
   // Android Back / edge-swipe pops this stack instead of exiting the app.
   useHardwareBack();
 

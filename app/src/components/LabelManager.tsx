@@ -113,7 +113,9 @@ export function LabelManager({
       });
   }
 
-  const reach = boardId ? 'on this board' : 'across every board';
+  // A board's own label normally sits on that board's cards alone, but an old
+  // build can have carried it elsewhere, and the sweep takes it off those too.
+  const reach = boardId ? 'wherever it is' : 'across every board';
 
   return (
     <>

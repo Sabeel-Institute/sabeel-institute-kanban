@@ -456,7 +456,7 @@ service cloud.firestore {
         && label().color.matches('^#[0-9A-Fa-f]{6}$')
         // Authorship is not the client's to invent. Nothing DISPLAYS it — it is
         // an audit field, the only record of where a stray label came from when
-        // someone asks. (The 32 migrated from board arrays carry '', because
+        // someone asks. (Those migrated from board arrays carry '', because
         // inventing an author for them would be a fabrication.)
         && label().createdBy == request.auth.uid
         && label().createdAt is number
