@@ -2327,6 +2327,39 @@ try {
     copiedText.replace(/\s+/g, ' '),
   );
 
+  // And MOVE the original, which goes through its own write: the card leaves
+  // the first board with its institute label and without the board's own.
+  await backToBoards(admin);
+  await admin.getByText('Fundraising 2026').first().click();
+  await admin.getByRole('checkbox', { name: 'Select Fix signup flow' }).waitFor({ timeout: 20000 });
+  await admin.getByRole('checkbox', { name: 'Select Fix signup flow' }).click();
+  await admin.getByRole('button', { name: 'Copy or move to another board' }).click();
+  await admin.getByLabel('Destination board').selectOption({ label: 'Second Board' });
+  await admin.getByLabel('Destination column').selectOption({ index: 1 });
+  await admin.getByRole('button', { name: 'Move', exact: true }).click();
+  check(
+    'a moved card leaves its board',
+    await admin
+      .getByRole('checkbox', { name: 'Select Fix signup flow' })
+      .waitFor({ state: 'detached', timeout: 20000 })
+      .then(() => true)
+      .catch(() => false),
+  );
+  await backToBoards(admin);
+  await admin.getByText('Second Board').first().click();
+  const both = admin.locator('[data-testid="card-Fix signup flow"]');
+  const arrived = await both
+    .nth(1)
+    .waitFor({ timeout: 20000 })
+    .then(() => true)
+    .catch(() => false);
+  const faces = arrived ? await both.allInnerTexts() : [];
+  check(
+    'and arrives with the institute label and not the board’s own',
+    faces.length === 2 && faces.every((f) => f.includes('org-wide') && !f.includes('cross-board')),
+    faces.map((f) => f.replace(/\s+/g, ' ')).join(' | '),
+  );
+
   await backToBoards(admin);
 
   // ---- An open tab below the version floor -----------------------------------

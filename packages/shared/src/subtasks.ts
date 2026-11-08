@@ -107,8 +107,8 @@ export function canBeSubtaskOf(
  * What a card's `parentId` should be after a CROSS-BOARD move, given the set of
  * cards travelling with it.
  *
- * A subtask link is board-scoped, like labels: the id only means anything while
- * both ends sit on the same board. So the link survives exactly when the parent
+ * A subtask link is board-scoped, like a board's own labels: the id only means
+ * anything while both ends sit on the same board. So the link survives exactly when the parent
  * is moving too — select a parent and its subtasks and the family arrives
  * intact; move a child on its own and it arrives unlinked rather than pointing
  * at a card left behind.

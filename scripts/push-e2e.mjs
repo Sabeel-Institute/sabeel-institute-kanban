@@ -18,9 +18,6 @@
  * at `subjectUrl` — computed by the worker's own function and loaded here, since
  * a script may not open a window from a click it dispatched itself.
  *
- * It also holds the web to having no minimum-version floor: with the floor
- * raised past this build, the web app still runs (`useMinVersion`).
- *
  * Full Chromium, not the headless shell: the shell refuses notification
  * permission, so the worker could draw nothing.
  */
@@ -235,13 +232,6 @@ for (const c of cases) {
     await until(async () => (await c.notifRef.get()).data()?.read === true));
   await fresh.close();
 }
-
-// ---- the web has no minimum-version floor ----------------------------------
-console.log('\nminimum version');
-await db.doc('config/app').set({ minVersionCode: 999999999 });
-check('with the floor raised past this build, the web app still runs',
-  (await home(page)) && !(await page.getByText('Update needed').count()));
-await db.doc('config/app').delete();
 
 await browser.close();
 

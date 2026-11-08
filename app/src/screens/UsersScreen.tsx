@@ -102,9 +102,9 @@ export function UsersScreen({ actor }: { actor: SessionUser }) {
         <IconAction icon="arrow-back" label="Back" onPress={nav.pop} />
       </Row>
       <Hint>
-        Only admins approve accounts, change roles, curate labels and see every
-        board. Organizers create boards; everyone else sees only the boards
-        they&rsquo;re added to. Who can RUN a board is set on the board itself,
+        Only admins approve accounts, change roles, manage the institute&rsquo;s
+        labels and see every board. Organizers create boards; everyone else
+        sees only the boards they&rsquo;re added to. Who can RUN a board is set on the board itself,
         in Board settings, and has nothing to do with the role here.
       </Hint>
 
@@ -224,7 +224,7 @@ function UserCard({
                     ? `Make ${user.displayName} an admin?`
                     : `Change role to ${next}?`,
                   next === 'admin'
-                    ? `This is full control. ${user.displayName} will be able to approve, reject and disable ANY account including yours, promote others to admin, rename and delete labels, read Stats, and see and run every board. Only grant this to someone you fully trust.`
+                    ? `This is full control. ${user.displayName} will be able to approve, reject and disable ANY account including yours, promote others to admin, manage the institute's labels, read Stats, and see and run every board. Only grant this to someone you fully trust.`
                     : next === 'organizer'
                       ? `${user.displayName} will be able to create new boards, and will own the ones they create. It grants nothing on any other board — they still see only boards they are added to.`
                       : `${user.displayName} will no longer be able to create boards. They keep whatever boards they already own, and still see only boards they are added to.`,

@@ -40,6 +40,7 @@ export const HELP_VIDEOS: readonly HelpVideo[] = [
   { id: 'moving', audience: 'everyone', title: 'Moving and sharing a card', summary: 'Into another column, and sending someone a link to it.' },
   { id: 'archiving', audience: 'everyone', title: 'Archiving a card', summary: 'Putting a card away, finding it again, and bringing it back.' },
   { id: 'bulk', audience: 'everyone', title: 'Several cards at once', summary: 'Selecting cards, and moving, assigning or archiving them together, even to another board.' },
+  { id: 'labels', audience: 'everyone', title: 'Managing labels', summary: "The institute's labels for every board, and a board's own." },
   { id: 'my-work', audience: 'everyone', title: 'My Work', summary: 'Every card assigned to you, from every board.' },
   { id: 'search', audience: 'everyone', title: 'Search', summary: 'Finding a card by its words, and narrowing the results.' },
   { id: 'notifications', audience: 'everyone', title: 'Alerts and notifications', summary: 'What you are told about, and choosing what reaches your phone.' },
@@ -50,7 +51,6 @@ export const HELP_VIDEOS: readonly HelpVideo[] = [
   { id: 'board-archive', audience: 'owner', title: 'Deleting cards and archiving a board', summary: 'Deleting a card for good, and putting a finished board away.' },
   { id: 'people', audience: 'admin', title: 'Approving people', summary: 'New accounts waiting for you, and letting them in.' },
   { id: 'roles', audience: 'admin', title: 'Roles and access', summary: 'Admin, organizer and member, and turning an account off.' },
-  { id: 'labels', audience: 'admin', title: 'Managing labels', summary: "The institute's labels for every board, and a board's own." },
   { id: 'stats', audience: 'admin', title: 'Stats', summary: 'How the boards are being used, and what is behind a bar.' },
 ];
 

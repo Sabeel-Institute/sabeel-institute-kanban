@@ -151,9 +151,12 @@ describe('creating a board label', () => {
     await assertSucceeds(addDoc(collection(fs('member1', 'member'), 'labels'), label({ boardId: 'b1' })));
   });
 
-  it('is refused to an account awaiting approval', async () => {
+  it('is refused to an account awaiting approval, or disabled while on the board', async () => {
     await assertFails(
       addDoc(collection(fs('member1', 'member', 'pending'), 'labels'), label()),
+    );
+    await assertFails(
+      addDoc(collection(fs('member1', 'member', 'disabled'), 'labels'), label()),
     );
     await assertSucceeds(
       addDoc(collection(fs('member1', 'member', 'active'), 'labels'), label()),
@@ -253,6 +256,8 @@ describe('renaming and recolouring', () => {
 
   it('of a board label is refused to someone not on that board', async () => {
     await assertFails(updateDoc(doc(fs('other1', 'member'), 'labels/own'), { name: 'Mine now' }));
+    // Still in memberUids, but disabled: being on the board is not enough.
+    await assertFails(updateDoc(doc(fs('member1', 'member', 'disabled'), 'labels/own'), { name: 'Mine now' }));
     await assertSucceeds(updateDoc(doc(fs('member1', 'member'), 'labels/own'), { name: 'Still theirs' }));
   });
 

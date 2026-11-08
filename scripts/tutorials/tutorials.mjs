@@ -554,7 +554,7 @@ export const TUTORIALS = [
         },
       },
       {
-        say: 'Move takes the cards over just as they are, comments and all. Copy leaves these where they are, and makes fresh ones.',
+        say: "Move takes the cards over, comments and all. The institute's labels go with them, and a board's own labels stay here. Copy leaves these where they are, and makes fresh ones.",
         do: async (t) => {
           await t.highlight(t.btn('Move'));
           await t.highlight(t.btn('Copy'));
@@ -847,7 +847,7 @@ export const TUTORIALS = [
         },
       },
       {
-        say: "People who don't own the board see this screen too, with the members and the history, so they know who to ask, and who changed what.",
+        say: "People who don't own the board see this screen too. They can look after the board's own labels, and see the members and the history, so they know who to ask, and who changed what.",
         do: (t) => t.wait(400),
       },
       {
