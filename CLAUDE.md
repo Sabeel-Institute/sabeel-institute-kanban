@@ -428,6 +428,16 @@ itself is deliberately NOT darkened — that would collapse it into
 
 # Working in this repo
 
+## Scale decides the design
+
+Fewer than fifty colleagues, using the app sporadically through the day: not
+thousands of users, not a feed anyone watches. Weigh every design against that.
+A short, announced maintenance window (deny-all rules while a migration or a
+deploy runs, then the real ones) beats machinery that keeps a busy service
+consistent under concurrent writes, old clients and races. Where a simple
+approach with a reasonable compromise exists, **propose it and ask** (Faisal,
+2026-11-07), rather than engineering for traffic this app does not have.
+
 ## Stack (locked — mirrors the time tracker)
 
 - **Android 7 (API 24) is the floor**, React Native's default, as in the LMS and
@@ -608,6 +618,40 @@ correct, and only the *rendered* authenticated screen showed it.
 `screens-e2e.mjs` replaced sat entirely inside a try/catch that logged and
 continued, so it reported success either way — and it had rotted to clicking
 "People" as a top-level button long after that moved into the More sheet.
+
+### The method: what "done" means for a change
+
+Three review rounds of one change (comment rendering on phones and board-scoped
+labels, 2026-11-07) found about forty bugs, and nearly every one traced to the
+lack of one of these six practices. They are the definition of done for any
+change of that size. A review round checks them; it does not replace them.
+
+1. **Name every surface the code runs on, and give evidence from each, or write
+   "unverified" beside it.** An Android emulator says nothing about an iPhone,
+   and a browser says nothing about either. "CI will check it later" stays
+   unverified until it has.
+2. **Test a third-party parser or renderer against its real implementation,
+   not against your idea of it.** Read its source in `node_modules`, and for
+   anything it draws, compare its output with ours differentially. The
+   library's own parsers, ported and fuzzed against the browser renderer, found
+   seven bugs no browser test could see.
+3. **Break every new check once and watch it fail before relying on it.** A
+   test written after the code, from the same reasoning, shares its blind
+   spots: a migration rehearsal passed with its ranking, its write order and its
+   transactions deleted, and a Maestro wait passed whatever had happened.
+4. **When a concept changes, grep an inventory of every consumer and tick each
+   one** before calling it done. Memory finds the main paths; the misses were a
+   Search chip, a screen-reader label, the dev seed, a help film, a dialog, docs
+   and stale test expectations.
+5. **For a rules, data or schema change, walk the rollout as a timeline:** every
+   app version still in use (an open web tab; a phone below the version floor,
+   or below 0.13.1, which never reads it) against every server state, and any
+   migration against colleagues editing. Then take the simplest safe way
+   through it; see "Scale decides the design".
+6. **Small steps, each verified before the next, and claims only from what was
+   observed.** A commit message, comment or doc says "covered" or "verified"
+   only for a check seen to fail without the code, on the surface it names.
+   Large fix batches brought bugs of their own.
 
 ### The width sweep is the DEFAULT check for layout, on both surfaces
 
