@@ -415,13 +415,26 @@ describe('the display HTML the phones render', () => {
     const WORDS = ['plain', 'a<b', 'x&y', '"quoted"', 'snake_case', '[bracket]', 'c*d', '\\', '@sara', 'الله', 'line\nbreak'];
     const flatten = (nodes: RichInline[]): string =>
       nodes.map((n) => (n.kind === 'text' ? n.text : flatten(n.content))).join('');
-    const unescape = (s: string) =>
-      s
-        .replace(/<[^>]*>/g, '')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&amp;/g, '&');
+    // The words a reader sees: tags skipped and entities decoded in one walk,
+    // so a decoded `&lt;` is never read as the start of a tag.
+    const ENTITIES: Record<string, string> = { '&lt;': '<', '&gt;': '>', '&quot;': '"', '&amp;': '&' };
+    const unescape = (s: string) => {
+      let out = '';
+      for (let i = 0; i < s.length; i += 1) {
+        if (s[i] === '<') {
+          const end = s.indexOf('>', i);
+          if (end < 0) break;
+          i = end;
+          continue;
+        }
+        const entity = s[i] === '&' ? Object.keys(ENTITIES).find((e) => s.startsWith(e, i)) : undefined;
+        if (entity) {
+          out += ENTITIES[entity];
+          i += entity.length - 1;
+        } else out += s[i];
+      }
+      return out;
+    };
 
     for (let seed = 1; seed <= 300; seed += 1) {
       const rnd = mulberry(seed);
