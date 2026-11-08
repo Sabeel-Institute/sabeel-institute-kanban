@@ -14,43 +14,21 @@ tells you the command to run.
 
 ---
 
-## Board labels — shipping them, then scoping the old ones
+## Board labels — v0.17.0, shipped in a maintenance window
 
-Board labels exist the moment the release that adds them is live: a card's `+`
-makes one from then on. A build from before it offers every board's own labels
-on every card and can carry one to another board, and its `+` is refused for
-anyone but an admin. So the window between the backend going out and the floor
-going up is kept short, and closed before any old label is given to a board.
+Board labels arrive with v0.17.0 (2026-11-07), released in one maintenance
+window: deny-all rules, the backend, the labels the admins named made board
+labels (`docs/DEPLOY.md` § Giving institute labels to boards), the real rules
+and the web, then the version floor raised to 0.17.0.
 
-**Shipping it** (in `docs/DEPLOY.md`'s order, with these four changes):
-
-- [ ] **Re-record and publish the `labels` help film first** (step 1b,
-      `docs/DEV-TOOLING.md` "The help films"): the published one says renaming
-      is an admin's job in any board's settings.
-- [ ] **Deploy the rules AND the functions after the release pull request is
-      merged**, immediately before `npx sabeel-ci release --ship`, not at the
-      start: that is when an old build's `+` starts being refused. Both, since
-      the new app's `+` is refused by the old rules.
-- [ ] **Ship comment selection (v0.16.2) on every surface first**, or ship the
-      two together as one release. `release` starts from main, so merging board
-      labels before v0.16.2 ships would put them in a release named for
-      comment selection.
-- [ ] **Raise the version floor to this release as soon as it is on Play,
-      TestFlight and the web** (`node scripts/set-min-version.mjs <X.Y.Z>`).
-      Open web tabs read it too and offer Reload. Phones before 0.13.1 never
-      read it: check Sentry's release health for any still in use.
-
-**Then scoping the old labels:**
-
-- [ ] **Ask the admins which labels belong to one board.** For each: its exact
-      name and, if more than one board uses it, the board that keeps it. Send it
-      in chat or write the plan file yourself, OUTSIDE the repo (real names; the
-      format is in `docs/DEPLOY.md` § Giving institute labels to boards).
-- [ ] **Read the dry run.** The number to look at is how many cards move to a
-      copy: each one logs "changed the labels" and tells its followers.
-- [ ] **Apply it** with `--actor <your address> --apply`. It ends by saying
-      whether any card still holds a label away from its board; if so, run it
-      again.
+- [x] **Ask the admins which labels belong to boards.** Answered 2026-11-07;
+      the plan file holds the names and stays outside the repo.
+- [ ] **Check an iPhone edit after the release**: in TestFlight's 0.17.0, open
+      a card whose description has bold text, a list and a link, edit one
+      word, save, and check the rest reads as before.
+- [ ] **Phones before 0.13.1 never read the floor.** If Sentry's release
+      health shows one still in use, ask its owner to update it from Play or
+      TestFlight by hand.
 
 ## Play publishing from the command line — **DONE, verified 2026-08-29**
 

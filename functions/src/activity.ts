@@ -3,7 +3,7 @@ import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { logger } from 'firebase-functions/v2';
 import { guardedEvent, sentryDsn } from './sentry';
 import { getFirestore } from 'firebase-admin/firestore';
-import { diffCard, UNKNOWN_ACTOR, type CardSnapshot } from '@sabeel/shared';
+import { diffCard, SYSTEM_ACTOR, UNKNOWN_ACTOR, type CardSnapshot } from '@sabeel/shared';
 import { recordStat } from './stats';
 
 /**
@@ -28,6 +28,10 @@ export const onCardWritten = onDocumentWritten(
     const before = (event.data?.before?.data() ?? null) as CardSnapshot | null;
     const after = (event.data?.after?.data() ?? null) as CardSnapshot | null;
 
+    // Nothing a person sees changed, so it is nobody's news. Every server write
+    // that does change something stamps its own actor, so this stamp left on a
+    // card cannot silence a later change.
+    if (after?.updatedBy === SYSTEM_ACTOR) return;
     const entries = diffCard(before, after);
     if (entries.length === 0) return;
 

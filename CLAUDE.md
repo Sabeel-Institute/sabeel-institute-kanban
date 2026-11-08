@@ -194,9 +194,12 @@ disabling the account is the block, by decision.
   added under a name a board already uses, are accepted residuals. So is "a
   board's own label is only on its own cards": rules cannot look inside
   `labelIds`, so it holds because the app keeps it, and a build from before
-  board labels does not: the release raises the version floor as soon as it is
-  on every surface (open web tabs read it too), before any label is given to a
-  board, and a phone before 0.13.1 never reads it.
+  board labels does not: 0.17.0 raised the version floor to itself, which a
+  phone before 0.13.1 and a web tab opened before 0.17.0 never read. The
+  existing labels became board labels in a maintenance window
+  (`scripts/scope-labels.mjs`), whose card writes are stamped `SYSTEM_ACTOR`:
+  the card trigger records no history for those, because a card moved onto its
+  board's copy of a label shows exactly what it showed before.
 
 ## Attachments
 

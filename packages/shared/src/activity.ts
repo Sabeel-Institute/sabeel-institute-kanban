@@ -143,6 +143,15 @@ export function isKnownActivityType(value: unknown): value is ActivityType {
  */
 export const UNKNOWN_ACTOR = 'unknown';
 
+/**
+ * `updatedBy` on a card write the server makes on nobody's behalf, when what a
+ * person sees does not change: `scripts/scope-labels.mjs` moving a card onto
+ * its board's copy of a label, same name and colour. `onCardWritten` records
+ * no history for it, so nobody is told about it either. Rules pin a client's
+ * `updatedBy` to its own uid, so only the server can write this.
+ */
+export const SYSTEM_ACTOR = 'system';
+
 /** Human-readable line for the timeline. `nameFor` resolves uids. */
 export function describeActivity(
   entry: { type: ActivityType; from?: string; to?: string },

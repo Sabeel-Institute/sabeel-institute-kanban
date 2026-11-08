@@ -1,6 +1,6 @@
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import { FieldValue } from 'firebase-admin/firestore';
-import { watchKey } from '@sabeel/shared';
+import { SYSTEM_ACTOR, watchKey } from '@sabeel/shared';
 import {
   adminDb,
   callFunction,
@@ -147,6 +147,31 @@ describe('onCardDeleted unlinks subtasks', () => {
         return s.data()?.parentId === undefined ? true : undefined;
       });
     })());
+});
+
+describe('a write stamped SYSTEM_ACTOR', () => {
+  it('records no history, so nobody hears about it', async () => {
+    const ref = adminDb().doc('cards/ct_system');
+    await ref.set(card({ labelIds: ['ct_l'] }));
+    await waitFor('created activity', async () => {
+      const snap = await ref.collection('activity').get();
+      return snap.empty ? undefined : true;
+    });
+    // What scripts/scope-labels.mjs writes: the same label, its board's copy.
+    await ref.update({ labelIds: ['ct_l_ct_b1'], updatedBy: SYSTEM_ACTOR });
+    // A person's change after it, whose entry proves the trigger has run past
+    // the system write.
+    await ref.update({ priority: 'high', updatedBy: MEM, updatedAt: 2 });
+    await waitFor('the priority entry', async () => {
+      const snap = await ref.collection('activity').where('type', '==', 'priority').get();
+      return snap.empty ? undefined : true;
+    });
+    const types = (await ref.collection('activity').get()).docs.map((d) => d.data().type).sort();
+    expect(types).toEqual(['created', 'priority']);
+    const pending = (await adminDb().doc('pendingNotices/ct_system').get()).data();
+    const pendingTypes = Object.values(pending?.entries ?? {}).map((e) => (e as { type: string }).type);
+    expect(pendingTypes).not.toContain('labels');
+  });
 });
 
 describe('removeBoardMember activity attribution', () => {
