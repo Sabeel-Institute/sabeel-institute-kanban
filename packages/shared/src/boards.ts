@@ -272,14 +272,16 @@ export function labelsForBoard<T extends { name: string; boardId?: string }>(
 /**
  * A card's labels once it lands on another board, by a move or a copy.
  *
- * Institute labels come along, the source board's own stay behind, and an id
- * that resolves to no label is dropped rather than carried as dead weight. One
- * of the destination board's own is kept, which only a card that once lived
- * there can hold.
+ * Institute labels come along, and labels known to belong to another board
+ * stay behind. One of the destination board's own is kept, which only a card
+ * that once lived there can hold. An id this list does not know is KEPT: the
+ * list can be a cached snapshot, and a label created since would otherwise be
+ * stripped from the card. A deleted label's id kept this way names nothing and
+ * shows nothing.
  *
  * `labels` must be the LOADED list. Called with an empty one, because a list
- * still loading read as "no labels", it would strip every label off the card;
- * the callers wait for it.
+ * still loading read as "no labels", it would keep another board's labels on
+ * the card; the callers wait for it.
  */
 export function labelIdsAfterBoardChange(
   labelIds: readonly string[],
@@ -289,7 +291,7 @@ export function labelIdsAfterBoardChange(
   const byId = new Map(labels.map((l) => [l.id, l]));
   return labelIds.filter((id) => {
     const l = byId.get(id);
-    return l !== undefined && (!l.boardId || l.boardId === destBoardId);
+    return l === undefined || !l.boardId || l.boardId === destBoardId;
   });
 }
 

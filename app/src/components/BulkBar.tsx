@@ -71,9 +71,13 @@ export function BulkBar({
   const otherBoards = (boards.data ?? []).filter((b) => b.id !== currentBoardId);
   const dest = otherBoards.find((b) => b.id === destBoardId);
   const loadedLabels = labels.status === 'ready' ? labels.data : null;
-  // This board's own labels on the selection, which stay here on a move or copy.
+  // Every board label on the selection but the destination's, which stay here
+  // on a move or copy (`labelIdsAfterBoardChange`).
   const stayBehind = (loadedLabels ?? []).filter(
-    (l) => l.boardId === currentBoardId && chosen.some((c) => c.labelIds.includes(l.id)),
+    (l) =>
+      l.boardId !== undefined &&
+      l.boardId !== destBoardId &&
+      chosen.some((c) => c.labelIds.includes(l.id)),
   );
 
   async function run(fn: () => Promise<unknown>) {

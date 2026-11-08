@@ -396,8 +396,10 @@ describe('label scopes', () => {
     expect(labelIdsAfterBoardChange(['i_a', 'own_a', 'i_b'], labels, 'b2')).toEqual(['i_a', 'i_b']);
   });
 
-  it('keeps one of the destination’s own, and drops an id that resolves to nothing', () => {
-    expect(labelIdsAfterBoardChange(['other', 'gone', 'i_a'], labels, 'b2')).toEqual(['other', 'i_a']);
+  it('keeps one of the destination’s own, and an id the list does not know', () => {
+    // `new` may be a label created since a cached list was read: dropping it
+    // would strip a real label off the card.
+    expect(labelIdsAfterBoardChange(['other', 'new', 'i_a'], labels, 'b2')).toEqual(['other', 'new', 'i_a']);
   });
 
   it('writes boardId only on a board label', () => {
