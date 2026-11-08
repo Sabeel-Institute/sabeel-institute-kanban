@@ -183,7 +183,9 @@ disabling the account is the block, by decision.
   for admins too). `boardId` never changes once written. A cross-board move or
   copy **carries institute labels and leaves the source board's own behind**,
   and the panel names them first; it waits for the label list, because "not
-  loaded" read as "no labels" would strip every institute label. Every active
+  loaded" would carry the board's own along, and it keeps an id it does not
+  know, because that list can be a cached snapshot missing a label made since
+  (`labelIdsAfterBoardChange`). Every active
   account reads every label, because My Work and Search are cross-board; pickers
   offer only institute labels and your boards' own. Deleting is a callable that
   strips the id from every card first and only then removes the document, and
