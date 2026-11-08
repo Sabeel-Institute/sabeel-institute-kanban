@@ -418,6 +418,40 @@ the team.
 
 ## Deploy log
 
+### 2026-11-08 — Board labels, and selecting a whole comment — v0.17.0
+
+- **Labels come in two kinds.** The institute's labels are on every board,
+  and only admins add, rename, recolour or delete them, in **More →
+  Labels**. Each board can also have labels of its own, which only that
+  board shows.
+- **Anyone on a board** can add, rename, recolour or delete that board's
+  own labels: from a card with **+**, or in the board's settings, which
+  someone who doesn't own the board now finds under **Members and
+  labels**. Institute labels show there with a lock.
+- **The labels the admins named now belong to the boards that use them.**
+  Each of those boards has its own copy, with the same name and colour,
+  and its cards carry it. The rest stay institute labels. Nothing on a card
+  looks different, so its history doesn't mention the change.
+- **Moving or copying a card to another board** carries the institute's
+  labels; a board's own stay behind, and the panel says which first.
+- Search names the board under a board's own label, in the list and on
+  the filter you picked.
+- On a phone, **long-press a comment or a description** and **Select all**
+  takes all of it, lists included. It used to take one paragraph, and a
+  bulleted or numbered line could not be selected at all.
+- Editing a description or comment on an iPhone no longer runs two lines
+  together when it saves.
+- Saving on a phone no longer adds stray asterisks around a bold or italic
+  space, drops a link, or drops an empty bullet, and an Android link whose
+  address holds `&` or a quote keeps it whole.
+- Numbered lists on a phone could sometimes show the wrong numbers and
+  empty rows, mostly just after the app opened. They no longer do.
+- A bulleted or numbered list written in Arabic keeps its bullets and
+  numbers on a phone.
+- **Everyone needs to update.** Older copies of the app can't add a label
+  any more. Phones from 0.13.1 on stop at the update screen; a browser page
+  opened before this release needs reloading by hand.
+
 ### 2026-11-03 — Fixes to following cards — v0.16.1
 
 - A copy of the app older than 0.15.0 can no longer change a board, so
