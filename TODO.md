@@ -14,6 +14,22 @@ tells you the command to run.
 
 ---
 
+## Board labels — v0.17.0, shipped in a maintenance window
+
+Board labels arrive with v0.17.0 (2026-11-07), released in one maintenance
+window: deny-all rules, the backend, the labels the admins named made board
+labels (`docs/DEPLOY.md` § Giving institute labels to boards), the real rules
+and the web, then the version floor raised to 0.17.0.
+
+- [x] **Ask the admins which labels belong to boards.** Answered 2026-11-07;
+      the plan file holds the names and stays outside the repo.
+- [ ] **Check an iPhone edit after the release**: in TestFlight's 0.17.0, open
+      a card whose description has bold text, a list and a link, edit one
+      word, save, and check the rest reads as before.
+- [ ] **Phones before 0.13.1 never read the floor.** If Sentry's release
+      health shows one still in use, ask its owner to update it from Play or
+      TestFlight by hand.
+
 ## Play publishing from the command line — **DONE, verified 2026-08-29**
 
 All five steps below are ticked because they were *exercised*, not because

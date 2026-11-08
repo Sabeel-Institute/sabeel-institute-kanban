@@ -3,21 +3,20 @@ import { onCall, HttpsError, type CallableRequest } from 'firebase-functions/v2/
 import { guarded, sentryDsn } from './sentry';
 import { logger } from 'firebase-functions/v2';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import { canCurateLabels } from '@sabeel/shared';
+import { canCurateLabels, canEditBoardLabels, canUseApp } from '@sabeel/shared';
 import { actorOf } from './actor';
 
 /**
- * Deleting an org-wide label.
+ * Deleting a label, of either scope.
  *
  * Labels live at `labels/{labelId}` and cards reference them by id, so removing
  * one is never a single-document act: every card carrying it has to let go of
  * it too. That is why `firestore.rules` denies client deletes outright.
  *
  * Three things a client could not do here:
- *  - Sweep across boards it cannot read. Only an admin may delete a label and
- *    only an admin reads every board — but the sweep must be complete regardless
- *    of who runs it, and the Admin SDK is what makes that guaranteed rather than
- *    incidental.
+ *  - Sweep across boards it cannot read. A board's own label belongs on its
+ *    cards alone, but a card that left the board without the app's help could
+ *    still carry it, and the sweep must be complete whoever runs it.
  *  - Name the actor. A delete TRIGGER cannot — Firestore does not tell it who
  *    performed the delete — which is the same reason attachment deletion is a
  *    callable rather than a trigger.
@@ -29,19 +28,42 @@ const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 /** A Firestore batch holds 500 writes; stay well under it. */
 const BATCH_LIMIT = 400;
 
-function requireCurator(request: CallableRequest<unknown>): { uid: string } {
+/**
+ * Whether the caller may count or delete this label, which is its SCOPE's
+ * question, the one `mayCurate()` asks in `firestore.rules`. An institute label
+ * reaches every board, so it takes an admin; a board's own takes someone on
+ * that board.
+ *
+ * A label that is not there is `not-found` for anyone allowed to use the app:
+ * every active account can read every label, so its absence tells nobody
+ * anything, and the race it comes from is ordinary. Someone deletes a board
+ * label a moment before a colleague does, and the colleague's client counts
+ * `not-found` as done; reported as "only an admin can change an institute
+ * label" it would have been a refusal about something that no longer exists.
+ */
+async function requireCurator(
+  request: CallableRequest<unknown>,
+  labelId: string,
+): Promise<{ uid: string }> {
   const auth = request.auth;
   if (!auth) throw new HttpsError('unauthenticated', 'Sign in first.');
   const actor = actorOf(auth);
-  // ADMIN-only since board authority became per-board. Deleting a label strips
-  // it from every card on every board, including boards the deleter is not on —
-  // an org-wide effect, so an org-wide authority. Owning a board grants no part
-  // of it.
-  if (!canCurateLabels(actor)) {
-    throw new HttpsError(
-      'permission-denied',
-      'Only an admin can change or delete a label.',
-    );
+  const db = getFirestore();
+  const label = await db.doc(`labels/${labelId}`).get();
+  if (!label.exists) {
+    if (!canUseApp(actor)) throw new HttpsError('permission-denied', 'Your account is not active.');
+    throw new HttpsError('not-found', 'No such label.');
+  }
+  const boardId = label.data()?.boardId as string | undefined;
+  if (boardId === undefined) {
+    if (!canCurateLabels(actor)) {
+      throw new HttpsError('permission-denied', 'Only an admin can change an institute label.');
+    }
+    return { uid: auth.uid };
+  }
+  const board = (await db.doc(`boards/${boardId}`).get()).data() ?? {};
+  if (!canEditBoardLabels(actor, board as { memberUids?: string[] })) {
+    throw new HttpsError('permission-denied', 'Only someone on this board can change its labels.');
   }
   return { uid: auth.uid };
 }
@@ -75,8 +97,9 @@ function cardsWithLabel(labelId: string) {
  * references in the entire database.
  */
 export const countLabelUsage = onCall({ secrets: [sentryDsn] }, guarded(async (request: CallableRequest<{ labelId?: unknown }>) => {
-  requireCurator(request);
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
   const labelId = requireLabelId(request.data);
+  await requireCurator(request, labelId);
 
   const used = await cardsWithLabel(labelId).select('archived').get();
   const archived = used.docs.filter((d) => d.data().archived === true).length;
@@ -99,8 +122,9 @@ export const countLabelUsage = onCall({ secrets: [sentryDsn] }, guarded(async (r
  * touched the card.
  */
 export const deleteLabel = onCall({ secrets: [sentryDsn] }, guarded(async (request: CallableRequest<{ labelId?: unknown }>) => {
-  const { uid } = requireCurator(request);
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
   const labelId = requireLabelId(request.data);
+  const { uid } = await requireCurator(request, labelId);
 
   const db = getFirestore();
   const label = await db.doc(`labels/${labelId}`).get();

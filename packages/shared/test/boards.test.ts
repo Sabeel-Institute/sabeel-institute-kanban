@@ -8,6 +8,8 @@ import {
   describeLabelUsage,
   defaultColumns,
   newBoard,
+  labelIdsAfterBoardChange,
+  labelsForBoard,
   newLabel,
   sortLabels,
   pushRecent,
@@ -197,7 +199,7 @@ describe('columnsPatch', () => {
 
 describe('newLabel', () => {
   it('trims the name and records colour and authorship', () => {
-    const made = newLabel({ name: '  Urgent  ', color: '#83114F', createdBy: 'u1', now: 7 });
+    const made = newLabel({ name: '  Urgent  ', color: '#83114F', createdBy: 'u1', now: 7, boardId: null });
     expect(made).toEqual({
       name: 'Urgent',
       color: '#83114F',
@@ -210,7 +212,7 @@ describe('newLabel', () => {
     // The id used to be a `lbl_` local id embedded in the board array. Handing
     // one out here again would mean two id schemes for the same thing.
     expect(
-      'id' in newLabel({ name: 'x', color: '#83114F', createdBy: 'u1', now: 1 }),
+      'id' in newLabel({ name: 'x', color: '#83114F', createdBy: 'u1', now: 1, boardId: null }),
     ).toBe(false);
   });
 });
@@ -370,5 +372,40 @@ describe('columnDeleteBlocked', () => {
 
   it('names the column so the message is actionable', () => {
     expect(columnDeleteBlocked('Waiting on donor', 2)).toContain('Waiting on donor');
+  });
+});
+
+describe('label scopes', () => {
+  const labels = [
+    { id: 'i_b', name: 'Budget' },
+    { id: 'own_z', name: 'Zebra', boardId: 'b1' },
+    { id: 'i_a', name: 'Approved' },
+    { id: 'own_a', name: 'Agenda', boardId: 'b1' },
+    { id: 'other', name: 'Homework', boardId: 'b2' },
+  ];
+
+  it('offers a board the institute labels first, then its own, each sorted', () => {
+    expect(labelsForBoard(labels, 'b1').map((l) => l.id)).toEqual(['i_a', 'i_b', 'own_a', 'own_z']);
+  });
+
+  it('never offers another board its neighbour’s labels', () => {
+    expect(labelsForBoard(labels, 'b2').map((l) => l.id)).toEqual(['i_a', 'i_b', 'other']);
+  });
+
+  it('keeps institute labels on a cross-board move and leaves the board’s own behind', () => {
+    expect(labelIdsAfterBoardChange(['i_a', 'own_a', 'i_b'], labels, 'b2')).toEqual(['i_a', 'i_b']);
+  });
+
+  it('keeps one of the destination’s own, and an id the list does not know', () => {
+    // `new` may be a label created since a cached list was read: dropping it
+    // would strip a real label off the card.
+    expect(labelIdsAfterBoardChange(['other', 'new', 'i_a'], labels, 'b2')).toEqual(['other', 'new', 'i_a']);
+  });
+
+  it('writes boardId only on a board label', () => {
+    expect(newLabel({ name: ' Venue ', color: '#83114F', createdBy: 'u', now: 1, boardId: 'b1' })).toEqual({
+      boardId: 'b1', name: 'Venue', color: '#83114F', createdAt: 1, createdBy: 'u',
+    });
+    expect('boardId' in newLabel({ name: 'Finance', color: '#83114F', createdBy: 'u', now: 1, boardId: null })).toBe(false);
   });
 });

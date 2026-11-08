@@ -7,6 +7,7 @@ import {
   canAdministerUsers,
   canCreateBoards,
   canCurateLabels,
+  canEditBoardLabels,
   canManageBoard,
   canSeeEveryBoard,
   canUnseatCreator,
@@ -89,6 +90,27 @@ describe('capability checks across the full role x status matrix', () => {
   it('label curation does not follow board authority', () => {
     expect(canCurateLabels({ role: 'organizer', status: 'active' })).toBe(false);
     expect(canCreateBoards({ role: 'organizer', status: 'active' })).toBe(true);
+  });
+});
+
+describe('canEditBoardLabels', () => {
+  const board = { memberUids: ['member1', 'owner1'] };
+  it('is anyone on the board, owner or not', () => {
+    expect(canEditBoardLabels({ uid: 'member1', role: 'member', status: 'active' }, board)).toBe(true);
+    expect(canEditBoardLabels({ uid: 'owner1', role: 'organizer', status: 'active' }, board)).toBe(true);
+  });
+  it('and admins, who can open every board', () => {
+    expect(canEditBoardLabels({ uid: 'nobody', role: 'admin', status: 'active' }, board)).toBe(true);
+  });
+  it('but nobody else, organizers included', () => {
+    expect(canEditBoardLabels({ uid: 'org1', role: 'organizer', status: 'active' }, board)).toBe(false);
+    expect(canEditBoardLabels({ uid: 'other', role: 'member', status: 'active' }, board)).toBe(false);
+  });
+  it('and nobody whose account is not active', () => {
+    for (const status of USER_STATUSES.filter((s) => s !== 'active')) {
+      expect(canEditBoardLabels({ uid: 'member1', role: 'member', status }, board)).toBe(false);
+      expect(canEditBoardLabels({ uid: 'admin1', role: 'admin', status }, board)).toBe(false);
+    }
   });
 });
 

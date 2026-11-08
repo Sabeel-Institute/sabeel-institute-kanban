@@ -468,6 +468,12 @@ trip through both undo scripts leaves membership untouched.
 
 Run both. Neither substitutes for the other.
 
+`scripts/scope-labels.mjs`, which gives chosen institute labels to boards
+(`docs/DEPLOY.md` § Giving institute labels to boards), has a rehearsal of its
+own in the same pass: `scripts/scope-labels-e2e.mjs` drives it on a label used
+on one board, one on three, one on none and one already scoped, checks each way
+a plan can be wrong is refused with nothing written, and runs it twice.
+
 ### Native flows on the Android emulator
 
 `npx sabeel-ci native-e2e` runs the Maestro flows in `maestro/` against the

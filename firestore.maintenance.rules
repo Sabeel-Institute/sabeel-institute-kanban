@@ -1,0 +1,13 @@
+rules_version = '2';
+
+// Deny-all, deployed for a maintenance window in place of firestore.rules
+// (docs/DEPLOY.md § Maintenance window), then replaced by it again. Clients
+// can read and write nothing meanwhile; the Admin SDK, which the functions
+// and the migration scripts use, is not bound by rules.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

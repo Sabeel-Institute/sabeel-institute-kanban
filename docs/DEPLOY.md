@@ -716,7 +716,64 @@ node scripts/set-min-version.mjs <X.Y.Z>   # the oldest version to keep
 It is a decision, not a deploy step: nothing raises it for you, and nothing
 shows until it is raised. Builds before 0.13.1, which added the gate, never
 read it, and nothing on the server can tell them apart from a current build.
-The web app has no floor; the site always serves the current bundle.
+A web tab from 0.17.0 on reads it too once someone is signed in, and offers
+Reload, which fetches the current bundle; so raise the floor only once the web
+is deployed, or a reload would fetch the same old bundle and show the screen
+again. A tab opened on an older bundle never reads it. The update screen
+replaces whatever an open tab or phone was showing, a draft not yet saved
+included, so raise the floor when nobody is working: at the end of a
+maintenance window.
+
+## Maintenance window
+
+For a migration, or a deploy that old clients and new rules would otherwise
+have to survive side by side. Fewer than fifty colleagues use the app
+sporadically, so a short, announced window costs less than machinery that
+keeps a busy service consistent through one (CLAUDE.md, "Scale decides the
+design"). Faisal announces it to the team first, with the time and how long.
+
+```sh
+# Clients can read and write nothing: every screen shows a loading error.
+# Functions and scripts use the Admin SDK and carry on.
+npx firebase deploy --only firestore:rules --config firebase.maintenance.json --project sabeel-institute-kanban
+
+# ... the backend deploy, the migration, the web deploy ...
+
+# The real rules again.
+npx firebase deploy --only firestore:rules,storage --project sabeel-institute-kanban
+```
+
+Raise the version floor last, once the release is on the web, Play and
+TestFlight (§ Retiring old builds), then check a board on the web and on a
+phone.
+
+### Giving institute labels to boards
+
+Every label is an institute label until it has a `boardId`. To make chosen
+ones board labels, write a plan file OUTSIDE the repo, since it holds real
+names: their exact names, nothing else.
+
+```json
+["Exact label name", "Another label"]
+```
+
+Each named label is replaced, on every board whose cards carry it, by that
+board's own label of the same name and colour, its cards are moved onto it, and
+the institute label is deleted; one on no card is just deleted. Run it inside a
+maintenance window (§ Maintenance window), after the functions of the release
+that added board labels (0.17.0) are deployed: it writes cards with
+`updatedBy: SYSTEM_ACTOR`, which their card trigger records no history for, so
+nobody is told about a change they cannot see. Read the dry run, then apply:
+
+```
+GCLOUD_PROJECT=sabeel-institute-kanban node scripts/scope-labels.mjs ~/plan.json
+GCLOUD_PROJECT=sabeel-institute-kanban node scripts/scope-labels.mjs ~/plan.json --apply
+```
+
+It checks every name before it writes anything, and refuses a name no label
+has exactly, saying which label it may mean. Stopped part-way, run it again: it
+finishes the job, and reports labels it already did as done.
+`scripts/scope-labels-e2e.mjs` rehearses it in CI.
 
 ## Rollback
 

@@ -127,12 +127,16 @@ const BOARDS = [
   },
 ];
 
-/** The org-wide labels, from the fixed swatch set every Sabeel app offers. */
+/**
+ * The labels, from the fixed swatch set every Sabeel app offers: the institute's,
+ * on every board, and one of the fundraising board's own (its fourth field).
+ */
 const LABELS = [
   ['events', 'Events', '#C2611F'],
   ['donors', 'Donors', '#83114F'],
   ['supplies', 'Supplies', '#3E6B8A'],
   ['volunteers', 'Volunteers', '#4E7A43'],
+  ['hall', 'Hall booking', '#6B7A4F', 'fundraising'],
 ];
 
 /**
@@ -242,8 +246,14 @@ export async function buildWorld() {
     });
   }
   await writeStats(uids);
-  for (const [id, name, color] of LABELS) {
-    await db.doc(`labels/${id}`).set({ name, color, createdAt: t0, createdBy: uids.faisal });
+  for (const [id, name, color, board] of LABELS) {
+    await db.doc(`labels/${id}`).set({
+      ...(board ? { boardId: boardId(board) } : {}),
+      name,
+      color,
+      createdAt: t0,
+      createdBy: uids.faisal,
+    });
   }
   const today = todayInOrgTz();
   for (const b of BOARDS) {

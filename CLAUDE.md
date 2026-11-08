@@ -173,19 +173,35 @@ disabling the account is the block, by decision.
   every constraint `assigneeUids` does: members only, cleared by
   `removeBoardMember` and filtered on a cross-board move. A copy carries only
   the person who made it, like any new card.
-- **Labels are ORG-WIDE, not per board** (changed 2026-07-27). One `labels/{id}`
-  collection every board shares; a card's `labelIds` mean the same thing wherever
-  the card is, so a cross-board move and copy **carry them** — the old code
-  cleared them and must not come back. **Any active member creates** one (from
-  the `+` in a card's label picker, since Board Settings opens for that board's
-  owners alone); **ADMINS rename, recolour and delete** — the effect is org-wide,
-  reaching cards on boards the editor cannot open, so the authority is org-wide
-  too. Deleting is a callable that strips the id from every card first and only
-  then removes the document — reversed, a failure would leave cards pointing at
-  nothing findable. A COLLECTION rather than an array on a config doc: concurrent
-  creates are the normal case here, and an array field would lose writes.
-  Uniqueness is case-insensitive and client-checked only; a simultaneous
-  double-create making two same-named labels is an accepted residual.
+- **Labels come in two scopes, and `boardId` is the whole difference** (Faisal,
+  2026-11-07, after the org-wide set of 2026-07-27). One `labels/{id}`
+  collection. A label with no `boardId` is an **institute label**: on every
+  board, added, renamed, recoloured and deleted by **admins only, and only in
+  More → Labels**; on a board it is listed and locked, admins included. A label
+  with a `boardId` is that **board's own**: shown only there, and anyone on that
+  board adds, renames, recolours or deletes it (the card's `+` always makes one,
+  for admins too). `boardId` never changes once written. A cross-board move or
+  copy **carries institute labels and leaves the source board's own behind**,
+  and the panel names them first; it waits for the label list, because "not
+  loaded" would carry the board's own along, and it keeps an id it does not
+  know, because that list can be a cached snapshot missing a label made since
+  (`labelIdsAfterBoardChange`). Every active
+  account reads every label, because My Work and Search are cross-board; pickers
+  offer only institute labels and your boards' own. Deleting is a callable that
+  strips the id from every card first and only then removes the document, and
+  it asks the label's scope who may. A COLLECTION rather than an array on a
+  config doc: concurrent creates are the normal case, and an array field would
+  lose writes. Uniqueness is case-insensitive, within what one board shows, and
+  client-checked only: a simultaneous double-create, and an institute label
+  added under a name a board already uses, are accepted residuals. So is "a
+  board's own label is only on its own cards": rules cannot look inside
+  `labelIds`, so it holds because the app keeps it, and a build from before
+  board labels does not: 0.17.0 raised the version floor to itself, which a
+  phone before 0.13.1 and a web tab opened before 0.17.0 never read. The
+  existing labels became board labels in a maintenance window
+  (`scripts/scope-labels.mjs`), whose card writes are stamped `SYSTEM_ACTOR`:
+  the card trigger records no history for those, because a card moved onto its
+  board's copy of a label shows exactly what it showed before.
 
 ## Attachments
 

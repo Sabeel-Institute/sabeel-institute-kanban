@@ -13,7 +13,7 @@
  *
  *  - Authority over a board is now PER BOARD (`Board.boardOwnerUids`), so a plain
  *    member can run one board without gaining anything anywhere else.
- *  - Seeing every board, curating the org-wide label set, and reading Stats are
+ *  - Seeing every board, curating the institute labels, and reading Stats are
  *    all `admin` alone.
  *
  * The old `manager` value meant all three at once, which is why one predicate
@@ -66,8 +66,16 @@ export interface BoardColumn {
 // ---- Labels ----------------------------------------------------------------
 
 /**
- * A label, org-wide. Lives at `labels/{labelId}` — every board sees every label,
- * and a card's `labelIds` resolve against this one set wherever the card is.
+ * A label. Lives at `labels/{labelId}`, one collection for both scopes, and
+ * `boardId` is the whole difference between them:
+ *
+ *  - no `boardId`: an INSTITUTE label, on every board, and changed by admins
+ *    alone, in More → Labels;
+ *  - a `boardId`: that board's own, shown nowhere else, and changed by anyone
+ *    on that board.
+ *
+ * Every label is readable by every active account, because My Work and Search
+ * are cross-board and resolve chips from this one set.
  *
  * A COLLECTION rather than an array on a config document, because any active
  * member may create one: two people adding to a single array field is a lost
@@ -76,6 +84,8 @@ export interface BoardColumn {
  * why `LABEL_NAME_MAX` was client-only while labels lived on the board.
  */
 export interface LabelDoc {
+  /** The board that owns it; absent on an institute label. Never changes. */
+  boardId?: string;
   name: string;
   /** From `LABEL_COLORS`. Must stay legible on the ivory background. */
   color: string;
@@ -200,9 +210,9 @@ export interface CardDoc {
   dueDate?: string;
   priority: Priority;
   /**
-   * Ids into the org-wide `labels` collection. Labels are NOT board-scoped, so
-   * these survive a cross-board move and are copied with the card — unlike
-   * `parentId`, which is scoped to the cards travelling with it.
+   * Ids into `labels`. A cross-board move or copy keeps the INSTITUTE labels
+   * and drops the source board's own (`labelIdsAfterBoardChange`), as it drops
+   * a `parentId` whose parent stays behind.
    *
    * An id whose label has been deleted resolves to nothing and renders as
    * nothing, but that is not a state the app produces: `deleteLabel` strips the
@@ -233,9 +243,7 @@ export interface CardDoc {
    * this is an opaque string and a child's read access comes from its own
    * `boardId`. So the picker only ever offers same-board cards, and a link that
    * goes stale (parent moved or deleted) simply renders as nothing. A cross-board
-   * move clears it unless the parent is travelling too. `labelIds` used to be
-   * cleared alongside it and no longer is — labels are org-wide, so they mean
-   * the same thing on every board.
+   * move clears it unless the parent is travelling too.
    */
   parentId?: string;
   createdAt: number;

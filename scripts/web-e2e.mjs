@@ -503,6 +503,22 @@ try {
     String(backGlyph),
   );
 
+  // An institute label first, from the one place they are made: More → Labels.
+  await admin.getByRole('button', { name: 'More' }).first().click();
+  await admin.getByRole('button', { name: /^Labels/ }).click();
+  await admin.getByPlaceholder('New label name').fill('org-wide');
+  await admin.getByRole('button', { name: 'Add label' }).click();
+  check(
+    'an admin adds an institute label in More → Labels',
+    await admin
+      .getByRole('button', { name: 'Rename label org-wide' })
+      .waitFor({ timeout: 15000 })
+      .then(() => true)
+      .catch(() => false),
+  );
+  await admin.getByRole('button', { name: 'Back' }).first().click();
+  await admin.getByRole('button', { name: 'Board settings' }).waitFor({ timeout: 15000 });
+
   // Board settings: add a column, add a label, add a member.
   await admin.getByRole('button', { name: 'Board settings' }).click();
   await admin.getByText('Board settings').waitFor({ timeout: 15000 });
@@ -514,17 +530,17 @@ try {
   await admin.getByPlaceholder('New label name').fill('urgent');
   await admin.getByRole('button', { name: 'Add label' }).click();
   await admin.getByText('urgent').first().waitFor({ timeout: 15000 });
-  check('a manager can add a label', true);
+  check('a board label can be added in Board settings', true);
 
-  // Labels are ORG-WIDE, and this screen is per-board — which is exactly the
-  // misreading the copy has to head off.
+  // The institute label is listed here and LOCKED, for an admin too: it
+  // changes in More → Labels and nowhere else.
   check(
-    'board settings says labels are shared by every board',
-    await admin
-      .getByText(/Labels are shared by every board/)
-      .first()
-      .isVisible()
-      .catch(() => false),
+    'an institute label is listed on the board, locked',
+    await admin.getByLabel('org-wide, set by admins').first().isVisible().catch(() => false),
+  );
+  check(
+    'and has no rename control here, even for an admin',
+    (await admin.getByRole('button', { name: 'Rename label org-wide' }).count()) === 0,
   );
 
   // Renaming keeps the id, so anything already carrying the label follows the
@@ -535,7 +551,7 @@ try {
   await admin.getByLabel('New name for label urgent').fill('urgent-fix');
   await admin.getByRole('button', { name: 'Save name for label urgent' }).click();
   check(
-    'a manager can rename a label',
+    'a board label can be renamed',
     await admin
       .getByText('urgent-fix')
       .first()
@@ -576,8 +592,8 @@ try {
   // But she does get a way in — the roster, read-only. The control SAYS which
   // one it is, because "Board settings" opening a member list would be a button
   // that does not describe what it does.
-  await sara.getByRole('button', { name: 'Board members' }).click();
-  await sara.getByText('Board members').first().waitFor({ timeout: 15000 });
+  await sara.getByRole('button', { name: 'Members and labels' }).click();
+  await sara.getByText('Members and labels').first().waitFor({ timeout: 15000 });
   check('a non-owner reaches a read-only roster instead', true);
   check(
     'the roster names the owner, so there is somebody to ask',
@@ -727,7 +743,7 @@ try {
     'revoking asks too — it is not a one-way door',
     /no longer be able to change it/.test(lastConfirm.get(admin) ?? ''),
   );
-  await sara.getByRole('button', { name: 'Board members' }).waitFor({ timeout: 25000 });
+  await sara.getByRole('button', { name: 'Members and labels' }).waitFor({ timeout: 25000 });
   check('and the demotion reaches her open app', true);
 
   const saraSeesNewBoard = await sara
@@ -1134,12 +1150,10 @@ try {
   await columnSelect.selectOption({ label: 'To Do' });
   await admin.waitForTimeout(2000);
 
-  // ---- Labels are ORG-WIDE ------------------------------------------------
-  // The renamed label from board settings must be offered on this card without
-  // anything having added it to this board, because there is no such thing as
-  // adding a label to a board any more.
+  // ---- Labels on a card ----------------------------------------------------
+  // The board's own label from Board settings, and the institute label.
   check(
-    'a label made in board settings is offered on a card',
+    'a label made in board settings is offered on that board’s card',
     await admin
       .getByRole('button', { name: 'Label urgent-fix' })
       .waitFor({ timeout: 20000 })
@@ -1147,9 +1161,20 @@ try {
       .catch(() => false),
   );
 
-  // The `+` is the one label affordance a plain member gets, since board
-  // settings is manager-only. Creating from here applies it to the card too.
+  check(
+    'and so is the institute label',
+    await admin.getByRole('button', { name: 'Label org-wide' }).isVisible().catch(() => false),
+  );
+  // Put it on this card: a copy to another board must carry it.
+  await admin.getByRole('button', { name: 'Label org-wide' }).click();
+  await admin.waitForTimeout(1500);
+
+  // The `+` makes a label of THIS board's own, and applies it to the card too.
   await admin.getByRole('button', { name: 'New label' }).click();
+  check(
+    'the new-label sheet names the board it lands on',
+    await admin.getByText('This label will only be on Fundraising 2026.').isVisible().catch(() => false),
+  );
   await admin.getByPlaceholder('Label name').fill('cross-board');
   await admin.getByRole('button', { name: 'Add label' }).click();
   check(
@@ -1965,7 +1990,8 @@ try {
    */
   const priorityChip = (word) => new RegExp(`^${word} priority filter,`);
   // `cross-board` is the one actually applied to a card, further up.
-  await pickInFilters('Labels', 'Filter by cross-board');
+  // A board's own label is announced with its board, as it is shown.
+  await pickInFilters('Labels', 'Filter by cross-board, Fundraising 2026');
   await admin.waitForTimeout(800);
   const oneLabel = await resultCount();
   check(
@@ -1977,8 +2003,16 @@ try {
   // `urgent-fix` is on NO card, which is what makes this discriminating: under
   // "any" the result is unchanged, under "all" it would collapse to zero. This
   // is the check that fails if the semantics are ever flipped.
-  await pickInFilters('Labels', 'Filter by urgent-fix');
+  await pickInFilters('Labels', 'Filter by urgent-fix, Fundraising 2026');
   await admin.waitForTimeout(300);
+  check(
+    'a board label’s filter chip names its board',
+    await admin
+      .getByRole('button', { name: /urgent-fix \(Fundraising 2026\)/ })
+      .first()
+      .isVisible()
+      .catch(() => false),
+  );
   const twoLabels = await resultCount();
   check(
     'a second label matches ANY of them rather than all',
@@ -2111,7 +2145,7 @@ try {
     );
     // Both picks read back as their own removable chip.
     // The active-filter chips say what tapping them DOES, and name their facet:
-    // the label set is org-wide, so a label called `Urgent` would otherwise answer
+    // any member may make a label, so one called `Urgent` would otherwise answer
     // to exactly the name the priority chip beside it does.
     const chips = await admin
       .getByRole('button', { name: /^Remove the (Urgent|High) priority filter$/ })
@@ -2227,10 +2261,11 @@ try {
     await admin.waitForTimeout(500);
   }
 
-  // ---- The label set is not scoped to a board -----------------------------
-  // The whole claim of global labels, and the only way to prove it is a board
-  // that has never been near the labels: a brand-new one, whose settings are
-  // never opened, must offer the labels made on the first board.
+  // ---- Labels on another board ---------------------------------------------
+  // A brand-new board, whose settings are never opened, must offer the
+  // institute label and must NOT offer the first board's own. Then a copy from
+  // the first board carries the institute label across and leaves the board's
+  // own behind.
   await backToBoards(admin);
   await admin.getByRole('button', { name: 'New board' }).click();
   await admin.getByPlaceholder('Board name').fill('Second Board');
@@ -2251,20 +2286,103 @@ try {
   await openCard(admin, 'Elsewhere entirely');
 
   const offeredHere = await admin
-    .getByRole('button', { name: 'Label cross-board' })
+    .getByRole('button', { name: 'Label org-wide' })
     .waitFor({ timeout: 20000 })
     .then(() => true)
     .catch(() => false);
-  check('a label made on one board is offered on a different board', offeredHere);
+  check('another board offers the institute label', offeredHere);
   check(
-    'and so is the renamed one, under its new name',
+    'but not the first board’s own labels',
+    (await admin.getByRole('button', { name: 'Label cross-board' }).count()) === 0 &&
+      (await admin.getByRole('button', { name: 'Label urgent-fix' }).count()) === 0,
+  );
+
+  // Copy the labelled card across.
+  await backToBoards(admin);
+  await admin.getByText('Fundraising 2026').first().click();
+  await admin.getByRole('checkbox', { name: 'Select Fix signup flow' }).waitFor({ timeout: 20000 });
+  await admin.getByRole('checkbox', { name: 'Select Fix signup flow' }).click();
+  await admin.getByRole('button', { name: 'Copy or move to another board' }).click();
+  await admin.getByLabel('Destination board').selectOption({ label: 'Second Board' });
+  check(
+    'the panel names the labels that stay behind',
     await admin
-      .getByRole('button', { name: 'Label urgent-fix' })
-      .isVisible()
+      .getByText(/^Staying here: .*cross-board/)
+      .first()
+      .waitFor({ timeout: 15000 })
+      .then(() => true)
       .catch(() => false),
+  );
+  await admin.getByLabel('Destination column').selectOption({ index: 1 });
+  await admin.getByRole('button', { name: 'Copy', exact: true }).click();
+  await admin.getByRole('checkbox', { name: 'Select Fix signup flow' }).waitFor({ timeout: 20000 });
+  await backToBoards(admin);
+  await admin.getByText('Second Board').first().click();
+  const copied = admin.locator('[data-testid="card-Fix signup flow"]');
+  await copied.waitFor({ timeout: 20000 });
+  const copiedText = await copied.innerText();
+  check(
+    'the copy carries the institute label and not the board’s own',
+    copiedText.includes('org-wide') && !copiedText.includes('cross-board'),
+    copiedText.replace(/\s+/g, ' '),
+  );
+
+  // And MOVE the original, which goes through its own write: the card leaves
+  // the first board with its institute label and without the board's own.
+  await backToBoards(admin);
+  await admin.getByText('Fundraising 2026').first().click();
+  await admin.getByRole('checkbox', { name: 'Select Fix signup flow' }).waitFor({ timeout: 20000 });
+  await admin.getByRole('checkbox', { name: 'Select Fix signup flow' }).click();
+  await admin.getByRole('button', { name: 'Copy or move to another board' }).click();
+  await admin.getByLabel('Destination board').selectOption({ label: 'Second Board' });
+  await admin.getByLabel('Destination column').selectOption({ index: 1 });
+  await admin.getByRole('button', { name: 'Move', exact: true }).click();
+  check(
+    'a moved card leaves its board',
+    await admin
+      .getByRole('checkbox', { name: 'Select Fix signup flow' })
+      .waitFor({ state: 'detached', timeout: 20000 })
+      .then(() => true)
+      .catch(() => false),
+  );
+  await backToBoards(admin);
+  await admin.getByText('Second Board').first().click();
+  const both = admin.locator('[data-testid="card-Fix signup flow"]');
+  const arrived = await both
+    .nth(1)
+    .waitFor({ timeout: 20000 })
+    .then(() => true)
+    .catch(() => false);
+  const faces = arrived ? await both.allInnerTexts() : [];
+  check(
+    'and arrives with the institute label and not the board’s own',
+    faces.length === 2 && faces.every((f) => f.includes('org-wide') && !f.includes('cross-board')),
+    faces.map((f) => f.replace(/\s+/g, ' ')).join(' | '),
   );
 
   await backToBoards(admin);
+
+  // ---- An open tab below the version floor -----------------------------------
+  // The web reads the floor too, or a tab left open from before a release would
+  // go on running the old bundle against the new rules.
+  await adminRun(`await db.doc('config/app').set({ minVersionCode: 999999999 });`);
+  check(
+    'an open tab below the version floor offers Reload',
+    await admin
+      .getByRole('button', { name: 'Reload', exact: true })
+      .waitFor({ timeout: 20000 })
+      .then(() => true)
+      .catch(() => false),
+  );
+  await adminRun(`await db.doc('config/app').delete();`);
+  check(
+    'and the app returns when the floor is lowered',
+    await admin
+      .getByRole('button', { name: 'New board' })
+      .waitFor({ timeout: 20000 })
+      .then(() => true)
+      .catch(() => false),
+  );
 
   // ---- Domain enforcement, from a real client -----------------------------
   // Sara's session is finished with — close it so this last context is not

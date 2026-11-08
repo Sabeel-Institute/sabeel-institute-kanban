@@ -81,21 +81,23 @@ async function enrich() {
   if (boards.empty) throw new Error(`board "${BOARD}" missing — was the seed interrupted?`);
   const boardId = boards.docs[0].id;
 
-  // Labels are org-wide, so create them once and reuse.
+  // Created once and reused: three institute labels, and one of this board's own.
   const wantLabels = [
     ['Fundraising', '#83114F'],
     ['Outreach', '#A8B89A'],
     ['Admin', '#C6A15B'],
+    ['Hall booking', '#3E6B8A', boardId],
   ];
   const labelIds = [];
   const existing = await db.collection('labels').get();
-  for (const [name, color] of wantLabels) {
+  for (const [name, color, labelBoard] of wantLabels) {
     const hit = existing.docs.find((d) => d.data().name === name);
     if (hit) {
       labelIds.push(hit.id);
       continue;
     }
     const ref = await db.collection('labels').add({
+      ...(labelBoard ? { boardId: labelBoard } : {}),
       name,
       color,
       createdAt: Date.now(),
@@ -113,7 +115,7 @@ async function enrich() {
 
   //  title                    days  priority   labels  description
   const plan = [
-    ['Book the venue', -2, 'urgent', [0],
+    ['Book the venue', -2, 'urgent', [0, 3],
       'Sayeed Hall is held provisionally until Friday. Confirm the deposit and get the contract signed.'],
     ['Confirm the caterer', 0, 'high', [0, 1],
       'Final head count is 120. Check the vegetarian option and whether they bring their own serving staff.'],
@@ -342,6 +344,24 @@ const SHOTS = {
     await members.scrollIntoViewIfNeeded();
     await p.waitForTimeout(900);
   },
+  // A board's labels: the institute's, locked, then the board's own with controls.
+  boardlabels: async (p) => {
+    await openBoard(p);
+    await p.getByRole('button', { name: 'Board settings' }).click();
+    const heading = p.getByText('Labels', { exact: true }).first();
+    await heading.waitFor({ timeout: 30000 });
+    await p.getByRole('button', { name: 'Rename label Hall booking' }).waitFor({ timeout: 30000 });
+    await heading.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+    await p.waitForTimeout(900);
+  },
+  // More → Labels, the admin's panel for the institute labels.
+  labels: async (p) => {
+    await nav(p, 'Boards');
+    await p.getByRole('button', { name: 'More' }).click();
+    await p.getByRole('button', { name: /^Labels/ }).click();
+    await p.getByRole('button', { name: 'Rename label Fundraising' }).waitFor({ timeout: 30000 });
+    await p.waitForTimeout(900);
+  },
   // The board's history, at the foot of settings: scrolled so its heading
   // sits at the top and the lines fill the rest.
   history: async (p) => {
@@ -358,7 +378,7 @@ const SHOTS = {
   roster: async (p) => {
     await nav(p, 'Boards');
     await p.getByText(BOARD).first().click();
-    await p.getByRole('button', { name: 'Board members' }).click();
+    await p.getByRole('button', { name: 'Members and labels' }).click();
     await p.getByText(/^Members \(/).first().waitFor({ timeout: 30000 });
     await p.waitForTimeout(900);
   },

@@ -348,7 +348,7 @@ service cloud.firestore {
 
       // Settings, columns, membership and OWNERSHIP are the board owner's work —
       // an admin, or a member the board's owners have promoted. Labels are NOT
-      // here any more: they are org-wide documents (see match /labels).
+      // here: they are documents of their own, even a board's (see match /labels).
       // A member who is not an owner deliberately cannot edit the board they are
       // on — including removing themselves, which would look like leaving but
       // would strand their card assignments (see the removeBoardMember callable).
@@ -402,12 +402,14 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
-    // ---- Labels (org-wide) ----
-    // One set of labels for the whole organisation: every board offers every
-    // label, and a card's `labelIds` mean the same thing wherever the card is.
+    // ---- Labels ----
+    // One collection, two scopes, and `boardId` is the whole difference. With
+    // none, an INSTITUTE label: on every board, and changed by admins alone (in
+    // More → Labels). With one, that board's own: shown there alone, and
+    // changed by anyone on that board. `boardId` never changes once written.
     //
     // A COLLECTION, not an array on a config document, and that is what makes
-    // this block possible. Any active member may add a label, so concurrent
+    // this block possible. Anyone on a board may add a label, so concurrent
     // creates are the ordinary case — two people appending to one array field is
     // a lost write. And rules cannot iterate a list, so while labels lived on the
     // board the name cap was client-side only (see LABEL_NAME_MAX in
@@ -416,22 +418,37 @@ service cloud.firestore {
       function label() { return request.resource.data; }
       function existingLabel() { return resource.data; }
 
+      // Who may add or change a label is its scope's question. An institute
+      // label changes cards on every board, so it takes an admin. A board's own
+      // reaches that board's cards alone, so being on the board is enough,
+      // owner or not (`canEditBoardLabels` in @sabeel/shared). Asked of the
+      // EXISTING document on update, so nobody can move a label into a scope
+      // they may change.
+      function mayCurate(d) {
+        return 'boardId' in d
+          ? isAdmin()
+            || request.auth.uid in get(/databases/$(database)/documents/boards/$(d.boardId)).data.memberUids
+          : isAdmin();
+      }
+
       // Everyone active reads them: a label can appear on a card on any board,
       // so restricting reads by board membership would blank out chips in My
-      // Work and Search, which are cross-board by definition.
+      // Work and Search, which are cross-board by definition. A board's own
+      // label names are therefore readable off the board; the app offers only
+      // your boards' own.
       allow read: if isActive();
 
-      // ANY active member — deliberately wider than the gate on renaming below.
-      // Adding a label is cheap, ordinary and reversible, and it happens while
-      // someone is looking at a card rather than in board settings.
       //
       // Colour is checked for SHAPE, not against LABEL_COLORS. The palette is a
       // design constraint rather than a security boundary, and restating those
       // eight values here would be a second source of truth for them; the client
       // only ever offers swatches. A stray hex makes an ugly chip, not a breach.
       allow create: if isActive()
-        && label().keys().hasOnly(['name', 'color', 'createdAt', 'createdBy'])
+        && label().keys().hasOnly(['boardId', 'name', 'color', 'createdAt', 'createdBy'])
         && label().keys().hasAll(['name', 'color', 'createdAt', 'createdBy'])
+        && (!('boardId' in label())
+            || (label().boardId is string && label().boardId.size() > 0))
+        && mayCurate(label())
         && label().name is string
         && label().name.size() > 0
         && label().name.size() <= 40
@@ -439,24 +456,25 @@ service cloud.firestore {
         && label().color.matches('^#[0-9A-Fa-f]{6}$')
         // Authorship is not the client's to invent. Nothing DISPLAYS it — it is
         // an audit field, the only record of where a stray label came from when
-        // someone asks. (The 32 migrated from board arrays carry '', because
+        // someone asks. (Those migrated from board arrays carry '', because
         // inventing an author for them would be a fabrication.)
         && label().createdBy == request.auth.uid
         && label().createdAt is number
         && label().createdAt <= request.time.toMillis() + 3600000;
 
-      // ADMIN-only. Renaming and recolouring are curation: unlike creating, they
-      // change what everyone else already sees — on every card on every board,
-      // including boards the editor is not a member of. An org-wide effect takes
-      // an org-wide authority, so owning a board grants no part of it. Nothing
-      // else may move either: `createdAt`/`createdBy` are history.
+      // Renaming and recolouring, by the label's scope. Nothing else may move:
+      // `boardId` is the scope, and `createdAt`/`createdBy` are history.
       //
       // `.get(field, default)` on both sides rather than plain access, the same
       // old-document guard the board and card blocks carry: a label written
       // before one of these fields existed would otherwise be permanently
       // uneditable, which is a worse failure than the drift being prevented.
-      allow update: if isAdmin()
-        && label().keys().hasOnly(['name', 'color', 'createdAt', 'createdBy'])
+      allow update: if isActive()
+        && mayCurate(existingLabel())
+        // null, not '', as the default: '' would let a write ADD boardId: ''
+        // to an institute label, which matches its absent one.
+        && label().get('boardId', null) == existingLabel().get('boardId', null)
+        && label().keys().hasOnly(['boardId', 'name', 'color', 'createdAt', 'createdBy'])
         && label().name is string
         && label().name.size() > 0
         && label().name.size() <= 40

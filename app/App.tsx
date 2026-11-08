@@ -39,6 +39,7 @@ import { MyWorkScreen } from './src/screens/MyWorkScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { SearchScreen } from './src/screens/SearchScreen';
 import { UsersScreen } from './src/screens/UsersScreen';
+import { LabelsScreen } from './src/screens/LabelsScreen';
 import { StatsScreen } from './src/screens/StatsScreen';
 import { ReportScreen } from './src/screens/ReportScreen';
 import { HelpFilmScreen, HelpScreen } from './src/screens/HelpScreen';
@@ -123,6 +124,12 @@ function renderScreen(route: Route, user: SessionUser) {
       ) : (
         <NotForYou what="Stats" />
       );
+    case 'labels':
+      return sessionCan.curateLabels(user) ? (
+        <LabelsScreen user={user} />
+      ) : (
+        <NotForYou what="Institute labels" />
+      );
     case 'report':
       return <ReportScreen />;
     case 'help':
@@ -179,9 +186,10 @@ function SignedInRoutes({ user }: { user: SessionUser }) {
 
 function Routes() {
   const session = useSession();
-  // The institute's floor for phone builds, read before anything else: a
-  // retired build shows the update screen whether or not anyone is signed in.
-  const outdated = useMinVersion();
+  // The institute's floor, read before anything else on a phone, where a
+  // retired build shows the update screen whether or not anyone is signed in;
+  // in a browser once someone is (see minVersion.ts).
+  const outdated = useMinVersion(session.state === 'signed-in');
   // Android Back / edge-swipe pops this stack instead of exiting the app.
   useHardwareBack();
 

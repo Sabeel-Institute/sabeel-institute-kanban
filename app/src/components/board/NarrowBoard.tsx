@@ -196,7 +196,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
   // still loading, or one that failed, as watching nothing.
   const watching = (columnId: string) =>
     (watched.data ?? []).includes(watchKey(boardId, columnId));
-  // Org-wide, not from the board: labels are one set for the whole team.
+  // Every label, of both scopes: a card's chips resolve against the lot.
   const allLabels = useLabels();
   const labels = allLabels.data ?? NO_LABELS;
 
@@ -392,7 +392,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
           control that does not say what it does. */}
       <IconAction
         icon={canManage ? 'settings' : 'group'}
-        label={canManage ? 'Board settings' : 'Board members'}
+        label={canManage ? 'Board settings' : 'Members and labels'}
         onPress={() => nav.push({ name: 'boardSettings', boardId })}
       />
     </>

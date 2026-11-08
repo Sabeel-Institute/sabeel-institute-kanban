@@ -7,8 +7,10 @@
  *       FIRESTORE_EMULATOR_HOST="127.0.0.1:$(npx sabeel-ci ports firestore)" \
  *       node scripts/set-min-version.mjs <X.Y.Z>        # against the emulator
  *
- * Every phone build below the floor shows the update screen instead of the
- * app, before sign-in, the moment its listener sees the change. Raise it after
+ * Every phone build from 0.13.1 below the floor shows the update screen
+ * instead of the app, before sign-in, the moment its listener sees the change;
+ * a web tab from 0.17.0 on shows it with Reload once someone is signed in.
+ * Older builds never read the floor. Raise it after
  * a release that older builds can no longer run against — a rules change that
  * refuses a listener they still open is the case it exists for.
  *

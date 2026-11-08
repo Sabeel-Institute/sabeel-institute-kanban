@@ -6,12 +6,10 @@ import { useLiveQuery } from './liveQuery';
 import type { SessionUser } from './session';
 
 /**
- * The org-wide label set.
- *
- * One collection for the whole organisation — every board offers every label, so
- * there is nothing to scope this by. That is also what fixes My Work and Search:
- * both are cross-board, and both used to resolve a card's chips against a single
- * loaded board document, so a card from anywhere else rendered no chips at all.
+ * Every label, of both scopes: the institute's (no `boardId`) and each board's
+ * own. One read for the lot, because My Work and Search are cross-board and
+ * resolve a card's chips wherever it is; what a board OFFERS is
+ * `labelsForBoard` in @sabeel/shared, applied where a picker is drawn.
  */
 const labelsRef = () => collection(db, 'labels');
 
@@ -27,6 +25,7 @@ export function useLabels() {
       sortLabels(
         docs.map((d) => ({
           id: d.id,
+          ...(typeof d.data.boardId === 'string' ? { boardId: d.data.boardId } : {}),
           name: (d.data.name as string) ?? '',
           // Rules require a hex, so a missing colour means a document that
           // predates them or was written by the Admin SDK. Fall back to the
@@ -40,14 +39,15 @@ export function useLabels() {
 }
 
 /**
- * Any active member may add one. Returns the new id so the caller can apply it
- * to the card in the same breath — which is the whole point of the `+` in the
- * card's label picker.
+ * A new label: a board's own (`boardId`), which anyone on that board may add,
+ * or an institute label (`null`), which only an admin may. Returns the new id so
+ * the card's `+` can apply it in the same breath.
  */
 export async function createLabel(params: {
   name: string;
   color: string;
   user: SessionUser;
+  boardId: string | null;
 }): Promise<string> {
   const created = await addDoc(
     labelsRef(),
@@ -56,16 +56,16 @@ export async function createLabel(params: {
       color: params.color,
       createdBy: params.user.uid,
       now: Date.now(),
+      boardId: params.boardId,
     }),
   );
   return created.id;
 }
 
 /**
- * Rename or recolour — ADMINS only, enforced in rules. A label is org-wide, so
- * renaming one changes cards on boards the renamer may not even be a member of.
- * The id never moves, so
- * every card carrying the label follows the change rather than losing it.
+ * Rename or recolour, by the label's scope (rules): an institute label by an
+ * admin, a board's own by anyone on that board. The id never moves, so every
+ * card carrying the label follows the change rather than losing it.
  */
 export async function updateLabel(
   labelId: string,

@@ -113,7 +113,9 @@ export function NarrowList({
               key={i.id}
               accessibilityRole="button"
               accessibilityState={{ selected }}
-              accessibilityLabel={`${actionVerb} ${i.name}`}
+              // The detail too: two labels can share a name, and only their
+              // boards tell them apart, to a screen reader as on screen.
+              accessibilityLabel={`${actionVerb} ${i.name}${i.detail ? `, ${i.detail}` : ''}`}
               onPress={() => onPick(i.id)}
               style={({ pressed }) => [
                 styles.option,
