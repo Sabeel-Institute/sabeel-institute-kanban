@@ -244,22 +244,54 @@ it.
   toolbar. Nobody types syntax — that was the whole objection to markdown in
   2026-07-20 and it still stands.
 - **ESCAPING IS THE CORRECTNESS CORE, not a detail.** The escape set is exactly
-  the parse set: `\`, `*`, `[` and a line-leading `-`/`+`/`N.`. Deliberately NOT
+  the parse set: `\`, `*`, `[`, a `]` inside a link's words (the one place the
+  parser reads one) and a line-leading `-`/`+`/`N.`. Deliberately NOT
   `_`, backtick or `~` — outside the vocabulary, so escaping them would store
   `snake\_case\_name`, noise in a field a backfill script will one day read. The
   hand-written list is **not** the correctness criterion; the criterion is
-  `parseRich(serializeRich(doc))` equalling `doc`, enforced by seeded fuzz. Add a
-  character to one list and you must add it to the other.
+  `parseRich(serializeRich(doc))` keeping every word and link of `doc`, enforced
+  by seeded fuzz. Add a character to one list and you must add it to the other.
+  The parser's known gap is a mark that ends in, or an italic that starts with,
+  the other mark: `**x *y***` reads back with literal asterisks. It predates
+  the phone editors and is left until emphasis is parsed by delimiter runs.
+- **Whether a phone shows and saves what the web does is measured, not
+  assumed.** `node scripts/richtext-conformance.mjs` runs seeded documents
+  through Node ports of the library's two HTML parsers; run it whenever
+  `react-native-enriched-html` or `packages/shared/src/richtext*.ts` changes
+  (`docs/DEV-TOOLING.md`, "Rich text on the phones").
 - **Autolinking of bare URLs is RENDER-TIME ONLY.** Storage keeps exactly what
   was typed. If either editor rewrote a bare URL, the same keystrokes would store
   different bytes on a phone than in a browser — which is why `linkRegex={null}`
   on native and no AutoLink plugin on web.
-- **The editor is the ONLY thing split by platform.** Lexical on web,
-  `react-native-enriched-html` on Android, both behind one markdown-in/
-  markdown-out contract and one `richtextHtml` seam. The renderer, toolbar,
-  mention policy and converter are shared — `RichText` in particular must never
-  gain a `.web` sibling, or the two surfaces could disagree about what a card
-  says. `docs/RESEARCH-RICH-TEXT.md` records why, and what the spike measured.
+- **The editor and the last step of drawing are split by platform, and the
+  document never is.** Lexical on web, `react-native-enriched-html` on the
+  phones, both behind one markdown-in/markdown-out contract and one
+  `richtextHtml` seam. `RichText` parses once with `parseRichForDisplay` and
+  hands that document to `RichDocView`: `Text` blocks in a browser, the
+  library's `EnrichedText` on a phone (Faisal, 2026-11-07). Android selection
+  cannot cross text views, so a comment drawn as a `Text` per block selected one
+  paragraph at a time; one native view with real list spans is the only way to
+  get Select all and keep wrapped list lines indented. The parse must stay in
+  `RichText`, or the two surfaces could disagree about what a card says. The
+  library's web build must never load: it renders through `innerHTML` and
+  brings TipTap. Toolbar, mention policy and converter are shared.
+  `docs/RESEARCH-RICH-TEXT.md` records why the editor is split.
+- **`patches/` changes one line of that library: `fromHtml` is
+  `synchronized`.** Its Android parser keeps list state in static fields, and a
+  text view is parsed on the layout thread and the UI thread together.
+  Unpatched, five cold starts in fourteen drew a numbered list out of order
+  with phantom rows, and the editor shares the parser. `patch-package` applies
+  it on install, and `app/src/richTextSeam.test.ts` fails if it did not, or
+  once upstream no longer needs it. Two more of the library's habits are
+  answered in `richDocToDisplayHtml`: it paints list markers off the canvas in
+  a right-to-left paragraph, so a list holding an RTL item gets typed markers,
+  and it collapses runs of spaces, so those go in as no-break spaces. Its iOS
+  parser makes `<br>` a newline only beside another tag, so nothing a phone
+  reads has a `<br>` inside a paragraph: `richDocToDisplayHtml` and
+  `markdownToPhoneEditorHtml` write each line as a `<p>`. A soft break edited on
+  a phone therefore saves as a paragraph break, as Android's editor always did.
+  The same parser keeps open tags by name, so neither writes a mark inside the
+  same mark, and returns a tapped href still escaped (`decodeDisplayHref`).
 
 ## Brand, theme and UI conventions
 
@@ -404,6 +436,16 @@ itself is deliberately NOT darkened — that would collapse it into
 ---
 
 # Working in this repo
+
+## Scale decides the design
+
+Fewer than fifty colleagues, using the app sporadically through the day: not
+thousands of users, not a feed anyone watches. Weigh every design against that.
+A short, announced maintenance window (deny-all rules while a migration or a
+deploy runs, then the real ones) beats machinery that keeps a busy service
+consistent under concurrent writes, old clients and races. Where a simple
+approach with a reasonable compromise exists, **propose it and ask** (Faisal,
+2026-11-07), rather than engineering for traffic this app does not have.
 
 ## Stack (locked — mirrors the time tracker)
 
@@ -586,6 +628,40 @@ correct, and only the *rendered* authenticated screen showed it.
 continued, so it reported success either way — and it had rotted to clicking
 "People" as a top-level button long after that moved into the More sheet.
 
+### The method: what "done" means for a change
+
+Three review rounds of one change (comment rendering on phones and board-scoped
+labels, 2026-11-07) found about forty bugs, and nearly every one traced to the
+lack of one of these six practices. They are the definition of done for any
+change of that size. A review round checks them; it does not replace them.
+
+1. **Name every surface the code runs on, and give evidence from each, or write
+   "unverified" beside it.** An Android emulator says nothing about an iPhone,
+   and a browser says nothing about either. "CI will check it later" stays
+   unverified until it has.
+2. **Test a third-party parser or renderer against its real implementation,
+   not against your idea of it.** Read its source in `node_modules`, and for
+   anything it draws, compare its output with ours differentially. The
+   library's own parsers, ported and fuzzed against the browser renderer, found
+   seven bugs no browser test could see.
+3. **Break every new check once and watch it fail before relying on it.** A
+   test written after the code, from the same reasoning, shares its blind
+   spots: a migration rehearsal passed with its ranking, its write order and its
+   transactions deleted, and a Maestro wait passed whatever had happened.
+4. **When a concept changes, grep an inventory of every consumer and tick each
+   one** before calling it done. Memory finds the main paths; the misses were a
+   Search chip, a screen-reader label, the dev seed, a help film, a dialog, docs
+   and stale test expectations.
+5. **For a rules, data or schema change, walk the rollout as a timeline:** every
+   app version still in use (an open web tab; a phone below the version floor,
+   or below 0.13.1, which never reads it) against every server state, and any
+   migration against colleagues editing. Then take the simplest safe way
+   through it; see "Scale decides the design".
+6. **Small steps, each verified before the next, and claims only from what was
+   observed.** A commit message, comment or doc says "covered" or "verified"
+   only for a check seen to fail without the code, on the surface it names.
+   Large fix batches brought bugs of their own.
+
 ### The width sweep is the DEFAULT check for layout, on both surfaces
 
 ```sh
@@ -612,7 +688,7 @@ Not for routine layout work. Use it for:
 
 | Seam | Why the browser cannot cover it |
 |---|---|
-| **The rich-text editor** | The only thing split by platform — Lexical vs `react-native-enriched-html` |
+| **Rich text** | The editor and the renderer's last step are split by platform — Lexical and `Text` vs `react-native-enriched-html` |
 | **Flex shrink / wrap / overflow** | Yoga ≠ CSS. See the bulk-bar rule above |
 | **Keyboard / IME** | Emulators misreport IME insets; `edgeToEdgeEnabled=true` makes `Keyboard` events no-ops |
 | **Gestures** | Long-press-to-select and the column swipe have no web path. The pager *layout* does render on web at 320px — it is the gestures that do not |

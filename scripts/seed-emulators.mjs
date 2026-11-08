@@ -282,6 +282,34 @@ try {
   console.warn('could not seed an attachment — continuing:', String(e).slice(0, 120));
 }
 
+// One comment with more than one block, through the real composer. A phone draws
+// a comment as one text view, and `maestro/board.yaml` selects all of this one.
+try {
+  const first = 'Two things before we book:';
+  await admin.getByText('Book the venue').first().click();
+  await admin.getByRole('button', { name: 'Attach a file' }).waitFor({ timeout: 25000 });
+  if (!(await admin.getByText(first).first().isVisible().catch(() => false))) {
+    const composer = admin.locator('[contenteditable="true"]').last();
+    await composer.click();
+    await admin.keyboard.type(first);
+    await admin.keyboard.press('Enter');
+    await admin.getByRole('button', { name: 'Bullet list', exact: true }).first().click();
+    await admin.waitForTimeout(400);
+    await admin.keyboard.type('Confirm the hall is free on the Saturday, and that the side rooms come with it.');
+    await admin.keyboard.press('Enter');
+    await admin.keyboard.type('Ask whether the deposit can wait until the pledges are in.');
+    await admin.keyboard.press('Enter');
+    await admin.keyboard.press('Enter');
+    await admin.keyboard.type('I can call them on Thursday.');
+    await admin.getByRole('button', { name: 'Comment', exact: true }).click();
+    await admin.getByText(first).first().waitFor({ timeout: 25000 });
+  }
+  await admin.getByRole('button', { name: 'Back' }).first().click();
+  await admin.getByText('To Do').first().waitFor({ timeout: 25000 });
+} catch (e) {
+  console.warn('could not seed a comment — continuing:', String(e).slice(0, 120));
+}
+
 await browser.close();
 console.log(`Seeded: 3 people, 1 board, ${COLUMNS.length + 3} columns, ${CARDS.length} cards.`);
 console.log(`Open ${BASE} and use the dev sign-in row.`);

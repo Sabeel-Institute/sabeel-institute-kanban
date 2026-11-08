@@ -46,7 +46,7 @@ import {
   htmlToMarkdown,
   isMentionQuery,
   mentionInsertion,
-  markdownToHtml,
+  markdownToPhoneEditorHtml,
   type MentionCandidate,
 } from '@sabeel/shared';
 import { RichToolbar, type RichMarks } from './RichToolbar';
@@ -180,12 +180,14 @@ export function RichEditor({
    * measures the tags as plain text, and on first mount the later correction
    * does not reach layout. Measured in the sibling LMS app on an AVD, from
    * cold starts: a 495 px box for 542 px of text every time, its last line
-   * hidden; enveloped, it fit. Every tag `markdownToHtml` emits (p, br, b, i,
-   * a, ul, ol, li) is in that parser's vocabulary.
+   * hidden; enveloped, it fit. Every tag `markdownToPhoneEditorHtml` emits
+   * (p, b, i, a, ul, ol, li) is in that parser's vocabulary. Not
+   * `markdownToHtml`: its `<br>` inside a paragraph ran two lines into one on
+   * an iPhone, and saved them that way.
    */
   const initialHtml = useRef<string | null>(null);
   if (initialHtml.current === null) {
-    initialHtml.current = `<html>${markdownToHtml(initialMarkdown)}</html>`;
+    initialHtml.current = `<html>${markdownToPhoneEditorHtml(initialMarkdown)}</html>`;
   }
   const [marks, setMarks] = useState<RichMarks>(EMPTY_MARKS);
   /**

@@ -1,7 +1,21 @@
 import { describe, it, expect } from 'vitest';
-import { htmlToMarkdown, markdownToHtml } from '../src/richtextHtml';
+import {
+  decodeDisplayHref,
+  htmlToMarkdown,
+  markdownToHtml,
+  markdownToPhoneEditorHtml,
+  richDocToDisplayHtml,
+} from '../src/richtextHtml';
 import { extractMentions, mentionInsertion } from '../src/mentions';
-import { normalizeMarkdown, toPlainText } from '../src/richtext';
+import {
+  normalizeMarkdown,
+  parseRich,
+  parseRichForDisplay,
+  serializeRich,
+  toPlainText,
+  type RichDoc,
+  type RichInline,
+} from '../src/richtext';
 
 /**
  * The seam both editors speak.
@@ -13,6 +27,12 @@ import { normalizeMarkdown, toPlainText } from '../src/richtext';
  */
 
 const trip = (md: string) => htmlToMarkdown(markdownToHtml(md));
+
+describe('pasting a phone’s copied text', () => {
+  it('turns its no-break spaces back into spaces', () => {
+    expect(htmlToMarkdown('<p>a&#160;b\u00A0c&nbsp;d</p>')).toBe('a b c d');
+  });
+});
 
 describe('markdown to HTML and back', () => {
   it('round-trips each element', () => {
@@ -240,5 +260,331 @@ describe('web and native mentions converge on the same stored markdown', () => {
   it('a handle the indicator is missing from resolves to NOBODY', () => {
     // The bug, stated as a test: this is exactly what native used to store.
     expect(extractMentions('hi sara there', roster)).toEqual([]);
+  });
+});
+
+/**
+ * What a phone draws. A browser never sees this HTML, but the phones do, so this
+ * is where a stray `<` or `"` in somebody's comment would become a rendering bug.
+ */
+describe('the display HTML the phones render', () => {
+  const display = (md: string) => richDocToDisplayHtml(parseRichForDisplay(md));
+
+  it('wraps the body so the library takes its direct parser', () => {
+    expect(display('hello')).toBe('<html><p>hello</p></html>');
+  });
+
+  it('puts one line break between blocks and none inside a list', () => {
+    expect(display('one\n\n- a\n- b\n\n1. c\n\ntwo')).toBe(
+      '<html><p>one</p><br><ul><li>a</li><li>b</li></ul><br><ol><li>c</li></ol><br><p>two</p></html>',
+    );
+  });
+
+  it('renders typed markup as the characters someone typed', () => {
+    expect(display('a < b & <script>alert(1)</script>')).toBe(
+      '<html><p>a &lt; b &amp; &lt;script&gt;alert(1)&lt;/script&gt;</p></html>',
+    );
+  });
+
+  it('makes a bare URL tappable, as the web renderer does', () => {
+    expect(display('see https://example.org/x now')).toBe(
+      '<html><p>see <a href="https://example.org/x">https://example.org/x</a> now</p></html>',
+    );
+  });
+
+  it('cannot let a quote in an address end the attribute', () => {
+    const html = display('[x](https://example.org/a"onclick="b)');
+    expect(html).not.toMatch(/href="[^"]*"onclick/);
+    expect(html).toContain('&quot;');
+  });
+
+  it('keeps a run of spaces, ending each on an ordinary space to wrap at', () => {
+    expect(display('a  b   c')).toBe('<html><p>a\u00A0 b\u00A0\u00A0 c</p></html>');
+  });
+
+  it('writes a mark inside the same mark once, which iOS needs', () => {
+    // iOS keys open tags by name: an inner <i> ended the outer one's record, and
+    // the outer italic's other words came out upright.
+    const doc: RichDoc = [
+      {
+        kind: 'paragraph',
+        content: [
+          {
+            kind: 'italic',
+            content: [
+              {
+                kind: 'bold',
+                content: [
+                  { kind: 'italic', content: [{ kind: 'text', text: 'Urgent:' }] },
+                  { kind: 'text', text: ' call ' },
+                  { kind: 'italic', content: [{ kind: 'text', text: 'today' }] },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ];
+    expect(richDocToDisplayHtml(doc)).toBe('<html><p><i><b>Urgent: call today</b></i></p></html>');
+  });
+
+  it('types the markers of a list that a right-to-left phone could lay out right to left', () => {
+    // No strong letter at all takes the phone's own direction.
+    expect(display('- 10:30\n- 11:00')).toBe('<html><p>\u2022 10:30</p><p>\u2022 11:00</p></html>');
+    // A right-to-left mark is strong.
+    expect(display('- \u200Fabc')).toBe('<html><p>\u2022 \u200Fabc</p></html>');
+  });
+
+  it('keeps an empty list item open, so the gap after the list survives on Android', () => {
+    const doc: RichDoc = [
+      { kind: 'bullets', items: [[{ kind: 'text', text: 'a' }], []] },
+      { kind: 'paragraph', content: [{ kind: 'text', text: 'next' }] },
+    ];
+    expect(richDocToDisplayHtml(doc)).toBe('<html><ul><li>a</li><li>\u200B</li></ul><br><p>next</p></html>');
+  });
+
+  it('keeps a space at the start of a line, and a run across a bold mark', () => {
+    const doc: RichDoc = [
+      { kind: 'paragraph', content: [{ kind: 'text', text: ' x' }] },
+      {
+        kind: 'paragraph',
+        content: [
+          { kind: 'text', text: 'a ' },
+          { kind: 'bold', content: [{ kind: 'text', text: ' b' }] },
+        ],
+      },
+    ];
+    expect(richDocToDisplayHtml(doc)).toBe('<html><p>\u00A0x</p><br><p>a <b>\u00A0b</b></p></html>');
+  });
+
+  it('draws each line of a paragraph as a paragraph of its own, never a <br> inside one', () => {
+    // iOS makes <br> a newline only beside another tag, so text<br>text ran the
+    // two lines together on an iPhone.
+    expect(display('first\nsecond')).toBe('<html><p>first</p><p>second</p></html>');
+    expect(display('first\nsecond')).not.toMatch(/[^>]<br>[^<]/);
+  });
+
+  it('closes and reopens a bold or a link that spans a line break', () => {
+    const doc: RichDoc = [
+      {
+        kind: 'paragraph',
+        content: [
+          { kind: 'bold', content: [{ kind: 'text', text: 'one\ntwo' }] },
+          { kind: 'link', href: 'https://example.org', content: [{ kind: 'text', text: 'x\ny' }] },
+        ],
+      },
+    ];
+    expect(richDocToDisplayHtml(doc)).toBe(
+      '<html><p><b>one</b></p><p><b>two</b><a href="https://example.org">x</a></p>' +
+        '<p><a href="https://example.org">y</a></p></html>',
+    );
+  });
+
+  it('hands back exactly the address that was written, once decoded', () => {
+    for (const href of ['https://example.org/f?a=1&b=2', 'https://example.org/a"b<c>', 'https://x.org/&amp;']) {
+      const html = richDocToDisplayHtml([
+        { kind: 'paragraph', content: [{ kind: 'link', href, content: [{ kind: 'text', text: 'go' }] }] },
+      ]);
+      const written = /href="([^"]*)"/.exec(html)![1];
+      expect(decodeDisplayHref(written)).toBe(href);
+    }
+  });
+
+  it('types the markers of a list with a right-to-left item', () => {
+    // The library paints list markers off the canvas in a right-to-left
+    // paragraph, so a real <ol> here would lose its numbers.
+    expect(display('1. واحد\n2. two')).toBe('<html><p>1. واحد</p><p>2. two</p></html>');
+    expect(display('- واحد\n- two')).toBe('<html><p>\u2022 واحد</p><p>\u2022 two</p></html>');
+  });
+
+  it('judges direction by the first strong character, as a text layout does', () => {
+    expect(display('- 12: واحد')).toBe('<html><p>\u2022 12: واحد</p></html>');
+    expect(display('- **واحد** two')).toBe('<html><p>\u2022 <b>واحد</b> two</p></html>');
+    // A left-to-right item with Arabic further along keeps the real list.
+    expect(display('- one واحد')).toBe('<html><ul><li>one واحد</li></ul></html>');
+  });
+
+  it('says the same words as the stored document, for 300 seeded documents', () => {
+    const mulberry = (seed: number) => () => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let z = seed;
+      z = Math.imul(z ^ (z >>> 15), z | 1);
+      z ^= z + Math.imul(z ^ (z >>> 7), z | 61);
+      return ((z ^ (z >>> 14)) >>> 0) / 4294967296;
+    };
+    const WORDS = ['plain', 'a<b', 'x&y', '"quoted"', 'snake_case', '[bracket]', 'c*d', '\\', '@sara', 'الله', 'line\nbreak'];
+    const flatten = (nodes: RichInline[]): string =>
+      nodes.map((n) => (n.kind === 'text' ? n.text : flatten(n.content))).join('');
+    // The words a reader sees: tags skipped and entities decoded in one walk,
+    // so a decoded `&lt;` is never read as the start of a tag.
+    const ENTITIES: Record<string, string> = { '&lt;': '<', '&gt;': '>', '&quot;': '"', '&amp;': '&' };
+    const unescape = (s: string) => {
+      let out = '';
+      for (let i = 0; i < s.length; i += 1) {
+        if (s[i] === '<') {
+          const end = s.indexOf('>', i);
+          if (end < 0) break;
+          i = end;
+          continue;
+        }
+        const entity = s[i] === '&' ? Object.keys(ENTITIES).find((e) => s.startsWith(e, i)) : undefined;
+        if (entity) {
+          out += ENTITIES[entity];
+          i += entity.length - 1;
+        } else out += s[i];
+      }
+      return out;
+    };
+
+    for (let seed = 1; seed <= 300; seed += 1) {
+      const rnd = mulberry(seed);
+      const pick = <T,>(xs: readonly T[]) => xs[Math.floor(rnd() * xs.length)];
+      const inline = (): RichInline[] => {
+        const text: RichInline = { kind: 'text', text: pick(WORDS) };
+        const roll = rnd();
+        if (roll < 0.2) return [text, { kind: 'text', text: ' ' }, { kind: 'bold', content: [{ kind: 'text', text: pick(WORDS) }] }];
+        if (roll < 0.4) return [{ kind: 'italic', content: [text] }];
+        return [text];
+      };
+      const doc: RichDoc = Array.from({ length: 1 + Math.floor(rnd() * 4) }, () => {
+        const roll = rnd();
+        if (roll < 0.5) return { kind: 'paragraph' as const, content: inline() };
+        const items = Array.from({ length: 1 + Math.floor(rnd() * 3) }, inline);
+        return { kind: roll < 0.75 ? ('bullets' as const) : ('numbers' as const), items };
+      });
+      const words = (d: RichDoc) =>
+        d.flatMap((b) =>
+          (b.kind === 'paragraph' ? [flatten(b.content)] : b.items.map(flatten)).flatMap((t) => t.split('\n')),
+        );
+      // Through storage first, so this is the document a phone actually receives.
+      const stored = parseRich(serializeRich(doc));
+      const html = richDocToDisplayHtml(stored);
+      const shown = html
+        .replace(/^<html>|<\/html>$/g, '')
+        .split(/<\/p>|<\/li>|<br>/)
+        .map(unescape)
+        // A no-break space is a space someone typed, kept from collapsing; a
+        // zero-width space holds an empty list item open.
+        .map((line) => line.replace(/\u00A0/g, ' ').replace(/\u200B/g, ''))
+        // A typed marker is the one thing a phone adds to the words.
+        .map((line) => line.replace(/^(\u2022|\d+\.) /, ''))
+        .filter((line) => line !== '');
+      expect(shown, `seed ${seed}: ${html}`).toEqual(words(stored).filter((line) => line !== ''));
+    }
+  });
+});
+
+/**
+ * What a phone editor opens with. iOS ran `line<br>line` into one line and
+ * saved it that way, so a phone editor never sees a `<br>` inside a paragraph.
+ */
+describe('the HTML a phone editor opens with', () => {
+  it('opens each line of a paragraph as a paragraph', () => {
+    expect(markdownToPhoneEditorHtml('Call the venue\nthen email Sara')).toBe(
+      '<p>Call the venue</p><p>then email Sara</p>',
+    );
+  });
+
+  it('reopens a bold that spans the break', () => {
+    expect(markdownToPhoneEditorHtml('**one\ntwo** three')).toBe('<p><b>one</b></p><p><b>two</b> three</p>');
+  });
+
+  it('writes a mark inside the same mark once, as the display does', () => {
+    const html = markdownToPhoneEditorHtml('***Urgent:* call *today***');
+    // No <i> opens while an <i> is open, and no <b> while a <b> is.
+    let depth = { b: 0, i: 0 };
+    for (const [, close, tag] of html.matchAll(/<(\/?)(b|i)>/g)) {
+      const t = tag as 'b' | 'i';
+      depth = { ...depth, [t]: depth[t] + (close ? -1 : 1) };
+      expect(depth[t], html).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('saves a soft break as a paragraph break, keeping every word', () => {
+    // What Android's editor has always done with one; now iPhones do too.
+    expect(htmlToMarkdown(markdownToPhoneEditorHtml('a\nb'))).toBe('a\n\nb');
+  });
+
+  it('is the browser editor’s HTML exactly, wherever there is no soft break', () => {
+    for (const md of ['**bold** and *it*', '- one\n- two', '1. one\n2. two', 'p\n\n- l', '[x](https://e.org/a"b)', 'a < b & c']) {
+      expect(markdownToPhoneEditorHtml(md), md).toBe(markdownToHtml(md));
+    }
+  });
+
+  it('never puts a <br> inside a paragraph', () => {
+    for (const md of ['a\nb\nc', '*x\ny*', '[l\nm](https://e.org)', 'one\n\ntwo\nthree']) {
+      expect(markdownToPhoneEditorHtml(md), md).not.toContain('<br>');
+    }
+  });
+});
+
+
+/**
+ * What a phone editor hands back, saved without anyone touching it. Each case
+ * is a shape scripts/richtext-conformance.mjs found the native editors return
+ * for a document the web stored, and each lost words, links or items.
+ */
+describe('what a phone editor hands back', () => {
+  it('keeps a space that is all a mark holds', () => {
+    // A dropped space left an empty mark, stored as stray asterisks between
+    // two words that then ran together.
+    expect(htmlToMarkdown('<html><p>a<i> </i>b</p></html>')).toBe('a* *b');
+    expect(htmlToMarkdown('<html><p>see<a href="https://e.org"> </a>here</p></html>')).toBe(
+      'see[ ](https://e.org)here',
+    );
+    expect(normalizeMarkdown(htmlToMarkdown(markdownToPhoneEditorHtml('a* *b')))).toBe('a* *b');
+  });
+
+  it('sets the space outside a mark that holds a space and then one other mark', () => {
+    // Inside, it stores as `** *c***`, which reads back with literal asterisks.
+    expect(htmlToMarkdown('<html><p>a<b> <i>c</i></b></p></html>')).toBe('a ***c***');
+    // Only that shape: anything else keeps its spaces where they were.
+    expect(htmlToMarkdown('<html><p><b> <i>c</i>d</b></p></html>')).toBe('** *c*d**');
+    expect(htmlToMarkdown('<html><p><b>l<i>x</i> </b></p></html>')).toBe('**l*x* **');
+    expect(htmlToMarkdown('<html><p>a<b> <a href="https://e.org">x</a></b></p></html>')).toBe(
+      'a** [x](https://e.org)**',
+    );
+  });
+
+  it('saves a tab inside a mark as a space', () => {
+    expect(htmlToMarkdown('<html><p>a<b>\t</b>b</p></html>')).toBe('a** **b');
+  });
+
+  it('still reads whitespace between tags as at most one space', () => {
+    expect(htmlToMarkdown('<p><b>a</b>\n  <i>b</i></p>')).toBe('**a** *b*');
+    expect(htmlToMarkdown('<ul>\n  <li>one</li>\n  <li>two</li>\n</ul>')).toBe('- one\n- two');
+    // Inside a mark too, when it spans lines: that is layout, not a space.
+    expect(htmlToMarkdown('<p><b>\n  <i>x</i></b></p>')).toBe('***x***');
+  });
+
+  it('writes nothing for a mark with nothing in it', () => {
+    expect(htmlToMarkdown('<html><p>a<b></b>b</p></html>')).toBe('ab');
+    expect(htmlToMarkdown('<html><p>a<b><i></i></b>b</p></html>')).toBe('ab');
+    expect(
+      serializeRich([
+        {
+          kind: 'paragraph',
+          content: [
+            { kind: 'text', text: 'a' },
+            { kind: 'bold', content: [] },
+            { kind: 'italic', content: [{ kind: 'bold', content: [] }] },
+            { kind: 'text', text: 'b' },
+          ],
+        },
+      ]),
+    ).toBe('ab');
+  });
+
+  it('keeps an empty list item', () => {
+    expect(htmlToMarkdown('<html><ul><li>a</li><li></li><li>b</li></ul></html>')).toBe('- a\n- \n- b');
+    expect(htmlToMarkdown('<html><ol><li></li></ol><p>after</p></html>')).toBe('1. \n\nafter');
+    expect(normalizeMarkdown(htmlToMarkdown(markdownToPhoneEditorHtml('- a\n- \n- b')))).toBe('- a\n- \n- b');
+  });
+
+  it('still makes no item of a list nested inside an item', () => {
+    // Lexical wraps a nested list in an <li> of its own.
+    expect(
+      htmlToMarkdown('<ul><li>a</li><li><ul><li>b</li></ul></li><li>c</li></ul>'),
+    ).toBe('- a\n- b\n- c');
   });
 });

@@ -100,6 +100,37 @@ name: Board, card, rich text and gestures
     direction: UP
 - tapOn: "Back"
 
+# Selecting a whole comment. A phone draws a comment as ONE text view, because
+# Android selection cannot cross views: one element holding the first and last
+# lines is what makes Select all mean all of it (seeded through the web
+# composer by scripts/seed-emulators.mjs), and it is the check, on both
+# platforms. Select all is exercised on Android, where its menu item has that
+# name; nothing on screen says how much it took.
+- extendedWaitUntil:
+    visible: "Tap a card to open it\\.[\\s\\S]*"
+    timeout: 15000
+- runFlow:
+    file: ci-tools/tap-until.yaml
+    env:
+      TARGET: "Book the venue[\\s\\S]*"
+      EXPECT: "Description"
+      SECONDS: 30
+- scrollUntilVisible:
+    element: "Two things before we book:[\\s\\S]*I can call them on Thursday\\."
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - longPressOn: "Two things before we book:[\\s\\S]*"
+      - tapOn: "Select all"
+      - takeScreenshot: 05-select-all
+      # Clears the selection without opening anything: a heading.
+      - tapOn: "Comments \\(\\d+\\)"
+- scrollUntilVisible:
+    element: "Back"
+    direction: UP
+- tapOn: "Back"
+
 # Long-press starts a selection. The board must be back and settled first: a
 # long-press that lands while it is still animating in starts nothing (the
 # iPhone simulator on a busy CI Mac, Kanban #29), so a missed one gets one
@@ -114,7 +145,7 @@ name: Board, card, rich text and gestures
       - extendedWaitUntil:
           visible: "1 selected[\\s\\S]*"
           timeout: 10000
-- takeScreenshot: 05-selection
+- takeScreenshot: 06-selection
 - tapOn: "Back"
 
 # Every tab answers, each with something only its own screen shows.
@@ -142,7 +173,7 @@ name: Board, card, rich text and gestures
       TARGET: "More"
       EXPECT: "Report a problem"
       SECONDS: 30
-- takeScreenshot: 06-more
+- takeScreenshot: 07-more
 
 # Help: a film opens in the platform's own player (expo-video), which is a
 # native module of its own. The player's frame is what is checked, so a
@@ -157,4 +188,4 @@ name: Board, card, rich text and gestures
     visible:
       id: "help-film"
     timeout: 20000
-- takeScreenshot: 07-help-film
+- takeScreenshot: 08-help-film

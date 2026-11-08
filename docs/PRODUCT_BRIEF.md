@@ -342,13 +342,16 @@ decision turns on.
 with a toolbar, which answers the 2026-07-20 objection directly rather than
 overruling it: the team never learns syntax.
 
-**A platform seam, and only for the editor.** Lexical on web,
-`react-native-enriched-html` on Android — each used only where it is strongest,
-and note the *experimental* part of the native library is its web support, which
-is never loaded. The renderer, toolbar, mention policy and the markdown↔HTML
-converter are shared. `RichText` must never gain a `.web` sibling: two surfaces
-disagreeing about what a card says is the one thing a shared board cannot
-tolerate.
+**A platform seam for the editor, and for the last step of drawing.** Lexical on
+web, `react-native-enriched-html` on the phones, each used only where it is
+strongest; the *experimental* part of the native library is its web support,
+which is never loaded. The parse, toolbar, mention policy and the markdown↔HTML
+converter are shared. `RichText` parses once and hands the same document to a
+browser's `Text` blocks or a phone's single native text view (2026-11-07), which
+exists because Android selection cannot cross views: drawn a block at a time,
+Select all took one paragraph. Two surfaces disagreeing about what a card says
+is the one thing a shared board cannot tolerate, which is why the parse is never
+split.
 
 **Escaping decides correctness.** Typing `2 * 3 * 4` stores `2 \* 3 \* 4` and
 renders as literal asterisks. The escape set is exactly the parse set, and the

@@ -631,6 +631,57 @@ node scripts/tutorials/publish.mjs --from $S/films  # every film, or none
 
 Re-record a film, and publish, whenever a screen it shows changes.
 
+## Patched dependencies
+
+`patches/` holds `patch-package` patches, applied by the root `postinstall` on
+every `npm install` and `npm ci`. There is one, two changes to
+`react-native-enriched-html`'s Android parser, and `app/src/richTextSeam.test.ts`
+fails if either did not apply:
+
+- `fromHtml` becomes `synchronized`, because the parser keeps list state in
+  static fields and a text view is parsed on two threads at once.
+- `toHtml` entity-encodes a link's address. Unpatched, a `"` in it ended the
+  attribute, so a save from an Android phone stored a broken link, and `&amp;`
+  in an address came back as `&`.
+
+When the library moves, `npm install` reports a patch that no longer applies. Read
+the new parser first: if its list state is no longer static, drop that change and
+the test's assertion about the reason; if `toHtml` now escapes the address, drop
+that one. Regenerate what is left with
+`npx patch-package react-native-enriched-html`. Either way, re-run the cold-start
+check on the emulator, since a warm re-open can look right with the bug intact,
+and the conformance run below.
+
+## Rich text on the phones
+
+The phones draw a comment or description with the library's native text view
+and edit it in its native editor, and both read our HTML with the library's own
+parsers, which are not a browser's (iOS makes `<br>` a newline only beside a
+tag, Android collapses spaces). Unit tests compare our converters with our idea
+of HTML; this compares them with the library's:
+
+```sh
+npm run build -w @sabeel/shared
+node scripts/richtext-conformance.mjs              # 20000 mixed documents
+node scripts/richtext-conformance.mjs --set plain  # documents shaped as people write them
+```
+
+It feeds seeded markdown through Node ports of Android's `EnrichedParser.java`
+and iOS's `HtmlParser.mm` (`scripts/richtext-conformance/ports.mjs`) and
+compares, per surface, what the phone would draw and what an unedited save in
+the phone editor would store with the document the web draws. Each kind of
+difference is printed with shrunk examples; the run exits 1 on a kind not in
+`KNOWN` at the top of the script, or one well commoner than it expects there. Run it by hand whenever
+`react-native-enriched-html` or `packages/shared/src/richtext*.ts` changes. It
+is not in CI: it takes a minute or more, and what it guards changes rarely.
+
+Two things it will not do for you. The ports describe version 1.1.1 with this
+repo's patch, and it refuses any other version until they have been checked
+against the new parsers' source. And it is a model: what it says about a
+device is evidence only while the ports match the code, so a change it calls
+safe still goes through the Native workflow (`maestro/board.yaml`) on the
+Android emulator and the iPhone simulator.
+
 ## A five-minute tour
 
 With the emulators running and the app open:

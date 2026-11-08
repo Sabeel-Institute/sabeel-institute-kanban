@@ -1,0 +1,26 @@
+diff --git a/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/common/parser/EnrichedParser.java b/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/common/parser/EnrichedParser.java
+index 53d761c..347bb84 100644
+--- a/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/common/parser/EnrichedParser.java
++++ b/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/common/parser/EnrichedParser.java
+@@ -70,7 +70,9 @@ public class EnrichedParser {
+     return fromHtml(source, style, spanFactory, null);
+   }
+ 
+-  public static <T> Spanned fromHtml(
++  // Synchronized because HtmlToSpannedConverter keeps its list state in static
++  // fields, and a text view is parsed on the layout thread and the UI thread.
++  public static synchronized <T> Spanned fromHtml(
+       String source, T style, EnrichedSpanFactory<T> spanFactory, Pattern linkRegex) {
+     Parser parser = new Parser();
+     try {
+@@ -306,7 +308,9 @@ public class EnrichedParser {
+         }
+         if (style[j] instanceof EnrichedLinkSpan) {
+           out.append("<a href=\"");
+-          out.append(((EnrichedLinkSpan) style[j]).getUrl());
++          // An attribute value: entity-encoded, or a quote in the address ends
++          // it early and an `&amp;` in it reads back as `&`.
++          out.append(TextUtils.htmlEncode(((EnrichedLinkSpan) style[j]).getUrl()));
+           out.append("\">");
+         }
+         if (style[j] instanceof EnrichedMentionSpan) {

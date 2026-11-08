@@ -2,7 +2,7 @@
  * The HTML seam — the ONLY thing either editor speaks.
  *
  * This HTML is never rendered in a browser and never stored. It exists so that
- * Lexical (web) and `react-native-enriched-html` (Android) can hand documents
+ * Lexical (web) and `react-native-enriched-html` (the phones) can hand documents
  * to us and take them back, while **markdown remains the single storage
  * format**. Both surfaces go through one converter, so the same keystrokes
  * produce byte-identical markdown from a phone and from a browser — which is
@@ -59,7 +59,19 @@ function encodeEntities(s: string): string {
 
 // ---------------------------------------------------------------- markdown → HTML
 
-function inlineToHtml(nodes: RichInline[]): string {
+/**
+ * `open`, when given, is the marks already open around these nodes, and a mark
+ * inside the same mark is not written again. It looks the same, and iOS keys
+ * open tags by name: an inner `<i>` closed the outer one's record, so the
+ * outer italic's other words came out upright. Only the phone paths pass it;
+ * the browser editor keeps the document exactly as parsed.
+ */
+function inlineToHtml(nodes: RichInline[], open?: ReadonlySet<'b' | 'i'>): string {
+  const wrap = (tag: 'b' | 'i', content: RichInline[]) => {
+    if (open?.has(tag)) return inlineToHtml(content, open);
+    const inner = inlineToHtml(content, open ? new Set([...open, tag]) : undefined);
+    return `<${tag}>${inner}</${tag}>`;
+  };
   return nodes
     .map((n) => {
       switch (n.kind) {
@@ -68,29 +80,207 @@ function inlineToHtml(nodes: RichInline[]): string {
           // <br>. Without this a two-line paragraph collapses to one line.
           return encodeEntities(n.text).split('\n').join('<br>');
         case 'bold':
-          return `<b>${inlineToHtml(n.content)}</b>`;
+          return wrap('b', n.content);
         case 'italic':
-          return `<i>${inlineToHtml(n.content)}</i>`;
+          return wrap('i', n.content);
         case 'link':
-          return `<a href="${encodeEntities(n.href)}">${inlineToHtml(n.content)}</a>`;
+          // An attribute value, so its quote has to be escaped as well: a `"` in
+          // an address would otherwise end the attribute early.
+          return `<a href="${encodeHref(n.href)}">${inlineToHtml(n.content, open)}</a>`;
       }
     })
     .join('');
 }
 
+function listToHtml(
+  b: RichBlock & { kind: 'bullets' | 'numbers' },
+  open?: ReadonlySet<'b' | 'i'>,
+): string {
+  const tag = b.kind === 'bullets' ? 'ul' : 'ol';
+  return `<${tag}>${b.items.map((i) => `<li>${inlineToHtml(i, open)}</li>`).join('')}</${tag}>`;
+}
+
+/** What the BROWSER editor (Lexical) opens with: a soft break is a `<br>`, which it keeps. */
 export function markdownToHtml(markdown: string): string {
   return parseRich(markdown)
-    .map((b) => {
-      switch (b.kind) {
-        case 'paragraph':
-          return `<p>${inlineToHtml(b.content)}</p>`;
-        case 'bullets':
-          return `<ul>${b.items.map((i) => `<li>${inlineToHtml(i)}</li>`).join('')}</ul>`;
-        case 'numbers':
-          return `<ol>${b.items.map((i) => `<li>${inlineToHtml(i)}</li>`).join('')}</ol>`;
+    .map((b) => (b.kind === 'paragraph' ? `<p>${inlineToHtml(b.content)}</p>` : listToHtml(b)))
+    .join('');
+}
+
+/**
+ * What a PHONE editor opens with: each line of a paragraph its own `<p>`, a
+ * bold or link that spans the break reopened on the next line.
+ *
+ * The phone editors have no line break inside a paragraph. iOS makes `<br>` a
+ * newline only beside another tag, so `line<br>line` opened as ONE line and
+ * saved that way: the words of a description ran together the first time an
+ * iPhone saved it. Android opens the `<br>` as a new line, which its editor
+ * saves as a new paragraph. So both now open what Android always saved: an
+ * edit on a phone turns a soft break into a paragraph break, and loses nothing.
+ */
+export function markdownToPhoneEditorHtml(markdown: string): string {
+  const none = new Set<'b' | 'i'>();
+  return parseRich(markdown)
+    .map((b) =>
+      b.kind === 'paragraph'
+        ? splitLines(b.content)
+            .map((line) => `<p>${inlineToHtml(line, none)}</p>`)
+            .join('')
+        : listToHtml(b, none),
+    )
+    .join('');
+}
+
+/**
+ * An address as an attribute value: its quote escaped as well, or a `"` in it
+ * would end the attribute early. `decodeDisplayHref` is the inverse.
+ */
+function encodeHref(href: string): string {
+  return encodeEntities(href).replace(/"/g, '&quot;');
+}
+
+/**
+ * The address a phone hands back when a link is tapped, as it was before
+ * `encodeHref`. iOS returns the attribute as written, escapes included, so
+ * `?a=1&b=2` would open as `?a=1&amp;b=2`; Android decodes it already, and
+ * decoding twice would turn a literal `&amp;` in an address into `&`.
+ */
+export function decodeDisplayHref(href: string): string {
+  return href
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
+/**
+ * The HTML a phone's native text view draws: the one thing here that IS
+ * rendered, on Android and iOS only, and never by a browser. Escaping here is
+ * what keeps a typed `<script>` as characters on a phone.
+ *
+ * Takes the parsed document rather than markdown, so the phones draw what
+ * `parseRichForDisplay` produced for the web too and the surfaces cannot
+ * disagree about the words. It differs from `markdownToHtml` in what the two
+ * platforms' parsers need in order to draw the same thing:
+ *
+ *  - `<html>` around the body sends it down the library's parser directly. Its
+ *    normaliser exists for HTML from elsewhere, and everything here is ours.
+ *  - `<br>` BETWEEN blocks, where a single text view has no margins to offer.
+ *  - Each LINE of a paragraph is a `<p>` of its own, never a `<br>` inside one.
+ *    iOS turns `<br>` into a newline only beside another tag, so
+ *    `line<br>line` ran the two lines together there. A bold or a link that
+ *    spans the break is closed and reopened on each line.
+ *  - Spaces survive. Android collapses a space after a space or at the start
+ *    of a line, as a browser would, so those become no-break spaces: every one
+ *    at the start of a line, and all but the LAST of a run elsewhere, so a line
+ *    still wraps at an ordinary space and starts without an indent.
+ *  - A mark inside the same mark is not written again (see `inlineToHtml`).
+ *  - An empty list item holds a zero-width space: Android closes an empty item
+ *    before it marks it, and the gap after the list went with it.
+ *  - A list holding a right-to-left item becomes lines with typed markers. The
+ *    library paints list markers off the canvas in a right-to-left paragraph
+ *    (1.1.1, both list spans on Android), so an Arabic list would lose its
+ *    bullets and its numbers. The whole list changes, because a list split in
+ *    two restarts its numbering, and gives up the hanging indent.
+ */
+export function richDocToDisplayHtml(doc: RichDoc): string {
+  const line = (nodes: RichInline[], marker = '') =>
+    `<p>${displayInline(marker ? [{ kind: 'text', text: marker }, ...nodes] : nodes, { space: true })}</p>`;
+  const block = (b: RichBlock): string => {
+    if (b.kind === 'paragraph') return splitLines(b.content).map((l) => line(l)).join('');
+    if (b.items.some(readsRightToLeft)) {
+      return b.items
+        .map((item, i) => line(item, b.kind === 'bullets' ? '\u2022 ' : `${i + 1}. `))
+        .join('');
+    }
+    const tag = b.kind === 'bullets' ? 'ul' : 'ol';
+    return `<${tag}>${b.items
+      .map((i) => `<li>${displayInline(i, { space: true }) || '\u200B'}</li>`)
+      .join('')}</${tag}>`;
+  };
+  return `<html>${doc.map(block).join('<br>')}</html>`;
+}
+
+/** A paragraph's inline nodes, one array per line, formatting reopened on each. */
+function splitLines(nodes: RichInline[]): RichInline[][] {
+  const lines: RichInline[][] = [[]];
+  const push = (n: RichInline) => lines[lines.length - 1].push(n);
+  for (const n of nodes) {
+    const parts: RichInline[][] =
+      n.kind === 'text'
+        ? n.text.split('\n').map((t) => (t ? [{ kind: 'text', text: t }] : []))
+        : splitLines(n.content).map((c) => (c.length ? [{ ...n, content: c }] : []));
+    parts.forEach((part, i) => {
+      if (i > 0) lines.push([]);
+      part.forEach(push);
+    });
+  }
+  return lines;
+}
+
+/**
+ * Inline nodes for the display HTML. `state.space` is whether the last
+ * character drawn was a space, or the line has only begun, and `state.open`
+ * the marks already open. Both carry across nodes: `a ` then a bold ` b` is a
+ * run of two spaces, and a bold inside a bold is one bold.
+ */
+function displayInline(
+  nodes: RichInline[],
+  state: { space: boolean; open?: ReadonlySet<'b' | 'i'> },
+): string {
+  const open = state.open ?? new Set<'b' | 'i'>();
+  const wrap = (tag: 'b' | 'i', content: RichInline[]) => {
+    if (open.has(tag)) return displayInline(content, state);
+    const outer = state.open;
+    state.open = new Set([...open, tag]);
+    const inner = displayInline(content, state);
+    state.open = outer;
+    return `<${tag}>${inner}</${tag}>`;
+  };
+  return nodes
+    .map((n) => {
+      switch (n.kind) {
+        case 'text': {
+          // A run of spaces at the start of a line is all no-break spaces;
+          // elsewhere every one but the last, which stays a place to wrap.
+          const out = n.text.replace(/ +/g, (run, at: number) =>
+            at === 0 && state.space ? '\u00A0'.repeat(run.length) : `${'\u00A0'.repeat(run.length - 1)} `,
+          );
+          if (n.text.length > 0) state.space = n.text.endsWith(' ');
+          return encodeEntities(out);
+        }
+        case 'bold':
+          return wrap('b', n.content);
+        case 'italic':
+          return wrap('i', n.content);
+        case 'link':
+          return `<a href="${encodeHref(n.href)}">${displayInline(n.content, state)}</a>`;
       }
     })
     .join('');
+}
+
+/** Hebrew and the Arabic blocks, presentation forms included, and the RLM and ALM marks. */
+const RIGHT_TO_LEFT = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFC\u200F\u061C]/;
+
+/**
+ * Could this item be laid out right to left? A text layout takes a
+ * paragraph's direction from its first strong character, and falls back to
+ * the phone's own direction when there is none: so an item of digits and
+ * punctuation alone ("10:30") is right to left on a phone set to Arabic.
+ * Digits and punctuation are neutral; a letter with case is the cheap test for
+ * "strongly left-to-right" that needs no Unicode tables on Hermes. An empty
+ * item has nothing to lay out.
+ */
+function readsRightToLeft(nodes: RichInline[]): boolean {
+  const flat = (ns: RichInline[]): string =>
+    ns.map((n) => (n.kind === 'text' ? n.text : flat(n.content))).join('');
+  const text = flat(nodes);
+  for (const ch of text) {
+    if (RIGHT_TO_LEFT.test(ch)) return true;
+    if (ch.toLowerCase() !== ch.toUpperCase()) return false;
+  }
+  return text.trim().length > 0;
 }
 
 // ---------------------------------------------------------------- HTML → markdown
@@ -195,7 +385,24 @@ export function htmlToMarkdown(html: string): string {
           arr.push(...done.content);
         }
       } else {
-        arr.push({ kind: done.kind, content: done.content });
+        // A mark holding a space and then one other mark: the space goes
+        // outside, so the two nest whole as `***c***`. Kept inside, it stores
+        // as `** *c***`, which reads back with literal asterisks: the parser
+        // closes the bold at the first `**` of the `***`. Only this shape;
+        // moving spaces elsewhere makes others of that kind. A mark holding
+        // only spaces keeps them: those are its content.
+        const content = done.content;
+        const [first, second] = content;
+        if (
+          content.length === 2 &&
+          first.kind === 'text' &&
+          first.text.trim() === '' &&
+          (second.kind === 'bold' || second.kind === 'italic')
+        ) {
+          content.shift();
+          pushText(first.text);
+        }
+        target().push({ kind: done.kind, content });
       }
       return;
     }
@@ -237,10 +444,19 @@ export function htmlToMarkdown(html: string): string {
     }
 
     if (tk.t === 'text') {
-      const text = decodeEntities(tk.text);
-      // Collapse the incidental whitespace editors emit between tags, but keep
-      // a single space so words do not run together.
+      // A no-break space pastes as a space: nobody typed one, and a phone's
+      // copied text is full of them (see richDocToDisplayHtml).
+      const text = decodeEntities(tk.text).replace(/\u00A0/g, ' ');
       if (text.trim() === '') {
+        // Inside a mark, spaces are content: a phone editor hands back
+        // `<i> </i>` for an italic space, and dropping it left an empty mark
+        // between two words that then ran together.
+        if (marks.length > 0 && !/[\n\r]/.test(text)) {
+          pushText(text.replace(/\t/g, ' '));
+          continue;
+        }
+        // Elsewhere it is the whitespace editors put between tags: one space,
+        // so words do not run together, and none at the start of a block.
         if (/[ \t\n]/.test(text) && target().length) pushText(' ');
         continue;
       }
@@ -320,8 +536,13 @@ export function htmlToMarkdown(html: string): string {
     else if (n === 'i' || n === 'em') shutMark('italic');
     else if (n === 'a') closeMark('link');
     else if (n === 'li') {
+      // An item that closes empty is still an item: a phone hands back
+      // `<li></li>` for one, and dropping it moved every item after it up.
+      // Not when a nested list already ended it: Lexical wraps a nested list
+      // in an <li> of its own, which holds no item.
       const c = flushRun();
       if (c) listItems.push(c);
+      else if (inItem) listItems.push([]);
       inItem = false;
     } else if (n === 'ul' || n === 'ol') {
       if (inItem) {
