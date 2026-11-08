@@ -1053,8 +1053,10 @@ export const TUTORIALS = [
       {
         say: "That place is for admins: More, then Labels. Whatever you change here changes on every board.",
         do: async (t) => {
-          // A phone shows its tab bar on the tab roots alone.
+          // A phone shows its tab bar on the tab roots alone: back from the
+          // settings, the board and the card this film opened on.
           if (t.phone) {
+            await t.tap(t.btn('Back'));
             await t.tap(t.btn('Back'));
             await t.tap(t.btn('Back'));
           }
