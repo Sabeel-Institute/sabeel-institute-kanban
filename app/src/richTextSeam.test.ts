@@ -45,6 +45,16 @@ describe('the native text view', () => {
     expect(parser).toMatch(/private static Integer currentOrderedListItemIndex/);
   });
 
+  it('is patched so the Android editor hands back a link’s address entity-encoded', () => {
+    // Unpatched, toHtml wrote the address into the attribute as it was: a `"`
+    // in it ended the attribute, so a save from an Android phone stored a
+    // broken link, and `&amp;` in an address came back as `&`.
+    const parser = read('android/src/main/java/com/swmansion/enriched/common/parser/EnrichedParser.java');
+    expect(parser, 'patches/react-native-enriched-html+*.patch did not apply; run npm install').toMatch(
+      /out\.append\(TextUtils\.htmlEncode\(\(\(EnrichedLinkSpan\) style\[j\]\)\.getUrl\(\)\)\);/,
+    );
+  });
+
   it('still parses HTML on iOS the way richDocToDisplayHtml works around', () => {
     // Each of these is a workaround in packages/shared/src/richtextHtml.ts. When
     // one fails, upstream changed it: re-check that workaround on an iPhone.

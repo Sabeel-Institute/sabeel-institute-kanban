@@ -634,14 +634,20 @@ Re-record a film, and publish, whenever a screen it shows changes.
 ## Patched dependencies
 
 `patches/` holds `patch-package` patches, applied by the root `postinstall` on
-every `npm install` and `npm ci`. There is one, a single word in
-`react-native-enriched-html`'s Android parser: `fromHtml` becomes `synchronized`,
-because the parser keeps list state in static fields and a text view is parsed
-on two threads at once. `app/src/richTextSeam.test.ts` fails if it did not apply.
+every `npm install` and `npm ci`. There is one, two changes to
+`react-native-enriched-html`'s Android parser, and `app/src/richTextSeam.test.ts`
+fails if either did not apply:
+
+- `fromHtml` becomes `synchronized`, because the parser keeps list state in
+  static fields and a text view is parsed on two threads at once.
+- `toHtml` entity-encodes a link's address. Unpatched, a `"` in it ended the
+  attribute, so a save from an Android phone stored a broken link, and `&amp;`
+  in an address came back as `&`.
 
 When the library moves, `npm install` reports a patch that no longer applies. Read
-the new parser first: if its list state is no longer static, delete the patch and
-the test's second assertion; otherwise regenerate it with
+the new parser first: if its list state is no longer static, drop that change and
+the test's assertion about the reason; if `toHtml` now escapes the address, drop
+that one. Regenerate what is left with
 `npx patch-package react-native-enriched-html`. Either way, re-run the cold-start
 check on the emulator, since a warm re-open can look right with the bug intact.
 
