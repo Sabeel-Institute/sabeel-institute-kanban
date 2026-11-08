@@ -254,6 +254,11 @@ it.
   The parser's known gap is a mark that ends in, or an italic that starts with,
   the other mark: `**x *y***` reads back with literal asterisks. It predates
   the phone editors and is left until emphasis is parsed by delimiter runs.
+- **Whether a phone shows and saves what the web does is measured, not
+  assumed.** `node scripts/richtext-conformance.mjs` runs seeded documents
+  through Node ports of the library's two HTML parsers; run it whenever
+  `react-native-enriched-html` or `packages/shared/src/richtext*.ts` changes
+  (`docs/DEV-TOOLING.md`, "Rich text on the phones").
 - **Autolinking of bare URLs is RENDER-TIME ONLY.** Storage keeps exactly what
   was typed. If either editor rewrote a bare URL, the same keystrokes would store
   different bytes on a phone than in a browser — which is why `linkRegex={null}`
