@@ -74,3 +74,41 @@ describe('the native text view', () => {
     expect(spec).toMatch(/onLinkPress\?:/);
   });
 });
+
+/**
+ * OUR SIDE OF THE SEAM: the components that hand the library what
+ * packages/shared prepared for it. The converters are tested in shared; these
+ * fail if a component stops calling them, which no browser suite can see
+ * because the web draws and edits through other files. The Native workflow's
+ * `maestro/board.yaml` is the device check.
+ */
+describe('the phone components', () => {
+  const src = (rel: string) =>
+    readFileSync(resolve(import.meta.dirname, 'components', rel), 'utf8').replace(/\s+/g, ' ');
+
+  it('decode an address on iOS before opening it, and only there', () => {
+    // iOS hands the href back as written in the HTML, `&amp;` and all;
+    // Android decodes it already, and decoding twice changes the address.
+    const view = src('RichDocView.tsx');
+    expect(view).toMatch(/const href = Platform\.OS === 'ios' \? decodeDisplayHref\(url\) : url;/);
+    expect(view).toMatch(/Linking\.openURL\(href\)/);
+    expect(view).toMatch(/onLinkPress=\{openLink\}/);
+  });
+
+  it('draw the display HTML in one selectable view, straight to the parser', () => {
+    const view = src('RichDocView.tsx');
+    expect(view).toMatch(/<EnrichedText selectable useHtmlNormalizer=\{false\}/);
+    expect(view).toMatch(/\{richDocToDisplayHtml\(doc\)\} <\/EnrichedText>/);
+  });
+
+  it('open the phone editor on a paragraph per line, never a <br> inside one', () => {
+    // markdownToHtml's `line<br>line` opened as one line on an iPhone, and saved so.
+    const editor = src('RichEditor.tsx');
+    expect(editor).toMatch(/initialHtml\.current = `<html>\$\{markdownToPhoneEditorHtml\(initialMarkdown\)\}<\/html>`;/);
+    expect(editor).toMatch(/defaultValue=\{initialHtml\.current\}/);
+    const imported = editor.match(/import \{([^}]*)\} from '@sabeel\/shared'/)?.[1] ?? '';
+    expect(imported).toMatch(/\bmarkdownToPhoneEditorHtml\b/);
+    expect(imported).not.toMatch(/\bmarkdownToHtml\b/);
+    expect(editor).toMatch(/onChangeHtml=\{\(e\) => onChangeMarkdown\(htmlToMarkdown\(e\.nativeEvent\.value\)\)\}/);
+  });
+});
