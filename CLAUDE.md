@@ -244,12 +244,16 @@ it.
   toolbar. Nobody types syntax — that was the whole objection to markdown in
   2026-07-20 and it still stands.
 - **ESCAPING IS THE CORRECTNESS CORE, not a detail.** The escape set is exactly
-  the parse set: `\`, `*`, `[` and a line-leading `-`/`+`/`N.`. Deliberately NOT
+  the parse set: `\`, `*`, `[`, a `]` inside a link's words (the one place the
+  parser reads one) and a line-leading `-`/`+`/`N.`. Deliberately NOT
   `_`, backtick or `~` — outside the vocabulary, so escaping them would store
   `snake\_case\_name`, noise in a field a backfill script will one day read. The
   hand-written list is **not** the correctness criterion; the criterion is
-  `parseRich(serializeRich(doc))` equalling `doc`, enforced by seeded fuzz. Add a
-  character to one list and you must add it to the other.
+  `parseRich(serializeRich(doc))` keeping every word and link of `doc`, enforced
+  by seeded fuzz. Add a character to one list and you must add it to the other.
+  The parser's known gap is a mark that ends in, or an italic that starts with,
+  the other mark: `**x *y***` reads back with literal asterisks. It predates
+  the phone editors and is left until emphasis is parsed by delimiter runs.
 - **Autolinking of bare URLs is RENDER-TIME ONLY.** Storage keeps exactly what
   was typed. If either editor rewrote a bare URL, the same keystrokes would store
   different bytes on a phone than in a browser — which is why `linkRegex={null}`

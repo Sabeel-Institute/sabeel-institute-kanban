@@ -156,6 +156,25 @@ describe('toPlainText', () => {
   });
 });
 
+describe('a link whose words hold a ]', () => {
+  const link = (content: RichInline[]): RichDoc => [
+    { kind: 'paragraph', content: [{ kind: 'link', href: 'https://e.org', content }] },
+  ];
+  it('keeps the link and every word', () => {
+    for (const text of [']', 'a]b', '[draft]', 'a]](', 'x\\', 'x\\]']) {
+      const doc = link([{ kind: 'text', text }]);
+      expect(parseRich(serializeRich(doc)), text).toEqual(doc);
+    }
+  });
+  it('inside a mark inside the link too', () => {
+    const doc = link([{ kind: 'bold', content: [{ kind: 'text', text: 'v]2' }] }]);
+    expect(parseRich(serializeRich(doc))).toEqual(doc);
+  });
+  it('escapes ] only in a link: elsewhere it means nothing', () => {
+    expect(round('a ] b')).toBe('a ] b');
+  });
+});
+
 describe('empty documents', () => {
   it('serialize to exactly the empty string', () => {
     // rules require body.size() > 0, addComment early-returns on an empty trim,
@@ -223,6 +242,51 @@ describe('round trip under fuzz', () => {
       checked += 1;
     }
     // An assertion that can pass on empty input is not an assertion.
+    expect(checked).toBe(400);
+  });
+
+  /**
+   * The words and the links a reader sees, marks aside: bold-in-italic and
+   * italic-in-bold are one canonical nesting, so marks are compared above, over
+   * the canonical form. Link boundaries and targets are part of it.
+   */
+  const seen = (doc: RichDoc): string[] => {
+    const flat = (ns: RichInline[]): string =>
+      ns
+        .map((n) =>
+          n.kind === 'text' ? n.text : n.kind === 'link' ? `<${n.href}|${flat(n.content)}>` : flat(n.content),
+        )
+        .join('');
+    return doc.flatMap((b) => (b.kind === 'paragraph' ? [flat(b.content)] : b.items.map(flat)));
+  };
+
+  // A mark inside the same mark is left out: no editor produces one (the HTML
+  // seam collapses them), and `****x****` is not emphasis in any markdown.
+  const genDistinct = (rnd: () => number, open: string[] = []): RichInline => {
+    const r = rnd();
+    if (open.length >= 2 || r < 0.55) return { kind: 'text', text: WORDS[Math.floor(rnd() * WORDS.length)] };
+    const kind = r < 0.7 ? 'bold' : r < 0.85 ? 'italic' : 'link';
+    if (open.includes(kind)) return { kind: 'text', text: WORDS[Math.floor(rnd() * WORDS.length)] };
+    const content = [genDistinct(rnd, [...open, kind])];
+    return kind === 'link' ? { kind, href: 'https://x.test/a(b)', content } : { kind, content };
+  };
+
+  it('keeps every word and link of the document it was given, for 400 seeded documents', () => {
+    let checked = 0;
+    for (let seed = 1; seed <= 400; seed += 1) {
+      const rnd = mulberry(seed);
+      const blocks: RichDoc = [];
+      const n = 1 + Math.floor(rnd() * 3);
+      for (let b = 0; b < n; b += 1) {
+        const r = rnd();
+        if (r < 0.6) blocks.push({ kind: 'paragraph', content: [genDistinct(rnd), genDistinct(rnd)] });
+        else if (r < 0.8) blocks.push({ kind: 'bullets', items: [[genDistinct(rnd)], [genDistinct(rnd)]] });
+        else blocks.push({ kind: 'numbers', items: [[genDistinct(rnd)], [genDistinct(rnd)]] });
+      }
+      const md = serializeRich(blocks);
+      expect(seen(parseRich(md)), `seed ${seed}: ${JSON.stringify(md)}`).toEqual(seen(blocks));
+      checked += 1;
+    }
     expect(checked).toBe(400);
   });
 });

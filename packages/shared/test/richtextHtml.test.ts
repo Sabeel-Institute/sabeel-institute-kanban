@@ -505,3 +505,73 @@ describe('the HTML a phone editor opens with', () => {
   });
 });
 
+
+/**
+ * What a phone editor hands back, saved without anyone touching it. Each case
+ * is a shape scripts/richtext-conformance.mjs found the native editors return
+ * for a document the web stored, and each lost words, links or items.
+ */
+describe('what a phone editor hands back', () => {
+  it('keeps a space that is all a mark holds', () => {
+    // A dropped space left an empty mark, stored as stray asterisks between
+    // two words that then ran together.
+    expect(htmlToMarkdown('<html><p>a<i> </i>b</p></html>')).toBe('a* *b');
+    expect(htmlToMarkdown('<html><p>see<a href="https://e.org"> </a>here</p></html>')).toBe(
+      'see[ ](https://e.org)here',
+    );
+    expect(normalizeMarkdown(htmlToMarkdown(markdownToPhoneEditorHtml('a* *b')))).toBe('a* *b');
+  });
+
+  it('sets the space outside a mark that holds a space and then one other mark', () => {
+    // Inside, it stores as `** *c***`, which reads back with literal asterisks.
+    expect(htmlToMarkdown('<html><p>a<b> <i>c</i></b></p></html>')).toBe('a ***c***');
+    // Only that shape: anything else keeps its spaces where they were.
+    expect(htmlToMarkdown('<html><p><b> <i>c</i>d</b></p></html>')).toBe('** *c*d**');
+    expect(htmlToMarkdown('<html><p><b>l<i>x</i> </b></p></html>')).toBe('**l*x* **');
+    expect(htmlToMarkdown('<html><p>a<b> <a href="https://e.org">x</a></b></p></html>')).toBe(
+      'a** [x](https://e.org)**',
+    );
+  });
+
+  it('saves a tab inside a mark as a space', () => {
+    expect(htmlToMarkdown('<html><p>a<b>\t</b>b</p></html>')).toBe('a** **b');
+  });
+
+  it('still reads whitespace between tags as at most one space', () => {
+    expect(htmlToMarkdown('<p><b>a</b>\n  <i>b</i></p>')).toBe('**a** *b*');
+    expect(htmlToMarkdown('<ul>\n  <li>one</li>\n  <li>two</li>\n</ul>')).toBe('- one\n- two');
+    // Inside a mark too, when it spans lines: that is layout, not a space.
+    expect(htmlToMarkdown('<p><b>\n  <i>x</i></b></p>')).toBe('***x***');
+  });
+
+  it('writes nothing for a mark with nothing in it', () => {
+    expect(htmlToMarkdown('<html><p>a<b></b>b</p></html>')).toBe('ab');
+    expect(htmlToMarkdown('<html><p>a<b><i></i></b>b</p></html>')).toBe('ab');
+    expect(
+      serializeRich([
+        {
+          kind: 'paragraph',
+          content: [
+            { kind: 'text', text: 'a' },
+            { kind: 'bold', content: [] },
+            { kind: 'italic', content: [{ kind: 'bold', content: [] }] },
+            { kind: 'text', text: 'b' },
+          ],
+        },
+      ]),
+    ).toBe('ab');
+  });
+
+  it('keeps an empty list item', () => {
+    expect(htmlToMarkdown('<html><ul><li>a</li><li></li><li>b</li></ul></html>')).toBe('- a\n- \n- b');
+    expect(htmlToMarkdown('<html><ol><li></li></ol><p>after</p></html>')).toBe('1. \n\nafter');
+    expect(normalizeMarkdown(htmlToMarkdown(markdownToPhoneEditorHtml('- a\n- \n- b')))).toBe('- a\n- \n- b');
+  });
+
+  it('still makes no item of a list nested inside an item', () => {
+    // Lexical wraps a nested list in an <li> of its own.
+    expect(
+      htmlToMarkdown('<ul><li>a</li><li><ul><li>b</li></ul></li><li>c</li></ul>'),
+    ).toBe('- a\n- b\n- c');
+  });
+});

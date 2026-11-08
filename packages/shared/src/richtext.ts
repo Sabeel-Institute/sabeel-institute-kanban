@@ -20,7 +20,8 @@
  *    contract the tests assert.
  *
  * 2. **The escape set equals the parse set.** We escape exactly what we
- *    interpret — `\`, `*`, `[`, and a line-leading `-`/`+`/`N.` — and nothing
+ *    interpret — `\`, `*`, `[`, a `]` inside a link's words (the one place a
+ *    `]` means something), and a line-leading `-`/`+`/`N.` — and nothing
  *    more. NOT `_`, backtick or `~`: those are not part of the vocabulary, so
  *    escaping them would store `snake\_case\_name`, which is noise in a field a
  *    backfill script or a raw-field glance will one day read.
@@ -95,9 +96,13 @@ const ESCAPABLE = new Set([
   '\\', '*', '[', ']', '(', ')', '-', '+', '.', '_', '`', '~', '#', '>',
 ]);
 
-/** What we emit escapes for. See the header: the escape set is the parse set. */
-function escapeText(text: string): string {
-  const inline = text.replace(/([\\*[])/g, '\\$1');
+/**
+ * What we emit escapes for. See the header: the escape set is the parse set.
+ * `inLink` is whether this text is part of a link's words, where the parser
+ * ends the words at the first unescaped `]`.
+ */
+function escapeText(text: string, inLink: boolean): string {
+  const inline = text.replace(inLink ? /([\\*[\]])/g : /([\\*[])/g, '\\$1');
   // A line that BEGINS with a list marker would re-parse as a list, so the
   // marker is escaped at the start of every line, not just the first.
   return inline
@@ -264,20 +269,27 @@ export function parseInline(source: string): RichInline[] {
   return out;
 }
 
-export function serializeInline(nodes: RichInline[]): string {
+export function serializeInline(nodes: RichInline[], inLink = false): string {
+  // A mark with nothing in it writes nothing: `****` reads back as four
+  // literal asterisks, so an empty bold an editor handed us would be stored as
+  // visible characters.
+  const mark = (fence: string, content: RichInline[]) => {
+    const inner = serializeInline(content, inLink);
+    return inner ? `${fence}${inner}${fence}` : '';
+  };
   return nodes
     .map((n) => {
       switch (n.kind) {
         case 'text':
-          return escapeText(n.text);
+          return escapeText(n.text, inLink);
         case 'bold':
-          return `**${serializeInline(n.content)}**`;
+          return mark('**', n.content);
         case 'italic':
-          return `*${serializeInline(n.content)}*`;
+          return mark('*', n.content);
         case 'link':
           // A URL may legitimately contain ')' — escape it, or the next
           // parse truncates the href at the first paren.
-          return `[${serializeInline(n.content)}](${escapeHref(n.href)})`;
+          return `[${serializeInline(n.content, true)}](${escapeHref(n.href)})`;
       }
     })
     .join('');

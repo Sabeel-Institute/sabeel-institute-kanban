@@ -385,7 +385,24 @@ export function htmlToMarkdown(html: string): string {
           arr.push(...done.content);
         }
       } else {
-        arr.push({ kind: done.kind, content: done.content });
+        // A mark holding a space and then one other mark: the space goes
+        // outside, so the two nest whole as `***c***`. Kept inside, it stores
+        // as `** *c***`, which reads back with literal asterisks: the parser
+        // closes the bold at the first `**` of the `***`. Only this shape;
+        // moving spaces elsewhere makes others of that kind. A mark holding
+        // only spaces keeps them: those are its content.
+        const content = done.content;
+        const [first, second] = content;
+        if (
+          content.length === 2 &&
+          first.kind === 'text' &&
+          first.text.trim() === '' &&
+          (second.kind === 'bold' || second.kind === 'italic')
+        ) {
+          content.shift();
+          pushText(first.text);
+        }
+        target().push({ kind: done.kind, content });
       }
       return;
     }
@@ -430,9 +447,16 @@ export function htmlToMarkdown(html: string): string {
       // A no-break space pastes as a space: nobody typed one, and a phone's
       // copied text is full of them (see richDocToDisplayHtml).
       const text = decodeEntities(tk.text).replace(/\u00A0/g, ' ');
-      // Collapse the incidental whitespace editors emit between tags, but keep
-      // a single space so words do not run together.
       if (text.trim() === '') {
+        // Inside a mark, spaces are content: a phone editor hands back
+        // `<i> </i>` for an italic space, and dropping it left an empty mark
+        // between two words that then ran together.
+        if (marks.length > 0 && !/[\n\r]/.test(text)) {
+          pushText(text.replace(/\t/g, ' '));
+          continue;
+        }
+        // Elsewhere it is the whitespace editors put between tags: one space,
+        // so words do not run together, and none at the start of a block.
         if (/[ \t\n]/.test(text) && target().length) pushText(' ');
         continue;
       }
@@ -512,8 +536,13 @@ export function htmlToMarkdown(html: string): string {
     else if (n === 'i' || n === 'em') shutMark('italic');
     else if (n === 'a') closeMark('link');
     else if (n === 'li') {
+      // An item that closes empty is still an item: a phone hands back
+      // `<li></li>` for one, and dropping it moved every item after it up.
+      // Not when a nested list already ended it: Lexical wraps a nested list
+      // in an <li> of its own, which holds no item.
       const c = flushRun();
       if (c) listItems.push(c);
+      else if (inItem) listItems.push([]);
       inItem = false;
     } else if (n === 'ul' || n === 'ol') {
       if (inItem) {
