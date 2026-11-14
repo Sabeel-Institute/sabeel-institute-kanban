@@ -14,15 +14,18 @@ export function NewCardBell({
   on,
   onToggle,
   label = 'Subscribe to this card',
+  disabled,
 }: {
   on: boolean;
   onToggle: () => void;
   label?: string;
+  disabled?: boolean;
 }) {
   return (
     <IconAction
       icon={on ? 'notifications-active' : 'notifications-none'}
       label={label}
+      disabled={disabled}
       selected={on}
       accent={on}
       onPress={onToggle}

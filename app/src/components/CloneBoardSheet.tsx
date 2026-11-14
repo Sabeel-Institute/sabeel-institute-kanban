@@ -20,6 +20,10 @@ import { Body, Button, Hint, Row, TextField } from './ui';
  * The bell subscribes the cloner to every cloned card, as a new card's bell
  * does to one, but starts OFF (Faisal, 2026-11-14): a template can hold
  * hundreds of cards, and each would tell them of every change made to it.
+ * It holds still once Clone has been pressed. A try whose answer was lost may
+ * have made the clone, and a retry returns that board as it was made: a name
+ * changed since is put right afterwards (`BoardsScreen`), but who follows its
+ * cards is not, so the bell must not show a choice the clone did not get.
  */
 export function CloneBoardSheet({
   boardName,
@@ -37,7 +41,13 @@ export function CloneBoardSheet({
 }) {
   const [name, setName] = useState(boardName);
   const [subscribe, setSubscribe] = useState(false);
+  // Pressed once in this offer: the bell holds from here (above).
+  const [tried, setTried] = useState(false);
   const ready = name.trim().length > 0 && name.trim() !== boardName.trim() && !busy;
+  const clone = () => {
+    setTried(true);
+    onClone(name, subscribe);
+  };
   return (
     <Sheet visible title={`Clone ${boardName}`} onClose={onClose} busy={busy}>
       <TextField
@@ -51,18 +61,17 @@ export function CloneBoardSheet({
         // Return as well as the button, and `ready` holds both while a clone is
         // on its way: a second Return would make a second clone.
         onSubmit={() => {
-          if (ready) onClone(name, subscribe);
+          if (ready) clone();
         }}
       />
-      {/* Clone right under the field, the explanation after it: on Android the
-          keyboard does not push a sheet up (edge-to-edge leaves the dialog
-          window unresized), so whatever sits low in it is under the keys. */}
+      {/* Clone right under the field it acts on, the explanation after it. */}
       <Row>
-        <Button label="Clone" busy={busy} disabled={!ready} onPress={() => onClone(name, subscribe)} />
+        <Button label="Clone" busy={busy} disabled={!ready} onPress={clone} />
         <NewCardBell
           on={subscribe}
           onToggle={() => setSubscribe((on) => !on)}
           label="Subscribe to every card"
+          disabled={tried}
         />
       </Row>
       {error ? <Body>{error}</Body> : null}

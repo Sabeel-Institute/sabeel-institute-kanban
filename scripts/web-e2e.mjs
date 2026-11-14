@@ -3040,12 +3040,21 @@ try {
     await tmplRow.click({ delay: 900 });
     await cloneName.waitFor({ timeout: 15000 });
     await cloneName.fill('Summer Program');
+    const bellFree = (await cloneBell.getAttribute('aria-disabled')) !== 'true';
     await cloneButton.click();
     const lostSaid = await admin
       .getByText('Cannot reach the server', { exact: false })
       .first()
       .waitFor({ timeout: 30000 })
       .then(() => true, () => false);
+    // The lost try may have made the clone, and a retry returns it as made:
+    // the bell holds still so it cannot show a choice the clone did not get.
+    const bellHeld = (await cloneBell.getAttribute('aria-disabled')) === 'true';
+    check(
+      'once Clone is pressed, the bell holds for the rest of that offer',
+      bellFree && lostSaid && bellHeld,
+      JSON.stringify({ bellFree, lostSaid, bellHeld }),
+    );
     await cloneName.fill('Summer Camp');
     await cloneButton.click();
     const openedRenamed = await admin

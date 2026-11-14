@@ -829,6 +829,10 @@ export const TUTORIALS = [
         do: (t) => t.highlight(t.text(/^The clone gets/, false)),
       },
       {
+        say: "If you'd like to hear about everything that happens on those cards, turn on the bell first. It starts off, because a big template would tell you about every change.",
+        do: (t) => t.highlight(t.btn('Subscribe to every card')),
+      },
+      {
         say: "Tap Clone, and your new board opens. You're its only member for now, so add the people who'll work on it in its settings.",
         do: async (t) => {
           await t.tap(t.btn('Clone'));

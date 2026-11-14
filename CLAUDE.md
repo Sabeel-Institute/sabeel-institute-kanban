@@ -172,7 +172,9 @@ disabling the account is the block, by decision.
   arm so the cross-board query needs no per-row board lookup — so it carries
   every constraint `assigneeUids` does: members only, cleared by
   `removeBoardMember` and filtered on a cross-board move. A copy carries only
-  the person who made it, like any new card.
+  the person who made it, like any new card. A clone's cards carry the cloner
+  only if the Clone sheet's bell is on, and it starts OFF (Faisal, 2026-11-14):
+  a template can hold hundreds of cards.
 - **Labels come in two scopes, and `boardId` is the whole difference** (Faisal,
   2026-11-07, after the org-wide set of 2026-07-27). One `labels/{id}`
   collection. A label with no `boardId` is an **institute label**: on every

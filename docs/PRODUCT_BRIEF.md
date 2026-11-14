@@ -631,7 +631,9 @@ and opens when it lands.
   one, which nobody could delete. The answer names the board as it was made;
   when the person changed the name before trying again, the app renames it to
   the name of the try it is waiting on. Only the latest try's answer is acted
-  on, so a late answer to an earlier one cannot undo that.
+  on, so a late answer to an earlier one cannot undo that. Who follows the
+  cards is not put right the same way, so the bell holds still once Clone has
+  been pressed: it cannot show a choice the clone did not get.
 - **The clone opens where it was asked for.** If the person has gone elsewhere
   while it was on its way (a notification tapped over the sheet), the clone
   waits in the boards list rather than being pushed on top of where they went.
