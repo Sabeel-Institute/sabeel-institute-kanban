@@ -130,8 +130,15 @@ name: Board, card, rich text and gestures
       - longPressOn: "Two things before we book:[\\s\\S]*"
       - tapOn: "Select all"
       - takeScreenshot: 05-select-all
-      # Clears the selection without opening anything: a heading.
-      - tapOn: "Comments \\(\\d+\\)"
+      # Clears the selection, and makes sure it has gone. A tap on the selected
+      # text collapses it; a tap on a heading does not. The action bar it
+      # leaves floats over the comment, which is centred, so it sits where
+      # every swipe below starts, and a swipe that lands on it scrolls nothing.
+      - retry:
+          maxRetries: 2
+          commands:
+            - tapOn: "Two things before we book:[\\s\\S]*"
+            - assertNotVisible: "Copy"
 - scrollUntilVisible:
     element: "Back"
     direction: UP
