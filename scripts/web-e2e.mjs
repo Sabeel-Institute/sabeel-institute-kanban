@@ -2872,7 +2872,7 @@ try {
       const b = boards.docs[0];
       const cards = (await db.collection('cards').where('boardId', '==', b.id).get()).docs.map((d) => ({ id: d.id, ...d.data() }));
       const template = (await db.collection('cards').where('boardId', '==', ${JSON.stringify(tmpl.id)}).get()).docs.map((d) => d.data());
-      console.log(JSON.stringify({ count: boards.size, board: b.data(), cards, template }));
+      console.log(JSON.stringify({ count: boards.size, id: b.id, board: b.data(), cards, template }));
     `);
     const byTitle = Object.fromEntries(cloned.cards.map((c) => [c.title, c]));
     const cols = Object.fromEntries(cloned.board.columns.map((c) => [c.name, c.id]));
@@ -2912,6 +2912,53 @@ try {
       cloned.template.length === 4 &&
         cloned.template.every((c) => c.dueDate === '2026-12-01' && c.assigneeUids.length === 1),
     );
+    // The server wrote the clone; firestore.rules judge every edit after it. A
+    // card added to the clone, a cloned card changed (the server stamped it
+    // SYSTEM_ACTOR) and the clone renamed must each land as on a board made in
+    // the app, and only the database says whether the rules let them through:
+    // a refused write shows on screen until the cache gives it back.
+    await admin.getByRole('button', { name: '+ Add card' }).first().click();
+    const addInput = admin.getByPlaceholder('Card title');
+    await addInput.waitFor({ timeout: 10000 });
+    await addInput.click();
+    await addInput.pressSequentially('Order the flowers', { delay: 10 });
+    await addInput.press('Enter');
+    await admin.getByText('Order the flowers').waitFor({ timeout: 20000 });
+    await admin.locator('[data-testid="card-Send thank-yous"]').first().click();
+    await admin.getByRole('button', { name: 'Share card' }).waitFor({ timeout: 20000 });
+    await admin.getByRole('button', { name: 'Priority Low' }).click();
+    await admin.getByRole('button', { name: 'Back' }).first().click();
+    await admin.getByRole('button', { name: 'Board settings' }).click();
+    const cloneNameBox = admin.getByPlaceholder('Board name');
+    await cloneNameBox.waitFor({ timeout: 15000 });
+    await cloneNameBox.fill('Spring Program 2027');
+    await admin.getByRole('button', { name: 'Save name' }).click();
+    const edited = await adminJson(`
+      const id = ${JSON.stringify(cloned.id)};
+      let seen = {};
+      for (let i = 0; i < 40; i += 1) {
+        const board = (await db.doc('boards/' + id).get()).data();
+        const cards = (await db.collection('cards').where('boardId', '==', id).get()).docs.map((d) => d.data());
+        const thanks = cards.find((c) => c.title === 'Send thank-yous');
+        seen = {
+          name: board.name,
+          added: cards.some((c) => c.title === 'Order the flowers'),
+          priority: thanks?.priority,
+          by: thanks?.updatedBy === ${JSON.stringify(tmpl.me)},
+        };
+        if (seen.name === 'Spring Program 2027' && seen.added && seen.priority === 'low' && seen.by) break;
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      console.log(JSON.stringify(seen));
+    `);
+    check(
+      'the clone takes a new card, a change to a cloned card and a new name, through the rules',
+      edited.name === 'Spring Program 2027' && edited.added && edited.priority === 'low' && edited.by,
+      JSON.stringify(edited),
+    );
+    await admin.getByRole('button', { name: 'Back' }).first().click();
+    await admin.getByRole('button', { name: '+ Add card' }).first().waitFor({ timeout: 15000 });
+
     // Back from the clone goes to the boards list, where it was cloned from.
     await admin.getByRole('button', { name: 'Back' }).first().click();
     check(
@@ -2921,6 +2968,100 @@ try {
         .waitFor({ timeout: 15000 })
         .then(() => true, () => false),
     );
+
+    // A clone that lands after the person has gone elsewhere leaves them there.
+    // Its sheet holds every exit of its own, but not a notification: one tapped
+    // while the clone is on its way opens what it names, and the clone,
+    // arriving after, must not be pushed on top of it. The tap is played the
+    // way the service worker delivers it to an open tab.
+    let releaseLate;
+    const lateHeld = new Promise((r) => (releaseLate = r));
+    await admin.route('**/cloneBoard', async (route) => {
+      await lateHeld;
+      await route.continue();
+    });
+    await tmplRow.click({ delay: 900 });
+    await cloneName.waitFor({ timeout: 15000 });
+    await cloneName.fill('Autumn Program');
+    const lateAsked = admin.waitForRequest('**/cloneBoard', { timeout: 15000 });
+    await cloneButton.click();
+    await lateAsked;
+    await admin.evaluate((boardId) => {
+      navigator.serviceWorker.dispatchEvent(
+        new MessageEvent('message', { data: { type: 'push-open', data: { boardId } } }),
+      );
+    }, tmpl.id);
+    const onTemplate = async () =>
+      (await admin.getByRole('button', { name: '+ Add card' }).first().isVisible().catch(() => false)) &&
+      (await admin.getByText('Program Template', { exact: true }).first().isVisible().catch(() => false)) &&
+      !(await admin.getByText('Autumn Program', { exact: true }).first().isVisible().catch(() => false));
+    await admin.getByRole('button', { name: '+ Add card' }).first().waitFor({ timeout: 15000 }).catch(() => {});
+    const wentThere = await onTemplate();
+    const lateAnswered = admin.waitForResponse('**/cloneBoard', { timeout: 30000 });
+    releaseLate();
+    const answer = await lateAnswered.then((r) => r.status(), () => 0);
+    // The answer reaches the screen within a frame or two; a push would show
+    // the clone's name in the header.
+    await admin.waitForTimeout(1500);
+    const stayed = await onTemplate();
+    await admin.unroute('**/cloneBoard');
+    const late = await adminJson(`
+      const boards = await db.collection('boards').where('name', '==', 'Autumn Program').get();
+      console.log(JSON.stringify({ count: boards.size }));
+    `);
+    check(
+      'a clone that lands after a notification took the person elsewhere is made, and leaves them there',
+      wentThere && answer === 200 && late.count === 1 && stayed,
+      JSON.stringify({ wentThere, answer, made: late.count, stayed }),
+    );
+    await backToBoards(admin);
+
+    // A clone whose answer was lost, tried again under a name changed since, is
+    // one board under the new name. The first try reaches the server, which
+    // makes the clone, and its answer is cut on the way back; the sheet says
+    // the server could not be reached, the name is changed, and the second try
+    // finds the board the first one made.
+    await admin.route(
+      '**/cloneBoard',
+      async (route) => {
+        await route.fetch();
+        await route.abort('failed');
+      },
+      { times: 1 },
+    );
+    await tmplRow.click({ delay: 900 });
+    await cloneName.waitFor({ timeout: 15000 });
+    await cloneName.fill('Summer Program');
+    await cloneButton.click();
+    const lostSaid = await admin
+      .getByText('Cannot reach the server', { exact: false })
+      .first()
+      .waitFor({ timeout: 30000 })
+      .then(() => true, () => false);
+    await cloneName.fill('Summer Camp');
+    await cloneButton.click();
+    const openedRenamed = await admin
+      .getByRole('button', { name: '+ Add card' })
+      .first()
+      .waitFor({ timeout: 30000 })
+      .then(() => admin.getByText('Summer Camp', { exact: true }).first().waitFor({ timeout: 15000 }))
+      .then(() => true, () => false);
+    const summer = await adminJson(`
+      let seen = {};
+      for (let i = 0; i < 40; i += 1) {
+        const named = async (n) => (await db.collection('boards').where('name', '==', n).get()).size;
+        seen = { camp: await named('Summer Camp'), program: await named('Summer Program') };
+        if (seen.camp === 1 && seen.program === 0) break;
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      console.log(JSON.stringify(seen));
+    `);
+    check(
+      'a clone tried again under a new name after its answer was lost is one board, under the new name',
+      lostSaid && openedRenamed && summer.camp === 1 && summer.program === 0,
+      JSON.stringify({ lostSaid, openedRenamed, ...summer }),
+    );
+    await backToBoards(admin);
   }
 
   // ---- Archived boards can be found and restored (Phase 2) ---------------

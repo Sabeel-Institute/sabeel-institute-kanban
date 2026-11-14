@@ -46,6 +46,7 @@ import type { SessionUser } from '../../session';
 import { useNav } from '../../nav';
 import { useListenerError } from '../../liveQuery';
 import { useLabels } from '../../labels';
+import { toUserMessage } from '../../errors';
 import { getTheme, radius, space, type Theme } from '../../theme';
 
 type DragState = { cardId: string; fromColumnId: string } | null;
@@ -340,7 +341,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         // Background tidy-up; never blocks the user.
         void rerankColumnIfNeeded(target).catch(() => {});
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(toUserMessage(e, 'moveCard'));
       }
     },
     [drag, cards.data, byColumn, user, autoScroll],
@@ -360,7 +361,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         subscribe,
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(toUserMessage(e, 'createCard'));
     }
   }
 
@@ -380,7 +381,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
    * contract locally rather than growing a second error channel.
    */
   function runReporting(fn: () => Promise<unknown>) {
-    void fn().catch((e) => setError(e instanceof Error ? e.message : String(e)));
+    void fn().catch((e: unknown) => setError(toUserMessage(e, 'board')));
   }
 
   /**

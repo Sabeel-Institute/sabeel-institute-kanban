@@ -150,7 +150,7 @@ describe('cloneBoard: the clone', () => {
   beforeAll(async () => {
     const res = await callFunction('cloneBoard', { boardId: 'cb_tmpl', name: ' Spring Program ', cloneId }, await idTokenFor(ORG));
     expect(res.body.error).toBeUndefined();
-    expect(res.body.result).toEqual({ boardId: cloneId });
+    expect(res.body.result).toEqual({ boardId: cloneId, name: 'Spring Program' });
   });
 
   it('is a new board, the cloner its only member and owner, with the template’s columns', async () => {
@@ -247,7 +247,11 @@ describe('cloneBoard: the clone', () => {
 
   it('asked again with the same id, answers with the same clone and makes no second', async () => {
     const again = await callFunction('cloneBoard', { boardId: 'cb_tmpl', name: 'Spring Program', cloneId }, await idTokenFor(ORG));
-    expect(again.body.result).toEqual({ boardId: cloneId });
+    expect(again.body.result).toEqual({ boardId: cloneId, name: 'Spring Program' });
+    // Asked again under a name changed since: the answer names the board as
+    // the earlier try made it, which is how the app knows to rename it.
+    const renamed = await callFunction('cloneBoard', { boardId: 'cb_tmpl', name: 'Spring Retreat', cloneId }, await idTokenFor(ORG));
+    expect(renamed.body.result).toEqual({ boardId: cloneId, name: 'Spring Program' });
     expect(await cloneCards()).toHaveLength(4);
     expect((await adminDb().collection('boards').where('name', '==', 'Spring Program').get()).size).toBe(1);
     // Someone else cannot take that id over.

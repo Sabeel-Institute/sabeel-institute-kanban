@@ -396,8 +396,10 @@ export const addBoardMember = onCall({ secrets: [sentryDsn] }, guarded(async (re
  * card against its board as it was before the write, so a client cannot create
  * a board and its cards in one batch, and a clone made in several writes could
  * stop half-made. Here the board, every card and every card's first history
- * line are ONE transaction, which also holds still what it read: a label
- * deleted meanwhile cannot leave its id on a cloned card.
+ * line are ONE transaction. It holds what it read only until it commits:
+ * `deleteLabel` sweeps cards outside any transaction, so a label deleted while
+ * a clone is made can stay on a cloned card as an id nothing shows, the same
+ * accepted residual as someone adding a label while it is deleted.
  *
  * The CALLER names the new board's id, chosen when the clone is offered. A
  * retry after a clone that landed but whose answer was lost — a phone dropping
@@ -440,14 +442,14 @@ export const cloneBoard = onCall({ secrets: [sentryDsn] }, guarded(async (reques
   const now = Date.now();
   const me = await db.doc(`users/${actor.uid}`).get();
 
-  const made = await db.runTransaction(async (tx) => {
+  const landed = await db.runTransaction(async (tx) => {
     const [source, already] = await Promise.all([tx.get(db.doc(`boards/${boardId}`)), tx.get(cloneRef)]);
     if (already.exists) {
       // The same clone asked for again: its answer was lost on the way back.
       if (already.data()?.createdBy !== actor.uid) {
         throw new HttpsError('already-exists', 'That board already exists.');
       }
-      return null;
+      return { made: null, name: already.data()?.name as string };
     }
     if (!source.exists) throw new HttpsError('not-found', 'No such board.');
     const board = source.data() as BoardDoc;
@@ -503,14 +505,17 @@ export const cloneBoard = onCall({ secrets: [sentryDsn] }, guarded(async (reques
       tx.create(cardRef, card.data);
       tx.create(cardRef.collection('activity').doc(), card.created);
     }
-    return clone.cards.length;
+    return { made: clone.cards.length, name: clone.board.name };
   });
 
+  const { made } = landed;
   if (made !== null) {
     // Once, for the whole clone: the cards are stamped SYSTEM_ACTOR, which keeps
     // the per-card Stats increments of onCardWritten out of them (boardClone).
     await recordStat(cloneId, now, { cardsCreated: made }, actor.uid);
     logger.info('Cloned board', { from: boardId, to: cloneId, cards: made, actorUid: actor.uid });
   }
-  return { boardId: cloneId };
+  // The name the board HAS, which differs from the one asked for when an
+  // earlier try, renamed since, made it: the app renames it to this try's.
+  return { boardId: cloneId, name: landed.name };
 }));

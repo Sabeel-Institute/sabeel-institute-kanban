@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput } from 'react-native';
 import { Icon } from '../icons';
 import { BOARD_NAME_MAX, sortBoardsForList } from '@sabeel/shared';
@@ -9,10 +9,13 @@ import {
   newBoardId,
   noteBoardOpened,
   toggleFavourite,
+  updateBoard,
   useMyBoardPrefs,
   useMyBoards,
   type BoardListItem,
 } from '../boards';
+import { captureError } from '../sentry';
+import { toUserMessage } from '../errors';
 import { sessionCan, type SessionUser } from '../session';
 import { useArchivedBoards } from '../boards';
 import { useNav } from '../nav';
@@ -166,6 +169,17 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const t = useTheme();
+  // Whether this screen is still the one showing (App mounts only the top
+  // route). A clone or a new board can land after a notification or a link has
+  // taken the person elsewhere, and opening it then would bury where they went;
+  // it waits in the list instead.
+  const showing = useRef(true);
+  useEffect(() => {
+    showing.current = true;
+    return () => {
+      showing.current = false;
+    };
+  }, []);
 
   // `?? []` would allocate a fresh array on every render, so the memo below
   // would never actually memoize. Constant empties keep the identity stable.
@@ -198,11 +212,22 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
 
   async function clone(offer: { board: BoardListItem; cloneId: string }, name: string) {
     await cloneAction.run(async () => {
-      const id = await cloneBoard(offer.board.id, name, offer.cloneId);
+      const landed = await cloneBoard(offer.board.id, name, offer.cloneId);
       setCloning(null);
+      // An earlier try made this board, its answer lost, and the name has been
+      // changed since: this answer is the one the person is waiting on, so the
+      // board takes the name they asked for now. Not awaited, because a board
+      // write waits while offline and the clone itself has landed.
+      const wanted = name.trim();
+      if (landed.name !== undefined && landed.name !== wanted) {
+        void updateBoard(landed.id, { name: wanted }).catch((e: unknown) =>
+          captureError(e, { source: 'cloneBoard rename' }),
+        );
+      }
+      if (!showing.current) return;
       // Opened as from the list, so Back finds it under Recent.
-      void noteBoardOpened(user, id, recents).catch(() => {});
-      nav.push({ name: 'board', boardId: id });
+      void noteBoardOpened(user, landed.id, recents).catch(() => {});
+      nav.push({ name: 'board', boardId: landed.id });
     });
   }
 
@@ -216,9 +241,9 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
     try {
       const id = await createBoard(name, user);
       setCreating(false);
-      nav.push({ name: 'board', boardId: id });
+      if (showing.current) nav.push({ name: 'board', boardId: id });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(toUserMessage(e, 'createBoard'));
     } finally {
       setBusy(false);
     }

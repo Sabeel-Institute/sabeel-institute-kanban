@@ -45,6 +45,7 @@ import { Select, type SelectOption } from '../components/Select';
 import { SearchFiltersSheet } from '../components/SearchFiltersSheet';
 import type { NarrowItem } from '../components/NarrowList';
 import { space } from '../theme';
+import { toUserMessage } from '../errors';
 import { useLayout } from '../theme/layout';
 
 const NO_LABELS: Label[] = [];
@@ -178,7 +179,7 @@ export function SearchScreen({ user }: { user: SessionUser }) {
         if (!cancelled) setCards(per.flat());
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+        if (!cancelled) setError(toUserMessage(e, 'search'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

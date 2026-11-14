@@ -201,11 +201,12 @@ export async function addBoardMember(boardId: string, uid: string): Promise<void
  * Clone a board: its columns and open cards, as a new board whose only member
  * and owner is the caller. A callable, because the board and its cards must
  * land in one write (`cloneBoard` in functions/src/boards.ts). Resolves to the
- * new board's id.
+ * new board's id and the name it has, which is an earlier try's when that try
+ * made it and the name was changed before this one.
  */
 const cloneBoardFn = httpsCallable<
   { boardId: string; name: string; cloneId: string },
-  { boardId: string }
+  { boardId: string; name?: string }
 >(functions, 'cloneBoard');
 
 /**
@@ -213,8 +214,13 @@ const cloneBoardFn = httpsCallable<
  * (`newBoardId`) and sent again on every try: a retry after a clone that landed
  * but whose answer was lost returns that board instead of making a second.
  */
-export async function cloneBoard(boardId: string, name: string, cloneId: string): Promise<string> {
-  return (await cloneBoardFn({ boardId, name: name.trim(), cloneId })).data.boardId;
+export async function cloneBoard(
+  boardId: string,
+  name: string,
+  cloneId: string,
+): Promise<{ id: string; name?: string }> {
+  const { data } = await cloneBoardFn({ boardId, name: name.trim(), cloneId });
+  return { id: data.boardId, name: data.name };
 }
 
 /** A fresh board document id, made on the device: nothing is written. */

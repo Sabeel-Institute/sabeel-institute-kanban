@@ -58,12 +58,24 @@ const browser = await chromium.launch();
  * answered with the app's own Try again, as a person would.
  */
 async function signIn(page, who) {
-  await page.getByRole('button', { name: who, exact: true }).click();
+  const button = page.getByRole('button', { name: who, exact: true });
+  await button.click();
   const gate = page.getByText('Waiting for approval');
   const through = page.getByText('Boards', { exact: true });
   const slow = page.getByText('Still setting up your account', { exact: true });
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    await gate.or(through).or(slow).first().waitFor({ timeout: 60000 }).catch(() => {});
+  // What the sign-in screen says when the Auth emulator did not answer in time
+  // (`auth/network-request-failed`), which an iPhone simulator's Mac at load
+  // 100 causes. The buttons stay, and a person presses theirs again; pressing
+  // clears the message, so it is waited away before looking again.
+  const unreachable = page.getByText('Cannot reach the server', { exact: false });
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await gate.or(through).or(slow).or(unreachable).first().waitFor({ timeout: 60000 }).catch(() => {});
+    if (await unreachable.isVisible().catch(() => false)) {
+      console.log(`  ${who}: the app could not reach the Auth emulator — signing in again`);
+      await button.click({ timeout: 60000 });
+      await unreachable.waitFor({ state: 'detached', timeout: 30000 }).catch(() => {});
+      continue;
+    }
     if (!(await slow.isVisible().catch(() => false))) break;
     console.log(`  ${who}: "Still setting up your account" — pressing the app's Try again`);
     await page.getByRole('button', { name: 'Try again', exact: true }).click();
@@ -134,14 +146,31 @@ await admin
   .waitFor({ timeout: 25000 })
   // A re-run against a seeded emulator has nobody left to approve.
   .catch(() => undefined);
-for (;;) {
-  const approve = admin.getByRole('button', { name: 'Approve' }).first();
-  if (!(await approve.isVisible().catch(() => false))) break;
-  await approve.click();
-  await admin.waitForTimeout(1500);
-}
+await pressEachUntilNone(admin, admin.getByRole('button', { name: 'Approve' }), 'approving');
 await admin.getByRole('button', { name: 'Back' }).first().click();
 for (const p of colleagues) await agreeIfAsked(p);
+
+/**
+ * Press the first of a list of rows until none is left, each press taking its
+ * row off the list once its callable lands (approving someone, adding them to
+ * the board). Waits on that, not on a clock: every row is disabled while one
+ * press is on its way, and on a loaded runner (an iPhone simulator's Mac at
+ * load 120) the callable can take longer than Playwright's click timeout,
+ * which is how a fixed sleep here failed v0.17.0's iPhone run.
+ */
+async function pressEachUntilNone(page, rows, doing) {
+  const SLOW = 120_000;
+  for (;;) {
+    const before = await rows.count();
+    if (before === 0 || !(await rows.first().isVisible().catch(() => false))) return;
+    await rows.first().click({ timeout: SLOW });
+    const deadline = Date.now() + SLOW;
+    while ((await rows.count()) >= before) {
+      if (Date.now() > deadline) throw new Error(`${doing}: a row stayed on the list ${SLOW / 1000} s after its press`);
+      await page.waitForTimeout(250);
+    }
+  }
+}
 
 /**
  * Fill a field and act on it, re-filling if the value is wiped underneath us.
@@ -256,12 +285,11 @@ await admin
   .getByRole('button', { name: /^Add someone/ })
   .click()
   .catch(() => undefined);
-for (;;) {
-  const add = admin.getByRole('button', { name: /^Add .* to this board$/ }).first();
-  if (!(await add.isVisible().catch(() => false))) break;
-  await add.click();
-  await admin.waitForTimeout(1200);
-}
+await pressEachUntilNone(
+  admin,
+  admin.getByRole('button', { name: /^Add .* to this board$/ }),
+  'adding a member',
+);
 await admin.getByRole('button', { name: 'Back' }).first().click();
 await admin.getByText('To Do').first().waitFor({ timeout: 30000 });
 

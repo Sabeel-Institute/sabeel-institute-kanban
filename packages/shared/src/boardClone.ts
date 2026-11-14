@@ -21,7 +21,10 @@ import type { BoardColumn, BoardDoc, CardDoc } from './types';
  * failures the triggers cannot recover from. The clone knows every one of those
  * figures exactly, so it writes them itself — the count and the history with
  * the cards, Stats once after — and stamps the cards `SYSTEM_ACTOR`, which
- * keeps the card triggers out of them.
+ * keeps the two counting triggers, `onCardWritten` and `onCardBoardCount`, out
+ * of them. The others still run: `onCardNotify` finds nobody newly assigned,
+ * since a clone assigns nobody, and each "created" line joins a pending notice
+ * that the sweep reads and sends nothing for, as a new column has no watchers.
  *
  * Pure, so the rules of a clone are unit-tested here and the `cloneBoard`
  * callable only reads, checks and writes.

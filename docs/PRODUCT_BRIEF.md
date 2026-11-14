@@ -606,10 +606,14 @@ and opens when it lands.
   clone exists whole or not at all; rules check a new card against its board as
   it stood before the write, so the client could not do it in one. The clone
   writes the board's `activeCardCount` with the cards and records Stats once,
-  and its cards are stamped `SYSTEM_ACTOR`, which keeps the card triggers out:
-  left to them, every card would land as its own increment on the same board
-  and Stats documents in the same second, more than Firestore sustains on one
-  document.
+  and its cards are stamped `SYSTEM_ACTOR`, which keeps the two counting
+  triggers (`onCardWritten`, `onCardBoardCount`) out: left to them, every card
+  would land as its own increment on the same board and Stats documents in the
+  same second, more than Firestore sustains on one document. The other card
+  triggers still run and have nothing to do, a clone assigning nobody and its
+  new columns having no watchers; but each card's "created" line still waits
+  as a pending notice, so a large clone holds other people's notices back by
+  about one more sweep, a minute. Accepted.
 - **Limits:** more than `CLONE_BOARD_MAX_CARDS` (240) open cards, or more than
   `CLONE_BOARD_MAX_BYTES` of text, is refused with a reason rather than cloned in
   parts — the first keeps the transaction inside Firestore's 500 writes, the
@@ -618,7 +622,14 @@ and opens when it lands.
 - **Asking twice makes one clone.** The app picks the new board's id when it
   offers the clone and sends it with every try, so a retry after a clone that
   landed but whose answer was lost gets that board back rather than a second
-  one, which nobody could delete.
+  one, which nobody could delete. The answer names the board as it was made;
+  when the person changed the name before trying again, the app renames it to
+  the name of the try it is waiting on. Only the latest try's answer is acted
+  on, so a late answer to an earlier one cannot undo that.
+- **The clone opens where it was asked for.** If the person has gone elsewhere
+  while it was on its way (a notification tapped over the sheet), the clone
+  waits in the boards list rather than being pushed on top of where they went.
+  The same holds for New board.
 
 `boardClone` in `@sabeel/shared` is the one statement of what a clone holds.
 
