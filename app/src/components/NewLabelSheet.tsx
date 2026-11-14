@@ -39,8 +39,12 @@ export function NewLabelSheet({
   const [name, setName] = useState('');
   const [color, setColor] = useState<string>(LABEL_COLORS[0]);
 
+  // No `busy` on the Sheet: its action is two Firestore writes, which offline
+  // wait for the connection, so a sheet that refused to close until they
+  // landed would trap whoever lost signal. Closed early, the label still lands
+  // on the card when the writes do.
   return (
-    <Sheet visible title="New label" onClose={onClose} busy={busy}>
+    <Sheet visible title="New label" onClose={onClose}>
       <Hint>{`This label will only be on ${boardName}.`}</Hint>
       <TextField
         value={name}

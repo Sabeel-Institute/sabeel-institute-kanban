@@ -2597,8 +2597,12 @@ try {
       for (const variant of HELP_VARIANTS) {
         for (const kind of ['video', 'captions']) {
           const url = helpFilmUrl(v.id, variant, kind);
-          const res = await fetch(url, { method: 'HEAD' }).catch(() => null);
-          if (!res?.ok || Number(res.headers.get('content-length') ?? '1') === 0) missingFilms.push(url.slice(HELP_FILMS_ORIGIN.length));
+          // Unreachable is said so, apart from absent: a network failure in CI
+          // is not a film missing from the site.
+          const res = await fetch(url, { method: 'HEAD' }).catch((e) => String(e));
+          const path = url.slice(HELP_FILMS_ORIGIN.length);
+          if (typeof res === 'string') missingFilms.push(`${path} (unreachable: ${res})`);
+          else if (!res.ok || Number(res.headers.get('content-length') ?? '1') === 0) missingFilms.push(`${path} (${res.status})`);
         }
       }
     }

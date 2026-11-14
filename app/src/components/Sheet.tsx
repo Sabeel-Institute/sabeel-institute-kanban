@@ -39,10 +39,15 @@ export function Sheet({
    * closed — not by its button, the backdrop, Android's Back or Escape.
    *
    * A sheet whose action finishes by doing something (opening the board it
-   * made, putting the label it made on the card) would otherwise do it after
-   * the person had closed the sheet and moved on: a clone "cancelled" mid-way
-   * still opened, wherever they had got to. The action cannot be called back
+   * made) would otherwise do it after the person had closed the sheet and
+   * moved on: a clone "cancelled" mid-way still opened, wherever they had got
+   * to. The action cannot be called back
    * once sent, so the honest sheet stays until it answers.
+   *
+   * ONLY for an action that is sure to answer: a callable gives up after 70
+   * seconds. A Firestore write does not — offline it waits for the connection
+   * — so a sheet held open by one traps whoever lost signal, with Back dead
+   * too. The new-label sheet was such a sheet, and does not pass this.
    */
   busy?: boolean;
   /**
