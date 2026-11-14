@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { palette } from './theme/palette';
 
@@ -32,5 +33,21 @@ describe('the web HTML shell', () => {
     // must agree. Update the HTML to match the theme.
     const painted = html.match(/background-color:\s*(#[0-9A-Fa-f]{6})/)?.[1];
     expect(painted?.toUpperCase()).toBe(palette.canvas.toUpperCase());
+  });
+
+  it("gives body react-native-web's own font stack", () => {
+    // Plain DOM text on the web board (its name is an <h1>) inherits the
+    // page's font, and with none set that was the browser's serif. The stack
+    // is react-native-web's, read from its style compiler, so a `Text` and a
+    // plain element always draw in the same face.
+    const compiler = readFileSync(
+      createRequire(__filename).resolve(
+        'react-native-web/dist/exports/StyleSheet/compiler/createReactDOMStyle.js',
+      ),
+      'utf8',
+    );
+    const stack = compiler.match(/SYSTEM_FONT_STACK = '([^']+)'/)?.[1];
+    expect(stack).toBeTruthy();
+    expect(html).toMatch(new RegExp(`body\\s*{[^}]*font-family:\\s*${stack!.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')};`, 's'));
   });
 });
