@@ -170,7 +170,12 @@ name: Board, card, rich text and gestures
 # the sheet would be under the keys, and hiding the keyboard first would hide
 # that.
 - takeScreenshot: 07-clone-board
-- tapOn: "Clone"
+# The button, above the sheet's explanation: Maestro also sees the keyboard's
+# suggestion strip, and with "clone" just typed its first suggestion is
+# "clone", which a bare `tapOn: "Clone"` picked instead (Kanban #97).
+- tapOn:
+    text: "Clone"
+    above: "The clone gets[\\s\\S]*"
 # The board screen first: the clone's name is in the sheet's field too, so
 # waiting on it would pass before the clone was made. The callable writes a
 # board and fourteen cards, which a busy CI Mac took over 15 s to show.
