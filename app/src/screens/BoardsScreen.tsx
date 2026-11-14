@@ -4,6 +4,7 @@ import { Icon } from '../icons';
 import { BOARD_NAME_MAX, sortBoardsForList } from '@sabeel/shared';
 import {
   boardsView,
+  copyBoard,
   createBoard,
   noteBoardOpened,
   toggleFavourite,
@@ -29,27 +30,50 @@ import {
   Title,
 } from '../components/ui';
 import { PushNudge } from '../components/PushNudge';
+import { CopyBoardSheet } from '../components/CopyBoardSheet';
+import { contextMenuProps } from '../contextMenu';
+import { useAction } from '../useAction';
 import { radius, space, type, useTheme } from '../theme';
 
 /** Shared empty array, so absent preferences keep a stable identity. */
 const EMPTY: string[] = [];
 
+/**
+ * One board in the list. A tap opens it; a long-press, or a right-click on a
+ * computer, offers to copy it — only to someone who can make boards, since a
+ * copy is one. For anyone else `onCopy` is absent and a press is only a press:
+ * no sheet, no menu, nothing announcing a feature they cannot use. A screen
+ * reader gets the same offer as an action on the row, since a long-press is
+ * not something every reader is used to giving.
+ */
 function BoardRow({
   board,
   isFavourite,
   onOpen,
   onToggleFavourite,
+  onCopy,
 }: {
   board: BoardListItem;
   isFavourite: boolean;
   onOpen: () => void;
   onToggleFavourite: () => void;
+  onCopy: (() => void) | undefined;
 }) {
   const t = useTheme();
   return (
     <Card>
       <Row style={styles.between}>
-        <Pressable onPress={onOpen} style={styles.grow} accessibilityRole="button">
+        <Pressable
+          onPress={onOpen}
+          onLongPress={onCopy}
+          {...contextMenuProps(onCopy)}
+          accessibilityActions={onCopy ? [{ name: 'copy', label: 'Copy board' }] : undefined}
+          onAccessibilityAction={(e) => {
+            if (e.nativeEvent.actionName === 'copy') onCopy?.();
+          }}
+          style={styles.grow}
+          accessibilityRole="button"
+        >
           <Body>{board.name}</Body>
           <Caption>
             {board.activeCardCount} card{board.activeCardCount === 1 ? '' : 's'} ·{' '}
@@ -133,6 +157,9 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
   const { filter } = boardsView.use();
   const setFilter = (v: string) => boardsView.set({ filter: v });
   const [creating, setCreating] = useState(false);
+  /** The board whose copy sheet is open. */
+  const [copying, setCopying] = useState<BoardListItem | null>(null);
+  const copyAction = useAction('copyBoard');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const t = useTheme();
@@ -153,6 +180,26 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
     // Fire-and-forget: recording "recently opened" must never delay navigation.
     void noteBoardOpened(user, board.id, recents).catch(() => {});
     nav.push({ name: 'board', boardId: board.id });
+  }
+
+  // Every board in this list is one you can see, and none is archived, so
+  // making boards is the whole question; `copyBoard` asks all three again.
+  const onCopyOf = (b: BoardListItem) =>
+    sessionCan.createBoards(user)
+      ? () => {
+          copyAction.setError(null);
+          setCopying(b);
+        }
+      : undefined;
+
+  async function copy(source: BoardListItem, name: string) {
+    await copyAction.run(async () => {
+      const id = await copyBoard(source.id, name);
+      setCopying(null);
+      // Opened as from the list, so Back finds it under Recent.
+      void noteBoardOpened(user, id, recents).catch(() => {});
+      nav.push({ name: 'board', boardId: id });
+    });
   }
 
   async function create(rawName: string) {
@@ -254,6 +301,7 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
                 isFavourite
                 onOpen={() => open(b)}
                 onToggleFavourite={() => toggleFavourite(user, b.id, favourites)}
+                onCopy={onCopyOf(b)}
               />
             ))}
           </CardGrid>
@@ -271,6 +319,7 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
                 isFavourite={false}
                 onOpen={() => open(b)}
                 onToggleFavourite={() => toggleFavourite(user, b.id, favourites)}
+                onCopy={onCopyOf(b)}
               />
             ))}
           </CardGrid>
@@ -292,6 +341,7 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
                 isFavourite={false}
                 onOpen={() => open(b)}
                 onToggleFavourite={() => toggleFavourite(user, b.id, favourites)}
+                onCopy={onCopyOf(b)}
               />
             ))}
           </CardGrid>
@@ -313,6 +363,16 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
           nothing still could not find a board they were on that someone else
           archived. */}
       <ArchivedBoards user={user} onOpen={open} />
+
+      {copying ? (
+        <CopyBoardSheet
+          boardName={copying.name}
+          busy={copyAction.busy}
+          error={copyAction.error}
+          onCopy={(name) => copy(copying, name)}
+          onClose={() => setCopying(null)}
+        />
+      ) : null}
     </Screen>
   );
 }
@@ -352,6 +412,8 @@ function ArchivedBoards({
                 isFavourite={false}
                 onOpen={() => onOpen(b)}
                 onToggleFavourite={() => {}}
+                // An archived board is restored before it is copied.
+                onCopy={undefined}
               />
             ))}
           </CardGrid>

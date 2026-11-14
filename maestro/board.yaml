@@ -148,6 +148,37 @@ name: Board, card, rich text and gestures
 - takeScreenshot: 06-selection
 - tapOn: "Back"
 
+# Copying the board: a long-press on its row in the boards list opens the
+# copy sheet, its name field typed into, and the copy opens as a board of its
+# own. The field starts as the board's name, so typing adds to it.
+- runFlow:
+    file: ci-tools/tap-until.yaml
+    env:
+      TARGET: "Boards"
+      EXPECT: "New board"
+      SECONDS: 30
+- retry:
+    maxRetries: 2
+    commands:
+      - longPressOn: "Fundraising 2026[\\s\\S]*"
+      - extendedWaitUntil:
+          visible: "Name of the copy"
+          timeout: 10000
+- inputText: " copy"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- takeScreenshot: 07-copy-board
+- tapOn: "Copy"
+- extendedWaitUntil:
+    visible: "Fundraising 2026 copy[\\s\\S]*"
+    timeout: 30000
+- extendedWaitUntil:
+    visible: "Tap a card to open it\\.[\\s\\S]*"
+    timeout: 15000
+
 # Every tab answers, each with something only its own screen shows.
 - runFlow:
     file: ci-tools/tap-until.yaml
@@ -173,7 +204,7 @@ name: Board, card, rich text and gestures
       TARGET: "More"
       EXPECT: "Report a problem"
       SECONDS: 30
-- takeScreenshot: 07-more
+- takeScreenshot: 08-more
 
 # Help: a film opens in the platform's own player (expo-video), which is a
 # native module of its own. The player's frame is what is checked, so a
@@ -188,4 +219,4 @@ name: Board, card, rich text and gestures
     visible:
       id: "help-film"
     timeout: 20000
-- takeScreenshot: 08-help-film
+- takeScreenshot: 09-help-film

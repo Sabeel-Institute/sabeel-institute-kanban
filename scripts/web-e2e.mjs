@@ -2752,6 +2752,129 @@ try {
     await ctx.close();
   }
 
+  // ---- Copying a board ----------------------------------------------------
+  // A program template, seeded with one of everything a copy keeps and one of
+  // everything it leaves behind, copied from the boards list. What the copy
+  // holds is read back from the database rather than off the screen, which
+  // would not show a due date's absence or a subtask link.
+  {
+    const tmpl = await adminJson(`
+      const uidOf = async (email) => (await db.collection('users').where('email', '==', email).get()).docs[0].id;
+      const me = await uidOf('faisal@oursabeel.com');
+      const sara = await uidOf('sara@oursabeel.com');
+      const now = Date.now();
+      const board = db.collection('boards').doc();
+      await board.set({
+        name: 'Program Template', description: 'Start every program here', archived: false,
+        columns: [{ id: 'c_plan', name: 'Plan' }, { id: 'c_wrap', name: 'Wrap up' }],
+        columnIds: ['c_plan', 'c_wrap'], memberUids: [me, sara], memberProfiles: {},
+        boardOwnerUids: [me], activeCardCount: 0, createdAt: now, createdBy: me,
+      });
+      const inst = db.collection('labels').doc();
+      await inst.set({ name: 'Copied everywhere', color: '#83114F', createdAt: now, createdBy: me });
+      const own = db.collection('labels').doc();
+      await own.set({ boardId: board.id, name: 'Template only', color: '#3E6B8A', createdAt: now, createdBy: me });
+      const card = (over) => ({
+        boardId: board.id, title: '', description: '', columnId: 'c_plan', rank: 'm',
+        assigneeUids: [sara], subscriberUids: [me, sara], priority: 'high', dueDate: '2026-12-01',
+        labelIds: [], archived: false, commentCount: 0, attachmentCount: 0,
+        createdAt: now, createdBy: me, updatedAt: now, updatedBy: me, ...over,
+      });
+      const parent = db.collection('cards').doc();
+      await parent.set(card({ title: 'Book the venue', description: 'Call **two** places', rank: 'b', labelIds: [inst.id, own.id], commentCount: 1 }));
+      await parent.collection('comments').doc().set({ authorUid: me, body: 'Last year it was the hall', mentionUids: [], createdAt: now });
+      await db.collection('cards').doc().set(card({ title: 'Confirm the date', rank: 'c', parentId: parent.id }));
+      await db.collection('cards').doc().set(card({ title: 'Send thank-yous', columnId: 'c_wrap', rank: 'b' }));
+      await db.collection('cards').doc().set(card({ title: 'Only last year', rank: 'd', archived: true, archivedAt: now }));
+      console.log(JSON.stringify({ id: board.id, me, inst: inst.id }));
+    `);
+    // A right-click is a computer's long-press: it opens the sheet, and Cancel
+    // closes it with nothing made. The copy itself goes through a long-press,
+    // a mouse button held down, as on a phone.
+    await backToBoards(admin);
+    const tmplRow = admin.getByText('Program Template', { exact: true }).first();
+    await tmplRow.waitFor({ timeout: 25000 });
+    await tmplRow.click({ button: 'right' });
+    const sheetTitle = admin.getByText('Copy Program Template', { exact: true });
+    const byRightClick = await sheetTitle.waitFor({ timeout: 15000 }).then(() => true, () => false);
+    await admin.getByRole('button', { name: 'Cancel', exact: true }).click();
+    const closed = await sheetTitle.waitFor({ state: 'detached', timeout: 15000 }).then(() => true, () => false);
+    check('a right-click on a board offers its copy, and Cancel closes it', byRightClick && closed);
+    await tmplRow.click({ delay: 900 });
+    const copyName = admin.getByLabel('Name of the copy');
+    await copyName.waitFor({ timeout: 15000 });
+    const copyButton = admin.getByRole('button', { name: 'Copy', exact: true });
+    check(
+      'the copy is offered under the template’s name, and waits for a name of its own',
+      (await copyName.inputValue()) === 'Program Template' &&
+        (await copyButton.getAttribute('aria-disabled')) === 'true',
+      await copyName.inputValue(),
+    );
+    await copyName.fill('Spring Program');
+    await copyButton.click();
+    // The copy opens as its own board, under its own name.
+    const opened = await admin
+      .getByText('Spring Program', { exact: true })
+      .first()
+      .waitFor({ timeout: 30000 })
+      .then(() => admin.getByText('Send thank-yous').first().waitFor({ timeout: 15000 }))
+      .then(() => true, () => false);
+    const copied = await adminJson(`
+      const boards = await db.collection('boards').where('name', '==', 'Spring Program').get();
+      const b = boards.docs[0];
+      const cards = (await db.collection('cards').where('boardId', '==', b.id).get()).docs.map((d) => ({ id: d.id, ...d.data() }));
+      const template = (await db.collection('cards').where('boardId', '==', ${JSON.stringify(tmpl.id)}).get()).docs.map((d) => d.data());
+      console.log(JSON.stringify({ count: boards.size, board: b.data(), cards, template }));
+    `);
+    const byTitle = Object.fromEntries(copied.cards.map((c) => [c.title, c]));
+    const cols = Object.fromEntries(copied.board.columns.map((c) => [c.name, c.id]));
+    check('copying opens the new board', opened);
+    check(
+      'the copy is a new board, its copier the only member and owner, with the template’s columns',
+      copied.count === 1 &&
+        JSON.stringify(copied.board.memberUids) === JSON.stringify([tmpl.me]) &&
+        JSON.stringify(copied.board.boardOwnerUids) === JSON.stringify([tmpl.me]) &&
+        copied.board.description === 'Start every program here' &&
+        JSON.stringify(copied.board.columns.map((c) => c.name)) === JSON.stringify(['Plan', 'Wrap up']),
+      JSON.stringify(copied.board).slice(0, 200),
+    );
+    check(
+      'it holds the open cards in their columns with descriptions and subtasks, and nothing archived',
+      Object.keys(byTitle).sort().join('|') === 'Book the venue|Confirm the date|Send thank-yous' &&
+        byTitle['Book the venue'].description === 'Call **two** places' &&
+        byTitle['Book the venue'].columnId === cols.Plan &&
+        byTitle['Send thank-yous'].columnId === cols['Wrap up'] &&
+        byTitle['Confirm the date'].parentId === byTitle['Book the venue'].id,
+      JSON.stringify(Object.keys(byTitle)),
+    );
+    check(
+      'and none of one run: no dates, assignees, priority, comments or the template’s own label',
+      copied.cards.every(
+        (c) =>
+          c.dueDate === undefined &&
+          c.assigneeUids.length === 0 &&
+          c.priority === 'none' &&
+          c.commentCount === 0 &&
+          JSON.stringify(c.subscriberUids) === JSON.stringify([tmpl.me]),
+      ) && JSON.stringify(byTitle['Book the venue'].labelIds) === JSON.stringify([tmpl.inst]),
+      JSON.stringify(copied.cards.map((c) => [c.title, c.dueDate, c.assigneeUids, c.priority, c.labelIds])),
+    );
+    check(
+      'the template is left as it was',
+      copied.template.length === 4 &&
+        copied.template.every((c) => c.dueDate === '2026-12-01' && c.assigneeUids.length === 1),
+    );
+    // Back from the copy goes to the boards list, where it was copied from.
+    await admin.getByRole('button', { name: 'Back' }).first().click();
+    check(
+      'Back from the copy returns to the boards list',
+      await admin
+        .getByRole('button', { name: 'New board' })
+        .waitFor({ timeout: 15000 })
+        .then(() => true, () => false),
+    );
+  }
+
   // ---- Archived boards can be found and restored (Phase 2) ---------------
   // Archiving is the SAFE alternative to deleting, so it must be reversible.
   // It was not: the board list filters archived boards out and Restore lives

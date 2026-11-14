@@ -198,6 +198,21 @@ export async function addBoardMember(boardId: string, uid: string): Promise<void
 }
 
 /**
+ * Copy a board: its columns and open cards, as a new board whose only member
+ * and owner is the caller. A callable, because the board and its cards must
+ * land in one write (`copyBoard` in functions/src/boards.ts). Resolves to the
+ * new board's id.
+ */
+const copyBoardFn = httpsCallable<{ boardId: string; name: string }, { boardId: string }>(
+  functions,
+  'copyBoard',
+);
+
+export async function copyBoard(boardId: string, name: string): Promise<string> {
+  return (await copyBoardFn({ boardId, name: name.trim() })).data.boardId;
+}
+
+/**
  * Who could still be added. NAMES ONLY — a picker needs something to tap, not
  * everybody's address.
  */

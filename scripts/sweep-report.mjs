@@ -26,7 +26,7 @@ const OUT = resolve(ROOT, 'shots', 'sweep-report.html');
 
 /** Tour order, then anything new alphabetically after it. */
 const ORDER = [
-  'rules', 'boards', 'mywork', 'search', 'alerts', 'stats', 'people', 'labels', 'more', 'report',
+  'rules', 'boards', 'boards-copy', 'mywork', 'search', 'alerts', 'stats', 'people', 'labels', 'more', 'report',
   'board', 'board-owner', 'board-member', 'roster-owner', 'roster-member',
   'board-longname', 'board-empty', 'bulk', 'card', 'card-editing', 'card-comment',
   'settings', 'archive',
@@ -74,6 +74,7 @@ const BLURB = {
   'board-empty': 'A board with no columns — reachable, since the last empty column can be deleted. Its board actions must survive having no column footer to live in.',
   'board-longname': 'A column name too long to centre — the name and its pencil slide left rather than truncating early. Narrow layouts only; the pager does not exist on wide.',
   settings: 'Board settings — this board\u2019s owners and admins only.',
+  'boards-copy': 'Copying a board: the sheet a long-press (or a right-click) on its row opens. Organizers and admins only, since a copy is a new board.',
   archive: 'Archived cards, most recently archived first.',
 };
 
