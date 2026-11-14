@@ -33,10 +33,17 @@ export function toUserMessage(e: unknown, source: string): string {
  * reports one as `internal`, lower case, because no response arrived, and the
  * sign-in screen showed exactly that word on 2026-10-22, when no function could
  * start. A function that ran and failed sends its own status, `INTERNAL`.
+ *
+ * The Functions SDK (since `@firebase/functions` 0.14, firebase 13) ends every
+ * message with the HTTP status it got, `Only a board's owners can do that.
+ * [403]`, and `internal [0]` when no answer came. That tail is for a developer,
+ * so it goes first; the tests take their errors from the real SDK, so a change
+ * in its format fails them rather than reaching the screen.
  */
 export function errorText(e: unknown): string {
   const err = e as { code?: string; message?: string } | null;
-  const raw = (err?.message ?? (typeof e === 'string' ? e : '')).trim();
+  const said = (err?.message ?? (typeof e === 'string' ? e : '')).trim();
+  const raw = err?.code?.startsWith('functions/') ? said.replace(/\s*\[\d+\]$/, '') : said;
   if (
     err?.code === 'unavailable' ||
     err?.code === 'functions/unavailable' ||

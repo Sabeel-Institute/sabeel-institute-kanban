@@ -4,6 +4,7 @@ import { ROLES, type Role, type UserStatus } from '@sabeel/shared';
 import { setUserAccess, useAllUsers, type AdminUserRow } from '../users';
 import { boardsSolelyOwnedBy } from '../boards';
 import { confirmAction } from '../confirm';
+import { toUserMessage } from '../errors';
 import type { SessionUser } from '../session';
 import { useNav } from '../nav';
 import {
@@ -64,7 +65,7 @@ export function UsersScreen({ actor }: { actor: SessionUser }) {
     try {
       await setUserAccess(uid, role, status);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(toUserMessage(e, 'setUserAccess'));
     } finally {
       setBusyUid(null);
     }

@@ -2,6 +2,35 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('./sentry', () => ({ captureError: vi.fn() }));
 const { errorText, toUserMessage } = await import('./errors');
+const { initializeApp } = await import('firebase/app');
+const { getFunctions, httpsCallable } = await import('firebase/functions');
+
+/**
+ * What the Functions SDK this app ships throws, made by the SDK itself: a real
+ * `httpsCallable` against a stubbed `fetch`. Hand-made errors are only our idea
+ * of its format, and that idea went stale when firebase 13 began ending every
+ * message with the HTTP status.
+ */
+let apps = 0;
+async function sdkError(respond: () => Promise<Response>): Promise<unknown> {
+  const app = initializeApp({ projectId: 'demo-errors', apiKey: 'demo', appId: 'demo' }, `errors-${(apps += 1)}`);
+  vi.stubGlobal('fetch', respond);
+  try {
+    await httpsCallable(getFunctions(app, 'us-central1'), 'probe')({});
+  } catch (e) {
+    return e;
+  } finally {
+    vi.unstubAllGlobals();
+  }
+  throw new Error('the callable did not fail');
+}
+const answer = (status: number, error?: { status: string; message: string }) => () =>
+  Promise.resolve(
+    new Response(JSON.stringify(error ? { error } : {}), {
+      status,
+      headers: { 'Content-Type': 'application/json' },
+    }),
+  );
 
 /**
  * What a person reads when something fails. Every case is a shape this app's
@@ -52,6 +81,25 @@ describe('errorText', () => {
   it('says something for nothing at all', () => {
     expect(errorText(undefined)).toBe(GENERIC);
     expect(errorText(new Error(''))).toBe(GENERIC);
+  });
+});
+
+describe('errorText, on what the Functions SDK really throws', () => {
+  it("shows a callable's own sentence without the status the SDK adds", async () => {
+    const e = await sdkError(answer(403, { status: 'PERMISSION_DENIED', message: 'Only a board’s owners can do that.' }));
+    expect((e as Error).message).toMatch(/\[403\]$/);
+    expect(errorText(e)).toBe('Only a board’s owners can do that.');
+  });
+
+  it('says plainly that a callable got no answer', async () => {
+    const e = await sdkError(() => Promise.reject(new TypeError('fetch failed')));
+    expect((e as Error).message).toBe('internal [0]');
+    expect(errorText(e)).toBe(UNREACHABLE);
+    expect(errorText(await sdkError(answer(503)))).toBe(UNREACHABLE);
+  });
+
+  it('turns away the bare status of a function that ran and failed', async () => {
+    expect(errorText(await sdkError(answer(500, { status: 'INTERNAL', message: 'INTERNAL' })))).toBe(GENERIC);
   });
 });
 
