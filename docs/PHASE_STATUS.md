@@ -418,6 +418,25 @@ the team.
 
 ## Deploy log
 
+### 2026-11-14 — Cloning a board — v0.18.0
+
+- **Organizers and admins can clone a board**, so a program that runs
+  again can start from a board made for it. On **Boards**, press and hold
+  the board (right-click it on a computer), give the clone its own name and
+  tap **Clone**. The new board opens.
+- The clone has the board's description, its columns and its open cards in
+  the same places, each with its title, description, subtasks and the
+  institute's labels. Due dates, assignees, priorities, comments, history,
+  files, archived cards and the board's own labels stay behind. The board
+  you cloned from does not change.
+- You are the clone's only member and owner, and you follow its cards, as
+  you would cards you made yourself. Add the people who need it in Board
+  settings.
+- A board with more than 240 open cards, or with a great deal of text,
+  is too large to clone in one go, and the app says so.
+- For a member, pressing and holding a board does nothing more than a tap.
+- More → Help has a film on cloning a board, and the manual a section.
+
 ### 2026-11-08 — Board labels, and selecting a whole comment — v0.17.0
 
 - **Labels come in two kinds.** The institute's labels are on every board,
