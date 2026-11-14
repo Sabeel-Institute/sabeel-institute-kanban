@@ -199,7 +199,7 @@ case "${1:-status}" in
     wait_for "http://127.0.0.1:${FIRESTORE_PORT}/" firestore || exit 1
     wait_for "http://127.0.0.1:${WEB_PORT}/" web       || exit 1
     wait_for_auth_trigger || exit 1
-    npm run seed
+    npm run seed || exit 1
     echo "Ready: http://127.0.0.1:${WEB_PORT}  (logs: /tmp/sk-emulators.log /tmp/sk-web.log)"
     ;;
   android)
