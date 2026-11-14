@@ -1,6 +1,7 @@
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
-import { COPY_BOARD_MAX_CARDS, SYSTEM_ACTOR, todayInOrgTz } from '@sabeel/shared';
+import { COPY_BOARD_MAX_CARDS, NOTICE_MAX_WAIT_MS, SYSTEM_ACTOR, todayInOrgTz } from '@sabeel/shared';
 import { adminDb, callFunction, idTokenFor, makeUser, shutdown, waitFor } from './emulatorClient';
+import { runNoticeSweep } from '../../src/notices';
 
 /**
  * `copyBoard`: who may, and what a copy holds once the triggers have run.
@@ -182,7 +183,7 @@ describe('copyBoard: the copy', () => {
     expect(parent.labelIds).toEqual(['cb_inst', 'cb_own']);
   });
 
-  it('is treated as ordinary new cards: history, card count and stats, and no notices', async () => {
+  it('is treated as ordinary new cards: history, card count and stats, and nobody notified', async () => {
     const cards = await copyCards();
     for (const c of cards) {
       await waitFor(`created entry on ${c.title}`, async () => {
@@ -201,11 +202,22 @@ describe('copyBoard: the copy', () => {
       const month = (await adminDb().doc(`stats/${copyId}/months/${today.slice(0, 7)}`).get()).data();
       return month?.days?.[today.slice(8, 10)]?.cardsCreated === 4 ? true : undefined;
     });
+    // Each card's "created" queues a notice, as any new card's does, and the
+    // sweep sends it to nobody: the copier made the card and is its only
+    // follower, and the template's people are not on the copy.
+    for (const c of cards) {
+      await waitFor(`pending notice on ${c.title}`, async () =>
+        (await adminDb().doc(`pendingNotices/${c.id}`).get()).exists ? true : undefined);
+    }
+    await runNoticeSweep(Date.now() + NOTICE_MAX_WAIT_MS + 1000);
+    const ids = new Set(cards.map((c) => c.id));
     for (const c of cards) {
       expect((await adminDb().doc(`pendingNotices/${c.id}`).get()).exists).toBe(false);
     }
-    const inbox = await adminDb().collection(`users/${ORG}/notifications`).get();
-    expect(inbox.size).toBe(0);
+    for (const uid of [ORG, MEM]) {
+      const inbox = await adminDb().collection(`users/${uid}/notifications`).get();
+      expect(inbox.docs.map((d) => d.data()).filter((n) => ids.has(n.cardId))).toEqual([]);
+    }
   });
 });
 

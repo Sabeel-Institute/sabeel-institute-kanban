@@ -178,6 +178,11 @@ name: Board, card, rich text and gestures
 - extendedWaitUntil:
     visible: "Tap a card to open it\\.[\\s\\S]*"
     timeout: 15000
+# Back to the boards list, where the tabs are: a board has none of its own.
+- runFlow:
+    file: ci-tools/back-until.yaml
+    env:
+      FROM: "Tap a card to open it\\.[\\s\\S]*"
 
 # Every tab answers, each with something only its own screen shows.
 - runFlow:
