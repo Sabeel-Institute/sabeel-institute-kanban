@@ -189,6 +189,22 @@ export const TUTORIALS = [
         do: (t) => t.highlight(t.card('Book the venue')),
       },
       {
+        say: "A card that's broken into subtasks says how many it has.",
+        do: (t) => t.highlight(t.card('Draft the donor letter')),
+      },
+      {
+        // The subtask is in In Progress: on a phone, one column along.
+        say: 'And each subtask names the card it belongs to, so you can see what goes together.',
+        do: async (t) => {
+          if (t.phone) {
+            await t.tap(t.btn('Next column'));
+            await t.wait(700);
+          }
+          await t.highlight(t.card('Design the programme'));
+          if (t.phone) await t.tap(t.btn('Previous column'));
+        },
+      },
+      {
         say: 'To add a card, tap Add card at the bottom of the column.',
         do: (t) => t.tap(t.btn('+ Add card')),
       },

@@ -336,8 +336,9 @@ board, linked to it.
   the subtask stays on the board as an ordinary card.
 - On the board, two grey chips show how cards belong together. A card with
   subtasks says **4 subtasks** (or however many), and each subtask names the
-  card it belongs to, as **↳ Plan the open house**. My Work and Search show a
-  subtask's chip as just **↳ Subtask**, since they list cards from many boards.
+  card it belongs to, as **↳ Plan the open house**. Where that card isn't
+  shown alongside it (My Work, Search, the archive, or once it's archived),
+  the chip says just **↳ Subtask**.
   There's no need for labels such as "main task" or "subtask" to show this.
 
 A subtask is a real card, not a checklist item: it moves through columns, gets
