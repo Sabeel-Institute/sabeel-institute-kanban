@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Body, Button, Caption, Hint } from './ui';
+import { useKeyboardHeight } from './useKeyboardHeight';
 import { radius, space, useTheme } from '../theme';
 
 /**
@@ -15,12 +16,14 @@ import { radius, space, useTheme } from '../theme';
  *
  *  - Bound the height (a fraction of the viewport) and scroll INSIDE it, so the
  *    dialog can never be taller than the screen however many options it has.
- *  - Centre it rather than pinning to an edge, so a keyboard rising from the
- *    bottom covers as little of it as it can. Not none: on Android the app is
+ *  - Centre it in the screen ABOVE the keyboard. On Android the app is
  *    edge-to-edge, and so is the dialog window, which the system then does
- *    not resize for the keyboard. Seen in the native flow (Kanban #97): the
- *    keys reach the lower part of a sheet with a field. So a sheet's action
- *    belongs right under its field, as in CloneBoardSheet, not at the foot.
+ *    not resize for the keyboard: the keys covered the lower part of a sheet
+ *    with a field (the native flow, Kanban #97). So the backdrop adds the
+ *    keyboard's height to its bottom padding (`useKeyboardHeight`), and the
+ *    panel, centred and bounded in what is left, moves up with the keys.
+ *    Only a screenshot shows it (`maestro/board.yaml`, 07-clone-board):
+ *    Maestro sees neither the keyboard's edge nor a view with no content.
  *  - Give it a dismissing backdrop, so it is never possible to get stuck behind.
  *
  * Uses RN's Modal, which renders in a top layer on both platforms. An
@@ -72,6 +75,7 @@ export function Sheet({
   children: ReactNode;
 }) {
   const t = useTheme();
+  const keyboard = useKeyboardHeight();
   if (!visible) return null;
   const close = () => {
     if (!busy) onClose();
@@ -114,7 +118,10 @@ export function Sheet({
         prop, so the web DOM is unchanged.
       */}
       <Pressable
-        style={[styles.backdrop, { backgroundColor: t.effect.overlay }]}
+        style={[
+          styles.backdrop,
+          { backgroundColor: t.effect.overlay, paddingBottom: space.lg + keyboard },
+        ]}
         onPress={close}
         focusable={false}
         accessible={false}
