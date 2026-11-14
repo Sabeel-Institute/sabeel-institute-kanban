@@ -44,9 +44,10 @@
          Every `Text` sets it for itself, but the web board draws some text as
          plain DOM (its name is an `<h1>`), and plain DOM inherits the page's
          font, which was the browser's default serif. The board's name had been
-         in Times since the wide board was written. The stack is
-         `SYSTEM_FONT_STACK` from react-native-web's style compiler, and
-         `webTemplate.test.ts` holds the two together.
+         in Times since the wide board was written. Form controls do not inherit
+         a font unless told to, so the board's raw buttons, input and select are
+         told. The stack is `SYSTEM_FONT_STACK` from react-native-web's style
+         compiler, and `webTemplate.test.ts` holds the two together.
     -->
     <style id="expo-reset">
       /* These styles make the body full-height */
@@ -59,6 +60,12 @@
       body {
         overflow: hidden;
         font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+      }
+      button,
+      input,
+      select,
+      textarea {
+        font-family: inherit;
       }
       /* These styles make the root element full-height */
       #root {

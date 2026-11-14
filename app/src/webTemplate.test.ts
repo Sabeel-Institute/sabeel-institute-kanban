@@ -49,5 +49,8 @@ describe('the web HTML shell', () => {
     const stack = compiler.match(/SYSTEM_FONT_STACK = '([^']+)'/)?.[1];
     expect(stack).toBeTruthy();
     expect(html).toMatch(new RegExp(`body\\s*{[^}]*font-family:\\s*${stack!.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')};`, 's'));
+    // Form controls do not inherit a font unless told to; the web board's raw
+    // buttons, input and select are.
+    expect(html).toMatch(/button,\s*input,\s*select,\s*textarea\s*{\s*font-family:\s*inherit;/);
   });
 });

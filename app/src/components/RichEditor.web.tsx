@@ -91,10 +91,11 @@ const TRANSFORMERS = [UNORDERED_LIST, ORDERED_LIST, BOLD_STAR, ITALIC_STAR];
  *
  * react-native-web sets this per-`Text` element (its `fontFamily: 'System'`
  * default, resolved in
- * `react-native-web/dist/exports/StyleSheet/compiler/createReactDOMStyle.js`),
- * never on `body` — so a raw `contenteditable` inherits nothing and falls back
- * to the UA default, which is **Times**. The editor rendered in serif while
- * the card beneath it rendered in sans, at 16px against the app's 15.
+ * `react-native-web/dist/exports/StyleSheet/compiler/createReactDOMStyle.js`).
+ * Before `app/public/index.html` set it on `body` too, a raw
+ * `contenteditable` inherited the UA default, **Times**: the editor rendered
+ * in serif while the card beneath it rendered in sans, at 16px against the
+ * app's 15. The editor keeps its own copy so it never depends on the shell.
  *
  * No lint rule covers this and every assertion passed; the manual's own
  * screenshot is what showed it. `richtext-e2e.mjs` now compares the editor's
