@@ -21,11 +21,8 @@ tells you the command to run.
       the policy lifted on this project for about a minute and put back
       (`docs/DEPLOY.md` § Known traps, "A new callable answers 403"). Every
       new callable needs the same.
-- [ ] **Clone one board in production** as an organizer or admin: press and
-      hold a board on **Boards** (right-click on a computer), name it, Clone.
-      Check the clone opens with the board's cards and subtasks, then archive
-      it if it was only a try. Production's sign-in is the one part of a
-      clone no test could run.
+- [x] **Clone one board in production** as an organizer or admin: done
+      2026-11-14 as an admin, and the clone archived after.
 
 ## Board labels — v0.17.0, shipped in a maintenance window
 
