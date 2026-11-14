@@ -867,7 +867,10 @@ factory rather than being silently dropped.
   the set (`docs/DEV-TOOLING.md`, "The help films"). The films live on their
   own public Hosting site, never in git, and show the guide world only — no
   real board, card or person. Their narration is a colleague talking you
-  through the screen, never labels read out.
+  through the screen, never labels read out. A film shipped stale on purpose
+  is listed in `docs/PHASE_STATUS.md` § Help films that lag the app, with what
+  it lacks: re-record from that list, add to it when a release leaves another
+  behind, and take each film off once the set is published with it.
 - Before ANY significant install (global/system/major framework), ask first;
   routine project-local npm deps of the locked stack are fine.
 - All repo artifacts (docs, plans, protocols) live in this repo.
