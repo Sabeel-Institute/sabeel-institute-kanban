@@ -436,6 +436,13 @@ the team.
   is too large to clone in one go, and the app says so.
 - For a member, pressing and holding a board does nothing more than a tap.
 - More → Help has a film on cloning a board, and the manual a section.
+- **Messages from the server read as written again.** Since 0.14.0 they
+  ended in a code, such as "Only a board's owners can do that. [403]", and
+  a request that got no answer said "internal [0]" instead of that the
+  server could not be reached.
+- New boards and clones open only if you are still on the boards list. If
+  a notification took you elsewhere while one was being made, it waits in
+  the list.
 
 ### 2026-11-08 — Board labels, and selecting a whole comment — v0.17.0
 
