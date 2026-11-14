@@ -5,10 +5,16 @@ import { logger } from 'firebase-functions/v2';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import type { BoardDoc } from '@sabeel/shared';
 import {
+  boardCopy,
   canAdministerUsers,
+  canCreateBoards,
   canManageBoard,
+  canSeeEveryBoard,
   canUnseatCreator,
+  COPY_BOARD_MAX_CARDS,
+  validateBoardName,
   watchKeyOnBoard,
+  type CopySourceCard,
 } from '@sabeel/shared';
 import { actorOf } from './actor';
 
@@ -373,4 +379,89 @@ export const addBoardMember = onCall({ secrets: [sentryDsn] }, guarded(async (re
   }
 
   return { ok: true, added: !already };
+}));
+
+/**
+ * Copy a board: its columns and open cards, under a new name, as a new board
+ * whose only member and owner is the caller. `boardCopy` in `@sabeel/shared`
+ * decides what a copy holds; this reads, checks and writes.
+ *
+ * A CALLABLE, because a copy must exist whole or not at all. Rules check a new
+ * card against its board as it was before the write, so a client cannot create
+ * a board and its cards in one batch, and a copy made in several writes could
+ * stop half-made. Here the board and every card are one batch.
+ *
+ * A copy is a new board, so it takes what creating one does: an organizer or
+ * an admin. And it reads the source, so the caller must see it: a member of
+ * it, or an admin.
+ */
+export const copyBoard = onCall({ secrets: [sentryDsn] }, guarded(async (request: CallableRequest<{ boardId?: unknown; name?: unknown }>) => {
+  const auth = request.auth;
+  if (!auth) throw new HttpsError('unauthenticated', 'Sign in first.');
+
+  const actor = actorOf(auth);
+  if (!canCreateBoards(actor)) {
+    throw new HttpsError(
+      'permission-denied',
+      'Only organizers and admins can copy a board, because a copy is a new board.',
+    );
+  }
+
+  const boardId = request.data?.boardId;
+  const name = request.data?.name;
+  if (typeof boardId !== 'string' || !boardId) {
+    throw new HttpsError('invalid-argument', 'A boardId is required.');
+  }
+  if (typeof name !== 'string') {
+    throw new HttpsError('invalid-argument', 'A name is required.');
+  }
+  const nameProblem = validateBoardName(name);
+  if (nameProblem) throw new HttpsError('invalid-argument', nameProblem);
+
+  const db = getFirestore();
+  const source = await db.doc(`boards/${boardId}`).get();
+  if (!source.exists) throw new HttpsError('not-found', 'No such board.');
+  const board = source.data() as BoardDoc;
+  if (!board.memberUids.includes(actor.uid) && !canSeeEveryBoard(actor)) {
+    throw new HttpsError('permission-denied', 'You can only copy a board you are on.');
+  }
+  if (board.archived) {
+    throw new HttpsError('failed-precondition', 'Restore this board before copying it.');
+  }
+
+  const [cardsSnap, labelsSnap, me] = await Promise.all([
+    db.collection('cards').where('boardId', '==', boardId).where('archived', '==', false).get(),
+    db.collection('labels').get(),
+    db.doc(`users/${actor.uid}`).get(),
+  ]);
+  if (cardsSnap.size > COPY_BOARD_MAX_CARDS) {
+    throw new HttpsError(
+      'failed-precondition',
+      `This board has ${cardsSnap.size} open cards; a copy takes at most ${COPY_BOARD_MAX_CARDS}.`,
+    );
+  }
+
+  const copyRef = db.collection('boards').doc();
+  const copy = boardCopy({
+    source: board,
+    cards: cardsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<CopySourceCard, 'id'>) })),
+    labels: labelsSnap.docs.map((d) => ({ id: d.id, boardId: d.data().boardId as string | undefined })),
+    boardId: copyRef.id,
+    name,
+    copier: actor.uid,
+    copierProfile: {
+      displayName: (me.data()?.displayName as string) ?? '',
+      email: (me.data()?.email as string) ?? '',
+    },
+    now: Date.now(),
+    newCardId: () => db.collection('cards').doc().id,
+  });
+
+  const batch = db.batch();
+  batch.set(copyRef, copy.board);
+  for (const card of copy.cards) batch.set(db.doc(`cards/${card.id}`), card.data);
+  await batch.commit();
+  logger.info('Copied board', { from: boardId, to: copyRef.id, cards: copy.cards.length, actorUid: actor.uid });
+
+  return { boardId: copyRef.id };
 }));

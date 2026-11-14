@@ -527,7 +527,7 @@ recreation:
 ```sh
 firebase functions:delete accountExists setUserAccess removeBoardMember \
   addBoardMember listAddableUsers countMemberAssignments \
-  boardsSolelyOwnedBy countLabelUsage deleteLabel \
+  boardsSolelyOwnedBy copyBoard countLabelUsage deleteLabel \
   finalizeAttachment deleteAttachment getAttachmentUrl \
   --region us-central1 --force
 firebase deploy --only functions

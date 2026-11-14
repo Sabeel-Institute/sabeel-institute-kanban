@@ -4,6 +4,7 @@ export * from './attachments';
 export * from './auth';
 export * from './autoScroll';
 export * from './boardHistory';
+export * from './boardCopy';
 export * from './boards';
 export * from './color';
 export * from './due';
