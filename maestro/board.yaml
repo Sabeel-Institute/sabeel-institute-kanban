@@ -115,8 +115,14 @@ name: Board, card, rich text and gestures
       TARGET: "Book the venue[\\s\\S]*"
       EXPECT: "Description"
       SECONDS: 30
+# Centred, because the press lands at the middle of what shows of the comment:
+# a scroll that stops with it peeking above the bottom edge puts that point on
+# Android's navigation handle, whose long-press (Circle to Search) takes the
+# touch after the text view has selected a word, so the view never sees the
+# finger lift and never offers Select all.
 - scrollUntilVisible:
     element: "Two things before we book:[\\s\\S]*I can call them on Thursday\\."
+    centerElement: true
 - runFlow:
     when:
       platform: Android

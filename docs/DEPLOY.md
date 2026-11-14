@@ -25,8 +25,11 @@ organization (`833557915874`), with `faisal.shah@oursabeel.com` as Owner
 and Institute billing. Authenticate Firebase CLI, gcloud and Application Default
 Credentials separately as the Institute account.
 
-Domain-restricted IAM sharing applies. Existing public callable endpoints are
-reachable; new public invoker bindings may require an approved policy exception.
+Domain-restricted IAM sharing applies (`iam.allowedPolicyMemberDomains`, set
+on the organization), so nothing can bind `allUsers` here: not a deploy, from
+CI or as Owner. Every callable needs it as its Cloud Run invoker, so a NEW
+callable is bound by hand after its first deploy (§ Known traps, "A new
+callable answers 403").
 OAuth consent is External and published.
 
 Repository: `Sabeel-Institute/sabeel-institute-kanban`. Local clone:
@@ -518,20 +521,32 @@ is the Gmail API. Such a report was kept; nothing re-sends it.
 These cost real time on the sibling time-tracker project; see
 `docs/INHERITED-STACK.md` for the full accounts.
 
-**Callables permanently 403 after a failed first deploy.** Gen-2 callables get
-their public-invoker IAM binding only on the *create* path. If the first deploy
-creates the function but the build fails, later deploys never re-apply it and
-every call bounces at the Cloud Run layer before your code runs. Fix by forcing
-recreation:
+**A new callable answers 403.** Gen-2 callables get their public-invoker
+binding only on the *create* path, and the organization's domain-restricted
+sharing refuses it there. The deploy reports `Unable to set the invoker` and
+blames `roles/functions.admin`; `firebase-debug.log` has the real answer, "do
+not belong to a permitted customer". Recreating the function, or deploying as
+Owner, meets the same refusal, and a later deploy never retries it. Every call
+bounces at the Cloud Run layer before the code runs, as an HTML page rather
+than a Firebase error. An organization policy admin (Faisal holds
+`roles/orgpolicy.policyAdmin`) lifts the policy on this project for the minute
+it takes, binds, and puts it back. The project has no policy of its own, so
+deleting the override restores it exactly:
 
 ```sh
-firebase functions:delete accountExists setUserAccess removeBoardMember \
-  addBoardMember listAddableUsers countMemberAssignments \
-  boardsSolelyOwnedBy cloneBoard countLabelUsage deleteLabel \
-  finalizeAttachment deleteAttachment getAttachmentUrl \
-  --region us-central1 --force
-firebase deploy --only functions
+P=sabeel-institute-kanban
+gcloud resource-manager org-policies describe iam.allowedPolicyMemberDomains --project=$P   # only an etag: inherited
+printf 'constraint: constraints/iam.allowedPolicyMemberDomains\nlistPolicy:\n  allValues: ALLOW\n' > allow.yaml
+gcloud resource-manager org-policies set-policy allow.yaml --project=$P
+gcloud run services add-iam-policy-binding <callable, lowercased> --member=allUsers \
+  --role=roles/run.invoker --region=us-central1 --project=$P   # refused for about a minute: retry
+gcloud resource-manager org-policies delete iam.allowedPolicyMemberDomains --project=$P
 ```
+
+Then an unauthenticated `curl -X POST .../<callable> -d '{"data":{}}'` returns
+the function's own `UNAUTHENTICATED`, and Deploy Functions' verify step passes.
+Do it right after the deploy that creates the callable, before the clients
+that call it ship; Health probes every callable in main's bundle.
 
 **First deploy of a Firestore-trigger function fails on the Eventarc service
 agent.** Not a config error — permissions take 2–5 minutes to propagate. Wait,
@@ -594,7 +609,8 @@ and every released tag's.
 # 1. Backend, when functions, rules or indexes changed, BEFORE the clients that
 #    need it. Indexes first; a deploy-log entry that needs another order (such as
 #    functions before rules) states it. Functions can also go through Deploy
-#    Functions (docs/GITHUB-ACTIONS.md).
+#    Functions (docs/GITHUB-ACTIONS.md). A NEW callable then needs its invoker
+#    bound by hand (§ Known traps, "A new callable answers 403").
 npx firebase deploy --only firestore:indexes --project sabeel-institute-kanban
 npx firebase deploy --only firestore:rules,storage,functions --project sabeel-institute-kanban
 

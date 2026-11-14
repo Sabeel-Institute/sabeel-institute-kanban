@@ -49,7 +49,10 @@ their public-invoker IAM binding only on the *create* path. If the first deploy
 creates the function but the build fails, later update deploys never re-apply the
 binding and every client call bounces at the Cloud Run layer before your code
 runs. Fix is `firebase functions:delete <names> --region us-central1 --force` then
-redeploy. Watch for this on the kanban project's first deploy too.
+redeploy. In this project that is not enough: the organization's
+domain-restricted sharing refuses the binding on create as well, so every new
+callable is bound by hand (`docs/DEPLOY.md` § Known traps, "A new callable
+answers 403").
 
 **3. First deploy of a Firestore-trigger function often fails on the Eventarc
 service agent.** Not a config error — permissions take 2–5 minutes to propagate.
