@@ -5,6 +5,7 @@ import {
   childrenOf,
   linkableUnder,
   parentAfterMove,
+  parentTitles,
   subtaskCounts,
 } from '../src/subtasks';
 
@@ -162,5 +163,24 @@ describe('parentAfterMove', () => {
 
   it('keeps a grandchild linked when the whole chain moves', () => {
     expect(parentAfterMove({ id: 'c', parentId: 'b' }, ids('a', 'b', 'c'))).toBe('b');
+  });
+});
+
+describe('parentTitles', () => {
+  const titled = () => board().map((c) => ({ ...c, title: `Title ${c.id}` }));
+
+  it('names the parent of every subtask whose parent is among the cards', () => {
+    expect(parentTitles(titled())).toEqual(
+      new Map([
+        ['b', 'Title a'],
+        ['c', 'Title a'],
+        ['e', 'Title b'],
+      ]),
+    );
+  });
+
+  it('names nothing for a subtask whose parent is not there (archived, or another list)', () => {
+    const withoutA = titled().filter((c) => c.id !== 'a');
+    expect(parentTitles(withoutA)).toEqual(new Map([['e', 'Title b']]));
   });
 });

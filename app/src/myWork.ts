@@ -15,6 +15,8 @@ export interface MyWorkCard {
   labelIds: string[];
   assigneeUids: string[];
   archived: boolean;
+  /** Set on a subtask, so its face carries the subtask chip. */
+  parentId?: string;
 }
 
 /**
@@ -34,6 +36,7 @@ function toMyWorkCards(docs: { id: string; data: Record<string, unknown> }[]): M
       labelIds: (d.data.labelIds as string[]) ?? [],
       assigneeUids: (d.data.assigneeUids as string[]) ?? [],
       archived: Boolean(d.data.archived),
+      parentId: d.data.parentId as string | undefined,
     }))
     .filter((c) => !c.archived);
 }

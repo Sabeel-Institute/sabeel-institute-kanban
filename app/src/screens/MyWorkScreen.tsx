@@ -19,6 +19,7 @@ import {
   Title,
 } from '../components/ui';
 import { CardFace } from '../components/CardFace';
+import { cardTileName } from '../cardTileName';
 import { space } from '../theme';
 
 const NO_LABELS: Label[] = [];
@@ -159,7 +160,7 @@ export function MyWorkScreen({ user }: { user: SessionUser }) {
                 <Pressable
                   key={`${c.boardId}/${c.id}`}
                   accessibilityRole="button"
-                  accessibilityLabel={c.title}
+                  accessibilityLabel={cardTileName(c)}
                   testID={`card-${c.title}`}
                   onPress={() =>
                     nav.push({ name: 'card', boardId: c.boardId, cardId: c.id })

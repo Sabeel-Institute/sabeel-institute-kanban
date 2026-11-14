@@ -37,6 +37,7 @@ import {
   canManageBoard,
   columnDeleteBlocked,
   columnsPatch,
+  parentTitles,
   subtaskCounts,
   watchKey,
   type BoardColumn,
@@ -65,6 +66,7 @@ function CardTile({
   labels,
   boardMembers,
   subtaskCount,
+  parentTitle,
   t,
   canEdit,
   selected,
@@ -79,6 +81,7 @@ function CardTile({
   labels: readonly Label[];
   boardMembers: readonly BoardMemberProfile[];
   subtaskCount?: number;
+  parentTitle?: string;
   t: Theme;
   canEdit: boolean;
   selected: boolean;
@@ -129,6 +132,7 @@ function CardTile({
             labels={labels}
             boardMembers={boardMembers}
             subtaskCount={subtaskCount}
+            parentTitle={parentTitle}
           />
         </div>
       </div>
@@ -299,6 +303,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
 
   // Derived, not stored — the board already holds every card it needs.
   const subtasksBy = useMemo(() => subtaskCounts(cards.data ?? EMPTY_CARDS), [cards.data]);
+  const parentsBy = useMemo(() => parentTitles(cards.data ?? EMPTY_CARDS), [cards.data]);
 
   const byColumn = useMemo(() => {
     const map = new Map<string, Card[]>();
@@ -698,6 +703,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
                     labels={labels}
                     boardMembers={members}
                     subtaskCount={subtasksBy.get(card.id)}
+                    parentTitle={parentsBy.get(card.id)}
                     t={t}
                     canEdit={canEdit}
                     selected={selection.isSelected(card.id)}

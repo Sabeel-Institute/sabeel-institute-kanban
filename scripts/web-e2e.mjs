@@ -1489,6 +1489,26 @@ try {
       .catch(() => false),
   );
 
+  // The board marks the pair with two chips: the subtask's face names its
+  // main task, and the main task's counts its subtasks. A browser reads the
+  // face's text, so "Subtask of" is in it too, drawn nowhere. Then back into
+  // the card for the unlink below.
+  await admin.getByRole('button', { name: 'Back' }).first().click();
+  const subTile = admin.locator('[data-testid="card-Draft the agenda"]').first();
+  const mainTile = admin.locator('[data-testid="card-Fix signup flow"]').first();
+  const flat = async (tile) => (await tile.innerText()).replace(/\s+/g, ' ');
+  const marked = await subTile
+    .waitFor({ timeout: 20000 })
+    .then(async () => ({ sub: await flat(subTile), main: await flat(mainTile) }))
+    .catch(() => null);
+  check(
+    'on the board, a subtask names its main task and the main task counts it',
+    !!marked && marked.sub.includes('Subtask of Fix signup flow') && /\b1 subtask\b/.test(marked.main),
+    JSON.stringify(marked),
+  );
+  await openCard(admin, 'Fix signup flow');
+  await subtaskRow.waitFor({ timeout: 20000 });
+
   await subtaskRow.click();
   check(
     'a subtask row goes away when unlinked',

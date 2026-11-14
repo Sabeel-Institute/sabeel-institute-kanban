@@ -334,8 +334,11 @@ board, linked to it.
   **Subtask of** at the top — tap that to come back up.
 - The unlink icon separates the two cards again. **It does not delete anything** —
   the subtask stays on the board as an ordinary card.
-- A parent card shows a small **N subtasks** marker on the board, so you can tell
-  at a glance that it breaks down further.
+- On the board, two grey chips show how cards belong together. A card with
+  subtasks says **4 subtasks** (or however many), and each subtask names the
+  card it belongs to, as **↳ Plan the open house**. My Work and Search show a
+  subtask's chip as just **↳ Subtask**, since they list cards from many boards.
+  There's no need for labels such as "main task" or "subtask" to show this.
 
 A subtask is a real card, not a checklist item: it moves through columns, gets
 assigned, and can be discussed like anything else. A card can be a subtask of only
