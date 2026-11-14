@@ -306,8 +306,13 @@ it.
   and it collapses runs of spaces, so those go in as no-break spaces. Its iOS
   parser makes `<br>` a newline only beside another tag, so nothing a phone
   reads has a `<br>` inside a paragraph: `richDocToDisplayHtml` and
-  `markdownToPhoneEditorHtml` write each line as a `<p>`. A soft break edited on
-  a phone therefore saves as a paragraph break, as Android's editor always did.
+  `markdownToPhoneEditorHtml` write each line as a `<p>`. The phone editor
+  opens with a blank line (`<br>`) between blocks, as the card draws them, and
+  `phoneHtmlToMarkdown` reads its HTML back the same way: a line is a line, a
+  blank line ends a paragraph, so the editor shows the card's spacing and a
+  soft break survives an edit on a phone (Faisal, 2026-11-14: "it should just
+  be true to how it's going to be displayed"). The browser editor's HTML goes
+  through `htmlToMarkdown`, where every `<p>` is a paragraph.
   The same parser keeps open tags by name, so neither writes a mark inside the
   same mark, and returns a tapped href still escaped (`decodeDisplayHref`).
 

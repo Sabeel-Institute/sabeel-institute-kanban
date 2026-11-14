@@ -20,7 +20,8 @@ import { useMemo } from 'react';
 import { Linking, Platform } from 'react-native';
 import { EnrichedText } from 'react-native-enriched-html';
 import { decodeDisplayHref, richDocToDisplayHtml, type RichDoc } from '@sabeel/shared';
-import { space, type, useTheme } from '../theme';
+import { type, useTheme } from '../theme';
+import { useRichHtmlStyle } from './richHtmlStyle';
 
 // iOS hands the address back as written in the HTML, escapes included, so
 // `?a=1&b=2` would open as `?a=1&amp;b=2`. Android has decoded it already.
@@ -32,19 +33,13 @@ function openLink({ url }: { url: string }) {
 export function RichDocView({ doc }: { doc: RichDoc }) {
   const t = useTheme();
   const style = useMemo(() => ({ ...type.body, color: t.text.primary }), [t]);
-  // Memoised because a new object re-parses the text natively: the library
-  // treats a style change as a reason to rebuild every span.
+  const shared = useRichHtmlStyle();
+  // Memoised because a new object re-parses the text natively (see
+  // `useRichHtmlStyle`). pressColor too, or a pressed link flashes the
+  // library's own dark blue.
   const htmlStyle = useMemo(
-    () => ({
-      // pressColor too, or a pressed link flashes the library's own dark blue.
-      a: { color: t.accent.base, textDecorationLine: 'underline' as const, pressColor: t.accent.hover },
-      // Text starts at about the same place in both, as it does in a browser. The
-      // library centres a number on its margin plus half the font size, so the gap
-      // is what keeps "10." clear of the words after it.
-      ul: { bulletColor: t.text.secondary, bulletSize: 4, marginLeft: space.sm, gapWidth: space.lg },
-      ol: { markerColor: t.text.secondary, marginLeft: space.xs, gapWidth: space.lg },
-    }),
-    [t],
+    () => ({ ...shared, a: { ...shared.a, pressColor: t.accent.hover } }),
+    [shared, t],
   );
   return (
     <EnrichedText

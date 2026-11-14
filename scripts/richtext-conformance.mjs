@@ -90,36 +90,40 @@ const lib = createRequire(import.meta.url)(`${root}packages/shared/lib/index.js`
  * makes a known problem commoner fails too. "display" compares what a phone
  * draws with the web; "editor" what an unedited save on a phone stores with
  * what was stored. Classes are reported most severe first per document:
- * text, then link or bold/italic, then structure, empty-item, whitespace.
+ * text, then link or bold/italic, then structure, paragraphs, empty-item,
+ * whitespace.
  */
 const WHY = {
   'blank-count': 'a blank line more or fewer between two lines',
   'blank-edge': 'a blank line more or fewer at either end',
   'gap-lost': 'an empty link in a list item takes the gap after the list',
   whitespace: 'spacing only: Android collapses runs, a tab saves as a space',
+  paragraphs: 'a line of marks alone, empty once parsed, saves as the blank line it shows as',
   structure: 'two lists of one kind with a blank line between save as one list',
-  'empty-item': 'the same, for lists of empty items',
+  'empty-item': 'the same, for lists of empty items; on iOS a list of only empty items after a blank line opens without them',
   link: 'iOS joins two links with nothing between them into one',
   'bold/italic': 'a mark ending in, or an italic starting with, the other mark (parseInline)',
   text: 'the same parser gap with literal asterisks, or a no-break space read as a list marker',
 };
 const KNOWN = {
-  plain: {
-    'editor and structure': 1671,
-    'editor ios structure': 1671,
-  },
+  // Realistic documents round-trip a phone editor with their lines and
+  // paragraphs intact since the editor opens with the card's blank lines
+  // (2026-11-14); before, 39% came back regrouped and 17% had two lists merged.
+  plain: {},
   all: {
     'display and blank-count': 13,
     'display ios blank-count': 13,
     'display and blank-edge': 7,
     'display ios blank-edge': 17,
     'display and gap-lost': 0.5,
-    'editor and whitespace': 5827,
-    'editor ios whitespace': 3610,
-    'editor and structure': 102,
-    'editor ios structure': 94,
-    'editor and empty-item': 5,
-    'editor ios empty-item': 5,
+    'editor and whitespace': 5889,
+    'editor ios whitespace': 3638,
+    'editor and paragraphs': 65,
+    'editor ios paragraphs': 32,
+    'editor and structure': 3,
+    'editor ios structure': 1,
+    'editor and empty-item': 1,
+    'editor ios empty-item': 50,
     'editor ios link': 171,
     'editor ios bold/italic': 9,
     'editor and text': 71,

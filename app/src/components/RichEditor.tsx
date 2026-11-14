@@ -43,13 +43,14 @@ import {
   type EnrichedTextInputInstance,
 } from 'react-native-enriched-html';
 import {
-  htmlToMarkdown,
   isMentionQuery,
   mentionInsertion,
   markdownToPhoneEditorHtml,
+  phoneHtmlToMarkdown,
   type MentionCandidate,
 } from '@sabeel/shared';
 import { RichToolbar, type RichMarks } from './RichToolbar';
+import { useRichHtmlStyle } from './richHtmlStyle';
 import { LinkSheet } from './LinkSheet';
 import { MENTION_DESIRED_HEIGHT, ROW_PITCH } from './MentionList';
 import { anchorForCaret, anchorForField, type MentionAnchor } from './mentionAnchor';
@@ -156,6 +157,7 @@ export function RichEditor({
   minHeight?: number;
 }) {
   const t = useTheme();
+  const htmlStyle = useRichHtmlStyle();
   const ref = useRef<EnrichedTextInputInstance>(null);
   /**
    * Seed ONCE, and mean it.
@@ -181,9 +183,12 @@ export function RichEditor({
    * does not reach layout. Measured in the sibling LMS app on an AVD, from
    * cold starts: a 495 px box for 542 px of text every time, its last line
    * hidden; enveloped, it fit. Every tag `markdownToPhoneEditorHtml` emits
-   * (p, b, i, a, ul, ol, li) is in that parser's vocabulary. Not
-   * `markdownToHtml`: its `<br>` inside a paragraph ran two lines into one on
-   * an iPhone, and saved them that way.
+   * (p, b, i, a, ul, ol, li, and br between blocks) is in that parser's
+   * vocabulary. Not `markdownToHtml`: its `<br>` inside a paragraph ran two
+   * lines into one on an iPhone, and saved them that way. The editor shows a
+   * blank line between paragraphs, as the card does, and
+   * `phoneHtmlToMarkdown` reads the two back: a line is a line, a blank line
+   * a paragraph break.
    */
   const initialHtml = useRef<string | null>(null);
   if (initialHtml.current === null) {
@@ -382,7 +387,7 @@ export function RichEditor({
           linkRegex={null}
           textShortcuts={TEXT_SHORTCUTS}
           mentionIndicators={candidates ? ['@'] : []}
-          onChangeHtml={(e) => onChangeMarkdown(htmlToMarkdown(e.nativeEvent.value))}
+          onChangeHtml={(e) => onChangeMarkdown(phoneHtmlToMarkdown(e.nativeEvent.value))}
           onChangeState={(e) => {
             const s = e.nativeEvent;
             setMarks({
@@ -431,7 +436,7 @@ export function RichEditor({
             // alone, typing and reading the same words differ in size.
             fontSize: type_.body.fontSize,
           }}
-          htmlStyle={{ a: { color: t.accent.base } }}
+          htmlStyle={htmlStyle}
         />
       </View>
 

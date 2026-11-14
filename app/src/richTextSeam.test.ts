@@ -101,14 +101,16 @@ describe('the phone components', () => {
     expect(view).toMatch(/\{richDocToDisplayHtml\(doc\)\} <\/EnrichedText>/);
   });
 
-  it('open the phone editor on a paragraph per line, never a <br> inside one', () => {
+  it('open the phone editor on a paragraph per line, never a <br> inside one, and read it back as a phone', () => {
     // markdownToHtml's `line<br>line` opened as one line on an iPhone, and saved so.
+    // The browser's reading takes every <p> for a paragraph; a phone's <p> is a line.
     const editor = src('RichEditor.tsx');
     expect(editor).toMatch(/initialHtml\.current = `<html>\$\{markdownToPhoneEditorHtml\(initialMarkdown\)\}<\/html>`;/);
     expect(editor).toMatch(/defaultValue=\{initialHtml\.current\}/);
     const imported = editor.match(/import \{([^}]*)\} from '@sabeel\/shared'/)?.[1] ?? '';
     expect(imported).toMatch(/\bmarkdownToPhoneEditorHtml\b/);
     expect(imported).not.toMatch(/\bmarkdownToHtml\b/);
-    expect(editor).toMatch(/onChangeHtml=\{\(e\) => onChangeMarkdown\(htmlToMarkdown\(e\.nativeEvent\.value\)\)\}/);
+    expect(editor).toMatch(/onChangeHtml=\{\(e\) => onChangeMarkdown\(phoneHtmlToMarkdown\(e\.nativeEvent\.value\)\)\}/);
+    expect(imported).not.toMatch(/\bhtmlToMarkdown\b/);
   });
 });
