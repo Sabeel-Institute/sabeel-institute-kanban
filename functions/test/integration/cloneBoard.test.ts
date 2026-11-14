@@ -127,6 +127,7 @@ describe('cloneBoard: who may', () => {
     expect(await refusal(ORG, { boardId: 'cb_tmpl', name: '   ', cloneId: newId() })).toMatch(/Give the board a name/);
     expect(await refusal(ORG, { boardId: 'cb_nowhere', name: 'Mine', cloneId: newId() })).toMatch(/No such board/);
     expect(await refusal(ORG, { boardId: 'cb_tmpl', name: 'Mine', cloneId: 'not/an id' })).toMatch(/A cloneId is required/);
+    expect(await refusal(ORG, { boardId: 'cb_tmpl', name: 'Mine', cloneId: newId(), subscribe: 'yes' })).toMatch(/subscribe must be true or false/);
   });
 
   it('lets an admin clone a board they are not on', async () => {
@@ -148,7 +149,8 @@ describe('cloneBoard: the clone', () => {
     );
 
   beforeAll(async () => {
-    const res = await callFunction('cloneBoard', { boardId: 'cb_tmpl', name: ' Spring Program ', cloneId }, await idTokenFor(ORG));
+    // The bell on: every card below names the cloner as its subscriber.
+    const res = await callFunction('cloneBoard', { boardId: 'cb_tmpl', name: ' Spring Program ', cloneId, subscribe: true }, await idTokenFor(ORG));
     expect(res.body.error).toBeUndefined();
     expect(res.body.result).toEqual({ boardId: cloneId, name: 'Spring Program' });
   });
@@ -256,6 +258,15 @@ describe('cloneBoard: the clone', () => {
     expect((await adminDb().collection('boards').where('name', '==', 'Spring Program').get()).size).toBe(1);
     // Someone else cannot take that id over.
     expect(await refusal(ADMIN, { boardId: 'cb_tmpl', name: 'Mine', cloneId })).toMatch(/already exists/);
+  });
+
+  it('subscribes nobody without the bell, which is also what an app from before it asks for', async () => {
+    const quiet = newId();
+    const res = await callFunction('cloneBoard', { boardId: 'cb_tmpl', name: 'Quiet Program', cloneId: quiet }, await idTokenFor(ORG));
+    expect(res.body.error).toBeUndefined();
+    const cards = (await adminDb().collection('cards').where('boardId', '==', quiet).get()).docs.map((d) => d.data());
+    expect(cards).toHaveLength(4);
+    for (const c of cards) expect(c.subscriberUids).toEqual([]);
   });
 });
 

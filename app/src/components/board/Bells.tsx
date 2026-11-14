@@ -7,12 +7,22 @@ import { IconAction } from '../ui';
  *
  * Shown only to a member of the board. Rules hold every subscriber to the
  * board's members, and an admin may add a card to a board they are not on.
+ *
+ * The Clone sheet uses it too, labelled for every card, and starts it off.
  */
-export function NewCardBell({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+export function NewCardBell({
+  on,
+  onToggle,
+  label = 'Subscribe to this card',
+}: {
+  on: boolean;
+  onToggle: () => void;
+  label?: string;
+}) {
   return (
     <IconAction
       icon={on ? 'notifications-active' : 'notifications-none'}
-      label="Subscribe to this card"
+      label={label}
       selected={on}
       accent={on}
       onPress={onToggle}

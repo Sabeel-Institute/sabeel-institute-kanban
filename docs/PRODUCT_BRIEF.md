@@ -599,8 +599,14 @@ and opens when it lands.
   comments, history and attachments, and the template's own labels (Faisal,
   2026-11-13: institute labels only). A subtask whose parent is archived is
   cloned as an ordinary card.
-- Each cloned card starts as a new card does: subscribed by the cloner, its
-  history opening "created" by them, and counted in Stats as created that day.
+- Each cloned card starts as a new card does: its history opening "created"
+  by the cloner, and counted in Stats as created that day. **Subscribed** to
+  every one only if the cloner turns on the sheet's bell, the new card's bell
+  labelled "Subscribe to every card" — which starts **off**, unlike a new
+  card's (Faisal, 2026-11-14: like creating all the cards, but a choice; a
+  template can hold hundreds, and each would announce every change). The
+  callable takes `subscribe` and treats it absent as off, so a 0.18.0 app,
+  which offers no bell, clones without subscribing anyone.
 - **One write, which keeps its own books.** The `cloneBoard` callable writes the
   board, every card and each card's "created" line in one transaction, so a
   clone exists whole or not at all; rules check a new card against its board as

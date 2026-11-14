@@ -2831,6 +2831,14 @@ try {
       await cloneName.inputValue(),
     );
     await cloneName.fill('Spring Program');
+    // The bell starts off, unlike a new card's: this clone turns it on, and
+    // every card it makes names the cloner as subscriber (checked below). The
+    // Summer clone further down leaves it off.
+    const cloneBell = admin.getByRole('button', { name: 'Subscribe to every card', exact: true });
+    const bellWasOff = (await cloneBell.getAttribute('aria-pressed')) === 'false';
+    await cloneBell.click();
+    const bellNowOn = (await cloneBell.getAttribute('aria-pressed')) === 'true';
+    check('the clone’s bell starts off and turns on', bellWasOff && bellNowOn, JSON.stringify({ bellWasOff, bellNowOn }));
     // The clone is held on its way for a few seconds: a sheet whose action is
     // running cannot be closed, by Cancel or by Escape, since the clone cannot
     // be called back and opens when it lands.
@@ -3054,12 +3062,23 @@ try {
         if (seen.camp === 1 && seen.program === 0) break;
         await new Promise((r) => setTimeout(r, 500));
       }
+      const camp = (await db.collection('boards').where('name', '==', 'Summer Camp').get()).docs[0];
+      seen.subscribers = camp
+        ? (await db.collection('cards').where('boardId', '==', camp.id).get()).docs.map((d) => d.data().subscriberUids)
+        : null;
       console.log(JSON.stringify(seen));
     `);
     check(
       'a clone tried again under a new name after its answer was lost is one board, under the new name',
       lostSaid && openedRenamed && summer.camp === 1 && summer.program === 0,
       JSON.stringify({ lostSaid, openedRenamed, ...summer }),
+    );
+    check(
+      'a clone made with the bell left off subscribes nobody to its cards',
+      Array.isArray(summer.subscribers) &&
+        summer.subscribers.length === 3 &&
+        summer.subscribers.every((u) => Array.isArray(u) && u.length === 0),
+      JSON.stringify(summer.subscribers),
     );
     await backToBoards(admin);
   }

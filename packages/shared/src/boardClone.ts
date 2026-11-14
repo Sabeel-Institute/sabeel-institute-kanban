@@ -81,6 +81,13 @@ export function boardClone(params: {
   boardId: string;
   name: string;
   cloner: string;
+  /**
+   * Whether the cloner follows every cloned card: the Clone sheet's bell,
+   * OFF until they turn it on (Faisal, 2026-11-14), unlike a new card's. A
+   * template can hold hundreds of cards, and following all of them is every
+   * change anyone makes to any of them.
+   */
+  subscribe: boolean;
   copierProfile: { displayName: string; email: string };
   now: number;
   /** A fresh card document id. */
@@ -114,8 +121,8 @@ export function boardClone(params: {
       columnId,
       rank: c.rank,
       assigneeUids: [],
-      // The cloner, as on any card they create: they are its only member.
-      subscriberUids: [cloner],
+      // The cloner only, and only when they asked: they are the only member.
+      subscriberUids: params.subscribe ? [cloner] : [],
       priority: 'none',
       labelIds: c.labelIds.filter((id) => institute.has(id)),
       archived: false,

@@ -21,7 +21,7 @@ const card = (over: Partial<CloneSourceCard> & { id: string }): CloneSourceCard 
   ...over,
 });
 
-function clone(cards: CloneSourceCard[]) {
+function clone(cards: CloneSourceCard[], subscribe = false) {
   let n = 0;
   return boardClone({
     source: { description: 'For every program', columns },
@@ -30,6 +30,7 @@ function clone(cards: CloneSourceCard[]) {
     boardId: 'clone',
     name: '  Spring Program  ',
     cloner: 'u_org',
+    subscribe,
     copierProfile: { displayName: 'Org', email: 'org@example.com' },
     now: 1000,
     newCardId: () => `new${(n += 1)}`,
@@ -78,7 +79,8 @@ describe('boardClone: the cards', () => {
           columnId: board.columnIds[1],
           rank: 'q',
           assigneeUids: [],
-          subscriberUids: ['u_org'],
+          // The sheet's bell starts off.
+          subscriberUids: [],
           priority: 'none',
           labelIds: [],
           archived: false,
@@ -94,6 +96,11 @@ describe('boardClone: the cards', () => {
         created: { type: 'created', actorUid: 'u_org', at: 1000 },
       },
     ]);
+  });
+
+  it('subscribes the cloner to every card when the bell is on, and only the cloner', () => {
+    const { cards } = clone([card({ id: 'a' }), card({ id: 'b', columnId: 'c_done' })], true);
+    expect(cards.map((c) => c.data.subscriberUids)).toEqual([['u_org'], ['u_org']]);
   });
 
   it('leaves archived cards behind', () => {

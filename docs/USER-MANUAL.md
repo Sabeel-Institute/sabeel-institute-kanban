@@ -631,9 +631,12 @@ start from a board made for it: its columns, a card for each step, the
 description that says how, and the subtasks under each. On **Boards**, press
 and hold that board — on a computer, right-click it. Give the clone its own name
 and tap **Clone**. The new board opens, with you as its only member and owner.
+To be subscribed to every card in the clone, as you are to a card you add,
+turn on the **bell** beside Clone first; it starts off, because a big template
+would otherwise tell you about every change to every card.
 
 <div class="pair">
-  <figure class="ph"><img src="manual/img/clone-phone.png" alt="Cloning a board on a phone: the name field, what the clone holds, and Clone"><figcaption>On a phone — press and hold the board</figcaption></figure>
+  <figure class="ph"><img src="manual/img/clone-phone.png" alt="Cloning a board on a phone: the name field, Clone and its bell, and what the clone holds"><figcaption>On a phone — press and hold the board</figcaption></figure>
   <figure class="wd"><img src="manual/img/clone-wide.png" alt="Cloning a board in a browser"><figcaption>In a browser — right-click the board</figcaption></figure>
 </div>
 
@@ -969,7 +972,7 @@ at the top of the list to show only those. Nobody is notified again.
 **…start a program from a template board?** *(organizers and admins)*
 On **Boards**, press and hold the template (right-click on a computer) → a new
 name → **Clone**. Its columns and open cards come along, without dates or
-assignees.
+assignees. Turn on the bell beside Clone to be subscribed to every card.
 
 **…rename a board?** *(the board's owners)*
 Open the board → **settings** → Name. That screen is the only place that does it.

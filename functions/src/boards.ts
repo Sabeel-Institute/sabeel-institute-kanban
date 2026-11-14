@@ -410,7 +410,7 @@ export const addBoardMember = onCall({ secrets: [sentryDsn] }, guarded(async (re
  * an admin. And it reads the source, so the caller must see it: a member of
  * it, or an admin.
  */
-export const cloneBoard = onCall({ secrets: [sentryDsn] }, guarded(async (request: CallableRequest<{ boardId?: unknown; name?: unknown; cloneId?: unknown }>) => {
+export const cloneBoard = onCall({ secrets: [sentryDsn] }, guarded(async (request: CallableRequest<{ boardId?: unknown; name?: unknown; cloneId?: unknown; subscribe?: unknown }>) => {
   const auth = request.auth;
   if (!auth) throw new HttpsError('unauthenticated', 'Sign in first.');
 
@@ -436,6 +436,12 @@ export const cloneBoard = onCall({ secrets: [sentryDsn] }, guarded(async (reques
   }
   const nameProblem = validateBoardName(name);
   if (nameProblem) throw new HttpsError('invalid-argument', nameProblem);
+  // The sheet's bell. Absent is off, which is also what an app from before the
+  // bell gets: it offered no choice, and off is the default the bell starts at.
+  const subscribe = request.data?.subscribe;
+  if (subscribe !== undefined && typeof subscribe !== 'boolean') {
+    throw new HttpsError('invalid-argument', 'subscribe must be true or false.');
+  }
 
   const db = getFirestore();
   const cloneRef = db.doc(`boards/${cloneId}`);
@@ -485,6 +491,7 @@ export const cloneBoard = onCall({ secrets: [sentryDsn] }, guarded(async (reques
       boardId: cloneId,
       name,
       cloner: actor.uid,
+      subscribe: subscribe === true,
       copierProfile: {
         displayName: (me.data()?.displayName as string) ?? '',
         email: (me.data()?.email as string) ?? '',
