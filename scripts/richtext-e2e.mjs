@@ -195,6 +195,10 @@ const fonts = await page.evaluate(() => {
     app: probe ? norm(getComputedStyle(probe).fontFamily) : null,
     size: es.fontSize,
     serif: /(^|,)(times|serif)/.test(norm(es.fontFamily)),
+    // The card draws a description with react-native-web's Text, at the
+    // browser's normal line height; the editor must space its lines the same.
+    lineHeight: es.lineHeight,
+    appLineHeight: probe ? getComputedStyle(probe).lineHeight : null,
   };
 });
 check(
@@ -203,6 +207,11 @@ check(
   JSON.stringify(fonts),
 );
 check('and the app body size', fonts.size === '15px', fonts.size);
+check(
+  'and the card’s line height, so editing spaces lines as the card does',
+  fonts.appLineHeight !== null && fonts.lineHeight === fonts.appLineHeight,
+  JSON.stringify({ editor: fonts.lineHeight, app: fonts.appLineHeight }),
+);
 
 await page.keyboard.press('End');
 // Collapsed at the line's end, or Enter below replaces the selection.
