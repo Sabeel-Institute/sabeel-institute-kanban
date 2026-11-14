@@ -48,6 +48,10 @@ export function Sheet({
    * to. The action cannot be called back
    * once sent, so the honest sheet stays until it answers.
    *
+   * It holds only the sheet's own exits. A notification or a link can still
+   * navigate from under it, so whatever the action does when it lands must
+   * also check that its screen is still showing (`BoardsScreen`'s `showing`).
+   *
    * ONLY for an action that is sure to answer: a callable gives up after 70
    * seconds. A Firestore write does not — offline it waits for the connection
    * — so a sheet held open by one traps whoever lost signal, with Back dead

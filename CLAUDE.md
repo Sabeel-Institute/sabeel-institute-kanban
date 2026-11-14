@@ -454,9 +454,12 @@ itself is deliberately NOT darkened — that would collapse it into
   about one write a second on a document: a burst of hundreds fails in ways the
   triggers can only log. So the writer, which knows every figure, writes them —
   the count and each "created" line with the cards, Stats once — and stamps the
-  cards `SYSTEM_ACTOR`, which keeps every card trigger out (`cloneBoard`,
-  2026-11-13). The emulator runs triggers one at a time and cannot show the
-  burst; reason about it, do not wait for a test to.
+  cards `SYSTEM_ACTOR`, which keeps the two counting triggers out
+  (`onCardWritten`, `onCardBoardCount`; `cloneBoard`, 2026-11-13). Only those
+  two read the stamp: `onCardNotify` still runs, so such a writer must not
+  assign anyone, and each "created" line still joins a pending notice. The
+  emulator runs triggers one at a time and cannot show the burst; reason about
+  it, do not wait for a test to.
 
 ---
 
