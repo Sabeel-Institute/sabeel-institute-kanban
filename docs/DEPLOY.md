@@ -521,9 +521,13 @@ is the Gmail API. Such a report was kept; nothing re-sends it.
 These cost real time on the sibling time-tracker project; see
 `docs/INHERITED-STACK.md` for the full accounts.
 
-**A new callable answers 403.** Gen-2 callables get their public-invoker
-binding only on the *create* path, and the organization's domain-restricted
-sharing refuses it there. The deploy reports `Unable to set the invoker` and
+**A new callable answers 403.** The same holds for a new blocking function
+(`beforeSignIn` and the like). Deploy Functions' plan step (`sabeel-ci
+ci-functions plan`) names each such function before the deploy and prints the
+commands below for it, in its log and the run summary; ci-tools' README, "A
+new function answers 403", is the general statement. Gen-2 callables get their
+public-invoker binding only on the *create* path, and the organization's
+domain-restricted sharing refuses it there. The deploy reports `Unable to set the invoker` and
 blames `roles/functions.admin`; `firebase-debug.log` has the real answer, "do
 not belong to a permitted customer". Recreating the function, or deploying as
 Owner, meets the same refusal, and a later deploy never retries it. Every call
@@ -609,8 +613,9 @@ and every released tag's.
 # 1. Backend, when functions, rules or indexes changed, BEFORE the clients that
 #    need it. Indexes first; a deploy-log entry that needs another order (such as
 #    functions before rules) states it. Functions can also go through Deploy
-#    Functions (docs/GITHUB-ACTIONS.md). A NEW callable then needs its invoker
-#    bound by hand (§ Known traps, "A new callable answers 403").
+#    Functions (docs/GITHUB-ACTIONS.md). A NEW callable or blocking function
+#    then needs its invoker bound by hand (§ Known traps, "A new callable
+#    answers 403"); Deploy Functions' plan step names it and prints the steps.
 npx firebase deploy --only firestore:indexes --project sabeel-institute-kanban
 npx firebase deploy --only firestore:rules,storage,functions --project sabeel-institute-kanban
 
