@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { boardCopy, type CopySourceCard } from '../src/boardCopy';
+import { SYSTEM_ACTOR } from '../src/activity';
+import { boardClone, boardCloneBytes, utf8Length, type CloneSourceCard } from '../src/boardClone';
 
 const columns = [
   { id: 'c_todo', name: 'To Do' },
@@ -10,7 +11,7 @@ const labels = [
   { id: 'own', boardId: 'tmpl' },
   { id: 'other', boardId: 'elsewhere' },
 ];
-const card = (over: Partial<CopySourceCard> & { id: string }): CopySourceCard => ({
+const card = (over: Partial<CloneSourceCard> & { id: string }): CloneSourceCard => ({
   title: `Title ${over.id}`,
   description: `Body of ${over.id}`,
   columnId: 'c_todo',
@@ -20,25 +21,25 @@ const card = (over: Partial<CopySourceCard> & { id: string }): CopySourceCard =>
   ...over,
 });
 
-function copy(cards: CopySourceCard[]) {
+function clone(cards: CloneSourceCard[]) {
   let n = 0;
-  return boardCopy({
+  return boardClone({
     source: { description: 'For every program', columns },
     cards,
     labels,
-    boardId: 'copy',
+    boardId: 'clone',
     name: '  Spring Program  ',
-    copier: 'u_org',
+    cloner: 'u_org',
     copierProfile: { displayName: 'Org', email: 'org@example.com' },
     now: 1000,
     newCardId: () => `new${(n += 1)}`,
   });
 }
 
-describe('boardCopy: the board', () => {
-  const { board } = copy([]);
+describe('boardClone: the board', () => {
+  const { board } = clone([]);
 
-  it('is a new board with the copier as its only member and owner', () => {
+  it('is a new board with the cloner as its only member and owner', () => {
     expect(board.name).toBe('Spring Program');
     expect(board.memberUids).toEqual(['u_org']);
     expect(board.boardOwnerUids).toEqual(['u_org']);
@@ -47,6 +48,11 @@ describe('boardCopy: the board', () => {
     expect(board.createdAt).toBe(1000);
     expect(board.archived).toBe(false);
     expect(board.activeCardCount).toBe(0);
+  });
+
+  it('counts its own cards: the clone keeps its own books', () => {
+    const { board: counted } = clone([card({ id: 'a' }), card({ id: 'b' }), card({ id: 'gone', archived: true })]);
+    expect(counted.activeCardCount).toBe(2);
   });
 
   it('keeps the description and the columns in order, under new ids', () => {
@@ -59,14 +65,14 @@ describe('boardCopy: the board', () => {
   });
 });
 
-describe('boardCopy: the cards', () => {
-  it('copies an open card with its title, description, column and rank, and nothing of one run', () => {
-    const { board, cards } = copy([card({ id: 'a', columnId: 'c_done', rank: 'q' })]);
+describe('boardClone: the cards', () => {
+  it('clones an open card with its title, description, column and rank, and nothing of one run', () => {
+    const { board, cards } = clone([card({ id: 'a', columnId: 'c_done', rank: 'q' })]);
     expect(cards).toEqual([
       {
         id: 'new1',
         data: {
-          boardId: 'copy',
+          boardId: 'clone',
           title: 'Title a',
           description: 'Body of a',
           columnId: board.columnIds[1],
@@ -81,24 +87,27 @@ describe('boardCopy: the cards', () => {
           createdAt: 1000,
           createdBy: 'u_org',
           updatedAt: 1000,
-          updatedBy: 'u_org',
+          // Keeps the card triggers out: the clone writes the count, the history
+          // and Stats itself.
+          updatedBy: SYSTEM_ACTOR,
         },
+        created: { type: 'created', actorUid: 'u_org', at: 1000 },
       },
     ]);
   });
 
   it('leaves archived cards behind', () => {
-    const { cards } = copy([card({ id: 'a' }), card({ id: 'gone', archived: true })]);
+    const { cards } = clone([card({ id: 'a' }), card({ id: 'gone', archived: true })]);
     expect(cards.map((c) => c.data.title)).toEqual(['Title a']);
   });
 
   it('keeps institute labels only, dropping the template’s own, another board’s and a deleted one', () => {
-    const { cards } = copy([card({ id: 'a', labelIds: ['own', 'inst', 'other', 'deleted'] })]);
+    const { cards } = clone([card({ id: 'a', labelIds: ['own', 'inst', 'other', 'deleted'] })]);
     expect(cards[0]!.data.labelIds).toEqual(['inst']);
   });
 
-  it('links each subtask to its parent’s copy, at any depth', () => {
-    const { cards } = copy([
+  it('links each subtask to its parent’s clone, at any depth', () => {
+    const { cards } = clone([
       card({ id: 'p' }),
       card({ id: 'child', parentId: 'p' }),
       card({ id: 'grandchild', parentId: 'child' }),
@@ -110,7 +119,7 @@ describe('boardCopy: the cards', () => {
   });
 
   it('makes a subtask of an archived parent an ordinary card', () => {
-    const { cards } = copy([
+    const { cards } = clone([
       card({ id: 'p', archived: true }),
       card({ id: 'child', parentId: 'p' }),
     ]);
@@ -119,7 +128,7 @@ describe('boardCopy: the cards', () => {
   });
 
   it('puts a card whose column has gone in the first column', () => {
-    const { board, cards } = copy([card({ id: 'a', columnId: 'c_deleted' })]);
+    const { board, cards } = clone([card({ id: 'a', columnId: 'c_deleted' })]);
     expect(cards[0]!.data.columnId).toBe(board.columnIds[0]);
   });
 
@@ -132,11 +141,26 @@ describe('boardCopy: the cards', () => {
       assigneeUids: ['u_x'],
       priority: 'urgent',
       commentCount: 4,
-    } as CopySourceCard;
-    const { data } = copy([source]).cards[0]!;
+    } as CloneSourceCard;
+    const { data } = clone([source]).cards[0]!;
     expect(data.dueDate).toBeUndefined();
     expect(data.assigneeUids).toEqual([]);
     expect(data.priority).toBe('none');
     expect(data.commentCount).toBe(0);
+  });
+});
+
+describe('boardCloneBytes', () => {
+  it('counts UTF-8 bytes, which is what Firestore limits', () => {
+    expect(utf8Length('a')).toBe(1);
+    expect(utf8Length('ب')).toBe(2);
+    expect(utf8Length('€')).toBe(3);
+    expect(utf8Length('😀')).toBe(4);
+  });
+
+  it('grows with the bytes in the descriptions, not their characters', () => {
+    const plain = boardCloneBytes(clone([card({ id: 'a', description: 'x'.repeat(1000) })]));
+    const euros = boardCloneBytes(clone([card({ id: 'a', description: '€'.repeat(1000) })]));
+    expect(euros - plain).toBe(2000);
   });
 });

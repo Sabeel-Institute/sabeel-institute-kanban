@@ -4,8 +4,9 @@ import { Icon } from '../icons';
 import { BOARD_NAME_MAX, sortBoardsForList } from '@sabeel/shared';
 import {
   boardsView,
-  copyBoard,
+  cloneBoard,
   createBoard,
+  newBoardId,
   noteBoardOpened,
   toggleFavourite,
   useMyBoardPrefs,
@@ -30,7 +31,7 @@ import {
   Title,
 } from '../components/ui';
 import { PushNudge } from '../components/PushNudge';
-import { CopyBoardSheet } from '../components/CopyBoardSheet';
+import { CloneBoardSheet } from '../components/CloneBoardSheet';
 import { contextMenuProps } from '../contextMenu';
 import { useAction } from '../useAction';
 import { radius, space, type, useTheme } from '../theme';
@@ -40,24 +41,26 @@ const EMPTY: string[] = [];
 
 /**
  * One board in the list. A tap opens it; a long-press, or a right-click on a
- * computer, offers to copy it — only to someone who can make boards, since a
- * copy is one. For anyone else `onCopy` is absent and a press is only a press:
- * no sheet, no menu, nothing announcing a feature they cannot use. A screen
- * reader gets the same offer as an action on the row, since a long-press is
- * not something every reader is used to giving.
+ * computer, offers to clone it — only to someone who can make boards, since a
+ * clone is one. For anyone else `onClone` is absent and a press is only a press:
+ * no sheet, no menu, nothing announcing a feature they cannot use. On a phone
+ * a screen reader gets the same offer as an action on the row, since a
+ * long-press is not something every reader is used to giving; react-native-web
+ * drops `accessibilityActions`, and there the keyboard's context-menu key (or
+ * Shift+F10) fires the same `contextmenu` a right-click does.
  */
 function BoardRow({
   board,
   isFavourite,
   onOpen,
   onToggleFavourite,
-  onCopy,
+  onClone,
 }: {
   board: BoardListItem;
   isFavourite: boolean;
   onOpen: () => void;
   onToggleFavourite: () => void;
-  onCopy: (() => void) | undefined;
+  onClone: (() => void) | undefined;
 }) {
   const t = useTheme();
   return (
@@ -65,11 +68,11 @@ function BoardRow({
       <Row style={styles.between}>
         <Pressable
           onPress={onOpen}
-          onLongPress={onCopy}
-          {...contextMenuProps(onCopy)}
-          accessibilityActions={onCopy ? [{ name: 'copy', label: 'Copy board' }] : undefined}
+          onLongPress={onClone}
+          {...contextMenuProps(onClone)}
+          accessibilityActions={onClone ? [{ name: 'clone', label: 'Clone board' }] : undefined}
           onAccessibilityAction={(e) => {
-            if (e.nativeEvent.actionName === 'copy') onCopy?.();
+            if (e.nativeEvent.actionName === 'clone') onClone?.();
           }}
           style={styles.grow}
           accessibilityRole="button"
@@ -157,9 +160,9 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
   const { filter } = boardsView.use();
   const setFilter = (v: string) => boardsView.set({ filter: v });
   const [creating, setCreating] = useState(false);
-  /** The board whose copy sheet is open. */
-  const [copying, setCopying] = useState<BoardListItem | null>(null);
-  const copyAction = useAction('copyBoard');
+  /** The board whose clone sheet is open, and the id its clone will have. */
+  const [cloning, setCloning] = useState<{ board: BoardListItem; cloneId: string } | null>(null);
+  const cloneAction = useAction('cloneBoard');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const t = useTheme();
@@ -183,19 +186,20 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
   }
 
   // Every board in this list is one you can see, and none is archived, so
-  // making boards is the whole question; `copyBoard` asks all three again.
-  const onCopyOf = (b: BoardListItem) =>
+  // making boards is the whole question; `cloneBoard` asks all three again.
+  const onCloneOf = (b: BoardListItem) =>
     sessionCan.createBoards(user)
       ? () => {
-          copyAction.setError(null);
-          setCopying(b);
+          cloneAction.setError(null);
+          // One id per offer, kept across tries: see `cloneBoard`.
+          setCloning({ board: b, cloneId: newBoardId() });
         }
       : undefined;
 
-  async function copy(source: BoardListItem, name: string) {
-    await copyAction.run(async () => {
-      const id = await copyBoard(source.id, name);
-      setCopying(null);
+  async function clone(offer: { board: BoardListItem; cloneId: string }, name: string) {
+    await cloneAction.run(async () => {
+      const id = await cloneBoard(offer.board.id, name, offer.cloneId);
+      setCloning(null);
       // Opened as from the list, so Back finds it under Recent.
       void noteBoardOpened(user, id, recents).catch(() => {});
       nav.push({ name: 'board', boardId: id });
@@ -301,7 +305,7 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
                 isFavourite
                 onOpen={() => open(b)}
                 onToggleFavourite={() => toggleFavourite(user, b.id, favourites)}
-                onCopy={onCopyOf(b)}
+                onClone={onCloneOf(b)}
               />
             ))}
           </CardGrid>
@@ -319,7 +323,7 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
                 isFavourite={false}
                 onOpen={() => open(b)}
                 onToggleFavourite={() => toggleFavourite(user, b.id, favourites)}
-                onCopy={onCopyOf(b)}
+                onClone={onCloneOf(b)}
               />
             ))}
           </CardGrid>
@@ -341,7 +345,7 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
                 isFavourite={false}
                 onOpen={() => open(b)}
                 onToggleFavourite={() => toggleFavourite(user, b.id, favourites)}
-                onCopy={onCopyOf(b)}
+                onClone={onCloneOf(b)}
               />
             ))}
           </CardGrid>
@@ -364,13 +368,13 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
           archived. */}
       <ArchivedBoards user={user} onOpen={open} />
 
-      {copying ? (
-        <CopyBoardSheet
-          boardName={copying.name}
-          busy={copyAction.busy}
-          error={copyAction.error}
-          onCopy={(name) => copy(copying, name)}
-          onClose={() => setCopying(null)}
+      {cloning ? (
+        <CloneBoardSheet
+          boardName={cloning.board.name}
+          busy={cloneAction.busy}
+          error={cloneAction.error}
+          onClone={(name) => clone(cloning, name)}
+          onClose={() => setCloning(null)}
         />
       ) : null}
     </Screen>
@@ -412,8 +416,8 @@ function ArchivedBoards({
                 isFavourite={false}
                 onOpen={() => onOpen(b)}
                 onToggleFavourite={() => {}}
-                // An archived board is restored before it is copied.
-                onCopy={undefined}
+                // An archived board is restored before it is cloned.
+                onClone={undefined}
               />
             ))}
           </CardGrid>

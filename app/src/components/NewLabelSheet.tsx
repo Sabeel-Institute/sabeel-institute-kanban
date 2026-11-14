@@ -40,7 +40,7 @@ export function NewLabelSheet({
   const [color, setColor] = useState<string>(LABEL_COLORS[0]);
 
   return (
-    <Sheet visible title="New label" onClose={onClose}>
+    <Sheet visible title="New label" onClose={onClose} busy={busy}>
       <Hint>{`This label will only be on ${boardName}.`}</Hint>
       <TextField
         value={name}

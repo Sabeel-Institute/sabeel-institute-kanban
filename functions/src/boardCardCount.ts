@@ -1,8 +1,12 @@
 import './setup';
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { logger } from 'firebase-functions/v2';
-import { guardedEvent, sentryDsn } from './sentry';
+import { guardedEvent, reportError, sentryDsn } from './sentry';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { SYSTEM_ACTOR } from '@sabeel/shared';
+
+/** gRPC's NOT_FOUND, which an update of a document that does not exist fails with. */
+const NOT_FOUND = 5;
 
 /**
  * Keeps `activeCardCount` on each board — the number of NON-archived cards — in
@@ -21,6 +25,10 @@ export const onCardBoardCount = onDocumentWritten(
   guardedEvent(async (event) => {
     const before = event.data?.before?.data();
     const after = event.data?.after?.data();
+    // A write that keeps its own books has counted itself: `cloneBoard` writes
+    // the clone's count with its cards, which a burst of increments here, all
+    // on one board document, could not be trusted to reach.
+    if (after?.updatedBy === SYSTEM_ACTOR) return;
 
     const from = before && !before.archived ? (before.boardId as string) : null;
     const to = after && !after.archived ? (after.boardId as string) : null;
@@ -36,7 +44,15 @@ export const onCardBoardCount = onDocumentWritten(
       } catch (e) {
         // Boards archive rather than hard-delete, so the board should always be
         // here; if it somehow isn't, there is nothing to keep in step.
-        logger.debug('activeCardCount update skipped', { boardId, error: String(e) });
+        if ((e as { code?: number }).code === NOT_FOUND) {
+          logger.debug('activeCardCount update skipped', { boardId, error: String(e) });
+          return;
+        }
+        // Anything else leaves the board's count wrong until
+        // scripts/backfill-board-card-count.mjs runs, so it is reported, not
+        // thrown: a retried trigger would count the card twice.
+        logger.warn('activeCardCount not updated', { boardId, delta, error: String(e) });
+        await reportError(e).catch(() => undefined);
       }
     };
 

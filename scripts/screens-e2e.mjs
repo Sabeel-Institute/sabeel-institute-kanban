@@ -598,14 +598,14 @@ async function tour(page, tag, width) {
     'the permission stub is not taking effect — the card is in no screenshot',
   );
 
-  // Copying a board: a long-press on its row, a mouse button held as a finger
+  // Cloning a board: a long-press on its row, a mouse button held as a finger
   // would be, opens the sheet over the list.
-  await visit('boards-copy', async () => {
+  await visit('boards-clone', async () => {
     await page.getByText('Fundraising 2026', { exact: true }).first().click({ delay: 900 });
-    await page.getByLabel('Name of the copy').waitFor({ timeout: 15000 });
+    await page.getByLabel('Name of the clone').waitFor({ timeout: 15000 });
   });
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await page.getByLabel('Name of the copy').waitFor({ state: 'detached', timeout: 15000 });
+  await page.getByLabel('Name of the clone').waitFor({ state: 'detached', timeout: 15000 });
 
   await visit('mywork', () => nav('My Work'));
   await visit('search', () => nav('Search'));
@@ -1076,8 +1076,8 @@ async function tour(page, tag, width) {
    */
   if (width < WIDE_BREAKPOINT) {
     for (const [who, role, wants] of [
-      ['sara', 'owner', { deleteColumn: true, settings: true, members: false, copy: true }],
-      ['omar', 'member', { deleteColumn: false, settings: false, members: true, copy: false }],
+      ['sara', 'owner', { deleteColumn: true, settings: true, members: false, clone: true }],
+      ['omar', 'member', { deleteColumn: false, settings: false, members: true, clone: false }],
     ]) {
       const roleCtx = await browser.newContext({ viewport: { width, height: 900 } });
       const rp = await roleCtx.newPage();
@@ -1087,16 +1087,16 @@ async function tour(page, tag, width) {
       await rp.getByRole('button', { name: who, exact: true }).click();
       await rp.getByRole('button', { name: 'More' }).waitFor({ timeout: 40000 });
       await rp.getByText('Fundraising 2026').first().waitFor({ timeout: 30000 });
-      // A copy is a new board: Sara, an organizer, is offered one by a
+      // A clone is a new board: Sara, an organizer, is offered one by a
       // right-click on the row; Omar, a member, gets nothing. Owning the board
       // has nothing to do with it.
       await rp.getByText('Fundraising 2026', { exact: true }).first().click({ button: 'right' });
-      const copyOffered = await rp
-        .getByLabel('Name of the copy')
+      const cloneOffered = await rp
+        .getByLabel('Name of the clone')
         .waitFor({ timeout: 4000 })
         .then(() => true, () => false);
-      check(`${tag} / ${who} ${wants.copy ? 'is' : 'is not'} offered a copy of the board`, copyOffered === wants.copy);
-      if (copyOffered) await rp.getByRole('button', { name: 'Cancel', exact: true }).click();
+      check(`${tag} / ${who} ${wants.clone ? 'is' : 'is not'} offered a clone of the board`, cloneOffered === wants.clone);
+      if (cloneOffered) await rp.getByRole('button', { name: 'Cancel', exact: true }).click();
       await rp.getByText('Fundraising 2026').first().click();
       await rp.waitForTimeout(2000);
       const got = await rp.evaluate(() => {

@@ -88,7 +88,7 @@ organizer / member — and **ownership of one board**, a `boardOwnerUids` array 
 the board document. They are orthogonal: a plain member can own a board, an
 organizer can own none.
 
-`organizer` grants EXACTLY ONE thing, creating a board (copying one, `copyBoard`,
+`organizer` grants EXACTLY ONE thing, creating a board (cloning one, `cloneBoard`,
 is creating one); label curation and Stats are admin-only; **only an admin sees a board they were not added to**. Everything
 about one board — settings, columns, membership, ownership, archiving,
 permanently deleting a card, deleting anyone's comment — is its owners plus
@@ -200,8 +200,8 @@ disabling the account is the block, by decision.
   phone before 0.13.1 and a web tab opened before 0.17.0 never read. The
   existing labels became board labels in a maintenance window
   (`scripts/scope-labels.mjs`), whose card writes are stamped `SYSTEM_ACTOR`:
-  the card trigger records no history for those, because a card moved onto its
-  board's copy of a label shows exactly what it showed before.
+  the card triggers stay out of those, because a card moved onto its board's
+  copy of a label shows exactly what it showed before.
 
 ## Attachments
 
@@ -448,6 +448,15 @@ itself is deliberately NOT darkened — that would collapse it into
   use `ORG_TIMEZONE`. Drift is acceptable only because
   `scripts/backfill-stats.mjs` rebuilds any range from the source documents;
   `bytesRemoved` is the one series that cannot be reconstructed.
+- **A server write that makes many cards at once keeps its own books.** The
+  per-card triggers turn every card into its own increment of the board's
+  `activeCardCount` and of one day's Stats documents, and Firestore sustains
+  about one write a second on a document: a burst of hundreds fails in ways the
+  triggers can only log. So the writer, which knows every figure, writes them —
+  the count and each "created" line with the cards, Stats once — and stamps the
+  cards `SYSTEM_ACTOR`, which keeps every card trigger out (`cloneBoard`,
+  2026-11-13). The emulator runs triggers one at a time and cannot show the
+  burst; reason about it, do not wait for a test to.
 
 ---
 

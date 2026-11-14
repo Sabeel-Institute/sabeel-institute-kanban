@@ -28,11 +28,23 @@ export function Sheet({
   title,
   onClose,
   closeLabel = 'Cancel',
+  busy = false,
   children,
 }: {
   visible: boolean;
   title: string;
   onClose: () => void;
+  /**
+   * The sheet's action is on its way: until it lands the sheet cannot be
+   * closed — not by its button, the backdrop, Android's Back or Escape.
+   *
+   * A sheet whose action finishes by doing something (opening the board it
+   * made, putting the label it made on the card) would otherwise do it after
+   * the person had closed the sheet and moved on: a clone "cancelled" mid-way
+   * still opened, wherever they had got to. The action cannot be called back
+   * once sent, so the honest sheet stays until it answers.
+   */
+  busy?: boolean;
   /**
    * The footer button's word. `Cancel` is right for a sheet whose picks only
    * take effect when you confirm, and WRONG for one whose picks apply as you
@@ -48,13 +60,16 @@ export function Sheet({
 }) {
   const t = useTheme();
   if (!visible) return null;
+  const close = () => {
+    if (!busy) onClose();
+  };
 
   return (
     <Modal
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onClose}
+      onRequestClose={close}
       statusBarTranslucent
     >
       {/*
@@ -87,7 +102,7 @@ export function Sheet({
       */}
       <Pressable
         style={[styles.backdrop, { backgroundColor: t.effect.overlay }]}
-        onPress={onClose}
+        onPress={close}
         focusable={false}
         accessible={false}
       >
@@ -137,7 +152,7 @@ export function Sheet({
           >
             {children}
           </ScrollView>
-          <Button label={closeLabel} variant="secondary" onPress={onClose} />
+          <Button label={closeLabel} variant="secondary" disabled={busy} onPress={close} />
         </Pressable>
       </Pressable>
     </Modal>

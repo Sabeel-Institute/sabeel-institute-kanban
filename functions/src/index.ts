@@ -16,7 +16,7 @@ export {
   listAddableUsers,
   countMemberAssignments,
   boardsSolelyOwnedBy,
-  copyBoard,
+  cloneBoard,
 } from './boards';
 export { countLabelUsage, deleteLabel } from './labels';
 export { onCommentWritten } from './comments';

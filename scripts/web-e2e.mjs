@@ -19,7 +19,7 @@ import { chromium } from 'playwright';
 import { todayInOrgTz } from '../packages/shared/lib/due.js';
 import { PASSWORD_SIGN_IN_EMAIL } from '../packages/shared/lib/constants.js';
 import { REPORT_TEXT_MAX } from '../packages/shared/lib/report.js';
-import { HELP_FILMS_ORIGIN, HELP_VIDEOS, helpFilmUrl } from '../packages/shared/lib/help.js';
+import { HELP_FILMS_ORIGIN, HELP_VARIANTS, HELP_VIDEOS, helpFilmUrl } from '../packages/shared/lib/help.js';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { readFile, readdir, mkdir } from 'node:fs/promises';
@@ -2587,6 +2587,22 @@ try {
     // the app asks for, and what it says when a film will not play — never a
     // film on the internet.
     const HELP_FILES = `${HELP_FILMS_ORIGIN}/**`;
+    // …and, once, the films' site itself: every film Help lists, both cuts
+    // and their captions, must be there. The films are not in git and are
+    // published by hand, so a film added to HELP_VIDEOS is a promise this
+    // check holds main to: publish it before merging, and no build from main
+    // can offer a film that will not play.
+    const missingFilms = [];
+    for (const v of HELP_VIDEOS) {
+      for (const variant of HELP_VARIANTS) {
+        for (const kind of ['video', 'captions']) {
+          const url = helpFilmUrl(v.id, variant, kind);
+          const res = await fetch(url, { method: 'HEAD' }).catch(() => null);
+          if (!res?.ok || Number(res.headers.get('content-length') ?? '1') === 0) missingFilms.push(url.slice(HELP_FILMS_ORIGIN.length));
+        }
+      }
+    }
+    check('every film Help lists is on the films’ site', missingFilms.length === 0, missingFilms.join(', '));
     const held = [];
     let failing = false;
     await page.route(HELP_FILES, (route) => (failing ? route.fulfill({ status: 404, body: '' }) : held.push(route)));
@@ -2752,9 +2768,9 @@ try {
     await ctx.close();
   }
 
-  // ---- Copying a board ----------------------------------------------------
-  // A program template, seeded with one of everything a copy keeps and one of
-  // everything it leaves behind, copied from the boards list. What the copy
+  // ---- Cloning a board ----------------------------------------------------
+  // A program template, seeded with one of everything a clone keeps and one of
+  // everything it leaves behind, cloned from the boards list. What the clone
   // holds is read back from the database rather than off the screen, which
   // would not show a due date's absence or a subtask link.
   {
@@ -2771,7 +2787,7 @@ try {
         boardOwnerUids: [me], activeCardCount: 0, createdAt: now, createdBy: me,
       });
       const inst = db.collection('labels').doc();
-      await inst.set({ name: 'Copied everywhere', color: '#83114F', createdAt: now, createdBy: me });
+      await inst.set({ name: 'On every board', color: '#83114F', createdAt: now, createdBy: me });
       const own = db.collection('labels').doc();
       await own.set({ boardId: board.id, name: 'Template only', color: '#3E6B8A', createdAt: now, createdBy: me });
       const card = (over) => ({
@@ -2789,54 +2805,82 @@ try {
       console.log(JSON.stringify({ id: board.id, me, inst: inst.id }));
     `);
     // A right-click is a computer's long-press: it opens the sheet, and Cancel
-    // closes it with nothing made. The copy itself goes through a long-press,
+    // closes it with nothing made. The clone itself goes through a long-press,
     // a mouse button held down, as on a phone.
     await backToBoards(admin);
     const tmplRow = admin.getByText('Program Template', { exact: true }).first();
     await tmplRow.waitFor({ timeout: 25000 });
     await tmplRow.click({ button: 'right' });
-    const sheetTitle = admin.getByText('Copy Program Template', { exact: true });
+    const sheetTitle = admin.getByText('Clone Program Template', { exact: true });
     const byRightClick = await sheetTitle.waitFor({ timeout: 15000 }).then(() => true, () => false);
     await admin.getByRole('button', { name: 'Cancel', exact: true }).click();
     const closed = await sheetTitle.waitFor({ state: 'detached', timeout: 15000 }).then(() => true, () => false);
-    check('a right-click on a board offers its copy, and Cancel closes it', byRightClick && closed);
+    check('a right-click on a board offers its clone, and Cancel closes it', byRightClick && closed);
     await tmplRow.click({ delay: 900 });
-    const copyName = admin.getByLabel('Name of the copy');
-    await copyName.waitFor({ timeout: 15000 });
-    const copyButton = admin.getByRole('button', { name: 'Copy', exact: true });
+    const cloneName = admin.getByLabel('Name of the clone');
+    await cloneName.waitFor({ timeout: 15000 });
+    const cloneButton = admin.getByRole('button', { name: 'Clone', exact: true });
     check(
-      'the copy is offered under the template’s name, and waits for a name of its own',
-      (await copyName.inputValue()) === 'Program Template' &&
-        (await copyButton.getAttribute('aria-disabled')) === 'true',
-      await copyName.inputValue(),
+      'the clone is offered under the template’s name, and waits for a name of its own',
+      (await cloneName.inputValue()) === 'Program Template' &&
+        (await cloneButton.getAttribute('aria-disabled')) === 'true',
+      await cloneName.inputValue(),
     );
-    await copyName.fill('Spring Program');
-    await copyButton.click();
-    // The copy opens as its own board, under its own name.
+    await cloneName.fill('Spring Program');
+    // The clone is held on its way for a few seconds: a sheet whose action is
+    // running cannot be closed, by Cancel or by Escape, since the clone cannot
+    // be called back and opens when it lands.
+    let releaseClone;
+    const cloneHeld = new Promise((r) => (releaseClone = r));
+    await admin.route('**/cloneBoard', async (route) => {
+      await cloneHeld;
+      await route.continue();
+    });
+    await cloneButton.click();
+    const cancel = admin.getByRole('button', { name: 'Cancel', exact: true });
+    await admin.waitForTimeout(800);
+    const cancelDisabled = (await cancel.getAttribute('aria-disabled')) === 'true';
+    await admin.keyboard.press('Escape');
+    await admin.waitForTimeout(500);
+    const stillOpen = await sheetTitle.isVisible().catch(() => false);
+    releaseClone();
+    check(
+      'while the clone is on its way the sheet stays, Cancel and Escape both refused',
+      cancelDisabled && stillOpen,
+      JSON.stringify({ cancelDisabled, stillOpen }),
+    );
+    // The clone opens as its own board: the board screen (its Add card), under
+    // the clone's name and not the template's. The boards list behind the sheet
+    // shows the clone's name too, the moment it is written, so the name alone
+    // would pass with the list still on screen.
     const opened = await admin
-      .getByText('Spring Program', { exact: true })
+      .getByRole('button', { name: '+ Add card' })
       .first()
       .waitFor({ timeout: 30000 })
-      .then(() => admin.getByText('Send thank-yous').first().waitFor({ timeout: 15000 }))
-      .then(() => true, () => false);
-    const copied = await adminJson(`
+      .then(async () =>
+        (await admin.getByText('Spring Program', { exact: true }).first().isVisible()) &&
+        !(await admin.getByText('Program Template', { exact: true }).first().isVisible().catch(() => false)),
+      )
+      .catch(() => false);
+    await admin.unroute('**/cloneBoard');
+    const cloned = await adminJson(`
       const boards = await db.collection('boards').where('name', '==', 'Spring Program').get();
       const b = boards.docs[0];
       const cards = (await db.collection('cards').where('boardId', '==', b.id).get()).docs.map((d) => ({ id: d.id, ...d.data() }));
       const template = (await db.collection('cards').where('boardId', '==', ${JSON.stringify(tmpl.id)}).get()).docs.map((d) => d.data());
       console.log(JSON.stringify({ count: boards.size, board: b.data(), cards, template }));
     `);
-    const byTitle = Object.fromEntries(copied.cards.map((c) => [c.title, c]));
-    const cols = Object.fromEntries(copied.board.columns.map((c) => [c.name, c.id]));
-    check('copying opens the new board', opened);
+    const byTitle = Object.fromEntries(cloned.cards.map((c) => [c.title, c]));
+    const cols = Object.fromEntries(cloned.board.columns.map((c) => [c.name, c.id]));
+    check('cloning opens the new board', opened);
     check(
-      'the copy is a new board, its copier the only member and owner, with the template’s columns',
-      copied.count === 1 &&
-        JSON.stringify(copied.board.memberUids) === JSON.stringify([tmpl.me]) &&
-        JSON.stringify(copied.board.boardOwnerUids) === JSON.stringify([tmpl.me]) &&
-        copied.board.description === 'Start every program here' &&
-        JSON.stringify(copied.board.columns.map((c) => c.name)) === JSON.stringify(['Plan', 'Wrap up']),
-      JSON.stringify(copied.board).slice(0, 200),
+      'the clone is a new board, its cloner the only member and owner, with the template’s columns',
+      cloned.count === 1 &&
+        JSON.stringify(cloned.board.memberUids) === JSON.stringify([tmpl.me]) &&
+        JSON.stringify(cloned.board.boardOwnerUids) === JSON.stringify([tmpl.me]) &&
+        cloned.board.description === 'Start every program here' &&
+        JSON.stringify(cloned.board.columns.map((c) => c.name)) === JSON.stringify(['Plan', 'Wrap up']),
+      JSON.stringify(cloned.board).slice(0, 200),
     );
     check(
       'it holds the open cards in their columns with descriptions and subtasks, and nothing archived',
@@ -2849,7 +2893,7 @@ try {
     );
     check(
       'and none of one run: no dates, assignees, priority, comments or the template’s own label',
-      copied.cards.every(
+      cloned.cards.every(
         (c) =>
           c.dueDate === undefined &&
           c.assigneeUids.length === 0 &&
@@ -2857,17 +2901,17 @@ try {
           c.commentCount === 0 &&
           JSON.stringify(c.subscriberUids) === JSON.stringify([tmpl.me]),
       ) && JSON.stringify(byTitle['Book the venue'].labelIds) === JSON.stringify([tmpl.inst]),
-      JSON.stringify(copied.cards.map((c) => [c.title, c.dueDate, c.assigneeUids, c.priority, c.labelIds])),
+      JSON.stringify(cloned.cards.map((c) => [c.title, c.dueDate, c.assigneeUids, c.priority, c.labelIds])),
     );
     check(
       'the template is left as it was',
-      copied.template.length === 4 &&
-        copied.template.every((c) => c.dueDate === '2026-12-01' && c.assigneeUids.length === 1),
+      cloned.template.length === 4 &&
+        cloned.template.every((c) => c.dueDate === '2026-12-01' && c.assigneeUids.length === 1),
     );
-    // Back from the copy goes to the boards list, where it was copied from.
+    // Back from the clone goes to the boards list, where it was cloned from.
     await admin.getByRole('button', { name: 'Back' }).first().click();
     check(
-      'Back from the copy returns to the boards list',
+      'Back from the clone returns to the boards list',
       await admin
         .getByRole('button', { name: 'New board' })
         .waitFor({ timeout: 15000 })

@@ -148,8 +148,8 @@ name: Board, card, rich text and gestures
 - takeScreenshot: 06-selection
 - tapOn: "Back"
 
-# Copying the board: a long-press on its row in the boards list opens the
-# copy sheet, its name field typed into, and the copy opens as a board of its
+# Cloning the board: a long-press on its row in the boards list opens the
+# clone sheet, its name field typed into, and the clone opens as a board of its
 # own. The field starts as the board's name, so typing adds to it.
 - runFlow:
     file: ci-tools/tap-until.yaml
@@ -162,23 +162,22 @@ name: Board, card, rich text and gestures
     commands:
       - longPressOn: "Fundraising 2026[\\s\\S]*"
       - extendedWaitUntil:
-          visible: "Name of the copy"
+          visible: "Name of the clone"
           timeout: 10000
-- inputText: " copy"
-- runFlow:
-    when:
-      platform: Android
-    commands:
-      - hideKeyboard
-- takeScreenshot: 07-copy-board
-- tapOn: "Copy"
-# The board screen first: the copy's name is in the sheet's field too, so
-# waiting on it would pass before the copy was made. The callable writes a
+- inputText: " clone"
+# Clone is tapped with the keyboard still up, as a person would: on Android an
+# edge-to-edge dialog is not resized for the keyboard, so a Clone placed low in
+# the sheet would be under the keys, and hiding the keyboard first would hide
+# that.
+- takeScreenshot: 07-clone-board
+- tapOn: "Clone"
+# The board screen first: the clone's name is in the sheet's field too, so
+# waiting on it would pass before the clone was made. The callable writes a
 # board and fourteen cards, which a busy CI Mac took over 15 s to show.
 - extendedWaitUntil:
     visible: "Tap a card to open it\\.[\\s\\S]*"
     timeout: 60000
-- assertVisible: "Fundraising 2026 copy[\\s\\S]*"
+- assertVisible: "Fundraising 2026 clone[\\s\\S]*"
 # Back to the boards list, where the tabs are: a board has none of its own.
 # The app's own Back, as everywhere in this flow; ci-tools' back.yaml is for a
 # native-stack header, which this app does not have.

@@ -144,11 +144,22 @@ export function isKnownActivityType(value: unknown): value is ActivityType {
 export const UNKNOWN_ACTOR = 'unknown';
 
 /**
- * `updatedBy` on a card write the server makes on nobody's behalf, when what a
- * person sees does not change: `scripts/scope-labels.mjs` moving a card onto
- * its board's copy of a label, same name and colour. `onCardWritten` records
- * no history for it, so nobody is told about it either. Rules pin a client's
- * `updatedBy` to its own uid, so only the server can write this.
+ * `updatedBy` on a card write the server makes that KEEPS ITS OWN BOOKS: the
+ * card triggers stay out of it — no history from `onCardWritten`, so nobody is
+ * told, no Stats, and no change to the board's `activeCardCount` from
+ * `onCardBoardCount` — and whatever of those the write needs, its writer has
+ * written. Two writers use it:
+ *
+ *  - `scripts/scope-labels.mjs`, moving a card onto its board's copy of a
+ *    label, same name and colour: nothing a person sees changed, so it needs
+ *    none of them.
+ *  - `cloneBoard`, whose hundreds of cards would otherwise land as hundreds of
+ *    increments on one board's count and one day's Stats in the same second
+ *    (`boardClone`): it writes the count and each card's "created" line with
+ *    the cards, and Stats once.
+ *
+ * Rules pin a client's `updatedBy` to its own uid, so only the server can
+ * write this, and a person's next edit to the card stamps it away again.
  */
 export const SYSTEM_ACTOR = 'system';
 
