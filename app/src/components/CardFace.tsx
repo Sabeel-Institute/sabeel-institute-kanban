@@ -19,6 +19,7 @@ export function CardFace({
   boardMembers,
   subtaskCount,
   parentTitle,
+  unnamed = false,
 }: {
   card: {
     title: string;
@@ -49,6 +50,14 @@ export function CardFace({
    * — and the chip then says only "Subtask".
    */
   parentTitle?: string;
+  /**
+   * The face is not inside a tile with a name of its own (the archive), so a
+   * phone's screen reader reads it piece by piece and the subtask chip needs
+   * its own words. Inside a named tile it must not: Android makes an
+   * accessible view a stop of its own, so TalkBack would read the tile, then
+   * stop on the chip again.
+   */
+  unnamed?: boolean;
   /** Every label, of both scopes, which is what lets My Work and Search render
    *  chips for cards whose board they never load. */
   labels: readonly Label[];
@@ -105,9 +114,8 @@ export function CardFace({
           {card.parentId ? (
             <View
               style={[styles.chip, styles.chipShrink, chip]}
-              // Read where the face is not inside a labelled tile (the
-              // archive); a tile's own name says it (`cardTileName`).
-              {...(Platform.OS === 'web'
+              // Inside a named tile the tile says it (`cardTileName`).
+              {...(Platform.OS === 'web' || !unnamed
                 ? {}
                 : {
                     accessible: true,
