@@ -5,12 +5,24 @@ import { logger } from 'firebase-functions/v2';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import type { BoardDoc } from '@sabeel/shared';
 import {
+  boardClone,
+  boardCloneBytes,
   canAdministerUsers,
+  canCreateBoards,
   canManageBoard,
+  canSeeEveryBoard,
   canUnseatCreator,
+  CLONE_BOARD_MAX_BYTES,
+  CLONE_BOARD_MAX_CARDS,
+  validateBoardName,
   watchKeyOnBoard,
+  type CloneSourceCard,
 } from '@sabeel/shared';
 import { actorOf } from './actor';
+import { recordStat } from './stats';
+
+/** A Firestore auto-id, as the client's `doc(collection(...)).id` makes one. */
+const DOCUMENT_ID = /^[A-Za-z0-9]{20}$/;
 
 /**
  * Removing someone from a board is a CALLABLE, not a plain client write.
@@ -373,4 +385,132 @@ export const addBoardMember = onCall({ secrets: [sentryDsn] }, guarded(async (re
   }
 
   return { ok: true, added: !already };
+}));
+
+/**
+ * Clone a board: its columns and open cards, under a new name, as a new board
+ * whose only member and owner is the caller. `boardClone` in `@sabeel/shared`
+ * decides what a clone holds; this reads, checks and writes.
+ *
+ * A CALLABLE, because a clone must exist whole or not at all. Rules check a new
+ * card against its board as it was before the write, so a client cannot create
+ * a board and its cards in one batch, and a clone made in several writes could
+ * stop half-made. Here the board, every card and every card's first history
+ * line are ONE transaction, which also holds still what it read: a label
+ * deleted meanwhile cannot leave its id on a cloned card.
+ *
+ * The CALLER names the new board's id, chosen when the clone is offered. A
+ * retry after a clone that landed but whose answer was lost — a phone dropping
+ * its connection — finds that board and returns it, rather than making a
+ * second one nobody can delete.
+ *
+ * A clone is a new board, so it takes what creating one does: an organizer or
+ * an admin. And it reads the source, so the caller must see it: a member of
+ * it, or an admin.
+ */
+export const cloneBoard = onCall({ secrets: [sentryDsn] }, guarded(async (request: CallableRequest<{ boardId?: unknown; name?: unknown; cloneId?: unknown }>) => {
+  const auth = request.auth;
+  if (!auth) throw new HttpsError('unauthenticated', 'Sign in first.');
+
+  const actor = actorOf(auth);
+  if (!canCreateBoards(actor)) {
+    throw new HttpsError(
+      'permission-denied',
+      'Only organizers and admins can clone a board, because a clone is a new board.',
+    );
+  }
+
+  const boardId = request.data?.boardId;
+  const name = request.data?.name;
+  const cloneId = request.data?.cloneId;
+  if (typeof boardId !== 'string' || !boardId) {
+    throw new HttpsError('invalid-argument', 'A boardId is required.');
+  }
+  if (typeof cloneId !== 'string' || !DOCUMENT_ID.test(cloneId)) {
+    throw new HttpsError('invalid-argument', 'A cloneId is required.');
+  }
+  if (typeof name !== 'string') {
+    throw new HttpsError('invalid-argument', 'A name is required.');
+  }
+  const nameProblem = validateBoardName(name);
+  if (nameProblem) throw new HttpsError('invalid-argument', nameProblem);
+
+  const db = getFirestore();
+  const cloneRef = db.doc(`boards/${cloneId}`);
+  const now = Date.now();
+  const me = await db.doc(`users/${actor.uid}`).get();
+
+  const made = await db.runTransaction(async (tx) => {
+    const [source, already] = await Promise.all([tx.get(db.doc(`boards/${boardId}`)), tx.get(cloneRef)]);
+    if (already.exists) {
+      // The same clone asked for again: its answer was lost on the way back.
+      if (already.data()?.createdBy !== actor.uid) {
+        throw new HttpsError('already-exists', 'That board already exists.');
+      }
+      return null;
+    }
+    if (!source.exists) throw new HttpsError('not-found', 'No such board.');
+    const board = source.data() as BoardDoc;
+    if (!board.memberUids.includes(actor.uid) && !canSeeEveryBoard(actor)) {
+      throw new HttpsError('permission-denied', 'You can only clone a board you are on.');
+    }
+    if (board.archived) {
+      throw new HttpsError('failed-precondition', 'Restore this board before cloning it.');
+    }
+
+    // One past the cap is enough to refuse, without reading a huge board in full.
+    const [cardsSnap, labelsSnap] = await Promise.all([
+      tx.get(
+        db
+          .collection('cards')
+          .where('boardId', '==', boardId)
+          .where('archived', '==', false)
+          .limit(CLONE_BOARD_MAX_CARDS + 1),
+      ),
+      tx.get(db.collection('labels')),
+    ]);
+    if (cardsSnap.size > CLONE_BOARD_MAX_CARDS) {
+      throw new HttpsError(
+        'failed-precondition',
+        `This board has more than ${CLONE_BOARD_MAX_CARDS} open cards, more than one clone can take.`,
+      );
+    }
+
+    const clone = boardClone({
+      source: board,
+      cards: cardsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<CloneSourceCard, 'id'>) })),
+      labels: labelsSnap.docs.map((d) => ({ id: d.id, boardId: d.data().boardId as string | undefined })),
+      boardId: cloneId,
+      name,
+      cloner: actor.uid,
+      copierProfile: {
+        displayName: (me.data()?.displayName as string) ?? '',
+        email: (me.data()?.email as string) ?? '',
+      },
+      now,
+      newCardId: () => db.collection('cards').doc().id,
+    });
+    if (boardCloneBytes(clone) > CLONE_BOARD_MAX_BYTES) {
+      throw new HttpsError(
+        'failed-precondition',
+        'This board holds too much text to clone in one go. Shorten some long descriptions, or archive cards the clone does not need.',
+      );
+    }
+
+    tx.create(cloneRef, clone.board);
+    for (const card of clone.cards) {
+      const cardRef = db.doc(`cards/${card.id}`);
+      tx.create(cardRef, card.data);
+      tx.create(cardRef.collection('activity').doc(), card.created);
+    }
+    return clone.cards.length;
+  });
+
+  if (made !== null) {
+    // Once, for the whole clone: the cards are stamped SYSTEM_ACTOR, which keeps
+    // the per-card Stats increments of onCardWritten out of them (boardClone).
+    await recordStat(cloneId, now, { cardsCreated: made }, actor.uid);
+    logger.info('Cloned board', { from: boardId, to: cloneId, cards: made, actorUid: actor.uid });
+  }
+  return { boardId: cloneId };
 }));

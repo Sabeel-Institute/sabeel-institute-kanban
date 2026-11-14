@@ -602,8 +602,8 @@ which is which.
 the whole organisation. There are three:
 
 - **Member** — the boards you've been added to, and nothing else.
-- **Organizer** — the same, plus **creating new boards**. That is the whole of
-  the difference.
+- **Organizer** — the same, plus **creating new boards**, or cloning one. That
+  is the whole of the difference.
 - **Admin** — everything, including every board. See Part 3.
 
 **Owning a board** is separate, and belongs to the board rather than to you.
@@ -623,6 +623,29 @@ read-only, with owners marked** — so you can always see who to ask.
 Every new board starts with three columns — **To Do**, **In Progress**, **Done**
 — which you can rename or replace in Settings. **You own the board you create**,
 and only an admin can change that.
+
+### Cloning a board
+
+*Organizers and admins.* A program that runs again can
+start from a board made for it: its columns, a card for each step, the
+description that says how, and the subtasks under each. On **Boards**, press
+and hold that board — on a computer, right-click it. Give the clone its own name
+and tap **Clone**. The new board opens, with you as its only member and owner.
+
+<div class="pair">
+  <figure class="ph"><img src="manual/img/clone-phone.png" alt="Cloning a board on a phone: the name field, what the clone holds, and Clone"><figcaption>On a phone — press and hold the board</figcaption></figure>
+  <figure class="wd"><img src="manual/img/clone-wide.png" alt="Cloning a board in a browser"><figcaption>In a browser — right-click the board</figcaption></figure>
+</div>
+
+The clone has the same columns, and each open card in the same place, with its
+title, its description and its subtasks, and the institute's labels. It starts
+fresh on everything that belongs to one run of the work: no due dates, nobody
+assigned, no priorities, comments, history or files. Archived cards and the
+board's own labels are not cloned. The board you cloned from does not change.
+
+For a member, pressing and holding a board does nothing more than a tap: a
+member who wants a clone asks an organizer. An archived board has to be
+restored before it can be cloned.
 
 ## 2.2 Board settings
 
@@ -942,6 +965,11 @@ at the top of the list to show only those. Nobody is notified again.
 
 **…create a board?** *(organizers and admins)*
 **Boards → New board** → name it. You own the board you create.
+
+**…start a program from a template board?** *(organizers and admins)*
+On **Boards**, press and hold the template (right-click on a computer) → a new
+name → **Clone**. Its columns and open cards come along, without dates or
+assignees.
 
 **…rename a board?** *(the board's owners)*
 Open the board → **settings** → Name. That screen is the only place that does it.

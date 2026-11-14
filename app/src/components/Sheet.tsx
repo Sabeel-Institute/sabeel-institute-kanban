@@ -16,7 +16,11 @@ import { radius, space, useTheme } from '../theme';
  *  - Bound the height (a fraction of the viewport) and scroll INSIDE it, so the
  *    dialog can never be taller than the screen however many options it has.
  *  - Centre it rather than pinning to an edge, so a keyboard rising from the
- *    bottom cannot cover it.
+ *    bottom covers as little of it as it can. Not none: on Android the app is
+ *    edge-to-edge, and so is the dialog window, which the system then does
+ *    not resize for the keyboard. Seen in the native flow (Kanban #97): the
+ *    keys reach the lower part of a sheet with a field. So a sheet's action
+ *    belongs right under its field, as in CloneBoardSheet, not at the foot.
  *  - Give it a dismissing backdrop, so it is never possible to get stuck behind.
  *
  * Uses RN's Modal, which renders in a top layer on both platforms. An
@@ -28,11 +32,28 @@ export function Sheet({
   title,
   onClose,
   closeLabel = 'Cancel',
+  busy = false,
   children,
 }: {
   visible: boolean;
   title: string;
   onClose: () => void;
+  /**
+   * The sheet's action is on its way: until it lands the sheet cannot be
+   * closed — not by its button, the backdrop, Android's Back or Escape.
+   *
+   * A sheet whose action finishes by doing something (opening the board it
+   * made) would otherwise do it after the person had closed the sheet and
+   * moved on: a clone "cancelled" mid-way still opened, wherever they had got
+   * to. The action cannot be called back
+   * once sent, so the honest sheet stays until it answers.
+   *
+   * ONLY for an action that is sure to answer: a callable gives up after 70
+   * seconds. A Firestore write does not — offline it waits for the connection
+   * — so a sheet held open by one traps whoever lost signal, with Back dead
+   * too. The new-label sheet was such a sheet, and does not pass this.
+   */
+  busy?: boolean;
   /**
    * The footer button's word. `Cancel` is right for a sheet whose picks only
    * take effect when you confirm, and WRONG for one whose picks apply as you
@@ -48,13 +69,16 @@ export function Sheet({
 }) {
   const t = useTheme();
   if (!visible) return null;
+  const close = () => {
+    if (!busy) onClose();
+  };
 
   return (
     <Modal
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onClose}
+      onRequestClose={close}
       statusBarTranslucent
     >
       {/*
@@ -87,7 +111,7 @@ export function Sheet({
       */}
       <Pressable
         style={[styles.backdrop, { backgroundColor: t.effect.overlay }]}
-        onPress={onClose}
+        onPress={close}
         focusable={false}
         accessible={false}
       >
@@ -137,7 +161,7 @@ export function Sheet({
           >
             {children}
           </ScrollView>
-          <Button label={closeLabel} variant="secondary" onPress={onClose} />
+          <Button label={closeLabel} variant="secondary" disabled={busy} onPress={close} />
         </Pressable>
       </Pressable>
     </Modal>

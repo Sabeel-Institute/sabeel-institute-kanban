@@ -198,6 +198,31 @@ export async function addBoardMember(boardId: string, uid: string): Promise<void
 }
 
 /**
+ * Clone a board: its columns and open cards, as a new board whose only member
+ * and owner is the caller. A callable, because the board and its cards must
+ * land in one write (`cloneBoard` in functions/src/boards.ts). Resolves to the
+ * new board's id.
+ */
+const cloneBoardFn = httpsCallable<
+  { boardId: string; name: string; cloneId: string },
+  { boardId: string }
+>(functions, 'cloneBoard');
+
+/**
+ * `cloneId` is the new board's id, chosen once per offer of a clone
+ * (`newBoardId`) and sent again on every try: a retry after a clone that landed
+ * but whose answer was lost returns that board instead of making a second.
+ */
+export async function cloneBoard(boardId: string, name: string, cloneId: string): Promise<string> {
+  return (await cloneBoardFn({ boardId, name: name.trim(), cloneId })).data.boardId;
+}
+
+/** A fresh board document id, made on the device: nothing is written. */
+export function newBoardId(): string {
+  return doc(collection(db, 'boards')).id;
+}
+
+/**
  * Who could still be added. NAMES ONLY — a picker needs something to tap, not
  * everybody's address.
  */

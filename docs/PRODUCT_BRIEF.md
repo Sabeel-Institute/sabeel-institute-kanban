@@ -572,6 +572,56 @@ the flat list genuinely hurts.
 
 On mobile this is the board-switcher bottom sheet; on web, the sidebar.
 
+## Cloning a board (2026-11-13)
+
+Programs that run again start from a **template board**: columns, the cards
+for each step, their descriptions and the subtasks under them. On the boards
+list, a **long-press** on a board (a **right-click** on a computer, where nobody
+holds a mouse button) opens a sheet that asks for the clone's name, and Clone
+opens the clone (Faisal, 2026-11-13: on the list, like a card's long-press, not
+in Board settings). For anyone who cannot clone, the long-press is not wired at
+all: no sheet and no message, and the press is an ordinary tap. On a phone a
+screen reader offers it as a "Clone board" action on the row; on a computer the
+keyboard's context-menu key (or Shift+F10) on a row does what a right-click
+does. Once Clone is pressed the sheet stays until the clone answers — Cancel,
+the backdrop, Back and Escape all wait — because a clone cannot be called back
+and opens when it lands.
+
+- **Organizers and admins**, on a board they can see (a member of it, or an
+  admin), and not an archived one. A clone is a new board, so it takes what New
+  board does; a member who wants one asks an organizer (Faisal, 2026-11-13).
+- **The cloner is the only member and owner**, as on any new board.
+- **What comes along:** the columns, in order; every OPEN card's title and
+  description, in the same column and order; subtask links, each pointing at
+  its parent's clone; the institute's labels on those cards; the board's
+  description.
+- **What stays behind:** archived cards, due dates, assignees, priorities,
+  comments, history and attachments, and the template's own labels (Faisal,
+  2026-11-13: institute labels only). A subtask whose parent is archived is
+  cloned as an ordinary card.
+- Each cloned card starts as a new card does: subscribed by the cloner, its
+  history opening "created" by them, and counted in Stats as created that day.
+- **One write, which keeps its own books.** The `cloneBoard` callable writes the
+  board, every card and each card's "created" line in one transaction, so a
+  clone exists whole or not at all; rules check a new card against its board as
+  it stood before the write, so the client could not do it in one. The clone
+  writes the board's `activeCardCount` with the cards and records Stats once,
+  and its cards are stamped `SYSTEM_ACTOR`, which keeps the card triggers out:
+  left to them, every card would land as its own increment on the same board
+  and Stats documents in the same second, more than Firestore sustains on one
+  document.
+- **Limits:** more than `CLONE_BOARD_MAX_CARDS` (240) open cards, or more than
+  `CLONE_BOARD_MAX_BYTES` of text, is refused with a reason rather than cloned in
+  parts — the first keeps the transaction inside Firestore's 500 writes, the
+  second inside its 10 MiB, which counts bytes: Arabic and curly quotes are two
+  or three a character.
+- **Asking twice makes one clone.** The app picks the new board's id when it
+  offers the clone and sends it with every try, so a retry after a clone that
+  landed but whose answer was lost gets that board back rather than a second
+  one, which nobody could delete.
+
+`boardClone` in `@sabeel/shared` is the one statement of what a clone holds.
+
 ## Theming
 
 **The palette is the Sabeel Institute brand palette** — see `docs/BRAND.md`, the

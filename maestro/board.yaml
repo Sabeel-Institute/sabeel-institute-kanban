@@ -148,6 +148,51 @@ name: Board, card, rich text and gestures
 - takeScreenshot: 06-selection
 - tapOn: "Back"
 
+# Cloning the board: a long-press on its row in the boards list opens the
+# clone sheet, its name field typed into, and the clone opens as a board of its
+# own. The field starts as the board's name, so typing adds to it.
+- runFlow:
+    file: ci-tools/tap-until.yaml
+    env:
+      TARGET: "Boards"
+      EXPECT: "New board"
+      SECONDS: 30
+- retry:
+    maxRetries: 2
+    commands:
+      - longPressOn: "Fundraising 2026[\\s\\S]*"
+      - extendedWaitUntil:
+          visible: "Name of the clone"
+          timeout: 10000
+- inputText: " clone"
+# Clone is tapped with the keyboard still up, as a person would: on Android an
+# edge-to-edge dialog is not resized for the keyboard, so a Clone placed low in
+# the sheet would be under the keys, and hiding the keyboard first would hide
+# that.
+- takeScreenshot: 07-clone-board
+# The button, above the sheet's explanation: Maestro also sees the keyboard's
+# suggestion strip, and with "clone" just typed its first suggestion is
+# "clone", which a bare `tapOn: "Clone"` picked instead (Kanban #97).
+- tapOn:
+    text: "Clone"
+    above: "The clone gets[\\s\\S]*"
+# The board screen first: the clone's name is in the sheet's field too, so
+# waiting on it would pass before the clone was made. The callable writes a
+# board and fourteen cards, which a busy CI Mac took over 15 s to show.
+- extendedWaitUntil:
+    visible: "Tap a card to open it\\.[\\s\\S]*"
+    timeout: 60000
+- assertVisible: "Fundraising 2026 clone[\\s\\S]*"
+# Back to the boards list, where the tabs are: a board has none of its own.
+# The app's own Back, as everywhere in this flow; ci-tools' back.yaml is for a
+# native-stack header, which this app does not have.
+- runFlow:
+    file: ci-tools/tap-until.yaml
+    env:
+      TARGET: "Back"
+      EXPECT: "New board"
+      SECONDS: 30
+
 # Every tab answers, each with something only its own screen shows.
 - runFlow:
     file: ci-tools/tap-until.yaml
@@ -173,7 +218,7 @@ name: Board, card, rich text and gestures
       TARGET: "More"
       EXPECT: "Report a problem"
       SECONDS: 30
-- takeScreenshot: 07-more
+- takeScreenshot: 08-more
 
 # Help: a film opens in the platform's own player (expo-video), which is a
 # native module of its own. The player's frame is what is checked, so a
@@ -188,4 +233,4 @@ name: Board, card, rich text and gestures
     visible:
       id: "help-film"
     timeout: 20000
-- takeScreenshot: 08-help-film
+- takeScreenshot: 09-help-film
