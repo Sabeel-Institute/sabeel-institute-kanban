@@ -316,6 +316,16 @@ const SHOTS = {
     await p.getByRole('button', { name: 'Board settings' }).click();
     await p.waitForTimeout(1500);
   },
+  // Copying a board: the sheet a long-press on its row opens, a new name
+  // typed, not yet sent, so the shots after it find the same boards.
+  copy: async (p) => {
+    await nav(p, 'Boards');
+    await p.getByText(BOARD, { exact: true }).first().click({ delay: 900 });
+    const name = p.getByLabel('Name of the copy');
+    await name.waitFor({ timeout: 30000 });
+    await name.fill('Spring Open House');
+    await p.waitForTimeout(700);
+  },
   people: async (p) => {
     await nav(p, 'Boards');
     await p.getByRole('button', { name: 'More' }).click();

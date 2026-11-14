@@ -300,6 +300,13 @@ function helpers(page, variant, world) {
       await center(loc);
     },
     /** A press and hold, as a phone selects a card. */
+    /** A right-click, the computer's long-press: the pointer travels to it and its ripple is drawn. */
+    rightClick: async (loc) => {
+      const { x, y } = await center(loc);
+      await page.mouse.move(x, y, { steps: 22 });
+      await page.mouse.click(x, y, { button: 'right' });
+      await wait(550);
+    },
     longPress: async (loc) => {
       const { x, y } = await center(loc);
       await page.mouse.move(x, y);

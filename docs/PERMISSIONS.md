@@ -20,6 +20,7 @@ it has accepted them, once (`acceptRules`; `docs/STORE-RELEASE.md` § 4).
 |---|---|---|---|
 | Use the app at all | ✓ | ✓ | ✓ |
 | Create a board | — | ✓ | ✓ |
+| Copy a board you can see | — | ✓ | ✓ |
 | Report a problem (five an hour) | ✓ | ✓ | ✓ |
 | Add, rename, recolour or delete an institute label | — | — | ✓ |
 | Stats | — | — | ✓ |
@@ -29,6 +30,10 @@ it has accepted them, once (`acceptRules`; `docs/STORE-RELEASE.md` § 4).
 `organizer` grants **exactly one thing**: starting a board. Whoever starts one
 owns it, which is how the role turns into authority — but only over what they
 started, and only until somebody hands it elsewhere.
+
+**Copying a board is starting one**, so it is the same grant, on a board the
+copier can see and that is not archived. The copy's only member and owner is
+whoever made it (`copyBoard`; `docs/PRODUCT_BRIEF.md` § Copying a board).
 
 **Only an admin sees every board.** Everyone else, organizers included, sees the
 boards they are a member of. There is no third case anywhere in the rules.

@@ -46,6 +46,7 @@ export const HELP_VIDEOS: readonly HelpVideo[] = [
   { id: 'notifications', audience: 'everyone', title: 'Alerts and notifications', summary: 'What you are told about, and choosing what reaches your phone.' },
   { id: 'report', audience: 'everyone', title: 'Reporting a problem', summary: 'Telling the administrators about a post or a person.' },
   { id: 'new-board', audience: 'owner', title: 'Creating a board', summary: 'Who can, and setting one up.' },
+  { id: 'copy-board', audience: 'owner', title: 'Copying a board', summary: 'Starting a program again from a board made for it.' },
   { id: 'board-settings', audience: 'owner', title: 'Board settings and columns', summary: 'Renaming a board, and adding, renaming and reordering columns.' },
   { id: 'board-people', audience: 'owner', title: 'Members and owners', summary: 'Adding and removing people, and sharing the running of a board.' },
   { id: 'board-archive', audience: 'owner', title: 'Deleting cards and archiving a board', summary: 'Deleting a card for good, and putting a finished board away.' },

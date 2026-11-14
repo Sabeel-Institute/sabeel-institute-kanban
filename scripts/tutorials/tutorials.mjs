@@ -802,6 +802,46 @@ export const TUTORIALS = [
     ],
   },
   {
+    id: 'copy-board',
+    as: 'sara',
+    start: '',
+    steps: [
+      {
+        say: "When a program runs again, you don't have to build its board from scratch. Organizers and admins can copy one, right here in your boards.",
+        do: (t) => t.highlight(t.text('Fundraising 2026')),
+      },
+      {
+        say: 'Press and hold the board you want to copy.',
+        cut: 'phone',
+        do: (t) => t.longPress(t.text('Fundraising 2026')),
+      },
+      {
+        say: 'Right-click the board you want to copy.',
+        cut: 'computer',
+        do: (t) => t.rightClick(t.text('Fundraising 2026')),
+      },
+      {
+        say: 'Give the new board its own name.',
+        do: (t) => t.replace(t.label('Name of the copy'), 'Fundraising 2027'),
+      },
+      {
+        say: "The copy gets the columns, and every open card with its description and its subtasks. Due dates, who's on each card, comments and files stay behind, so the new run starts clean.",
+        do: (t) => t.highlight(t.text(/^The copy gets/, false)),
+      },
+      {
+        say: "Tap Copy, and your new board opens. You're its only member for now, so add the people who'll work on it in its settings.",
+        do: async (t) => {
+          await t.tap(t.btn('Copy'));
+          await t.waitFor(t.text('Draft the donor letter'), 30000);
+        },
+      },
+      {
+        say: "And the board you copied from stays exactly as it was. If you're not an organizer, just ask one to make the copy for you.",
+        do: (t) => t.wait(600),
+      },
+    ],
+  },
+  {
     id: 'board-settings',
     as: 'sara',
     start: (w) => w.board('weekend-school'),

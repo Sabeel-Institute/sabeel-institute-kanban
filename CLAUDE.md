@@ -88,8 +88,8 @@ organizer / member — and **ownership of one board**, a `boardOwnerUids` array 
 the board document. They are orthogonal: a plain member can own a board, an
 organizer can own none.
 
-`organizer` grants EXACTLY ONE thing, creating a board; label curation and Stats
-are admin-only; **only an admin sees a board they were not added to**. Everything
+`organizer` grants EXACTLY ONE thing, creating a board (copying one, `copyBoard`,
+is creating one); label curation and Stats are admin-only; **only an admin sees a board they were not added to**. Everything
 about one board — settings, columns, membership, ownership, archiving,
 permanently deleting a card, deleting anyone's comment — is its owners plus
 admins. `docs/PERMISSIONS.md` is the full statement; **do not restate the table
