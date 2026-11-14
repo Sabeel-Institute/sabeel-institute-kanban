@@ -14,6 +14,19 @@ tells you the command to run.
 
 ---
 
+## Cloning a board — v0.18.0, shipped 2026-11-14
+
+- [x] **`cloneBoard`'s public invoker**, refused on create by the
+      organization's domain-restricted sharing: bound by hand on 2026-11-14,
+      the policy lifted on this project for about a minute and put back
+      (`docs/DEPLOY.md` § Known traps, "A new callable answers 403"). Every
+      new callable needs the same.
+- [ ] **Clone one board in production** as an organizer or admin: press and
+      hold a board on **Boards** (right-click on a computer), name it, Clone.
+      Check the clone opens with the board's cards and subtasks, then archive
+      it if it was only a try. Production's sign-in is the one part of a
+      clone no test could run.
+
 ## Board labels — v0.17.0, shipped in a maintenance window
 
 Board labels arrive with v0.17.0 (2026-11-07), released in one maintenance
