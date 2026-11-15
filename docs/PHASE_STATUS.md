@@ -449,6 +449,35 @@ the team.
 
 ## Deploy log
 
+### 2026-11-14 — Subtasks at a glance, and editing that looks like the card — v0.19.0
+
+- **Subtasks show on the board.** A card broken into subtasks carries a grey
+  chip saying how many it has, and each subtask a chip naming the card it
+  belongs to (↳ Plan the open house), so there's no need for "main task" and
+  "subtask" labels to see what goes together. Where that card isn't shown
+  alongside it (My Work, Search, the archive), the chip says just Subtask.
+- **Editing a description or comment looks like the card.** On a phone the
+  editor shows the same blank lines between paragraphs as the card, instead
+  of running them together, and a line break stays a line break when you
+  save: one Return starts a new line, two start a new paragraph. In a
+  browser the editor spaces lines and lists as the card does. Lists in both
+  have the card's grey markers.
+- **Cloning a board asks whether you want to follow its cards.** The Clone
+  sheet has a bell beside Clone; turn it on to be subscribed to every card in
+  the clone. It starts off. Once you press Clone it stays as it was. A clone
+  made from 0.18.0, which has no bell, subscribes nobody.
+- **Sheets stay above the keyboard on Android.** A sheet with a field, such
+  as Clone, New label or Add a link, moves up when the keyboard opens.
+- On a computer, a board's name and its buttons are drawn in the app's own
+  font instead of the browser's.
+- The manual covers the subtask chips and the clone bell.
+
+Deploy the functions before the clients: 0.19.0 against the 0.18.0
+functions ignores the clone bell and subscribes the cloner to every card.
+The help films are not re-recorded in this release (Faisal, 2026-11-14);
+§ Help films that lag the app, at the top of this file, lists the fourteen
+that show screens this release changed.
+
 ### 2026-11-14 — Cloning a board — v0.18.0
 
 - **Organizers and admins can clone a board**, so a program that runs
