@@ -6,6 +6,7 @@ import {
   columnDeleteBlocked,
   columnsPatch,
   type Label,
+  parentTitles,
   subtaskCounts,
   watchKey,
 } from '@sabeel/shared';
@@ -19,6 +20,7 @@ import {
 } from '../../cards';
 import { updateBoard, useBoard, type BoardMemberProfile } from '../../boards';
 import { CardFace } from '../CardFace';
+import { cardTileName } from '../../cardTileName';
 import { ColumnNameEditor } from '../ColumnNameEditor';
 import { useSelection } from '../../useSelection';
 import { BulkBar } from '../BulkBar';
@@ -98,6 +100,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   // Derived, not stored: every card of the board is already loaded, so the count
   // costs nothing and can never drift from reality.
   const subtasksBy = useMemo(() => subtaskCounts(cards.data ?? EMPTY_CARDS), [cards.data]);
+  const parentsBy = useMemo(() => parentTitles(cards.data ?? EMPTY_CARDS), [cards.data]);
 
   const byColumn = useMemo(() => {
     const map = new Map<string, Card[]>();
@@ -325,7 +328,10 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
                     <Pressable
                       key={card.id}
                       accessibilityRole="button"
-                      accessibilityLabel={card.title}
+                      accessibilityLabel={cardTileName(card, {
+                        subtaskCount: subtasksBy.get(card.id),
+                        parentTitle: parentsBy.get(card.id),
+                      })}
                       onPress={() =>
                         selection.active
                           ? selection.toggle(card.id)
@@ -348,6 +354,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
                         labels={labels}
                         boardMembers={members}
                         subtaskCount={subtasksBy.get(card.id)}
+                        parentTitle={parentsBy.get(card.id)}
                       />
                     </Pressable>
                   );

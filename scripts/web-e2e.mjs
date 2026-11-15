@@ -1489,6 +1489,26 @@ try {
       .catch(() => false),
   );
 
+  // The board marks the pair with two chips: the subtask's face names its
+  // main task, and the main task's counts its subtasks. A browser reads the
+  // face's text, so "Subtask of" is in it too, drawn nowhere. Then back into
+  // the card for the unlink below.
+  await admin.getByRole('button', { name: 'Back' }).first().click();
+  const subTile = admin.locator('[data-testid="card-Draft the agenda"]').first();
+  const mainTile = admin.locator('[data-testid="card-Fix signup flow"]').first();
+  const flat = async (tile) => (await tile.innerText()).replace(/\s+/g, ' ');
+  const marked = await subTile
+    .waitFor({ timeout: 20000 })
+    .then(async () => ({ sub: await flat(subTile), main: await flat(mainTile) }))
+    .catch(() => null);
+  check(
+    'on the board, a subtask names its main task and the main task counts it',
+    !!marked && marked.sub.includes('Subtask of Fix signup flow') && /\b1 subtask\b/.test(marked.main),
+    JSON.stringify(marked),
+  );
+  await openCard(admin, 'Fix signup flow');
+  await subtaskRow.waitFor({ timeout: 20000 });
+
   await subtaskRow.click();
   check(
     'a subtask row goes away when unlinked',
@@ -2831,6 +2851,14 @@ try {
       await cloneName.inputValue(),
     );
     await cloneName.fill('Spring Program');
+    // The bell starts off, unlike a new card's: this clone turns it on, and
+    // every card it makes names the cloner as subscriber (checked below). The
+    // Summer clone further down leaves it off.
+    const cloneBell = admin.getByRole('button', { name: 'Subscribe to every card', exact: true });
+    const bellWasOff = (await cloneBell.getAttribute('aria-pressed')) === 'false';
+    await cloneBell.click();
+    const bellNowOn = (await cloneBell.getAttribute('aria-pressed')) === 'true';
+    check('the clone’s bell starts off and turns on', bellWasOff && bellNowOn, JSON.stringify({ bellWasOff, bellNowOn }));
     // The clone is held on its way for a few seconds: a sheet whose action is
     // running cannot be closed, by Cancel or by Escape, since the clone cannot
     // be called back and opens when it lands.
@@ -3032,12 +3060,21 @@ try {
     await tmplRow.click({ delay: 900 });
     await cloneName.waitFor({ timeout: 15000 });
     await cloneName.fill('Summer Program');
+    const bellFree = (await cloneBell.getAttribute('aria-disabled')) !== 'true';
     await cloneButton.click();
     const lostSaid = await admin
       .getByText('Cannot reach the server', { exact: false })
       .first()
       .waitFor({ timeout: 30000 })
       .then(() => true, () => false);
+    // The lost try may have made the clone, and a retry returns it as made:
+    // the bell holds still so it cannot show a choice the clone did not get.
+    const bellHeld = (await cloneBell.getAttribute('aria-disabled')) === 'true';
+    check(
+      'once Clone is pressed, the bell holds for the rest of that offer',
+      bellFree && lostSaid && bellHeld,
+      JSON.stringify({ bellFree, lostSaid, bellHeld }),
+    );
     await cloneName.fill('Summer Camp');
     await cloneButton.click();
     const openedRenamed = await admin
@@ -3054,12 +3091,23 @@ try {
         if (seen.camp === 1 && seen.program === 0) break;
         await new Promise((r) => setTimeout(r, 500));
       }
+      const camp = (await db.collection('boards').where('name', '==', 'Summer Camp').get()).docs[0];
+      seen.subscribers = camp
+        ? (await db.collection('cards').where('boardId', '==', camp.id).get()).docs.map((d) => d.data().subscriberUids)
+        : null;
       console.log(JSON.stringify(seen));
     `);
     check(
       'a clone tried again under a new name after its answer was lost is one board, under the new name',
       lostSaid && openedRenamed && summer.camp === 1 && summer.program === 0,
       JSON.stringify({ lostSaid, openedRenamed, ...summer }),
+    );
+    check(
+      'a clone made with the bell left off subscribes nobody to its cards',
+      Array.isArray(summer.subscribers) &&
+        summer.subscribers.length === 3 &&
+        summer.subscribers.every((u) => Array.isArray(u) && u.length === 0),
+      JSON.stringify(summer.subscribers),
     );
     await backToBoards(admin);
   }

@@ -32,6 +32,7 @@ import {
   columnDeleteBlocked,
   columnsPatch,
   type Label,
+  parentTitles,
   subtaskCounts,
   watchKey,
 } from '@sabeel/shared';
@@ -43,6 +44,7 @@ import {
 } from '../../cards';
 import { updateBoard, useBoard, type BoardMemberProfile } from '../../boards';
 import { CardFace } from '../CardFace';
+import { cardTileName } from '../../cardTileName';
 import { ColumnNameEditor } from '../ColumnNameEditor';
 import { useSelection } from '../../useSelection';
 import { BulkBar } from '../BulkBar';
@@ -80,6 +82,7 @@ function CardTile({
   labels,
   boardMembers,
   subtaskCount,
+  parentTitle,
   selected,
   selectionActive,
   onOpen,
@@ -89,18 +92,20 @@ function CardTile({
   labels: readonly Label[];
   boardMembers: readonly BoardMemberProfile[];
   subtaskCount?: number;
+  parentTitle?: string;
   selected: boolean;
   selectionActive: boolean;
   onOpen: () => void;
   onLongPress: () => void;
 }) {
   const t = useTheme();
+  const name = cardTileName(card, { subtaskCount, parentTitle });
   return (
     <Pressable
       onPress={onOpen}
       onLongPress={onLongPress}
       accessibilityRole="button"
-      accessibilityLabel={selected ? `${card.title}, selected` : card.title}
+      accessibilityLabel={selected ? `${name}, selected` : name}
       // Same handle the web board emits, so ONE selector addresses a card on
       // every layout. It existed only on `WideBoard.web.tsx`, which meant every
       // e2e suite ran wide and the phone board — the layout this app is designed
@@ -121,6 +126,7 @@ function CardTile({
         labels={labels}
         boardMembers={boardMembers}
         subtaskCount={subtaskCount}
+        parentTitle={parentTitle}
       />
       {selectionActive ? (
         <Hint>{selected ? '✓ selected' : 'tap to select'}</Hint>
@@ -204,6 +210,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
   const columns = board.data?.columns ?? NO_COLUMNS;
   // Derived, not stored — the board already holds every card it needs.
   const subtasksBy = useMemo(() => subtaskCounts(cards.data ?? EMPTY_CARDS), [cards.data]);
+  const parentsBy = useMemo(() => parentTitles(cards.data ?? EMPTY_CARDS), [cards.data]);
 
   const byColumn = useMemo(() => {
     const map = new Map<string, Card[]>();
@@ -606,6 +613,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
                     labels={labels}
                     boardMembers={members}
                     subtaskCount={subtasksBy.get(item.id)}
+                    parentTitle={parentsBy.get(item.id)}
                     selected={selection.isSelected(item.id)}
                     selectionActive={selection.active}
                     // Once anything is selected, tapping toggles rather than

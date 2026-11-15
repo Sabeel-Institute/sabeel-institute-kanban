@@ -34,6 +34,8 @@ export interface SearchableCard {
   priority: Priority;
   dueDate?: string;
   archived: boolean;
+  /** Set on a subtask, so a result's face carries the subtask chip. */
+  parentId?: string;
   /**
    * Last EDIT to the card document. Optional so callers that only ever search
    * by text need not carry it.

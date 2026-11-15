@@ -41,6 +41,7 @@ import {
   Title,
 } from '../components/ui';
 import { CardFace } from '../components/CardFace';
+import { cardTileName } from '../cardTileName';
 import { Select, type SelectOption } from '../components/Select';
 import { SearchFiltersSheet } from '../components/SearchFiltersSheet';
 import type { NarrowItem } from '../components/NarrowList';
@@ -166,6 +167,7 @@ export function SearchScreen({ user }: { user: SessionUser }) {
             priority: d.data().priority ?? 'none',
             dueDate: d.data().dueDate as string | undefined,
             archived: Boolean(d.data().archived),
+            parentId: d.data().parentId as string | undefined,
             // All three feed `lastActivityOf`, which takes the max — see its
             // note in @sabeel/shared for why none of them is enough alone.
             updatedAt: (d.data().updatedAt as number) ?? 0,
@@ -534,7 +536,7 @@ export function SearchScreen({ user }: { user: SessionUser }) {
               // title on either surface rather than needing two idioms.
               testID={`card-${c.title}`}
               accessibilityRole="button"
-              accessibilityLabel={c.title}
+              accessibilityLabel={cardTileName(c)}
               onPress={() => nav.push({ name: 'card', boardId: c.boardId, cardId: c.id })}
             >
               <Panel>

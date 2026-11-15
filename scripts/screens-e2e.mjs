@@ -294,9 +294,13 @@ const CARDS = [
   ['sw_card4', 'c3', 'Thank the volunteers', 'none'],
   ['sw_card5', 'c1', 'A deliberately long card title that has to wrap somewhere sensible', 'low'],
 ];
+// The first card is a subtask of the long-titled one, so a face carries both
+// subtask chips and the main task's long name has to fit its chip at 320.
+const PARENT_OF = { sw_card1: 'sw_card5' };
 for (const [id, columnId, title, priority] of CARDS) {
   await db.doc(`cards/${id}`).set({
     boardId: BOARD, title, columnId, priority,
+    ...(PARENT_OF[id] ? { parentId: PARENT_OF[id] } : {}),
     description:
       'Confirm the **deposit** and the *date* before Friday.\n\n- call the hall\n- send the [contract](https://example.org/contract)\n\n1. deposit\n2. signature\n\nVenue notes: https://example.org/venue',
     rank: `V${id.slice(-1)}`,

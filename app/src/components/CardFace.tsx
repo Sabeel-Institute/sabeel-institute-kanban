@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '../icons';
 import { bucketFor, describeDue, todayInOrgTz, type Label, type Priority } from '@sabeel/shared';
 import type { BoardMemberProfile } from '../boards';
@@ -18,9 +18,13 @@ export function CardFace({
   labels,
   boardMembers,
   subtaskCount,
+  parentTitle,
+  unnamed = false,
 }: {
   card: {
     title: string;
+    /** Set on a subtask: the card it belongs to. */
+    parentId?: string;
     priority: Priority;
     dueDate?: string;
     labelIds: string[];
@@ -40,6 +44,20 @@ export function CardFace({
    * never load a card's siblings.
    */
   subtaskCount?: number;
+  /**
+   * A subtask's main task, by title (see `parentTitles`), which its chip names.
+   * Absent where the main task is not loaded — archived, or a cross-board list
+   * — and the chip then says only "Subtask".
+   */
+  parentTitle?: string;
+  /**
+   * The face is not inside a tile with a name of its own (the archive), so a
+   * phone's screen reader reads it piece by piece and the subtask chip needs
+   * its own words. Inside a named tile it must not: Android makes an
+   * accessible view a stop of its own, so TalkBack would read the tile, then
+   * stop on the chip again.
+   */
+  unnamed?: boolean;
   /** Every label, of both scopes, which is what lets My Work and Search render
    *  chips for cards whose board they never load. */
   labels: readonly Label[];
@@ -55,6 +73,7 @@ export function CardFace({
     .map((uid) => boardMembers.find((m) => m.uid === uid))
     .filter((m): m is BoardMemberProfile => !!m);
 
+  const chip = { backgroundColor: t.bg.inset, borderColor: t.border.subtle };
   const overdue = bucketFor(card.dueDate, today) === 'overdue';
   const dueColor = overdue ? t.text.danger : t.text.muted;
   const subtasks = subtaskCount ?? 0;
@@ -67,6 +86,7 @@ export function CardFace({
     chips.length > 0 ||
     !!card.dueDate ||
     subtasks > 0 ||
+    !!card.parentId ||
     files > 0;
 
   return (
@@ -79,11 +99,44 @@ export function CardFace({
           {chips.map((l) => (
             <ColorBadge key={l.id} color={l.color} label={l.name} />
           ))}
+          {/* The two subtask chips (Faisal, 2026-11-14, option C of three):
+              soft grey, like an assignee, so they read as how cards relate
+              rather than as one more coloured label. People had been adding
+              "Main Task" and "subtask" labels by hand to see this. */}
           {subtasks > 0 ? (
-            <View style={styles.due}>
-              <Icon name="account-tree" size={13} color={t.text.muted} />
-              <Text style={[type.caption, { color: t.text.muted }]}>
+            <View style={[styles.chip, chip]}>
+              <Icon name="account-tree" size={13} color={t.text.secondary} />
+              <Text style={[type.caption, { color: t.text.secondary }]}>
                 {subtasks} subtask{subtasks === 1 ? '' : 's'}
+              </Text>
+            </View>
+          ) : null}
+          {card.parentId ? (
+            <View
+              style={[styles.chip, styles.chipShrink, chip]}
+              // Inside a named tile the tile says it (`cardTileName`).
+              {...(Platform.OS === 'web' || !unnamed
+                ? {}
+                : {
+                    accessible: true,
+                    accessibilityLabel: parentTitle !== undefined ? `Subtask of ${parentTitle}` : 'Subtask',
+                  })}
+            >
+              <Icon name="subdirectory-arrow-right" size={13} color={t.text.secondary} />
+              <Text
+                style={[type.caption, styles.shrink, { color: t.text.secondary }]}
+                numberOfLines={1}
+              >
+                {/* A browser reads the face's text, because the computer's
+                    board tile is a plain element with no name of its own, so
+                    "Subtask of" is there, drawn nowhere. In the SAME element
+                    as the title: on its own, the title would be a second
+                    element reading exactly the main task's name, which a
+                    lookup by text takes for the main task's own card. */}
+                {Platform.OS === 'web' && parentTitle !== undefined ? (
+                  <Text style={styles.unseen}>Subtask of </Text>
+                ) : null}
+                {parentTitle ?? 'Subtask'}
               </Text>
             </View>
           ) : null}
@@ -122,4 +175,25 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.xs },
   assigneeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.xs },
   due: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 999,
+    paddingHorizontal: space.sm,
+    paddingVertical: 2,
+  },
+  // A long main-task name is cut short inside its chip rather than widening
+  // the row: Yoga's flexShrink defaults to 0, so the text must be allowed to give.
+  chipShrink: { maxWidth: '100%' },
+  shrink: { flexShrink: 1 },
+  // Present for a screen reader, drawn nowhere.
+  unseen: {
+    position: 'absolute',
+    width: 1,
+    height: 1,
+    overflow: 'hidden',
+    opacity: 0,
+  },
 });

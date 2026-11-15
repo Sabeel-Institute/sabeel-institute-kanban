@@ -210,9 +210,13 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
         }
       : undefined;
 
-  async function clone(offer: { board: BoardListItem; cloneId: string }, name: string) {
+  async function clone(
+    offer: { board: BoardListItem; cloneId: string },
+    name: string,
+    subscribe: boolean,
+  ) {
     await cloneAction.run(async () => {
-      const landed = await cloneBoard(offer.board.id, name, offer.cloneId);
+      const landed = await cloneBoard(offer.board.id, name, offer.cloneId, subscribe);
       setCloning(null);
       // An earlier try made this board, its answer lost, and the name has been
       // changed since: this answer is the one the person is waiting on, so the
@@ -398,7 +402,7 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
           boardName={cloning.board.name}
           busy={cloneAction.busy}
           error={cloneAction.error}
-          onClone={(name) => clone(cloning, name)}
+          onClone={(name, subscribe) => clone(cloning, name, subscribe)}
           onClose={() => setCloning(null)}
         />
       ) : null}

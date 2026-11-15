@@ -138,6 +138,7 @@ export function BoardArchiveScreen({
                 card={card}
                 labels={allLabels.data ?? NO_LABELS}
                 boardMembers={b.members}
+                unnamed
               />
             </View>
             <IconAction

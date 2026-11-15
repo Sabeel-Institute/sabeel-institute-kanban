@@ -109,14 +109,19 @@ export function markdownToHtml(markdown: string): string {
 
 /**
  * What a PHONE editor opens with: each line of a paragraph its own `<p>`, a
- * bold or link that spans the break reopened on the next line.
+ * bold or link that spans the break reopened on the next line, and a blank
+ * line (`<br>`) between blocks. `phoneHtmlToMarkdown` reads it back.
  *
- * The phone editors have no line break inside a paragraph. iOS makes `<br>` a
- * newline only beside another tag, so `line<br>line` opened as ONE line and
- * saved that way: the words of a description ran together the first time an
- * iPhone saved it. Android opens the `<br>` as a new line, which its editor
- * saves as a new paragraph. So both now open what Android always saved: an
- * edit on a phone turns a soft break into a paragraph break, and loses nothing.
+ * It is drawn the way the card shows the same text (`richDocToDisplayHtml`):
+ * lines of a paragraph one under the other, a blank line between paragraphs.
+ * The phone editors have no paragraph spacing and no line break inside a
+ * paragraph, so a line is a `<p>` and a paragraph break an empty line, which
+ * both phones' editors write back as `<br>`. Opened without the blank lines,
+ * a description's paragraphs ran together in the editor while the card
+ * showed them apart, and came back apart only on save (Faisal, 2026-11-14).
+ *
+ * No `<br>` INSIDE a paragraph: iOS makes `<br>` a newline only beside
+ * another tag, so `line<br>line` opened as one line there and saved that way.
  */
 export function markdownToPhoneEditorHtml(markdown: string): string {
   const none = new Set<'b' | 'i'>();
@@ -128,7 +133,18 @@ export function markdownToPhoneEditorHtml(markdown: string): string {
             .join('')
         : listToHtml(b, none),
     )
-    .join('');
+    .join('<br>');
+}
+
+/**
+ * Markdown from a PHONE editor's HTML: what `markdownToPhoneEditorHtml` opens,
+ * as the editor hands it back. Lines next to each other are lines of one
+ * paragraph; a blank line ends it. So the editor keeps the text's shape as the
+ * card draws it: a line typed with one Return stays a line, two make a new
+ * paragraph, and a soft break survives an edit on a phone.
+ */
+export function phoneHtmlToMarkdown(html: string): string {
+  return htmlToMarkdown(html, { phone: true });
 }
 
 /**
@@ -339,9 +355,16 @@ function attr(attrs: string, name: string): string | undefined {
  * paragraph, and a nested list is flattened because the native editor does not
  * support nesting either.
  */
-export function htmlToMarkdown(html: string): string {
+export function htmlToMarkdown(html: string, opts: { phone?: boolean } = {}): string {
   const tokens = tokenize(html);
   const blocks: RichDoc = [];
+  // Phone mode (`phoneHtmlToMarkdown`): a `<p>` is a LINE, and a paragraph
+  // ends only at a blank line, a `<br>` between blocks. `gap` says one stands
+  // before the next paragraph; `pDepth` tells a block-level `<br>` from one
+  // inside a line.
+  const phone = opts.phone === true;
+  let gap = true;
+  let pDepth = 0;
 
   // Inline state: a stack of open marks, and the run being built.
   let run: RichInline[] = [];
@@ -418,12 +441,22 @@ export function htmlToMarkdown(html: string): string {
 
   const endBlock = () => {
     const content = flushRun();
-    if (content) blocks.push({ kind: 'paragraph', content });
+    if (!content) return false;
+    const last = blocks[blocks.length - 1];
+    if (phone && !gap && last?.kind === 'paragraph') {
+      // The next line of the same paragraph: a soft break between them.
+      last.content.push({ kind: 'text', text: '\n' }, ...content);
+    } else {
+      blocks.push({ kind: 'paragraph', content });
+    }
+    gap = false;
+    return true;
   };
 
   const endList = () => {
     if (listKind && listItems.length) {
       blocks.push({ kind: listKind, items: listItems } as RichBlock);
+      gap = false;
     }
     listKind = null;
     listItems = [];
@@ -506,7 +539,13 @@ export function htmlToMarkdown(html: string): string {
       if (n === 'b' || n === 'strong') openMark('bold');
       else if (n === 'i' || n === 'em') openMark('italic');
       else if (n === 'a') marks.push({ kind: 'link', href: attr(tk.attrs, 'href'), content: [] });
-      else if (n === 'br') pushText('\n');
+      else if (n === 'br') {
+        if (phone && pDepth === 0 && listDepth === 0) {
+          // A blank line between blocks: the paragraph before it is done.
+          endBlock();
+          gap = true;
+        } else pushText('\n');
+      }
       else if (n === 'ul' || n === 'ol') {
         if (listDepth === 0) {
           endBlock();
@@ -521,6 +560,7 @@ export function htmlToMarkdown(html: string): string {
         }
         inItem = true;
       } else if (BLOCKISH.has(n)) {
+        if (n === 'p') pDepth += 1;
         if (listDepth === 0) endBlock();
       }
       continue;
@@ -553,7 +593,9 @@ export function htmlToMarkdown(html: string): string {
       listDepth = Math.max(0, listDepth - 1);
       if (listDepth === 0) endList();
     } else if (BLOCKISH.has(n)) {
-      if (listDepth === 0) endBlock();
+      if (n === 'p') pDepth = Math.max(0, pDepth - 1);
+      // An empty line written as `<p></p>` is a blank line too.
+      if (listDepth === 0 && !endBlock() && phone && n === 'p') gap = true;
     }
   }
 

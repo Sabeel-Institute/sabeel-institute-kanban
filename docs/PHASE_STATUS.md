@@ -27,6 +27,37 @@ web. "The code looks right" is not verification.
 | 14 | ClickUp import + launch | **complete** (2026-07-26) — three boards imported from a CSV export in one pass; `scripts/import-clickup.mjs` and the `sourceId` field remain so a re-run would update, not duplicate. See `docs/MIGRATION.md`. |
 | — | Since launch | The app is **in production and in daily use**. Work now ships as numbered releases rather than phases; the **deploy log** below is the running record. |
 
+## Help films that lag the app
+
+The films on More → Help are recorded from the guide world
+(`scripts/tutorials/`) and published as one set. A release that changes a
+screen re-records the films that show it; when one is shipped stale on
+purpose, it is listed here with what it lacks, and comes off the list when it
+is re-recorded and the set published. Re-record from this list.
+
+**As of v0.19.0** (Faisal, 2026-11-14: shipped with stale films, to start the
+next release sooner). The scripts already carry the new lines (the board film
+explains the subtask chips, the clone film the bell); only the recording and
+publishing are missing. The clone film's narration is rendered.
+
+| Film | Stale? | What it lacks |
+|---|---|---|
+| `board` | stale | Subtask chips on card faces, and its two new lines about them; the board name in the app's font (computer) |
+| `clone-board` | stale | The Clone sheet's bell and its new line; the chips on the cloned board; the board name's font (computer) |
+| `card` | stale | The chips on the board it starts from; the description editor's new spacing (phone: blank lines between paragraphs; computer: the card's line height); the board name's font (computer) |
+| `getting-around` | stale | The chips on the Fundraising board it visits; the board name's font (computer) |
+| `moving` | stale | The chips on the board; the board name's font (computer) |
+| `archiving` | stale | The chips on the board; the board name's font (computer) |
+| `bulk` | stale | The chips on the board; the board name's font (computer) |
+| `board-archive` | stale | The chips on the board it starts from; the board name's font (computer) |
+| `labels` | stale | The chips on the board it passes through; the board name's font (computer) |
+| `search` | stale | "↳ Subtask" on Design the programme in the results |
+| `comments` | stale, computer only | The comment box's new line height |
+| `board-settings` | stale, computer only | The board name's font |
+| `board-people` | stale, computer only | The board name's font |
+| `new-board` | stale, computer only | The new board's name in the app's font |
+| `signing-in`, `attachments`, `subtasks`, `my-work`, `notifications`, `report`, `people`, `roles`, `stats` | current | Nothing: they show none of v0.19.0's changes |
+
 ## What works today (2026-10-16)
 
 Every phase is complete and the app is **live and in daily use** at

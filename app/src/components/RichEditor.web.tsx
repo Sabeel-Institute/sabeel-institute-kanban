@@ -91,10 +91,11 @@ const TRANSFORMERS = [UNORDERED_LIST, ORDERED_LIST, BOLD_STAR, ITALIC_STAR];
  *
  * react-native-web sets this per-`Text` element (its `fontFamily: 'System'`
  * default, resolved in
- * `react-native-web/dist/exports/StyleSheet/compiler/createReactDOMStyle.js`),
- * never on `body` — so a raw `contenteditable` inherits nothing and falls back
- * to the UA default, which is **Times**. The editor rendered in serif while
- * the card beneath it rendered in sans, at 16px against the app's 15.
+ * `react-native-web/dist/exports/StyleSheet/compiler/createReactDOMStyle.js`).
+ * Before `app/public/index.html` set it on `body` too, a raw
+ * `contenteditable` inherited the UA default, **Times**: the editor rendered
+ * in serif while the card beneath it rendered in sans, at 16px against the
+ * app's 15. The editor keeps its own copy so it never depends on the shell.
  *
  * No lint rule covers this and every assertion passed; the manual's own
  * screenshot is what showed it. `richtext-e2e.mjs` now compares the editor's
@@ -603,20 +604,27 @@ export function RichEditor({
    */
   const css = useMemo(
     () => `
+      /* Spacing is the card's (RichDocView.web.tsx), so editing shows what
+         saving will: its lines at the browser's normal height, a block gap of
+         space.sm, list rows space.xs apart, list text after an 18px marker
+         column and a space.sm gap, markers in the secondary colour. */
       .sk-rt {
         outline: none;
         /* NOT inherited from anywhere — see SYSTEM_FONT_STACK above. */
         font-family: ${SYSTEM_FONT_STACK};
         font-size: ${type_.body.fontSize}px;
+        line-height: normal;
       }
       .sk-rt-p { margin: 0 0 ${space.sm}px; }
       .sk-rt-b { font-weight: 700; }
       .sk-rt-i { font-style: italic; }
       .sk-rt-a { color: ${t.accent.base}; text-decoration: underline; }
-      .sk-rt-ul, .sk-rt-ol { margin: 0 0 ${space.sm}px; padding-left: ${space.lg}px; }
+      .sk-rt-ul, .sk-rt-ol { margin: 0 0 ${space.sm}px; padding-left: ${18 + space.sm}px; }
       .sk-rt-li { margin: 0 0 ${space.xs}px; }
+      .sk-rt-li:last-child { margin-bottom: 0; }
+      .sk-rt-li::marker { color: ${t.text.secondary}; }
     `,
-    [t.accent.base],
+    [t.accent.base, t.text.secondary],
   );
 
   const initialConfig = useMemo(
@@ -700,9 +708,8 @@ export function RichEditor({
                 borderStyle: 'solid',
                 borderRadius: radius.sm,
                 padding: space.md,
-                // Font family and size live in `.sk-rt` — an inline value here
-                // would win over the class and silently undo it.
-                lineHeight: 1.5,
+                // Font family, size and line height live in `.sk-rt` — an
+                // inline value here would win over the class and undo it.
               }}
             />
           }
@@ -723,7 +730,7 @@ export function RichEditor({
                 // typeface on the first keystroke.
                 fontFamily: SYSTEM_FONT_STACK,
                 fontSize: type_.body.fontSize,
-                lineHeight: 1.5,
+                lineHeight: 'normal',
               }}
             >
               {placeholder}

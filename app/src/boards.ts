@@ -205,7 +205,7 @@ export async function addBoardMember(boardId: string, uid: string): Promise<void
  * made it and the name was changed before this one.
  */
 const cloneBoardFn = httpsCallable<
-  { boardId: string; name: string; cloneId: string },
+  { boardId: string; name: string; cloneId: string; subscribe: boolean },
   { boardId: string; name?: string }
 >(functions, 'cloneBoard');
 
@@ -218,8 +218,10 @@ export async function cloneBoard(
   boardId: string,
   name: string,
   cloneId: string,
+  /** Follow every cloned card: the sheet's bell. */
+  subscribe: boolean,
 ): Promise<{ id: string; name?: string }> {
-  const { data } = await cloneBoardFn({ boardId, name: name.trim(), cloneId });
+  const { data } = await cloneBoardFn({ boardId, name: name.trim(), cloneId, subscribe });
   return { id: data.boardId, name: data.name };
 }
 

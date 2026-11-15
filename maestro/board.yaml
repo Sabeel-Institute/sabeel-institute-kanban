@@ -178,10 +178,12 @@ name: Board, card, rich text and gestures
           visible: "Name of the clone"
           timeout: 10000
 - inputText: " clone"
-# Clone is tapped with the keyboard still up, as a person would: on Android an
-# edge-to-edge dialog is not resized for the keyboard, so a Clone placed low in
-# the sheet would be under the keys, and hiding the keyboard first would hide
-# that.
+# The sheet with the keyboard up, as a person types into it: Sheet lifts
+# itself by the keyboard's height, because an edge-to-edge dialog window is
+# not resized for the keys. The screenshot is the evidence; Maestro sees
+# neither the keyboard's edge nor a view with no content, and a tap on Cancel
+# landed even with the lift removed. Clone is tapped with the keyboard still
+# up, as a person would.
 - takeScreenshot: 07-clone-board
 # The button, above the sheet's explanation: Maestro also sees the keyboard's
 # suggestion strip, and with "clone" just typed its first suggestion is

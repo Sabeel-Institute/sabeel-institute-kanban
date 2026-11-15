@@ -172,7 +172,9 @@ disabling the account is the block, by decision.
   arm so the cross-board query needs no per-row board lookup — so it carries
   every constraint `assigneeUids` does: members only, cleared by
   `removeBoardMember` and filtered on a cross-board move. A copy carries only
-  the person who made it, like any new card.
+  the person who made it, like any new card. A clone's cards carry the cloner
+  only if the Clone sheet's bell is on, and it starts OFF (Faisal, 2026-11-14):
+  a template can hold hundreds of cards.
 - **Labels come in two scopes, and `boardId` is the whole difference** (Faisal,
   2026-11-07, after the org-wide set of 2026-07-27). One `labels/{id}`
   collection. A label with no `boardId` is an **institute label**: on every
@@ -304,8 +306,13 @@ it.
   and it collapses runs of spaces, so those go in as no-break spaces. Its iOS
   parser makes `<br>` a newline only beside another tag, so nothing a phone
   reads has a `<br>` inside a paragraph: `richDocToDisplayHtml` and
-  `markdownToPhoneEditorHtml` write each line as a `<p>`. A soft break edited on
-  a phone therefore saves as a paragraph break, as Android's editor always did.
+  `markdownToPhoneEditorHtml` write each line as a `<p>`. The phone editor
+  opens with a blank line (`<br>`) between blocks, as the card draws them, and
+  `phoneHtmlToMarkdown` reads its HTML back the same way: a line is a line, a
+  blank line ends a paragraph, so the editor shows the card's spacing and a
+  soft break survives an edit on a phone (Faisal, 2026-11-14: "it should just
+  be true to how it's going to be displayed"). The browser editor's HTML goes
+  through `htmlToMarkdown`, where every `<p>` is a paragraph.
   The same parser keeps open tags by name, so neither writes a mark inside the
   same mark, and returns a tapped href still escaped (`decodeDisplayHref`).
 
@@ -860,7 +867,10 @@ factory rather than being silently dropped.
   the set (`docs/DEV-TOOLING.md`, "The help films"). The films live on their
   own public Hosting site, never in git, and show the guide world only — no
   real board, card or person. Their narration is a colleague talking you
-  through the screen, never labels read out.
+  through the screen, never labels read out. A film shipped stale on purpose
+  is listed in `docs/PHASE_STATUS.md` § Help films that lag the app, with what
+  it lacks: re-record from that list, add to it when a release leaves another
+  behind, and take each film off once the set is published with it.
 - Before ANY significant install (global/system/major framework), ask first;
   routine project-local npm deps of the locked stack are fine.
 - All repo artifacts (docs, plans, protocols) live in this repo.

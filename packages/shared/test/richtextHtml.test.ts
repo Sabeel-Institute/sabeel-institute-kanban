@@ -4,6 +4,7 @@ import {
   htmlToMarkdown,
   markdownToHtml,
   markdownToPhoneEditorHtml,
+  phoneHtmlToMarkdown,
   richDocToDisplayHtml,
 } from '../src/richtextHtml';
 import { extractMentions, mentionInsertion } from '../src/mentions';
@@ -475,8 +476,10 @@ describe('the display HTML the phones render', () => {
 });
 
 /**
- * What a phone editor opens with. iOS ran `line<br>line` into one line and
- * saved it that way, so a phone editor never sees a `<br>` inside a paragraph.
+ * What a phone editor opens with, and how its HTML reads back. iOS ran
+ * `line<br>line` into one line and saved it that way, so a phone editor never
+ * sees a `<br>` inside a paragraph: a line is a `<p>`, and the blank line
+ * between paragraphs, which the card draws, is a `<br>` between blocks.
  */
 describe('the HTML a phone editor opens with', () => {
   it('opens each line of a paragraph as a paragraph', () => {
@@ -500,21 +503,66 @@ describe('the HTML a phone editor opens with', () => {
     }
   });
 
-  it('saves a soft break as a paragraph break, keeping every word', () => {
-    // What Android's editor has always done with one; now iPhones do too.
-    expect(htmlToMarkdown(markdownToPhoneEditorHtml('a\nb'))).toBe('a\n\nb');
+  it('puts a blank line between paragraphs, as the card does', () => {
+    expect(markdownToPhoneEditorHtml('one\n\ntwo')).toBe('<p>one</p><br><p>two</p>');
+    expect(markdownToPhoneEditorHtml('p\n\n- l\n\nq')).toBe('<p>p</p><br><ul><li>l</li></ul><br><p>q</p>');
   });
 
-  it('is the browser editor’s HTML exactly, wherever there is no soft break', () => {
+  it('is the browser editor’s HTML block by block, wherever there is no soft break', () => {
     for (const md of ['**bold** and *it*', '- one\n- two', '1. one\n2. two', 'p\n\n- l', '[x](https://e.org/a"b)', 'a < b & c']) {
-      expect(markdownToPhoneEditorHtml(md), md).toBe(markdownToHtml(md));
+      expect(markdownToPhoneEditorHtml(md).split('<br>').join(''), md).toBe(markdownToHtml(md));
     }
   });
 
-  it('never puts a <br> inside a paragraph', () => {
-    for (const md of ['a\nb\nc', '*x\ny*', '[l\nm](https://e.org)', 'one\n\ntwo\nthree']) {
-      expect(markdownToPhoneEditorHtml(md), md).not.toContain('<br>');
+  it('never puts a <br> inside a paragraph, only between blocks', () => {
+    for (const md of ['a\nb\nc', '*x\ny*', '[l\nm](https://e.org)', 'one\n\ntwo\nthree', '- a\n\nb\nc']) {
+      const html = markdownToPhoneEditorHtml(md);
+      for (const [at] of [...html.matchAll(/<br>/g)].map((m) => [m.index!])) {
+        expect(html.slice(0, at), md).toMatch(/<\/(p|ul|ol)>$/);
+        expect(html.slice(at + 4), md).toMatch(/^<(p|ul|ol)>/);
+      }
     }
+  });
+
+  it('reads a line as a line and a blank line as a paragraph break', () => {
+    // As both phones write it back: a line per <p>, a <br> per blank line.
+    expect(phoneHtmlToMarkdown('<html>\n<p>a</p>\n<br>\n<p>b</p>\n<p>c</p>\n</html>')).toBe('a\n\nb\nc');
+    // An empty line written as an empty paragraph is a blank line too.
+    expect(phoneHtmlToMarkdown('<p>a</p><p></p><p>b</p>')).toBe('a\n\nb');
+    // Several blank lines are one break; none at either end.
+    expect(phoneHtmlToMarkdown('<br><p>a</p><br><br><p>b</p><br>')).toBe('a\n\nb');
+    // A break inside a line, should an editor write one, stays a line break.
+    expect(phoneHtmlToMarkdown('<p>a<br>b</p>')).toBe('a\nb');
+    // A list ends its block whatever follows it.
+    expect(phoneHtmlToMarkdown('<ul><li>x</li></ul><p>y</p><p>z</p>')).toBe('- x\n\ny\nz');
+  });
+
+  it('keeps a line that starts like a list item a line of text', () => {
+    const md = phoneHtmlToMarkdown('<p>a</p><p>- b</p><p>2. c</p>');
+    expect(parseRich(md)).toEqual([
+      { kind: 'paragraph', content: [{ kind: 'text', text: 'a\n- b\n2. c' }] },
+    ]);
+  });
+
+  it('opens what it saved: an unedited save changes nothing a phone shows', () => {
+    for (const md of [
+      'a\nb',
+      'one\n\ntwo\nthree',
+      '**one\ntwo** three',
+      '- x\n- y\n\npara\nline',
+      '1. a\n2. b\n\n- c',
+      'Cc [the sheet\nhere](https://e.org/s) now',
+      'I thought:\n\n[one](https://e.org/1)\n\n[two](https://e.org/2)\n\nThen this:',
+    ]) {
+      const html = markdownToPhoneEditorHtml(md);
+      // The Android editor's own spacing between tags, which is ignored.
+      const saved = phoneHtmlToMarkdown(`<html>\n${html.replace(/(<\/p>|<br>|<\/[uo]l>)/g, '$1\n')}</html>`);
+      expect(markdownToPhoneEditorHtml(saved), md).toBe(html);
+    }
+  });
+
+  it('leaves the browser’s reading alone: every <p> there is a paragraph', () => {
+    expect(htmlToMarkdown('<p>a</p><p>b</p>')).toBe('a\n\nb');
   });
 });
 

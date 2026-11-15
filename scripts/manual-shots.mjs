@@ -40,6 +40,8 @@ import { RULES_TITLE } from './lib/rules.mjs';
 const OUT = 'docs/manual/img';
 const BASE = process.env.MANUAL_BASE ?? `http://127.0.0.1:${PORTS.web}`;
 const BOARD = 'Fundraising 2026';
+// Looked up EXACTLY: the card has a subtask (below), whose chip names it, and
+// a loose match takes whichever comes first on the board.
 const CARD = 'Draft the donor letter';
 
 /** [tag, width, height] — the two shapes the manual lays out for. */
@@ -233,7 +235,7 @@ async function nav(p, label) {
 async function openBoard(p) {
   await nav(p, 'Boards');
   await p.getByText(BOARD).first().click();
-  await p.getByText(CARD).first().waitFor({ timeout: 60000 });
+  await p.getByText(CARD, { exact: true }).first().waitFor({ timeout: 60000 });
   await p.waitForTimeout(1500);
 }
 
@@ -245,7 +247,7 @@ const SHOTS = {
   board: openBoard,
   card: async (p) => {
     await openBoard(p);
-    await p.getByText(CARD).first().click();
+    await p.getByText(CARD, { exact: true }).first().click();
     await p.getByRole('button', { name: 'Share card' }).waitFor({ timeout: 30000 });
   },
   // The formatting row only exists while the description is being EDITED, so
@@ -253,7 +255,7 @@ const SHOTS = {
   // manual that photographs an editor rather than a screen.
   format: async (p) => {
     await openBoard(p);
-    await p.getByText(CARD).first().click();
+    await p.getByText(CARD, { exact: true }).first().click();
     await p.getByRole('button', { name: 'Edit description' }).click();
     // Wait for the editor itself, not a timeout — it mounts asynchronously and
     // a screenshot taken early catches the read-only text it replaces.
@@ -270,7 +272,7 @@ const SHOTS = {
     } else {
       // Long-press starts a selection. Holding the pointer down is what
       // `onLongPress` listens for — a plain click only opens the card.
-      await p.getByText(CARD).first().click({ delay: 900 });
+      await p.getByText(CARD, { exact: true }).first().click({ delay: 900 });
       await p.waitForTimeout(700);
       await p.getByText('Book the venue').first().click();
     }
@@ -296,7 +298,7 @@ const SHOTS = {
   // cannot be photographed from a card at rest.
   attach: async (p) => {
     await openBoard(p);
-    await p.getByText(CARD).first().click();
+    await p.getByText(CARD, { exact: true }).first().click();
     const chooser = p.waitForEvent('filechooser', { timeout: 30000 });
     await p.getByRole('button', { name: 'Attach a file' }).click();
     await (await chooser).setFiles({

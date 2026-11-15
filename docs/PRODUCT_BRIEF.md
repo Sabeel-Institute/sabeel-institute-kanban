@@ -54,7 +54,7 @@ in the app.
 | Card deletion | Members **archive** only. Permanent **delete is the board's owners and admins**. |
 | Offboarding | A disabled user **keeps their assignments**, rendered as inactive; a board's owners get a review list to reassign. Disabling **warns** if the person solely owns a board, and proceeds anyway. |
 | Theming | **Single light theme, no dark mode** (decided 2026-07-21). Semantic tokens throughout, so a re-theme stays a one-file change. |
-| Subtasks | A card may be a **subtask of one other card on the same board** (`parentId` on the child). The parent's detail view lists them and links straight through; the child shows "Subtask of". Deliberately NOT a checklist: a subtask is an ordinary card, with its own column, assignees and comments. Added 2026-07-25 — the ClickUp import had been faking it in description text. **`parentId` is an opaque string to the rules**: same-board is enforced by the picker, not by `firestore.rules`, which check only that it is a string under 200 chars. A child's read access comes from its OWN `boardId`, so a stale or cross-board link leaks nothing — it renders as nothing. Do not add a rules lookup to "fix" this; it would cost a read on every card write to enforce something the UI already does and no one can exploit. |
+| Subtasks | A card may be a **subtask of one other card on the same board** (`parentId` on the child). The parent's detail view lists them and links straight through; the child shows "Subtask of". On a card's face (Faisal, 2026-11-14, the chips of three prototypes, because people were hand-labelling cards "Main Task" and "subtask" to see this on the board): the parent a grey chip with its count, the child one naming its parent (`parentTitles`), or "Subtask" where the parent is not among the cards loaded — archived, on another board after a move that left the child linked, or on a screen that loads no siblings (My Work, Search, the board's archive). A tile's accessible name says both (`cardTileName`). Deliberately NOT a checklist: a subtask is an ordinary card, with its own column, assignees and comments. Added 2026-07-25 — the ClickUp import had been faking it in description text. **`parentId` is an opaque string to the rules**: same-board is enforced by the picker, not by `firestore.rules`, which check only that it is a string under 200 chars. A child's read access comes from its OWN `boardId`, so a stale or cross-board link leaks nothing: it shows as a plain "Subtask" chip and a "Subtask of" line the child can unlink, never the other card's title. Do not add a rules lookup to "fix" this; it would cost a read on every card write to enforce something the UI already does and no one can exploit. |
 | Explicitly NOT in v1 | Checklists (as a separate item type — see Subtasks), custom fields, dependencies, recurring cards, alternate board views, automations, integrations, guest/external access. |
 | Layout | **Chosen by available WIDTH, not platform** (breakpoint **700px**, `WIDE_BREAKPOINT` in `app/src/theme/layout.ts` — the one definition; never restate it). Wide → columns side by side. Narrow → one column at a time, swipe between them. So a tablet gets columns and a phone browser gets the swipe board. |
 | Drag and drop | A web **capability** layered on the wide layout. Native has no HTML5 drag API, so a wide native surface (a tablet) offers the same explicit "Move to…" the narrow layout uses. |
@@ -599,8 +599,14 @@ and opens when it lands.
   comments, history and attachments, and the template's own labels (Faisal,
   2026-11-13: institute labels only). A subtask whose parent is archived is
   cloned as an ordinary card.
-- Each cloned card starts as a new card does: subscribed by the cloner, its
-  history opening "created" by them, and counted in Stats as created that day.
+- Each cloned card starts as a new card does: its history opening "created"
+  by the cloner, and counted in Stats as created that day. **Subscribed** to
+  every one only if the cloner turns on the sheet's bell, the new card's bell
+  labelled "Subscribe to every card" — which starts **off**, unlike a new
+  card's (Faisal, 2026-11-14: like creating all the cards, but a choice; a
+  template can hold hundreds, and each would announce every change). The
+  callable takes `subscribe` and treats it absent as off, so a 0.18.0 app,
+  which offers no bell, clones without subscribing anyone.
 - **One write, which keeps its own books.** The `cloneBoard` callable writes the
   board, every card and each card's "created" line in one transaction, so a
   clone exists whole or not at all; rules check a new card against its board as
@@ -625,7 +631,9 @@ and opens when it lands.
   one, which nobody could delete. The answer names the board as it was made;
   when the person changed the name before trying again, the app renames it to
   the name of the try it is waiting on. Only the latest try's answer is acted
-  on, so a late answer to an earlier one cannot undo that.
+  on, so a late answer to an earlier one cannot undo that. Who follows the
+  cards is not put right the same way, so the bell holds still once Clone has
+  been pressed: it cannot show a choice the clone did not get.
 - **The clone opens where it was asked for.** If the person has gone elsewhere
   while it was on its way (a notification tapped over the sheet), the clone
   waits in the boards list rather than being pushed on top of where they went.

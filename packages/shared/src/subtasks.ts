@@ -48,6 +48,26 @@ export function subtaskCounts(cards: readonly SubtaskCard[]): Map<string, number
 }
 
 /**
+ * The title of each subtask's parent, keyed by the subtask's id, for the mark
+ * on its face that names the card it belongs to.
+ *
+ * Only parents among `cards` are named. A board layout holds the board's open
+ * cards, so a parent missing from them is archived; My Work and Search load no
+ * siblings at all. The face then says only that the card is a subtask.
+ */
+export function parentTitles(
+  cards: readonly (SubtaskCard & { title: string })[],
+): Map<string, string> {
+  const titleOf = new Map(cards.map((c) => [c.id, c.title]));
+  const out = new Map<string, string>();
+  for (const c of cards) {
+    const title = c.parentId ? titleOf.get(c.parentId) : undefined;
+    if (title !== undefined) out.set(c.id, title);
+  }
+  return out;
+}
+
+/**
  * The chain of ancestors above `cardId`, nearest first.
  *
  * Guarded by a visited set so already-corrupt data (a cycle written by an older

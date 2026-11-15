@@ -124,7 +124,7 @@ function firstDiff(a, b) {
 
 // ---------------------------------------------------------------- round trip canon
 const isWs = (c) => c.c === ' ' || c.c === '\t' || c.c === '\u00A0';
-function rtBlocks(lib, md, level) {
+function rtBlocks(lib, md, level, paragraphs = false) {
   const doc = lib.parseRich(md);
   const norm = (cells) => {
     if (level < 1) return cells;
@@ -140,10 +140,18 @@ function rtBlocks(lib, md, level) {
   const out = [];
   for (const b of doc) {
     if (b.kind === 'paragraph') {
+      const lines = [];
       for (const l of splitNl(cellsOf(b.content))) {
         const n = norm(l);
-        if (n.length) out.push({ kind: 'p', cells: n });
+        if (n.length) lines.push({ kind: 'p', cells: n });
       }
+      // `paragraphs` keeps a paragraph's lines together, so a soft break saved
+      // as a paragraph break, or the reverse, is seen; otherwise a line reads
+      // as a block of its own.
+      if (paragraphs && lines.length) {
+        const nl = { c: '\u23CE', b: false, i: false, href: null };
+        out.push({ kind: 'p', cells: lines.flatMap((l, k) => (k ? [nl, ...l.cells] : l.cells)) });
+      } else out.push(...lines);
     } else {
       let items = b.items.map((i) => norm(cellsOf(i)));
       if (level >= 2) items = items.filter((i) => i.length);
@@ -161,12 +169,17 @@ const blocksStr = (bs) =>
     )
     .join(' | ');
 export function compareRt(lib, md0, md1) {
+  // Each level is tried with paragraphs kept, then with lines alone. Equal
+  // only with lines alone is a paragraph grouping the save changed, which
+  // outranks the spacing differences of the same level.
+  const same = (lvl, paras) => blocksStr(rtBlocks(lib, md0, lvl, paras)) === blocksStr(rtBlocks(lib, md1, lvl, paras));
   for (const [lvl, cat] of [
     [0, null],
     [1, 'whitespace'],
     [2, 'empty-item'],
   ]) {
-    if (blocksStr(rtBlocks(lib, md0, lvl)) === blocksStr(rtBlocks(lib, md1, lvl))) return cat ? { cat } : null;
+    if (same(lvl, true)) return cat ? { cat } : null;
+    if (same(lvl, false)) return { cat: 'paragraphs' };
   }
   const a = rtBlocks(lib, md0, 2);
   const b = rtBlocks(lib, md1, 2);
@@ -198,7 +211,7 @@ export function roundTrips(lib, md) {
   const ehtml = `<html>${lib.markdownToPhoneEditorHtml(md)}</html>`;
   const aHtml = androidEditorRoundTrip(ehtml);
   const iHtml = iosToHtml(iosInputOpen(ehtml));
-  return { ehtml, aHtml, iHtml, mdA: lib.htmlToMarkdown(aHtml), mdI: lib.htmlToMarkdown(iHtml) };
+  return { ehtml, aHtml, iHtml, mdA: lib.phoneHtmlToMarkdown(aHtml), mdI: lib.phoneHtmlToMarkdown(iHtml) };
 }
 
 // ---------------------------------------------------------------- shrinker
