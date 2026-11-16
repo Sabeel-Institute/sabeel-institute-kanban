@@ -7,12 +7,20 @@
  * so it is worked out here, without React, and the screen draws it.
  */
 
-export type BoardSettingsPage = 'general' | 'columns' | 'lanes' | 'people' | 'labels' | 'history';
+export type BoardSettingsPage =
+  | 'general'
+  | 'columns'
+  | 'lanes'
+  | 'details'
+  | 'people'
+  | 'labels'
+  | 'history';
 
 export const PAGE_TITLES: Record<BoardSettingsPage, string> = {
   general: 'General',
   columns: 'Columns',
   lanes: 'Lanes',
+  details: 'Details',
   people: 'People',
   labels: 'Labels',
   history: 'History',
@@ -21,15 +29,15 @@ export const PAGE_TITLES: Record<BoardSettingsPage, string> = {
 /**
  * In the order the list draws them.
  *
- * Someone who does not run the board gets the pages they can use: the people
- * (who to ask), the labels (a board's own are anyone-on-the-board's to change)
- * and the history. Not General or Columns drawn disabled, which reads as
- * something broken.
+ * Someone who does not run the board gets the pages they can use: its
+ * details (everyone on the board reads them), the people (who to ask), the
+ * labels (a board's own are anyone-on-the-board's to change) and the history.
+ * Not General or Columns drawn disabled, which reads as something broken.
  */
 export function settingsPages(canManage: boolean): BoardSettingsPage[] {
   return canManage
-    ? ['general', 'columns', 'lanes', 'people', 'labels', 'history']
-    : ['people', 'labels', 'history'];
+    ? ['general', 'columns', 'lanes', 'details', 'people', 'labels', 'history']
+    : ['details', 'people', 'labels', 'history'];
 }
 
 /**
@@ -88,6 +96,9 @@ export interface PageFacts {
   lanes: number;
   /** The finished column's name, while lanes are on. */
   finishedColumn: string | null;
+  fields: number;
+  /** Of those, the ones with a value. */
+  filled: number;
 }
 
 function count(n: number, one: string, many: string): string {
@@ -112,6 +123,8 @@ export function pageSummary(page: BoardSettingsPage, facts: PageFacts): string |
       return `On, ${count(facts.lanes, 'lane', 'lanes')}${
         facts.finishedColumn ? `. Finished cards are in ${facts.finishedColumn}` : ''
       }`;
+    case 'details':
+      return facts.fields === 0 ? 'None yet' : `${facts.filled} of ${facts.fields} filled in`;
     case 'people':
       return `${count(facts.members, 'person', 'people')}, ${
         facts.owners === 0 ? 'no owners' : count(facts.owners, 'owner', 'owners')

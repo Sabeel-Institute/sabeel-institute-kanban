@@ -32,10 +32,13 @@ export function DateField({
   value,
   onChange,
   label,
+  emptyLabel = 'No due date',
 }: {
   value?: string;
   onChange: (next: string | undefined) => void;
   label?: string;
+  /** What it says with no date: a card's due date by default. */
+  emptyLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -49,7 +52,7 @@ export function DateField({
       {value ? (
         <Button label="Clear" variant="secondary" onPress={() => onChange(undefined)} />
       ) : (
-        <Hint>No due date</Hint>
+        <Hint>{emptyLabel}</Hint>
       )}
 
       {open ? (

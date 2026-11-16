@@ -3,6 +3,7 @@ import {
   arrayRemove,
   arrayUnion,
   collection,
+  deleteField,
   doc,
   getDoc,
   query,
@@ -16,6 +17,7 @@ import {
   newBoard,
   pushRecent,
   type BoardColumn,
+  type BoardField,
   type BoardLane,
   type BoardDoc,
 } from '@sabeel/shared';
@@ -60,6 +62,9 @@ export interface BoardListItem {
   lanesOn: boolean;
   lanes: BoardLane[];
   doneColumnId?: string;
+  /** The board's details: its fields in order, and each one's value by id. */
+  fields: BoardField[];
+  details: Record<string, string>;
 }
 
 function toBoard(id: string, data: Record<string, unknown>): BoardListItem {
@@ -92,6 +97,8 @@ function toBoard(id: string, data: Record<string, unknown>): BoardListItem {
     lanesOn: data.lanesOn === true,
     lanes: (data.lanes as BoardLane[]) ?? [],
     ...(typeof data.doneColumnId === 'string' ? { doneColumnId: data.doneColumnId } : {}),
+    fields: (data.fields as BoardField[]) ?? [],
+    details: (data.details as Record<string, string>) ?? {},
   };
 }
 
@@ -169,12 +176,51 @@ export async function updateBoard(
   boardId: string,
   patch: BoardPatch,
 ): Promise<void> {
-  // `createdBy` must be echoed back: the update rule pins it to its existing
-  // value so authorship cannot be rewritten, and Firestore rules compare against
-  // the full incoming document.
+  await writeBoard(boardId, patch);
+}
+
+/**
+ * Every client board write, stamped. `createdBy` must be echoed back: the
+ * update rule pins it to its existing value so authorship cannot be rewritten,
+ * and Firestore rules compare against the full incoming document.
+ */
+async function writeBoard(boardId: string, patch: Record<string, unknown>): Promise<void> {
   const snap = await getDoc(doc(db, 'boards', boardId));
   const createdBy = snap.data()?.createdBy;
   await updateDoc(doc(db, 'boards', boardId), { ...patch, createdBy, ...changeStamp() });
+}
+
+/** Add, rename or reorder a board's details' fields: the list as it should be. */
+export async function setBoardFields(boardId: string, fields: BoardField[]): Promise<void> {
+  await writeBoard(boardId, { fields });
+}
+
+/**
+ * Remove a field AND its value, in one write, so `fields` and `details` cannot
+ * drift: a value for no field would sit in the map, counting against its
+ * bound, with nothing to show or clear it.
+ */
+export async function removeBoardField(
+  boardId: string,
+  fields: readonly BoardField[],
+  fieldId: string,
+): Promise<void> {
+  await writeBoard(boardId, {
+    fields: fields.filter((f) => f.id !== fieldId),
+    [`details.${fieldId}`]: deleteField(),
+  });
+}
+
+/**
+ * One field's value, by its own path, so two owners saving different values
+ * at once both land. Null clears it. Build `value` with `validateDetailValue`.
+ */
+export async function setBoardDetail(
+  boardId: string,
+  fieldId: string,
+  value: string | null,
+): Promise<void> {
+  await writeBoard(boardId, { [`details.${fieldId}`]: value ?? deleteField() });
 }
 
 /**

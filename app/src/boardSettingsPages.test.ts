@@ -9,11 +9,19 @@ import {
 
 describe('settingsPages', () => {
   it('gives someone who runs the board every page, General first', () => {
-    expect(settingsPages(true)).toEqual(['general', 'columns', 'lanes', 'people', 'labels', 'history']);
+    expect(settingsPages(true)).toEqual([
+      'general',
+      'columns',
+      'lanes',
+      'details',
+      'people',
+      'labels',
+      'history',
+    ]);
   });
 
   it('gives anyone else the pages they can use, and no others', () => {
-    expect(settingsPages(false)).toEqual(['people', 'labels', 'history']);
+    expect(settingsPages(false)).toEqual(['details', 'people', 'labels', 'history']);
   });
 });
 
@@ -27,7 +35,7 @@ describe('shownPage', () => {
 
   it('opens the first page on a wide screen', () => {
     expect(shownPage(undefined, owner, true)).toBe('general');
-    expect(shownPage(undefined, member, true)).toBe('people');
+    expect(shownPage(undefined, member, true)).toBe('details');
   });
 
   it('shows the page asked for, at either width', () => {
@@ -38,7 +46,7 @@ describe('shownPage', () => {
   // A live demotion re-renders a route the person can no longer use.
   it('treats a page the person cannot use as no page', () => {
     expect(shownPage('columns', member, false)).toBeNull();
-    expect(shownPage('columns', member, true)).toBe('people');
+    expect(shownPage('columns', member, true)).toBe('details');
   });
 });
 
@@ -52,6 +60,8 @@ describe('pageSummary', () => {
     lanesOn: true,
     lanes: 6,
     finishedColumn: 'Done',
+    fields: 5,
+    filled: 3,
   };
 
   it('counts what each page holds', () => {
@@ -76,6 +86,11 @@ describe('pageSummary', () => {
     expect(pageSummary('lanes', { ...facts, lanes: 1 })).toBe('On, 1 lane. Finished cards are in Done');
     expect(pageSummary('lanes', { ...facts, lanes: 0 })).toBe('On, no lanes yet');
     expect(pageSummary('lanes', { ...facts, lanesOn: false })).toBe('Off');
+  });
+
+  it('says how many details are filled in, or that there are none', () => {
+    expect(pageSummary('details', facts)).toBe('3 of 5 filled in');
+    expect(pageSummary('details', { ...facts, fields: 0, filled: 0 })).toBe('None yet');
   });
 
   it('offers Restore on an archived board', () => {
