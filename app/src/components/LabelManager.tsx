@@ -69,12 +69,7 @@ export function LabelManager({
       setError(problem);
       return false;
     }
-    let created = false;
-    await run(async () => {
-      await createLabel({ name, color, user, boardId });
-      created = true;
-    });
-    return created;
+    return run(() => createLabel({ name, color, user, boardId }));
   }
 
   async function saveName(label: Label, name: string): Promise<boolean> {
@@ -86,13 +81,10 @@ export function LabelManager({
       return false;
     }
     // Closes only once the write lands, so a refused rename keeps its text.
-    let saved = false;
-    await run(async () => {
+    return run(async () => {
       await updateLabel(label.id, { name });
       setRenaming(null);
-      saved = true;
     });
-    return saved;
   }
 
   /**

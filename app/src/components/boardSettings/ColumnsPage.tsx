@@ -12,8 +12,8 @@ import { Body, Card, Hint, IconAction, Row, TextField } from '../ui';
 export function ColumnsPage({ board }: { board: BoardListItem }) {
   const { run, busy, error, setError } = useAction('boardSettings');
 
-  // Returns whether the name was ACCEPTED, so the row knows whether to clear
-  // itself. A rejected name stays in the field.
+  // Returns whether the column was ADDED, so the row knows whether to clear
+  // itself: a name refused here or by the rules stays in the field.
   async function addColumn(name: string): Promise<boolean> {
     const problem = validateColumnName(name, board.columns);
     if (problem) {
@@ -25,8 +25,7 @@ export function ColumnsPage({ board }: { board: BoardListItem }) {
     // against the flat `columnIds` mirror, so a desynced pair means cards cannot
     // be created in the new column at all — with a bare PERMISSION_DENIED as the
     // only clue.
-    await run(() => updateBoard(board.id, columnsPatch(next)));
-    return true;
+    return run(() => updateBoard(board.id, columnsPatch(next)));
   }
 
   return (
@@ -83,7 +82,7 @@ function AddColumnRow({
   onAdd,
 }: {
   busy: boolean;
-  /** Resolves once the column is written; rejects if it was refused. */
+  /** Whether the column was written; false leaves the name in the field. */
   onAdd: (name: string) => Promise<boolean>;
 }) {
   const [name, setName] = useState('');
