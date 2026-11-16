@@ -324,9 +324,11 @@ export function SearchScreen({ user }: { user: SessionUser }) {
   // Deliberately simple for the size this actually is (tens of cards); the
   // honest limit is the CAP below, which says out loud when it is hiding
   // something rather than silently truncating.
+  // Read on every render and a dependency: read inside the memo, it stayed at
+  // the day the screen opened, and past midnight Overdue missed a day.
+  const today = todayInOrgTz();
   const { results, total } = useMemo(() => {
     if (!cards) return { results: [], total: 0 };
-    const today = todayInOrgTz();
     const matched = filterCards(
       cards,
       {
@@ -356,6 +358,7 @@ export function SearchScreen({ user }: { user: SessionUser }) {
     assigneeUid,
     sort,
     finished,
+    today,
   ]);
 
   return (

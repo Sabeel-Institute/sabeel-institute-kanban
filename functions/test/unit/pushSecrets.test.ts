@@ -11,57 +11,66 @@ import { resolve } from 'node:path';
  * person who was meant to hear. Nothing else would show it: the emulator never
  * sends, and no other test reaches Apple.
  *
- * The senders are FOUND, not listed: every exported function whose body calls
- * `notify(`, the one way a push leaves `notifications.ts`, or calls a function
- * that does — a schedule's body lives in a `run…` function so a test can call
- * it, as `runDueSoonReminders` does. A list would have to be remembered by
- * whoever adds the next one, which is the failure this exists to catch.
+ * The senders are FOUND, not listed: every exported function that reaches
+ * `send(`, the one way a push leaves (`messaging.ts`), through any number of
+ * helpers. Followed through one helper only, the scan missed `noticeSweep`
+ * (`runNoticeSweep` → `deliver` → `notify` → `send`), and removing its
+ * secrets failed no test. A list would have to be remembered by whoever adds
+ * the next one, which is the failure this exists to catch.
  */
 
 // Paths resolve from the functions workspace, vitest's cwd here — the same
 // convention suite-coverage.test.ts uses.
 const SRC = resolve('src');
 
-const sources = () =>
-  readdirSync(SRC)
-    .filter((f) => f.endsWith('.ts'))
-    .map((f) => readFileSync(resolve(SRC, f), 'utf8').split('\n'));
-
-/** Top-level function declarations whose body calls `notify(`: the helpers a sender may call. */
-function helpers(): Set<string> {
-  const found = new Set<string>();
-  for (const lines of sources()) {
-    let current: string | null = null;
-    for (const line of lines) {
-      const start = /^(?:export )?(?:async )?function (\w+)/.exec(line);
-      if (start) current = start[1];
-      else if (/^export const |^const \w+ = /.test(line)) current = null;
-      if (current && /\bnotify\(/.test(line) && !line.startsWith(`export async function ${current}`))
-        found.add(current);
-    }
-  }
-  return found;
-}
+type Fn = { calls: Set<string>; deployed: boolean; importsSend: boolean };
 
 /**
- * The exported functions (deployed ones are `export const X = on…(`) that call
- * `notify(`, directly or through one of `helpers()`.
+ * Each top-level function in src, by name: what it calls, whether it is a
+ * deployed export, and whether its file imports `send` from messaging (other
+ * files have their own `send`, such as the report's mail sender).
  */
-function senders(): string[] {
-  const via = [...helpers()];
-  const calls = (line: string) =>
-    /\bnotify\(/.test(line) || via.some((h) => new RegExp(`\\b${h}\\(`).test(line));
-  const found = new Set<string>();
-  for (const lines of sources()) {
+function functions(): Map<string, Fn> {
+  const out = new Map<string, Fn>();
+  for (const file of readdirSync(SRC).filter((f) => f.endsWith('.ts'))) {
+    const text = readFileSync(resolve(SRC, file), 'utf8');
+    const importsSend = /import \{[^}]*\bsend\b[^}]*\} from '\.\/messaging'/.test(text);
     let current: string | null = null;
-    for (const line of lines) {
-      const start = /^export const (\w+) = /.exec(line);
-      if (start) current = start[1];
-      else if (/^(export )?(async )?function |^const \w+ = /.test(line)) current = null;
-      if (current && calls(line)) found.add(current);
+    for (const line of text.split('\n')) {
+      const fn = /^(?:export )?(?:async )?function (\w+)/.exec(line);
+      const deployed = /^export const (\w+) = /.exec(line);
+      const constFn = /^(?:export )?const (\w+) = (?:async )?\(/.exec(line);
+      const name = fn?.[1] ?? deployed?.[1] ?? constFn?.[1];
+      if (name) {
+        current = name;
+        out.set(name, { calls: new Set(), deployed: Boolean(deployed), importsSend });
+      } else if (/^(?:export )?(?:const|let|interface|type|class) /.test(line)) {
+        current = null;
+      }
+      const code = line.trim();
+      if (!current || code.startsWith('//') || code.startsWith('*') || code.startsWith('/*')) continue;
+      for (const m of line.matchAll(/\b(\w+)\(/g)) out.get(current)!.calls.add(m[1]);
     }
   }
-  return [...found].sort();
+  return out;
+}
+
+/** The deployed exports that reach `send(`, through any depth of helpers. */
+function senders(): string[] {
+  const fns = functions();
+  const reaches = new Set<string>(
+    [...fns].filter(([, f]) => f.importsSend && f.calls.has('send')).map(([name]) => name),
+  );
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const [name, { calls }] of fns) {
+      if (!reaches.has(name) && [...calls].some((c) => reaches.has(c))) {
+        reaches.add(name);
+        grew = true;
+      }
+    }
+  }
+  return [...fns].filter(([name, f]) => f.deployed && reaches.has(name)).map(([name]) => name).sort();
 }
 
 describe('push senders', () => {
@@ -69,7 +78,7 @@ describe('push senders', () => {
     // The ones that send today. A new sender joins this list by being found;
     // one that stops sending leaves it. Either way this line is updated
     // knowingly, and the next test covers whatever is found.
-    expect(senders()).toEqual(['dueSoonReminders', 'onCardNotify', 'onCommentNotify', 'onUserPending']);
+    expect(senders()).toEqual(['dueSoonReminders', 'noticeSweep', 'onCardNotify', 'onCommentNotify', 'onUserPending']);
   });
 
   it('are each bound to APNS_KEY', async () => {

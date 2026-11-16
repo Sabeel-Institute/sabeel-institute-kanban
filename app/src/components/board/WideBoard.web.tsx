@@ -227,7 +227,10 @@ function WebAddCardForm({
   // Unmount-scoped like the draft, so every new composer starts subscribed.
   const [subscribe, setSubscribe] = useState(initial?.subscribe ?? true);
   // None chosen to start, as in the native form: see `AddCardForm`.
-  const [laneId, setLaneId] = useState(initial?.laneId ?? '');
+  // A lane given back is kept only while the board still has it.
+  const [laneId, setLaneId] = useState(
+    initial?.laneId && lanes?.some((l) => l.id === initial.laneId) ? initial.laneId : '',
+  );
   const [needsLane, setNeedsLane] = useState(false);
 
   function submit() {
@@ -449,7 +452,8 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   // (`retry`), in front of the error.
   async function addCard(columnId: string, title: string, subscribe: boolean, laneId?: string) {
     setAdding(null);
-    setRetry(null);
+    // Only this column's: a refused add waiting elsewhere is kept.
+    setRetry((r) => (r?.columnId === columnId ? null : r));
     try {
       await createCard({
         boardId,

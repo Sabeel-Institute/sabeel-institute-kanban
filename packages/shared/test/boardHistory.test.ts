@@ -192,8 +192,11 @@ describe('diffBoard on lanes', () => {
     ]);
   });
 
-  it('records nothing for a board without lanes that does not change them', () => {
-    expect(diffBoard(board(), board({ name: 'Fundraising' }))).toEqual([]);
+  it('records only the change made on a board without lanes, nothing of lanes', () => {
+    // A real change, so a diff that reported lanes on any write would show.
+    expect(diffBoard(board(), board({ name: 'Fundraising 2027' }))).toEqual([
+      { type: 'renamed', from: 'Fundraising', to: 'Fundraising 2027' },
+    ]);
   });
 });
 

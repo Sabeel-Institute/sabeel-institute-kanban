@@ -330,7 +330,8 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
   // (`retry`), in front of the error.
   async function addCard(columnId: string, title: string, subscribe: boolean, laneId?: string) {
     setAdding(false);
-    setRetry(null);
+    // Only this column's: a refused add waiting elsewhere is kept.
+    setRetry((r) => (r?.columnId === columnId ? null : r));
     const added = await run(() =>
       createCard({
         boardId,

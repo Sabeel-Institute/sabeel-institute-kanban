@@ -77,7 +77,7 @@ export function newBoard(params: {
  * On a board with lanes switched on, the finished column moves with them: kept
  * while its column stays, given to the new last column when its column goes,
  * and written either way, so a later add or reorder cannot move it. Without
- * that, deleting the finished column silently made the column before it
+ * that, deleting the finished column silently made the last column left
  * finished (every card in Review never late, and no reminder), and adding a
  * column afterwards silently moved it again.
  */

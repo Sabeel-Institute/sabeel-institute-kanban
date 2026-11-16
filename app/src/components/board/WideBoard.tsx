@@ -130,7 +130,8 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   // (`retry`), in front of the error.
   async function addCard(columnId: string, title: string, subscribe: boolean, laneId?: string) {
     setAdding(null);
-    setRetry(null);
+    // Only this column's: a refused add waiting elsewhere is kept.
+    setRetry((r) => (r?.columnId === columnId ? null : r));
     const added = await run(() =>
       createCard({
         boardId,

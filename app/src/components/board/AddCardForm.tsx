@@ -60,7 +60,10 @@ export function AddCardForm({
   const [subscribe, setSubscribe] = useState(initial?.subscribe ?? true);
   // None chosen to start, and nothing remembered between cards (Faisal,
   // 2026-11-15): a lane picked for you is a card filed in the wrong place.
-  const [laneId, setLaneId] = useState(initial?.laneId ?? '');
+  // A lane given back is kept only while the board still has it.
+  const [laneId, setLaneId] = useState(
+    initial?.laneId && lanes?.some((l) => l.id === initial.laneId) ? initial.laneId : '',
+  );
   const [needsLane, setNeedsLane] = useState(false);
 
   // One path for both the Add button and the keyboard's submit, so they cannot

@@ -252,7 +252,7 @@ export function lanesSwitchPatch(
 /**
  * What deleting a column does to the finished column, for its confirmation,
  * or null when it does nothing: deleting the finished column of a board with
- * lanes makes the column before it the finished one (`columnsPatch`).
+ * lanes makes the last column left the finished one (`columnsPatch`).
  */
 export function finishedColumnDeleteNote(
   board: Omit<LaneBoard, 'columns'> & { columns: readonly { id: string; name: string }[] },

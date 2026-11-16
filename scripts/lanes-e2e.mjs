@@ -358,7 +358,10 @@ try {
   await openCard('Design the flyer');
   await page.getByLabel('Column', { exact: true }).selectOption({ label: 'Done' });
   await page.getByLabel('Due date').fill(PAST);
-  await page.waitForTimeout(1500);
+  // The date is on the card once Clear is offered, which only a set date has;
+  // "not Overdue" before then would say nothing.
+  await page.getByRole('button', { name: 'Clear', exact: true }).waitFor({ timeout: 15000 });
+  await page.waitForTimeout(500);
   check(
     'a finished card past its date is not overdue on the card',
     !(await page.getByText('Overdue', { exact: true }).isVisible().catch(() => false)),
@@ -507,8 +510,19 @@ try {
     await fire('[data-testid="card-Drag B"]', 'dragstart');
     await page.waitForTimeout(250);
     await fire('[data-testid="card-Drag N"]', 'dragover');
-    await page.waitForTimeout(250);
-    check('a card with a lane over a card in No lane draws no bar in No lane', !(await barIn(page, 'To Do', 'No lane')));
+    // The dragover took effect: refused by No lane, it fell to the column,
+    // which draws the bar at the end of the card's own lane. Then none in
+    // No lane means something.
+    let drawn = false;
+    for (let i = 0; i < 20 && !drawn; i += 1) {
+      drawn = await barIn(page, 'To Do', 'Supplies');
+      if (!drawn) await page.waitForTimeout(150);
+    }
+    check(
+      'a card with a lane over a card in No lane draws no bar in No lane',
+      drawn && !(await barIn(page, 'To Do', 'No lane')),
+      drawn ? 'a bar in No lane' : 'no bar drawn anywhere',
+    );
     await fire('[data-testid="card-Drag N"]', 'drop');
     await fire('[data-testid="card-Drag B"]', 'dragend');
     await page.waitForTimeout(1200);
@@ -542,7 +556,8 @@ try {
       `title ${kept}, lane ${lane}`,
     );
     await boardDoc.ref.update({ columnIds: bd.columnIds });
-    await page.getByRole('button', { name: 'Cancel', exact: true }).first().click();
+    // The browser's form closes on Escape; it has no Cancel button.
+    await page.getByPlaceholder('Card title').press('Escape');
   }
 
   // ---- Removing a lane -----------------------------------------------------------
