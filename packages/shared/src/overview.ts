@@ -79,7 +79,8 @@ export interface OverviewRow {
   createdAt: number;
   /** The board's Start date, `YYYY-MM-DD`, or null. */
   start: string | null;
-  overdueDays: number;
+  /** Null while its cards load, or when they could not: last, both ways. */
+  overdueDays: number | null;
   /** The lanes' names, in order: the group's heading. */
   laneNames: readonly string[];
 }
@@ -108,7 +109,13 @@ export function sortOverview<T extends OverviewRow>(
   if (sort === 'created') {
     return [...rows].sort((a, b) => way * (a.createdAt - b.createdAt) || byName(a, b));
   }
-  return [...rows].sort((a, b) => way * (b.overdueDays - a.overdueDays) || byName(a, b));
+  // A board not yet known (its cards loading, or failed) is not "not late":
+  // it goes last whichever way the order runs, as no start date does.
+  const known = rows
+    .filter((r) => r.overdueDays !== null)
+    .sort((a, b) => way * (b.overdueDays! - a.overdueDays!) || byName(a, b));
+  const unknown = rows.filter((r) => r.overdueDays === null).sort(byName);
+  return [...known, ...unknown];
 }
 
 export interface OverviewGroup<T> {
@@ -134,17 +141,13 @@ export function groupOverview<T extends OverviewRow>(sorted: readonly T[]): Over
 }
 
 /**
- * A person's hidden boards after hiding or showing one, with ids of boards no
- * longer listed dropped, so the list cannot grow without end.
+ * A person's hidden boards after hiding or showing one. Ids of boards not
+ * listed now are kept: a board archived and restored, or lanes switched off
+ * and on, stays hidden, and a list read from a cache that lacks some boards
+ * cannot drop them. The bound keeps the latest OVERVIEW_HIDDEN_MAX.
  */
-export function nextHidden(
-  hidden: readonly string[],
-  listedIds: readonly string[],
-  boardId: string,
-  hide: boolean,
-): string[] {
-  const listed = new Set(listedIds);
-  const kept = hidden.filter((id) => listed.has(id) && id !== boardId);
+export function nextHidden(hidden: readonly string[], boardId: string, hide: boolean): string[] {
+  const kept = hidden.filter((id) => id !== boardId);
   return hide ? [...kept, boardId].slice(-OVERVIEW_HIDDEN_MAX) : kept;
 }
 

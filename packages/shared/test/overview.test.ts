@@ -132,6 +132,12 @@ describe('sortOverview', () => {
     expect(ids(sortOverview(rows, 'late', true))).toEqual(['a', 'b', 'none']);
   });
 
+  it('puts a board whose lateness is not known yet last, either way', () => {
+    const rs = [row('slow', { overdueDays: null }), row('late', { overdueDays: 5 }), row('fine', { overdueDays: 0 })];
+    expect(ids(sortOverview(rs, 'late', false))).toEqual(['late', 'fine', 'slow']);
+    expect(ids(sortOverview(rs, 'late', true))).toEqual(['fine', 'late', 'slow']);
+  });
+
   it('breaks ties on the name', () => {
     const tied = [row('Zeta', { start: '2027-06-01' }), row('Alpha', { start: '2027-06-01' })];
     expect(ids(sortOverview(tied, 'start', false))).toEqual(['Alpha', 'Zeta']);
@@ -154,17 +160,17 @@ describe('groupOverview', () => {
 
 describe('nextHidden', () => {
   it('hides and shows a board', () => {
-    expect(nextHidden([], ['a', 'b'], 'a', true)).toEqual(['a']);
-    expect(nextHidden(['a', 'b'], ['a', 'b'], 'a', false)).toEqual(['b']);
+    expect(nextHidden([], 'a', true)).toEqual(['a']);
+    expect(nextHidden(['a', 'b'], 'a', false)).toEqual(['b']);
   });
 
-  it('drops boards no longer listed, on the next write', () => {
-    expect(nextHidden(['gone', 'a'], ['a', 'b'], 'b', true)).toEqual(['a', 'b']);
+  it('keeps boards not listed now, so one archived and restored stays hidden', () => {
+    expect(nextHidden(['archived', 'a'], 'b', true)).toEqual(['archived', 'a', 'b']);
   });
 
   it('never holds more than the most a person may hide', () => {
     const many = Array.from({ length: OVERVIEW_HIDDEN_MAX }, (_, i) => `b${i}`);
-    const next = nextHidden(many, [...many, 'new'], 'new', true);
+    const next = nextHidden(many, 'new', true);
     expect(next).toHaveLength(OVERVIEW_HIDDEN_MAX);
     expect(next[next.length - 1]).toBe('new');
   });

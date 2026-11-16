@@ -78,8 +78,9 @@ export function OverviewScreen({ user }: { user: SessionUser }) {
   const [showHidden, setShowHidden] = useState(false);
   // Each row's days overdue, reported by the row from its own cards, for the
   // "most overdue" order.
-  const [overdue, setOverdue] = useState<Record<string, number>>({});
-  const report = useCallback((boardId: string, days: number) => {
+  // Null when the row's cards could not be read; absent while they load.
+  const [overdue, setOverdue] = useState<Record<string, number | null>>({});
+  const report = useCallback((boardId: string, days: number | null) => {
     setOverdue((prev) => (prev[boardId] === days ? prev : { ...prev, [boardId]: days }));
   }, []);
 
@@ -89,6 +90,12 @@ export function OverviewScreen({ user }: { user: SessionUser }) {
   const reverse = prefs.data?.reverse ?? false;
   const shown = listed.filter((b) => !hidden.includes(b.id));
   const hiddenBoards = listed.filter((b) => hidden.includes(b.id));
+  // Closed again once nothing is hidden, so the next board hidden does not
+  // land in a list already open.
+  const noneHidden = hiddenBoards.length === 0;
+  useEffect(() => {
+    if (noneHidden) setShowHidden(false);
+  }, [noneHidden]);
 
   const groups = useMemo(() => {
     const rows: (OverviewRow & { board: BoardListItem })[] = shown.map((b) => ({
@@ -96,7 +103,7 @@ export function OverviewScreen({ user }: { user: SessionUser }) {
       name: b.name,
       createdAt: b.createdAt,
       start: namedFieldValue(b, 'start'),
-      overdueDays: overdue[b.id] ?? 0,
+      overdueDays: overdue[b.id] ?? null,
       laneNames: b.lanes.map((l) => l.name),
       board: b,
     }));
@@ -107,9 +114,13 @@ export function OverviewScreen({ user }: { user: SessionUser }) {
     return <Spinner label="Loading the overview…" />;
   }
 
+  // Hiding writes the whole list, so it is offered only once the list is
+  // known: built on a failed read's empty one, a single hide would replace
+  // every board hidden before.
+  const canHide = prefs.status === 'ready';
   function hide(board: BoardListItem, yes: boolean) {
-    const next = nextHidden(hidden, listed.map((b) => b.id), board.id, yes);
-    void run(() => setOverviewHidden(user, next));
+    if (!canHide) return;
+    void run(() => setOverviewHidden(user, nextHidden(hidden, board.id, yes)));
   }
 
   return (
@@ -120,6 +131,9 @@ export function OverviewScreen({ user }: { user: SessionUser }) {
       </Row>
 
       {boards.status === 'error' ? <LoadError what="your boards" code={boards.error} /> : null}
+      {prefs.status === 'error' ? (
+        <LoadError what="your overview's order and hidden boards" code={prefs.error} />
+      ) : null}
       {error ? (
         <Card>
           <Body>{error}</Body>
@@ -141,10 +155,10 @@ export function OverviewScreen({ user }: { user: SessionUser }) {
         />
       </Row>
 
-      {listed.length === 0 ? (
+      {boards.status !== 'ready' ? null : listed.length === 0 ? (
         <Card>
           <Body>No boards with lanes yet.</Body>
-          <Hint>A board shows here once its lanes are switched on in its settings.</Hint>
+          <Hint>A board shows here once its owners switch its lanes on.</Hint>
         </Card>
       ) : shown.length === 0 ? (
         <Card>
@@ -180,7 +194,11 @@ export function OverviewScreen({ user }: { user: SessionUser }) {
                     <View style={styles.grow}>
                       <Body>{b.name}</Body>
                     </View>
-                    <Button label="Show" variant="secondary" onPress={() => hide(b, false)} />
+                    <IconAction
+                      icon="unarchive"
+                      label={`Show ${b.name}`}
+                      onPress={() => hide(b, false)}
+                    />
                   </Row>
                 </Card>
               ))
@@ -188,7 +206,7 @@ export function OverviewScreen({ user }: { user: SessionUser }) {
         </>
       ) : null}
 
-      <Sheet visible={hiding !== null} title={hiding?.name ?? ''} onClose={() => setHiding(null)}>
+      <Sheet visible={hiding !== null && canHide} title={hiding?.name ?? ''} onClose={() => setHiding(null)}>
         <SheetOption
           label="Hide from my overview"
           detail="From yours only. Hidden boards are listed at the foot, to show again."
@@ -222,20 +240,22 @@ function Group({
 }: {
   laneNames: readonly string[];
   boards: BoardListItem[];
-  onReport: (boardId: string, overdueDays: number) => void;
+  onReport: (boardId: string, overdueDays: number | null) => void;
   onOpen: (board: BoardListItem) => void;
   onMenu: (board: BoardListItem) => void;
 }) {
   const { isWide } = useLayout();
   const [width, setWidth] = useState(0);
   const onLayout = useCallback((e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width), []);
+  const measured = useMeasuredWidths(laneNames);
   const inner = width - 2 * ROW_PAD - (isWide ? NAME_WIDTH + space.md : 0);
   const cols = useMemo(
-    () => (inner > 0 ? laneColumns(inner, ROW_PAD, laneNames) : null),
-    [inner, laneNames],
+    () => (inner > 0 && measured.widths ? laneColumns(inner, ROW_PAD, measured.widths) : null),
+    [inner, measured.widths],
   );
   return (
     <View style={styles.group} onLayout={onLayout} testID="overview-group">
+      {measured.measurer}
       {cols ? <LaneNames names={laneNames} cols={cols} /> : null}
       {boards.map((b) => (
         <BoardRow
@@ -252,8 +272,52 @@ function Group({
 }
 
 /**
+ * Each name's width as drawn, from a hidden copy of the names laid out at
+ * their natural width, in the font and on the platform at hand: what
+ * `laneColumns` needs to write every name in full. Null until each has been
+ * laid out; laid out again when a font arrives or a name changes.
+ *
+ * The copy sits in a box of no size that clips it, so its 2000-point row can
+ * neither be seen nor widen the page.
+ */
+function useMeasuredWidths(names: readonly string[]) {
+  const key = names.join('\u0000');
+  const [measured, setMeasured] = useState<{ key: string; widths: (number | undefined)[] }>({
+    key,
+    widths: [],
+  });
+  const current = measured.key === key ? measured.widths : [];
+  const complete = names.length > 0 && names.every((_, i) => current[i] !== undefined);
+  const measurer = (
+    <View style={styles.measureClip} aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <View style={styles.measureRow} key={key}>
+        {names.map((name, i) => (
+          <Text
+            key={i}
+            style={[styles.name, styles.measured]}
+            onLayout={(e) => {
+              const w = e.nativeEvent.layout.width;
+              setMeasured((prev) => {
+                const base = prev.key === key ? prev.widths : [];
+                if (base[i] === w) return prev;
+                const widths = [...base];
+                widths[i] = w;
+                return { key, widths };
+              });
+            }}
+          >
+            {name}
+          </Text>
+        ))}
+      </View>
+    </View>
+  );
+  return { measurer, widths: complete ? (current as number[]) : null };
+}
+
+/**
  * A group's heading: its lanes' names over the marks' columns, straight where
- * each fits its column on two lines, otherwise in full on a slant, so every
+ * each fits its column on one line, otherwise in full on a slant, so every
  * lane is on screen and nothing scrolls sideways (Faisal, 2026-11-15). Hidden
  * from screen readers: each row says its lanes' names with their marks.
  */
@@ -274,7 +338,7 @@ function LaneNames({ names, cols }: { names: readonly string[]; cols: LaneColumn
         {names.map((name, i) => (
           <View key={`${i}:${name}`} style={styles.cell}>
             {cols.straight ? (
-              <Text style={[styles.name, { color: t.text.secondary }]} numberOfLines={2}>
+              <Text style={[styles.name, { color: t.text.secondary }]} numberOfLines={1}>
                 {name}
               </Text>
             ) : (
@@ -322,7 +386,7 @@ function BoardRow({
   board: BoardListItem;
   /** The group's columns; null until the group has measured itself. */
   cols: LaneColumns | null;
-  onReport: (boardId: string, overdueDays: number) => void;
+  onReport: (boardId: string, overdueDays: number | null) => void;
   onOpen: () => void;
   onMenu: () => void;
 }) {
@@ -340,9 +404,15 @@ function BoardRow({
     };
   }, [cards.status, cards.data, cards.error, board, today]);
 
-  const days = cards.status === 'ready' ? boardOverdueDays(cards.data ?? [], board, today) : 0;
+  // Reported once known: a failed read is not "nothing late" (`sortOverview`).
+  const days =
+    cards.status === 'ready'
+      ? boardOverdueDays(cards.data ?? [], board, today)
+      : cards.status === 'error'
+        ? null
+        : undefined;
   useEffect(() => {
-    onReport(board.id, days);
+    if (days !== undefined) onReport(board.id, days);
   }, [board.id, days, onReport]);
 
   const start = namedFieldValue(board, 'start');
@@ -464,6 +534,9 @@ const styles = StyleSheet.create({
   cell: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', minWidth: 0 },
   markCell: { height: MARK_MAX, justifyContent: 'center' },
   name: { fontSize: NAME_FONT, fontWeight: '600', textAlign: 'center' },
+  measureClip: { position: 'absolute', width: 0, height: 0, overflow: 'hidden' },
+  measureRow: { position: 'absolute', left: 0, top: 0, width: 2000, alignItems: 'flex-start' },
+  measured: { alignSelf: 'flex-start', textAlign: 'left' },
   /**
    * A slanted name starts at its column's centre and leans up to the right,
    * turning about its bottom-left corner. It overflows its cell on purpose;

@@ -12,12 +12,8 @@
 export const NAME_FONT = 11;
 /** One line of a name, at NAME_FONT. */
 export const NAME_LINE = 15;
-/**
- * A character's width, estimated high. Measuring each name would cost a layout
- * pass per name; an estimate that errs long only adds room, and a name drawn
- * in a box narrower than it needs is cut with an ellipsis, never spills.
- */
-const CHAR = NAME_FONT * 0.56;
+/** Room left beside a measured name, so rounding never cuts its last letter. */
+const NAME_PAD = 2;
 /**
  * The slants tried, gentlest first: the gentlest is easiest to read, a steeper
  * one reaches less far right, which leaves wider columns, and packs closer.
@@ -28,20 +24,15 @@ const rad = (deg: number) => (deg * Math.PI) / 180;
 export const MARK_MAX = 22;
 export const MARK_MIN = 10;
 
-/** The width a name is drawn at: its text's estimated width. */
-export function nameWidth(name: string): number {
-  return Math.ceil(name.trim().length * CHAR) + 4;
-}
-
 export interface LaneColumns {
-  /** Names written straight, up to two lines each, over their marks. */
+  /** Names written straight, on one line each, over their marks. */
   straight: boolean;
   /** A slanted name's angle from the horizontal, in degrees. */
   angle: number;
   /** The marks' line, and the heading's: `cell` times the lane count. */
   width: number;
   cell: number;
-  /** Each name's drawn width, in order. */
+  /** Each name's drawn width, in order: as measured, plus a little room. */
   nameWidths: number[];
   /** A slanted heading's height; a straight one sizes to its text. */
   height: number;
@@ -54,25 +45,27 @@ function markSize(cell: number): number {
 }
 
 /**
- * The columns for `names` in `inner` points, where a slanted name may run on
- * `overflow` points past the right edge (the row's padding).
+ * The columns for names of `measured` widths in `inner` points, where a
+ * slanted name may run on `overflow` points past the right edge (the row's
+ * padding).
  *
- * Straight when every name fits its column on two lines. Otherwise each name
+ * The widths are MEASURED, each name laid out in the app's font on the
+ * platform at hand: an estimate from the letters was short for capitals, and
+ * a name drawn narrower than it needs is cut with an ellipsis, which "written
+ * in full" rules out.
+ *
+ * Straight when every name fits its column on one line. Otherwise each name
  * starts at its mark's centre and leans up to the right, and the columns
  * narrow until the name that reaches furthest ends inside `inner + overflow`:
  * the room kept on the right is what the names need, not a fixed margin, and
  * the marks shrink to fit. The slant is the gentlest at which two neighbouring
  * names are a line apart, or failing that the steepest.
  */
-export function laneColumns(inner: number, overflow: number, names: readonly string[]): LaneColumns {
-  const n = Math.max(1, names.length);
-  const nameWidths = names.map(nameWidth);
+export function laneColumns(inner: number, overflow: number, measured: readonly number[]): LaneColumns {
+  const n = Math.max(1, measured.length);
+  const nameWidths = measured.map((w) => Math.ceil(w) + NAME_PAD);
   const even = inner / n;
-  const fitsStraight = names.every((name, i) => {
-    const longestWord = Math.max(...name.trim().split(/\s+/).map(nameWidth));
-    return longestWord <= even - 4 && nameWidths[i] <= 2 * (even - 4);
-  });
-  if (fitsStraight) {
+  if (nameWidths.every((w) => w <= even - 4)) {
     return { straight: true, angle: 0, width: inner, cell: even, nameWidths, height: 0, mark: markSize(even) };
   }
   let cols: LaneColumns | null = null;
