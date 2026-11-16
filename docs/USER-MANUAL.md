@@ -114,6 +114,8 @@ rail stays put — it's narrow enough to keep out of the way.
 
 **Boards** lists everything you can open. Tap the **star** beside a board to keep
 it at the top; boards you've opened recently follow, then the rest alphabetically.
+Boards marked as **templates**, the ones people clone to start a program, come
+last under their own heading, each with a small *Template* badge.
 
 Every board shows as a card in a grid on wide screens, and as a single-column list
 on a phone. If your account can create boards, **New board** is at the top (see
@@ -697,6 +699,11 @@ fresh on everything that belongs to one run of the work: no due dates, nobody
 assigned, no priorities, comments, history or files. Archived cards and the
 board's own labels are not cloned. The board you cloned from does not change.
 
+A board made to be cloned can be **marked as a template** in its settings, under
+**General**: it then sits under *Templates* in the Boards list. Any board can be
+cloned, marked or not, and a clone is never marked. The clone's history opens
+with one line saying which board it was cloned from; nothing else ties the two.
+
 For a member, pressing and holding a board does nothing more than a tap: a
 member who wants a clone asks an organizer. An archived board has to be
 restored before it can be cloned.
@@ -726,8 +733,8 @@ and **History**, and nothing else.
 
 The pages:
 
-- **General** — rename the board, and archive it (or restore it, once it is
-  archived). This page is the only place that renames a board, which is why a
+- **General** — rename the board, mark it as a **template** (see *Cloning a
+  board*), and archive it (or restore it, once it is archived). This page is the only place that renames a board, which is why a
   member who cannot open it cannot rename a board either.
 - **Columns** — add, rename, and reorder. Tap the **pencil** beside a column's
   name to rename it; drag the handle to reorder. A column can only be deleted

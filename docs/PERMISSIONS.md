@@ -65,6 +65,7 @@ board — is what lets you:
   the finished column (Board settings → Lanes)
 - add, rename, reorder and remove the board's details, and fill them in
   (Board settings → Details), which everyone on the board reads
+- mark the board as a template, or take the mark off (Board settings → General)
 - add and remove members
 - make another member an owner, or take it away
 - archive the board, and restore it

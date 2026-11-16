@@ -56,8 +56,9 @@ The order, at the end, against a fresh `scripts/dev.sh web` seed:
 Manual pictures that will change before then, so are retaken at the end:
 `settings-phone`/`-wide` (the list gains Details), `roster-*` (a non-owner's
 settings are now "About this board", opening on Details), `lanesettings-*`,
-every board picture once the overview's entry is in the Boards header, and the
-Boards list (Templates heading). New, never yet taken: `details-*`. New
+every board picture once the overview's entry is in the Boards header, the
+Boards list (`boards-*`: the seed now has a template, under Templates), and
+`clone-*` (the sheet over a list with Templates). New, never yet taken: `details-*`. New
 pictures go into `manual-shots.mjs` with the step that adds the screen, unrun
 until the end.
 

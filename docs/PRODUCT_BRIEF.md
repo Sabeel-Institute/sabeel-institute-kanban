@@ -57,6 +57,7 @@ in the app.
 | Offboarding | A disabled user **keeps their assignments**, rendered as inactive; a board's owners get a review list to reassign. Disabling **warns** if the person solely owns a board, and proceeds anyway. |
 | Theming | **Single light theme, no dark mode** (decided 2026-07-21). Semantic tokens throughout, so a re-theme stays a one-file change. |
 | Subtasks | A card may be a **subtask of one other card on the same board** (`parentId` on the child). The parent's detail view lists them and links straight through; the child shows "Subtask of". On a card's face (Faisal, 2026-11-14, the chips of three prototypes, because people were hand-labelling cards "Main Task" and "subtask" to see this on the board): the parent a grey chip with its count, the child one naming its parent (`parentTitles`), or "Subtask" where the parent is not among the cards loaded — archived, on another board after a move that left the child linked, or on a screen that loads no siblings (My Work, Search, the board's archive). A tile's accessible name says both (`cardTileName`). Deliberately NOT a checklist: a subtask is an ordinary card, with its own column, assignees and comments. Added 2026-07-25 — the ClickUp import had been faking it in description text. **`parentId` is an opaque string to the rules**: same-board is enforced by the picker, not by `firestore.rules`, which check only that it is a string under 200 chars. A child's read access comes from its OWN `boardId`, so a stale or cross-board link leaks nothing: it shows as a plain "Subtask" chip and a "Subtask of" line the child can unlink, never the other card's title. Do not add a rules lookup to "fix" this; it would cost a read on every card write to enforce something the UI already does and no one can exploit. |
+| Template mark | **A board may be marked as a template** (2026-11-15), by its owners and admins on General. The mark does exactly two things: the board is listed under Templates with a badge, and it is left out of the overview. Cloning stays a long press on any board; a clone is never marked; its history opens with one line, "cloned from", and nothing else ties it to its source. |
 | Details | **A board may carry details** (2026-11-15): a short list of typed fields (Text, Number, Date, Link, and the fixed Start date and End date), filled in on Board settings → Details. Everyone on the board reads them; its owners and admins change them. See "Details". |
 | Lanes | **A board may be divided into lanes as well as columns** (2026-11-15), so a program board can stand in for a tracking spreadsheet. A switch on Board settings → Lanes, off by default; a card sits in one column and one lane. With lanes, one column holds **finished** cards: a lane's heading counts them, and a finished card is never late. See "Lanes". |
 | Explicitly NOT in v1 | Checklists (as a separate item type — see Subtasks), dependencies, recurring cards, alternate board views, automations, integrations, guest/external access. |
@@ -168,12 +169,14 @@ boards/{boardId}
   doneColumnId?                                  # the finished column, read only through `finishedColumnId`
   fields?: [ { id, name, type } ]                # details' fields, at most 20; type text|number|date|link|start|end
   details?: { fieldId: value }                   # every value a string; a date YYYY-MM-DD; no key = not set
+  template?: bool                                # listed under Templates; never copied to a clone
 
 boards/{boardId}/activity/{entryId}              # the board's own history
   type: created|renamed|archived|restored|memberAdded|memberRemoved|ownerAdded|ownerRemoved
         |columnAdded|columnRemoved|columnRenamed|columnsReordered
         |lanesOn|lanesOff|laneAdded|laneRemoved|laneRenamed|lanesReordered|finishedColumn
         |fieldAdded|fieldRemoved|fieldRenamed|fieldsReordered|detailChanged   # detailChanged carries `field`
+        |templateOn|templateOff|cloned                # cloned: a clone's first line, written by cloneBoard
   at, actorUid?, actorName?, subjectUid?, subjectName?, from?, to?, since?
   # Written ONLY by the onBoardWritten trigger. Names are stored, not looked up.
 
@@ -578,6 +581,9 @@ curation overhead:
 2. **Recents** — last 10 opened (`recentBoardIds`, on the user doc so it syncs
    between phone and web).
 3. **Everything else** — alphabetical, with a filter box.
+4. **Templates** — boards marked as templates (2026-11-15), alphabetical, each
+   with a badge, taken out before the others so a marked board is listed once.
+   An archived template goes under Archived and keeps its badge.
 
 No folders or groups: they need curation, a permission story of their own, and a
 second tree to navigate on a phone. Revisit only if the team passes ~50 boards and
