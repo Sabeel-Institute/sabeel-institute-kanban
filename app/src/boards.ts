@@ -470,7 +470,7 @@ export async function setOverviewReverse(user: SessionUser, reverse: boolean): P
   await updateDoc(doc(db, 'users', user.uid), { overviewReverse: reverse });
 }
 
-/** Build `hidden` with `nextHidden`, which drops boards no longer listed. */
+/** Build `hidden` with `nextHidden`, which keeps boards not listed at the moment. */
 export async function setOverviewHidden(user: SessionUser, hidden: string[]): Promise<void> {
   await updateDoc(doc(db, 'users', user.uid), { overviewHiddenBoardIds: hidden });
 }

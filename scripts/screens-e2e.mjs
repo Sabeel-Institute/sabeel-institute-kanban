@@ -1247,7 +1247,22 @@ async function tour(page, tag, width) {
   for (const name of SETTINGS_PAGES) {
     await visit(`settings-${name.toLowerCase()}`, async () => {
       await pageRow(name).click();
-      await page.waitForTimeout(600);
+      // Proof the page opened, or the checks would run on the page before
+      // it: on a wide screen its row is marked current, on a phone the list
+      // gives way to the page.
+      if (wide) {
+        await page.waitForFunction(
+          (n) =>
+            [...document.querySelectorAll('[aria-current="page"]')].some(
+              (el) => el.getAttribute('aria-label') === n,
+            ),
+          name,
+          { timeout: 15000 },
+        );
+      } else {
+        await pageRow(SETTINGS_PAGES[0]).waitFor({ state: 'hidden', timeout: 15000 });
+      }
+      await page.waitForTimeout(300);
     });
     if (!wide) {
       await page.getByRole('button', { name: 'Back' }).first().click();

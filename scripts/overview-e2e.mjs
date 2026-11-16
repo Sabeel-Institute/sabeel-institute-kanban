@@ -148,20 +148,24 @@ try {
   await grantAdmin('faisal@oursabeel.com');
   await agreeToRules(page);
   await page.getByRole('button', { name: 'New board' }).waitFor({ timeout: 30000 });
-  // Absent only means something once the board list has answered: the
-  // Boards screen says it has none, then the icon is looked for.
+  const faisal = (await db.collection('users').where('email', '==', 'faisal@oursabeel.com').get()).docs[0];
+  const F = { uid: faisal.id, name: 'Faisal', email: 'faisal@oursabeel.com' };
+
+  // A board whose lanes were switched OFF keeps them (lanesOn false, lanes
+  // there), which is what tells "lanes switched on" from "has lanes". While it
+  // is the admin's only board, the overview is not offered. Absent means
+  // something only once the list has answered: its row is waited for first.
+  await board('ov_plain', 'Plain Board', PS, { lanesOn: false, createdAt: 7000 }, [F]);
   const answered = await page
-    .getByText('No boards yet. Create one to get started.')
+    .getByText('Plain Board', { exact: true })
+    .first()
     .waitFor({ timeout: 20000 })
     .then(() => true, () => false);
   check(
-    'someone with no board with lanes is offered no overview',
+    'someone whose only board has its lanes switched off is offered no overview',
     answered && (await overviewButton(page).count()) === 0,
     answered ? 'the icon is there' : 'the board list never answered',
   );
-
-  const faisal = (await db.collection('users').where('email', '==', 'faisal@oursabeel.com').get()).docs[0];
-  const F = { uid: faisal.id, name: 'Faisal', email: 'faisal@oursabeel.com' };
 
   // Omar signs in now, so his uid can go on the boards he is to be on.
   const { ctx: octx, page: opage } = await signIn(browser, 'omar');
@@ -179,7 +183,6 @@ try {
   await board('ov_delta', 'Delta Retreat', [...PS, 'Wrap-up'], { details: { f_start: '2027-05-01' }, createdAt: 3000 }, [F]);
   await board('ov_tmpl', 'Template Program', PS, { template: true, createdAt: 5000 }, [F, O]);
   await board('ov_old', 'Old Program', PS, { archived: true, createdAt: 6000 }, [F, O]);
-  await board('ov_plain', 'Plain Board', [], { lanesOn: false, createdAt: 7000 }, [F, O]);
   // Alpha: a finished card long past its date (not late), and a late one.
   await card('ov_alpha', 0, 0, 'c_done', '2020-01-01', F.uid);
   await card('ov_alpha', 1, 1, 'c_todo', '2025-06-01', F.uid);
@@ -266,7 +269,16 @@ try {
   await overviewButton(page).waitFor({ timeout: 30000 }).catch(() => {});
   if (await overviewButton(page).isVisible()) await overviewButton(page).click();
   got = await settled(page, LATE_BACK);
-  check('and is the order the overview opens in next time', same(got, LATE_BACK), flat(got));
+  // LATE_BACK happens to draw as the default order does, so the controls are
+  // read too: they show what was kept, not what an overview with nothing
+  // stored would choose.
+  const keptSort = await order.inputValue().catch(() => null);
+  const keptReverse = await reverse.getAttribute('aria-pressed').catch(() => null);
+  check(
+    'and is the order the overview opens in next time',
+    same(got, LATE_BACK) && keptSort === 'late' && keptReverse === 'true',
+    `${flat(got)} | order ${keptSort}, reversed ${keptReverse}`,
+  );
   await reverse.click();
   await order.selectOption({ label: 'Start date' });
   got = await settled(page, START);
@@ -323,11 +335,14 @@ try {
   // hidden. Hiding writes the whole list, and it once dropped every board
   // not listed at that moment.
   await db.doc('boards/ov_gamma').update({ archived: true });
-  await page.waitForTimeout(1500);
+  // Archived and so no longer listed: the foot has nothing hidden to count.
+  await page.getByRole('button', { name: /^Hidden \(/ }).waitFor({ state: 'detached', timeout: 20000 });
   await page.getByTestId('overview-row:Delta Retreat').click({ button: 'right' });
   await page.getByText('Hide from my overview').click();
   await settled(page, [['Beta Course', 'Alpha Camp']]);
   await db.doc('boards/ov_gamma').update({ archived: false });
+  // Restored: listed again, and hidden, so the foot counts two.
+  await page.getByRole('button', { name: 'Hidden (2)' }).waitFor({ timeout: 20000 }).catch(() => {});
   got = await settled(page, [['Beta Course', 'Alpha Camp']]);
   prefs = await stored();
   check(

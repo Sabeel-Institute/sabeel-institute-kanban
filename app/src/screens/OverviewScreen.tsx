@@ -306,7 +306,9 @@ function useMeasuredWidths(names: readonly string[]) {
               });
             }}
           >
-            {name}
+            {/* A box of no size is never reported laid out: a blank name is
+                measured as one space. */}
+            {name || '\u00a0'}
           </Text>
         ))}
       </View>

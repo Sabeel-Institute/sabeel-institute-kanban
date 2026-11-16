@@ -562,8 +562,12 @@ itself is deliberately NOT darkened — that would collapse it into
   (`onCardWritten`, `onCardBoardCount`; `cloneBoard`, 2026-11-13). Only those
   two read the stamp: `onCardNotify` still runs, so such a writer must not
   assign anyone, and each "created" line still joins a pending notice. The
-  emulator runs triggers one at a time and cannot show the burst; reason about
-  it, do not wait for a test to.
+  emulator runs triggers in parallel (up to fifty, one at a time only when
+  debugging functions), but without production's write rate per document, so
+  it cannot show the burst; reason about it, do not wait for a test to. Nor can
+  a test lean on trigger ORDER: one trigger's line appearing does not prove an
+  earlier event's trigger has finished. Hold the condition a while after the
+  signal instead (`stays`).
 
 ---
 
@@ -812,6 +816,20 @@ about thirty more, and their causes added four:
     and look: a failed read drawn as "none", a refused add that lost its
     title, a failed preferences read that let one hide wipe the list. The
     three-state rule says this; only looking finds where it was missed.
+
+A second round, aimed at the first round's causes, added two more:
+
+11. **A check's expected state must differ from what the code shows without
+    the feature.** An order that happened to draw as the default, a clone
+    whose finished column was the last one anyway, an "empty" label another
+    field also showed, a scan that followed helpers one level deep: each
+    passed with the feature removed. Break every new check once (practice 3),
+    a fix's own included, and say in the commit what was broken.
+12. **Review a fix batch as a change of its own, and run each test before
+    committing it.** The first round's fixes held about ten new faults (a
+    picked date lost on leaving the screen, a Back fixed for one of its three
+    ways in); a reviewer given only the fixes' diff found them. A test
+    committed without running its suite failed on its first run.
 
 ### The width sweep is the DEFAULT check for layout, on both surfaces
 
