@@ -493,6 +493,43 @@ try {
   console.warn('could not seed the second program — continuing:', String(e).slice(0, 160));
 }
 
+// A third program with eight lanes, too many for a phone to write their names
+// straight: the overview slants them, the layout the phones must be seen to
+// draw (Maestro's overview screenshot), beside the two straight-named ones.
+const CAMP = 'Summer Camp 2027';
+const CAMP_LANES = ['Planning', 'Curriculum', 'Staffing', 'Supplies', 'Venue', 'Registration', 'Volunteers', 'Food'];
+try {
+  await admin.getByRole('button', { name: 'Boards' }).first().click();
+  await admin.getByRole('button', { name: 'New board' }).waitFor({ timeout: 25000 });
+  await admin.waitForTimeout(1500);
+  if (!(await admin.getByText(CAMP, { exact: true }).first().isVisible().catch(() => false))) {
+    await admin.getByRole('button', { name: 'New board' }).click();
+    await fillThen(admin, 'Board name', CAMP, (o) =>
+      admin.getByRole('button', { name: 'Create', exact: true }).click(o),
+    );
+    await admin.getByText('To Do').first().waitFor({ timeout: 30000 });
+    await admin.getByRole('button', { name: 'Board settings' }).click();
+    await settingsPage('Lanes');
+    await admin.getByRole('switch', { name: 'Lanes on this board' }).click();
+    await admin.getByPlaceholder('New lane name').waitFor({ timeout: 25000 });
+    for (const lane of CAMP_LANES) {
+      await fillThen(admin, 'New lane name', lane, (o) =>
+        admin.getByRole('button', { name: 'Add lane' }).click(o),
+      );
+      await admin.getByRole('button', { name: `Rename lane ${lane}` }).waitFor({ timeout: 25000 });
+    }
+    await admin.getByRole('button', { name: 'Back' }).first().click();
+    await admin.getByText('To Do').first().waitFor({ timeout: 25000 });
+    await admin.getByRole('button', { name: '+ Add card' }).first().click();
+    await admin.getByPlaceholder('Card title').fill('Book the campsite');
+    await admin.getByLabel('Lane', { exact: true }).selectOption({ label: 'Venue' });
+    await admin.getByRole('button', { name: 'Add card', exact: true }).click();
+    await admin.getByText('Book the campsite').first().waitFor({ timeout: 25000 });
+  }
+} catch (e) {
+  console.warn('could not seed the camp board — continuing:', String(e).slice(0, 160));
+}
+
 // A board marked as a template, so the Boards list has its Templates heading.
 const TEMPLATE_BOARD = 'Program template';
 try {
@@ -515,7 +552,7 @@ try {
 
 await browser.close();
 console.log(
-  `Seeded: 3 people, 4 boards (two with ${LANES.length} lanes, one a template), ${COLUMNS.length + 3} columns, ${
+  `Seeded: 3 people, 5 boards (two with ${LANES.length} lanes, one with ${CAMP_LANES.length}, one a template), ${COLUMNS.length + 3} columns, ${
     CARDS.length
   } cards.`,
 );

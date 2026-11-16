@@ -148,8 +148,17 @@ try {
   await grantAdmin('faisal@oursabeel.com');
   await agreeToRules(page);
   await page.getByRole('button', { name: 'New board' }).waitFor({ timeout: 30000 });
-  await page.waitForTimeout(1500);
-  check('someone with no board with lanes is offered no overview', (await overviewButton(page).count()) === 0);
+  // Absent only means something once the board list has answered: the
+  // Boards screen says it has none, then the icon is looked for.
+  const answered = await page
+    .getByText('No boards yet. Create one to get started.')
+    .waitFor({ timeout: 20000 })
+    .then(() => true, () => false);
+  check(
+    'someone with no board with lanes is offered no overview',
+    answered && (await overviewButton(page).count()) === 0,
+    answered ? 'the icon is there' : 'the board list never answered',
+  );
 
   const faisal = (await db.collection('users').where('email', '==', 'faisal@oursabeel.com').get()).docs[0];
   const F = { uid: faisal.id, name: 'Faisal', email: 'faisal@oursabeel.com' };
@@ -292,7 +301,7 @@ try {
   const disclosure = page.getByRole('button', { name: 'Hidden (1)' });
   check('Hidden (1) at the foot', await disclosure.isVisible());
   await disclosure.click();
-  const show = page.getByRole('button', { name: 'Show', exact: true });
+  const show = page.getByRole('button', { name: 'Show Alpha Camp', exact: true });
   const opened = await show.waitFor({ timeout: 10000 }).then(() => true, () => false);
   const expanded = await disclosure.getAttribute('aria-expanded');
   check(
@@ -308,6 +317,27 @@ try {
   // Faisal hides Gamma, for the member's check below.
   await page.getByTestId('overview-row:Gamma Circle').click({ button: 'right' });
   await page.getByText('Hide from my overview').click();
+  await settled(page, [['Beta Course', 'Alpha Camp'], ['Delta Retreat']]);
+
+  // A hidden board archived, another hidden meanwhile, then restored: still
+  // hidden. Hiding writes the whole list, and it once dropped every board
+  // not listed at that moment.
+  await db.doc('boards/ov_gamma').update({ archived: true });
+  await page.waitForTimeout(1500);
+  await page.getByTestId('overview-row:Delta Retreat').click({ button: 'right' });
+  await page.getByText('Hide from my overview').click();
+  await settled(page, [['Beta Course', 'Alpha Camp']]);
+  await db.doc('boards/ov_gamma').update({ archived: false });
+  got = await settled(page, [['Beta Course', 'Alpha Camp']]);
+  prefs = await stored();
+  check(
+    'a hidden board archived and restored is still hidden, though another was hidden meanwhile',
+    same(got, [['Beta Course', 'Alpha Camp']]) &&
+      JSON.stringify([...prefs.overviewHiddenBoardIds].sort()) === '["ov_delta","ov_gamma"]',
+    `${flat(got)} | ${JSON.stringify(prefs.overviewHiddenBoardIds)}`,
+  );
+  await page.getByRole('button', { name: /^Hidden \(/ }).click();
+  await page.getByRole('button', { name: 'Show Delta Retreat', exact: true }).click();
   await settled(page, [['Beta Course', 'Alpha Camp'], ['Delta Retreat']]);
 
   // ---- A row opens its board --------------------------------------------------------------

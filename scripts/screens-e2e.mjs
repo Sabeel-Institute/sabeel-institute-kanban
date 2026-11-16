@@ -359,7 +359,8 @@ for (const [id, columnId, laneId, title, dueDate] of [
 // each state a mark draws: complete, late, soon, under way, no due dates.
 const SOON = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
 const OVERVIEW_BOARDS = [
-  ['sw_six', 'Tajweed Course', ['Planning', 'Curriculum', 'Marketing', 'Staffing', 'Supplies', 'Wrap-up']],
+  // Capitals, which an estimate from letter counts once drew too narrow.
+  ['sw_six', 'Tajweed Course', ['Planning', 'Curriculum', 'MARKETING & PR', 'Staffing', 'Supplies', 'Wrap-up']],
   ['sw_twelve', 'Summer Camp 2027', [
     'Planning', 'Curriculum', 'Staffing', 'Supplies', 'Venue', 'Registration',
     'Volunteers', 'Food', 'Transport', 'Photography', 'Wrap-up', LONG_LANE,
@@ -719,7 +720,8 @@ const contrastFaults = (page) =>
 /**
  * What the overview must hold at every width, read from the page: within a
  * row no two marks touch and each is on screen; every lane name is on screen,
- * drawn in full (no ellipsis), and ends above its group's first row.
+ * drawn in full (no ellipsis across, no clamp downwards), and ends above its
+ * group's first row.
  */
 const overviewFaults = (page) =>
   page.evaluate(() => {
@@ -732,7 +734,10 @@ const overviewFaults = (page) =>
         const r = name.getBoundingClientRect();
         const text = name.textContent;
         if (r.left < -0.5 || r.right > w + 0.5) faults.push(`"${text}" off screen (${Math.round(r.left)}–${Math.round(r.right)})`);
-        if (name.scrollWidth > name.clientWidth + 1) faults.push(`"${text}" cut short`);
+        // Cut either way: an ellipsis across, or a clamp downwards.
+        if (name.scrollWidth > name.clientWidth + 1 || name.scrollHeight > name.clientHeight + 1) {
+          faults.push(`"${text}" cut short`);
+        }
         if (r.bottom > rowTop + 0.5) faults.push(`"${text}" runs into the row below`);
       }
       for (const row of group.querySelectorAll('[data-testid^="overview-row:"]')) {

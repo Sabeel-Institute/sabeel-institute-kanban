@@ -296,6 +296,9 @@ name: Board, card, rich text and gestures
 # its mark. Both board names are on the Boards list too.
 - assertVisible: "Summer Program 2027[\\s\\S]*: Planning, [\\s\\S]*"
 - assertVisible: "Autumn Program 2027[\\s\\S]*: Planning, [\\s\\S]*"
+# Eight lanes: too many for a phone to write their names straight, so they
+# are slanted, a rotated Text on each platform's own layout and font.
+- assertVisible: "Summer Camp 2027[\\s\\S]*: Planning, [\\s\\S]*"
 - takeScreenshot: 13-overview
 - tapOn: "Back"
 
