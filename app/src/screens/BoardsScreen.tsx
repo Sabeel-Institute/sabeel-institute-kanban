@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Icon } from '../icons';
-import { BOARD_NAME_MAX, sortBoardsForList } from '@sabeel/shared';
+import { BOARD_NAME_MAX, overviewBoards, sortBoardsForList } from '@sabeel/shared';
 import {
   boardsView,
   cloneBoard,
@@ -27,6 +27,7 @@ import {
   Card,
   CardGrid,
   Heading,
+  IconAction,
   LoadError,
   Row,
   Screen,
@@ -275,6 +276,9 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
     );
   }
 
+  // Hidden boards count: hiding one from the overview should not take away
+  // the way back to it.
+  const hasOverview = overviewBoards(boards.data ?? []).length > 0;
   const hasAny =
     sections.favourites.length +
       sections.recents.length +
@@ -286,8 +290,15 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
     <Screen width="list">
       {/* Section actions (Search, My work, Alerts, People, Sign out) live in the
           app-wide nav bar now — bottom bar on a phone, left rail on wide. This
-          screen keeps only its own title and the create-board control. */}
-      <Title>Boards</Title>
+          screen keeps only its own title, the create-board control, and the
+          overview's entry for whoever has a board it lists (Faisal,
+          2026-11-15): someone with no board with lanes never sees it. */}
+      <Row style={styles.between}>
+        <Title>Boards</Title>
+        {hasOverview ? (
+          <IconAction icon="checklist" label="Overview" onPress={() => nav.push({ name: 'overview' })} />
+        ) : null}
+      </Row>
 
       {/* Top of the content, below the alert only. Same place in all three apps:
           first thing after anything that needs acting on today. This screen has
