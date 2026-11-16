@@ -31,9 +31,11 @@ export const FIELD_TYPE_LABELS: Record<BoardFieldType, string> = {
   end: 'End date',
 };
 
+const NAMED_TYPES = ['start', 'end'] as const;
+
 /** Start date and End date: one of each at most, under these names always. */
 export function isNamedType(type: BoardFieldType): type is 'start' | 'end' {
-  return type === 'start' || type === 'end';
+  return (NAMED_TYPES as readonly string[]).includes(type);
 }
 
 /** Whether values of this type are dates (`YYYY-MM-DD`). */
@@ -53,11 +55,26 @@ export function fieldAddBlocked(fields: readonly BoardField[]): string | null {
     : null;
 }
 
-export function validateFieldName(name: string, existing: readonly BoardField[]): string | null {
+/**
+ * Why `name` cannot be a field's name, or null. Start date and End date are
+ * the two names other screens read, so no field of another type may take
+ * either: a Text field called "Start date" would read as the board's start
+ * date to a person and to nobody else, and would stop the real one being added.
+ */
+export function validateFieldName(
+  name: string,
+  existing: readonly BoardField[],
+  type?: BoardFieldType,
+): string | null {
   const trimmed = name.trim();
   if (trimmed.length === 0) return 'Give the field a name.';
   if (trimmed.length > BOARD_FIELD_NAME_MAX)
     return `Keep the field name under ${BOARD_FIELD_NAME_MAX} characters.`;
+  const reserved = NAMED_TYPES.find(
+    (t) => FIELD_TYPE_LABELS[t].toLowerCase() === trimmed.toLowerCase(),
+  );
+  if (reserved && reserved !== type)
+    return `${FIELD_TYPE_LABELS[reserved]} is kept for the board's ${FIELD_TYPE_LABELS[reserved].toLowerCase()}: add it as that type.`;
   if (existing.some((f) => f.name.toLowerCase() === trimmed.toLowerCase()))
     return 'There is already a field with that name.';
   return null;
@@ -81,11 +98,11 @@ export function addField(
       return { ok: false, error: `The board already has a ${FIELD_TYPE_LABELS[type]}.` };
     const fixed = FIELD_TYPE_LABELS[type];
     // A field someone named "Start date" by hand would read as a second one.
-    const clash = validateFieldName(fixed, fields);
+    const clash = validateFieldName(fixed, fields, type);
     if (clash) return { ok: false, error: clash };
     return { ok: true, fields: [...fields, { id: localId('fld'), name: fixed, type }] };
   }
-  const problem = validateFieldName(name, fields);
+  const problem = validateFieldName(name, fields, type);
   if (problem) return { ok: false, error: problem };
   return { ok: true, fields: [...fields, { id: localId('fld'), name: name.trim(), type }] };
 }
@@ -106,6 +123,7 @@ export function renameField(
   const problem = validateFieldName(
     rawName,
     fields.filter((f) => f.id !== fieldId),
+    field?.type,
   );
   if (problem) return { ok: false, error: problem };
   const trimmed = rawName.trim();
@@ -132,7 +150,8 @@ export function safeLink(value: string | undefined): string | null {
 
 /**
  * A value as stored, null to clear the field, or why it cannot be saved.
- * Empty clears. Numbers are kept as typed once commas are taken out; dates are
+ * Empty clears. Numbers are kept as typed, less the commas between groups of
+ * three; dates are
  * `YYYY-MM-DD` and real; a link must be http or https, which is also checked
  * again before one is opened (`safeLink`), since another client could have
  * written anything.
@@ -142,9 +161,11 @@ export function validateDetailValue(type: BoardFieldType, raw: string): DetailRe
   if (value.length === 0) return { ok: true, value: null };
   switch (type) {
     case 'number': {
-      const plain = value.replace(/,/g, '');
-      if (!/^-?\d+(\.\d+)?$/.test(plain)) return { ok: false, error: 'Enter a number, such as 120 or 7.5.' };
-      return { ok: true, value: plain };
+      // A comma only between groups of three, as in 1,200: "7,5" is a
+      // decimal comma or a slip, and taking it out would save 75.
+      if (!/^-?(\d+|\d{1,3}(,\d{3})+)(\.\d+)?$/.test(value))
+        return { ok: false, error: 'Enter a number, such as 1,200 or 7.5.' };
+      return { ok: true, value: value.replace(/,/g, '') };
     }
     case 'date':
     case 'start':

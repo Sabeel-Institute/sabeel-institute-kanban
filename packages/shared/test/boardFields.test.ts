@@ -147,3 +147,31 @@ describe('what other screens read', () => {
     expect(filledFields(board.fields, undefined)).toBe(0);
   });
 });
+
+describe('the fixed names', () => {
+  it('are kept for Start date and End date, in any capitals', () => {
+    expect(addField([], 'text', 'Start date')).toMatchObject({ ok: false });
+    expect(addField([], 'date', 'end DATE')).toMatchObject({ ok: false });
+    const withText = addField([], 'text', 'Teachers');
+    if (!withText.ok) throw new Error('setup');
+    expect(renameField(withText.fields, withText.fields[0].id, 'End date')).toMatchObject({ ok: false });
+  });
+
+  it('still let the real Start date and End date be added', () => {
+    const start = addField([], 'start', '');
+    expect(start.ok).toBe(true);
+    if (!start.ok) throw new Error('setup');
+    expect(addField(start.fields, 'end', '')).toMatchObject({ ok: true });
+  });
+});
+
+describe('a number', () => {
+  it('takes commas between groups of three only', () => {
+    expect(validateDetailValue('number', '1,200')).toEqual({ ok: true, value: '1200' });
+    expect(validateDetailValue('number', '1,200,000.50')).toEqual({ ok: true, value: '1200000.50' });
+    expect(validateDetailValue('number', '-3,500')).toEqual({ ok: true, value: '-3500' });
+    expect(validateDetailValue('number', '7,5')).toMatchObject({ ok: false });
+    expect(validateDetailValue('number', '1,2,3')).toMatchObject({ ok: false });
+    expect(validateDetailValue('number', '12,00')).toMatchObject({ ok: false });
+  });
+});
