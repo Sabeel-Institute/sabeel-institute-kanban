@@ -33,6 +33,9 @@ import { timed, type Untimed } from './slowWrites';
  * once cleared a typed name the rules had refused; `runSeam.test.ts` scans for
  * them.
  */
+/** `run` as a component takes it from its parent: true once the work landed. */
+export type Run = (fn: () => Promise<unknown>) => Promise<boolean>;
+
 export function useAction(source: string) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
