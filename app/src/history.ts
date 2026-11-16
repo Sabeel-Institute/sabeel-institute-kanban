@@ -8,7 +8,7 @@ export function pushHistory(): void {}
 export function replaceHistory(): void {}
 
 /** Returns false so nav.ts pops its own stack directly on native. */
-export function goBackHistory(): boolean {
+export function goBackHistory(_steps = 1): boolean {
   return false;
 }
 

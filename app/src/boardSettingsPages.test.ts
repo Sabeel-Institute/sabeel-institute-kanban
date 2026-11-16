@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { pageSummary, settingsPages, shownPage, type PageFacts } from './boardSettingsPages';
+import {
+  pageSummary,
+  settingsBack,
+  settingsPages,
+  shownPage,
+  type PageFacts,
+} from './boardSettingsPages';
 
 describe('settingsPages', () => {
   it('gives someone who runs the board every page, General first', () => {
@@ -63,5 +69,37 @@ describe('pageSummary', () => {
   // Labels that could not be counted are not "none".
   it('says nothing about labels it could not count', () => {
     expect(pageSummary('labels', { ...facts, ownLabels: null })).toBeUndefined();
+  });
+});
+
+describe('settingsBack', () => {
+  const board = { name: 'board', boardId: 'b' };
+  const list = { name: 'boardSettings', boardId: 'b' };
+  const page = { name: 'boardSettings', boardId: 'b' };
+
+  it('leaves settings from the list on a phone', () => {
+    expect(settingsBack([board, list], 'b', false, false)).toEqual({ pop: 1 });
+  });
+
+  it('goes back to the list from a page pushed over it on a phone', () => {
+    expect(settingsBack([board, list, page], 'b', false, true)).toEqual({ pop: 1 });
+  });
+
+  it('shows the list from a page with none beneath, as after turning a wide screen narrow', () => {
+    expect(settingsBack([board, page], 'b', false, true)).toEqual({ toList: true });
+  });
+
+  it('leaves settings from a wide screen, every entry of it, as after turning a phone wide', () => {
+    expect(settingsBack([board, list, page], 'b', true, true)).toEqual({ pop: 2 });
+    expect(settingsBack([board, page], 'b', true, true)).toEqual({ pop: 1 });
+  });
+
+  it('leaves settings from the list drawn on a page no longer offered, not back to the list', () => {
+    expect(settingsBack([board, list, page], 'b', false, false)).toEqual({ pop: 2 });
+  });
+
+  it('counts only this board’s settings', () => {
+    const other = { name: 'boardSettings', boardId: 'x' };
+    expect(settingsBack([other, board, page], 'b', true, true)).toEqual({ pop: 1 });
   });
 });

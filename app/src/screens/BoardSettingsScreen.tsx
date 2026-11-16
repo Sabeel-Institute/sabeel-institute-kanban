@@ -4,6 +4,7 @@ import { useBoard, type BoardListItem } from '../boards';
 import {
   PAGE_TITLES,
   pageSummary,
+  settingsBack,
   settingsPages,
   shownPage,
   type BoardSettingsPage,
@@ -90,6 +91,12 @@ export function BoardSettingsScreen({
     ownLabels,
   };
 
+  function goBack() {
+    const r = settingsBack(nav.stack, boardId, isWide, shown !== null);
+    if ('pop' in r) nav.back(r.pop);
+    else nav.replace({ name: 'boardSettings', boardId });
+  }
+
   function open(next: BoardSettingsPage) {
     const route = { name: 'boardSettings', boardId, page: next } as const;
     if (isWide) nav.replace(route);
@@ -114,7 +121,7 @@ export function BoardSettingsScreen({
   if (isWide) {
     return (
       <Screen width="content">
-        <Header title={listTitle} boardName={b.name} onBack={nav.pop} />
+        <Header title={listTitle} boardName={b.name} onBack={goBack} />
         <View style={styles.split}>
           <View style={styles.side}>{list}</View>
           <View style={styles.page}>{body}</View>
@@ -128,7 +135,7 @@ export function BoardSettingsScreen({
       <Header
         title={shown ? PAGE_TITLES[shown] : listTitle}
         boardName={b.name}
-        onBack={nav.pop}
+        onBack={goBack}
       />
       {shown ? body : list}
     </Screen>

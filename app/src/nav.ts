@@ -60,12 +60,18 @@ function popInternal() {
 onPopState(popInternal);
 
 function pop() {
-  if (stack.length <= 1) return;
-  // On web let the BROWSER drive: history.back() fires popstate, which calls
-  // popInternal. Popping here as well would take two screens off one press.
-  // Returns false on native, where we pop directly.
-  if (goBackHistory()) return;
-  popInternal();
+  back(1);
+}
+
+/** Take `steps` screens off the stack at once, never the last. */
+function back(steps: number) {
+  const n = Math.min(steps, stack.length - 1);
+  if (n <= 0) return;
+  // On web let the BROWSER drive: history.go(-n) fires popstate, which calls
+  // popInternal once a step. Popping here as well would take screens off
+  // twice. Returns false on native, where we pop directly.
+  if (goBackHistory(n)) return;
+  for (let i = 0; i < n; i += 1) popInternal();
 }
 
 /**
@@ -129,9 +135,12 @@ export function useNav() {
 
   return {
     route: s[s.length - 1],
+    /** The whole stack, top last, for a screen whose Back depends on it. */
+    stack: s,
     canGoBack: s.length > 1,
     push: useCallback(push, []),
     pop: useCallback(pop, []),
+    back: useCallback(back, []),
     replace: useCallback(replace, []),
     reset: useCallback(reset, []),
   };

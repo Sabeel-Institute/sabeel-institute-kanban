@@ -23,8 +23,11 @@ if (typeof window !== 'undefined') {
   window.addEventListener('popstate', (e) => {
     const next = (e.state as { depth?: number } | null)?.depth ?? 0;
     if (next < depth) {
+      // One call per step: a jump of several entries (`history.go(-n)`)
+      // takes as many screens off the stack.
+      const steps = depth - next;
       depth = next;
-      subscribers.forEach((f) => f());
+      for (let i = 0; i < steps; i += 1) subscribers.forEach((f) => f());
     } else {
       // Forward, or an entry we cannot reconstruct: re-align without navigating.
       depth = next;
@@ -45,9 +48,9 @@ export function replaceHistory(): void {
   window.history.replaceState({ depth }, '');
 }
 
-export function goBackHistory(): boolean {
+export function goBackHistory(steps = 1): boolean {
   if (typeof window === 'undefined') return false;
-  window.history.back();
+  window.history.go(-steps);
   return true;
 }
 

@@ -48,6 +48,33 @@ export function shownPage(
   return wide ? (pages[0] ?? null) : null;
 }
 
+/**
+ * What Back does on Board settings, from the routes on the stack (top last).
+ *
+ * Settings can stand on the stack as one entry or two: a page is pushed over
+ * the list on a phone and replaces the top on a wide screen, and the width can
+ * change while it is open (a tablet turned) or the page can stop being offered
+ * (a demotion). So Back reads the stack rather than assuming its shape: from
+ * the list, or anywhere on a wide screen, it leaves settings, every entry of
+ * them; from a page on a phone it shows the list, the entry beneath when there
+ * is one.
+ */
+export function settingsBack(
+  stack: readonly { name: string; boardId?: string }[],
+  boardId: string,
+  wide: boolean,
+  pageShown: boolean,
+): { pop: number } | { toList: true } {
+  let entries = 0;
+  for (let i = stack.length - 1; i >= 0; i -= 1) {
+    const r = stack[i];
+    if (r.name !== 'boardSettings' || r.boardId !== boardId) break;
+    entries += 1;
+  }
+  if (wide || !pageShown) return { pop: Math.max(1, entries) };
+  return entries >= 2 ? { pop: 1 } : { toList: true };
+}
+
 /** What a page holds, as the list says it under the page's name. */
 export interface PageFacts {
   archived: boolean;
