@@ -19,6 +19,7 @@ export function CardFace({
   boardMembers,
   subtaskCount,
   parentTitle,
+  finished = false,
   unnamed = false,
 }: {
   card: {
@@ -51,6 +52,13 @@ export function CardFace({
    */
   parentTitle?: string;
   /**
+   * `isFinished` for this card on its board: in the finished column of a board
+   * with lanes. A finished card is never drawn as late, on any surface, so
+   * every caller passes it — the board layouts, the archive, My Work and
+   * Search, each from the card's own board.
+   */
+  finished?: boolean;
+  /**
    * The face is not inside a tile with a name of its own (the archive), so a
    * phone's screen reader reads it piece by piece and the subtask chip needs
    * its own words. Inside a named tile it must not: Android makes an
@@ -74,7 +82,7 @@ export function CardFace({
     .filter((m): m is BoardMemberProfile => !!m);
 
   const chip = { backgroundColor: t.bg.inset, borderColor: t.border.subtle };
-  const overdue = bucketFor(card.dueDate, today) === 'overdue';
+  const overdue = !finished && bucketFor(card.dueDate, today) === 'overdue';
   const dueColor = overdue ? t.text.danger : t.text.muted;
   const subtasks = subtaskCount ?? 0;
   // Straight off the card document — denormalised by the attachment callables —
@@ -152,7 +160,7 @@ export function CardFace({
             <View style={styles.due}>
               <Icon name="event" size={13} color={dueColor} />
               <Text style={[type.caption, { color: dueColor }]}>
-                {describeDue(card.dueDate, today)}
+                {describeDue(card.dueDate, today, finished)}
               </Text>
             </View>
           ) : null}

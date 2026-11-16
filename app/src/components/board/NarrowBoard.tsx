@@ -28,12 +28,19 @@ import {
 } from 'react-native';
 import {
   type BoardColumn,
+  type BoardLane,
   canManageBoard,
   columnDeleteBlocked,
   columnsPatch,
+  groupByLane,
+  isFinished,
   type Label,
+  laneInfo,
+  type LaneInfo,
+  lanesLive,
   parentTitles,
   subtaskCounts,
+  todayInOrgTz,
   watchKey,
 } from '@sabeel/shared';
 import {
@@ -65,6 +72,7 @@ import {
 } from '../ui';
 import { AddCardForm } from './AddCardForm';
 import { WatchColumnBell } from './Bells';
+import { LaneHeading } from './LaneHeading';
 import { setColumnWatched, useWatchedColumns } from '../../notifications';
 import { useLabels } from '../../labels';
 import { radius, space, useTheme } from '../../theme';
@@ -76,6 +84,12 @@ const NO_COLUMNS: BoardColumn[] = [];
 const EMPTY_CARDS: Card[] = [];
 const NO_MEMBERS: BoardMemberProfile[] = [];
 const NO_LABELS: Label[] = [];
+const NO_LANES: BoardLane[] = [];
+
+/** One row of a column's list: a card, or on a board with lanes a lane's heading. */
+type ColumnRow =
+  | { kind: 'card'; card: Card }
+  | { kind: 'lane'; lane: BoardLane | null };
 
 function CardTile({
   card,
@@ -83,6 +97,7 @@ function CardTile({
   boardMembers,
   subtaskCount,
   parentTitle,
+  finished,
   selected,
   selectionActive,
   onOpen,
@@ -93,6 +108,7 @@ function CardTile({
   boardMembers: readonly BoardMemberProfile[];
   subtaskCount?: number;
   parentTitle?: string;
+  finished: boolean;
   selected: boolean;
   selectionActive: boolean;
   onOpen: () => void;
@@ -127,6 +143,7 @@ function CardTile({
         boardMembers={boardMembers}
         subtaskCount={subtaskCount}
         parentTitle={parentTitle}
+        finished={finished}
       />
       {selectionActive ? (
         <Hint>{selected ? '✓ selected' : 'tap to select'}</Hint>
@@ -218,6 +235,36 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
     return map;
   }, [columns, cards.data]);
 
+  // Lanes, on a board that uses them: each column lists the board's lanes in
+  // order, each heading counting its lane across every column.
+  const laneBoard = board.data;
+  const live = laneBoard ? lanesLive(laneBoard) : false;
+  const lanes = laneBoard?.lanes ?? NO_LANES;
+  const infoByLane = useMemo(() => {
+    const map = new Map<string, LaneInfo>();
+    if (!laneBoard || !live) return map;
+    const today = todayInOrgTz();
+    for (const lane of laneBoard.lanes) {
+      map.set(lane.id, laneInfo(cards.data ?? EMPTY_CARDS, laneBoard, lane.id, today));
+    }
+    return map;
+  }, [laneBoard, live, cards.data]);
+  const rowsByColumn = useMemo(() => {
+    const map = new Map<string, ColumnRow[]>();
+    for (const [columnId, colCards] of byColumn) {
+      map.set(
+        columnId,
+        live && laneBoard
+          ? groupByLane(colCards, laneBoard, cards.data ?? EMPTY_CARDS).flatMap((g) => [
+              { kind: 'lane' as const, lane: g.lane },
+              ...g.cards.map((card) => ({ kind: 'card' as const, card })),
+            ])
+          : colCards.map((card) => ({ kind: 'card' as const, card })),
+      );
+    }
+    return map;
+  }, [byColumn, live, laneBoard, cards.data]);
+
   /**
    * The page actually being shown, which is NOT always the remembered one.
    *
@@ -283,7 +330,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
 
   // The title comes from `AddCardForm`, already trimmed and non-empty — the
   // draft lives there so typing one does not re-render the board.
-  async function addCard(columnId: string, title: string, subscribe: boolean) {
+  async function addCard(columnId: string, title: string, subscribe: boolean, laneId?: string) {
     setAdding(false);
     await run(() =>
       createCard({
@@ -293,6 +340,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
         user,
         columnCards: byColumn.get(columnId) ?? [],
         subscribe,
+        laneId,
       }),
     );
   }
@@ -493,6 +541,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
         canManage={canManage}
         currentBoardId={boardId}
         columns={columns}
+        lanes={live && laneBoard ? laneBoard.lanes : undefined}
         allCards={cards.data ?? []}
         selection={selection}
         members={members}
@@ -577,7 +626,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
         scrollEventThrottle={32}
       >
         {columns.map((col, colIndex) => {
-          const colCards = byColumn.get(col.id) ?? [];
+          const rows = rowsByColumn.get(col.id) ?? [];
           const onScreen = colIndex === visiblePage;
           return (
             /*
@@ -605,28 +654,40 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
                 // being clipped. See styles.page.
                 style={styles.fill}
                 keyboardShouldPersistTaps="handled"
-                data={colCards}
-                keyExtractor={(c) => c.id}
-                renderItem={({ item }) => (
-                  <CardTile
-                    card={item}
-                    labels={labels}
-                    boardMembers={members}
-                    subtaskCount={subtasksBy.get(item.id)}
-                    parentTitle={parentsBy.get(item.id)}
-                    selected={selection.isSelected(item.id)}
-                    selectionActive={selection.active}
-                    // Once anything is selected, tapping toggles rather than
-                    // opens — otherwise building a selection means alternating
-                    // between long-press and tap, which nobody discovers.
-                    onOpen={() =>
-                      selection.active
-                        ? selection.toggle(item.id)
-                        : nav.push({ name: 'card', boardId, cardId: item.id })
-                    }
-                    onLongPress={() => selection.toggle(item.id)}
-                  />
-                )}
+                data={rows}
+                keyExtractor={(row) =>
+                  row.kind === 'card' ? row.card.id : `lane:${row.lane?.id ?? 'none'}`
+                }
+                renderItem={({ item: row }) =>
+                  row.kind === 'lane' ? (
+                    // Every lane keeps its heading in every column, holding
+                    // cards here or not, so it holds its place as you swipe.
+                    <LaneHeading
+                      name={row.lane?.name ?? 'No lane'}
+                      info={row.lane ? (infoByLane.get(row.lane.id) ?? null) : null}
+                    />
+                  ) : (
+                    <CardTile
+                      card={row.card}
+                      labels={labels}
+                      boardMembers={members}
+                      subtaskCount={subtasksBy.get(row.card.id)}
+                      parentTitle={parentsBy.get(row.card.id)}
+                      finished={laneBoard ? isFinished(row.card, laneBoard) : false}
+                      selected={selection.isSelected(row.card.id)}
+                      selectionActive={selection.active}
+                      // Once anything is selected, tapping toggles rather than
+                      // opens — otherwise building a selection means alternating
+                      // between long-press and tap, which nobody discovers.
+                      onOpen={() =>
+                        selection.active
+                          ? selection.toggle(row.card.id)
+                          : nav.push({ name: 'card', boardId, cardId: row.card.id })
+                      }
+                      onLongPress={() => selection.toggle(row.card.id)}
+                    />
+                  )
+                }
                 ListEmptyComponent={<Hint>No cards in {col.name}.</Hint>}
                 contentContainerStyle={styles.listContent}
               />
@@ -651,8 +712,11 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
                         hoisting the draft back onto the board — hoisting it is
                         what made every keystroke re-render every column. */}
                     <AddCardForm
-                      onAdd={(title, subscribe) => addCard(col.id, title, subscribe)}
+                      onAdd={(title, subscribe, laneId) =>
+                        addCard(col.id, title, subscribe, laneId)
+                      }
                       canSubscribe={isMember}
+                      lanes={live ? lanes : undefined}
                       onCancel={() => setAdding(false)}
                     />
                   </Panel>

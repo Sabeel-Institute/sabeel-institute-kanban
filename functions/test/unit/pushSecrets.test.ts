@@ -12,25 +12,53 @@ import { resolve } from 'node:path';
  * sends, and no other test reaches Apple.
  *
  * The senders are FOUND, not listed: every exported function whose body calls
- * `notify(`, the one way a push leaves `notifications.ts`. A list would have to
- * be remembered by whoever adds the next one, which is the failure this exists
- * to catch.
+ * `notify(`, the one way a push leaves `notifications.ts`, or calls a function
+ * that does — a schedule's body lives in a `run…` function so a test can call
+ * it, as `runDueSoonReminders` does. A list would have to be remembered by
+ * whoever adds the next one, which is the failure this exists to catch.
  */
 
 // Paths resolve from the functions workspace, vitest's cwd here — the same
 // convention suite-coverage.test.ts uses.
 const SRC = resolve('src');
 
-/** The exported functions (deployed ones are `export const X = on…(`) that call `notify(`. */
-function senders(): string[] {
+const sources = () =>
+  readdirSync(SRC)
+    .filter((f) => f.endsWith('.ts'))
+    .map((f) => readFileSync(resolve(SRC, f), 'utf8').split('\n'));
+
+/** Top-level function declarations whose body calls `notify(`: the helpers a sender may call. */
+function helpers(): Set<string> {
   const found = new Set<string>();
-  for (const file of readdirSync(SRC).filter((f) => f.endsWith('.ts'))) {
+  for (const lines of sources()) {
     let current: string | null = null;
-    for (const line of readFileSync(resolve(SRC, file), 'utf8').split('\n')) {
+    for (const line of lines) {
+      const start = /^(?:export )?(?:async )?function (\w+)/.exec(line);
+      if (start) current = start[1];
+      else if (/^export const |^const \w+ = /.test(line)) current = null;
+      if (current && /\bnotify\(/.test(line) && !line.startsWith(`export async function ${current}`))
+        found.add(current);
+    }
+  }
+  return found;
+}
+
+/**
+ * The exported functions (deployed ones are `export const X = on…(`) that call
+ * `notify(`, directly or through one of `helpers()`.
+ */
+function senders(): string[] {
+  const via = [...helpers()];
+  const calls = (line: string) =>
+    /\bnotify\(/.test(line) || via.some((h) => new RegExp(`\\b${h}\\(`).test(line));
+  const found = new Set<string>();
+  for (const lines of sources()) {
+    let current: string | null = null;
+    for (const line of lines) {
       const start = /^export const (\w+) = /.exec(line);
       if (start) current = start[1];
       else if (/^(export )?(async )?function |^const \w+ = /.test(line)) current = null;
-      if (current && /\bnotify\(/.test(line)) found.add(current);
+      if (current && calls(line)) found.add(current);
     }
   }
   return [...found].sort();

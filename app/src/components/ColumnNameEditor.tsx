@@ -1,8 +1,44 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { renameColumn, COLUMN_NAME_MAX, type BoardColumn } from '@sabeel/shared';
+import {
+  COLUMN_NAME_MAX,
+  LANE_NAME_MAX,
+  renameColumn,
+  renameLane,
+  type BoardColumn,
+  type BoardLane,
+} from '@sabeel/shared';
 import { IconAction, Row, TextField } from './ui';
 import { space, type, useTheme } from '../theme';
+
+type Named = { id: string; name: string };
+type RenameResult<T> = { ok: true; items: T[] } | { ok: false; error: string };
+
+/** What every caller passes, whichever kind of name it is. */
+type EditorProps = {
+  canEdit: boolean;
+  /** Trailing metadata shown after the name, e.g. a card count. Not editable. */
+  suffix?: string;
+  center?: boolean;
+  /**
+   * How many lines the name may occupy before it truncates. One everywhere it
+   * shares a row with other content; two on the phone pager, where the name is
+   * the row and there is empty space above and below it.
+   */
+  lines?: number;
+  bold?: boolean;
+  busy?: boolean;
+  /** The caller's `useAction` runner, so a failed rename reports in the same
+   *  banner as every other failure on that screen. */
+  run: (fn: () => Promise<unknown>) => void;
+  onError: (message: string) => void;
+  /**
+   * Lets a cramped surface make room while editing — the phone pager hides its
+   * Prev/Next arrows so the field gets the whole row instead of the ~190px left
+   * between them.
+   */
+  onEditingChange?: (editing: boolean) => void;
+};
 
 /**
  * A column's name, renamed in place.
@@ -25,55 +61,92 @@ import { space, type, useTheme } from '../theme';
 export function ColumnNameEditor({
   column,
   columns,
-  canEdit,
-  suffix,
-  center,
-  lines = 1,
-  bold,
-  busy,
   onRename,
-  run,
-  onError,
-  onEditingChange,
-}: {
+  ...rest
+}: EditorProps & {
   column: BoardColumn;
   /** The whole list — needed to reject a name another column already has. */
   columns: readonly BoardColumn[];
-  canEdit: boolean;
-  /** Trailing metadata shown after the name, e.g. a card count. Not editable. */
-  suffix?: string;
-  center?: boolean;
-  /**
-   * How many lines the name may occupy before it truncates. One everywhere it
-   * shares a row with other content; two on the phone pager, where the name is
-   * the row and there is empty space above and below it.
-   */
-  lines?: number;
-  bold?: boolean;
-  busy?: boolean;
   /**
    * The write itself, and it must REJECT if the write fails — that rejection is
    * what keeps the field open. Do not wrap it in the caller's `run`; pass `run`
    * separately, or a failure resolves quietly and the draft is discarded.
    */
   onRename: (columns: BoardColumn[]) => Promise<unknown>;
-  /** The caller's `useAction` runner, so a failed rename reports in the same
-   *  banner as every other failure on that screen. */
-  run: (fn: () => Promise<unknown>) => void;
-  onError: (message: string) => void;
-  /**
-   * Lets a cramped surface make room while editing — the phone pager hides its
-   * Prev/Next arrows so the field gets the whole row instead of the ~190px left
-   * between them.
-   */
-  onEditingChange?: (editing: boolean) => void;
+}) {
+  return (
+    <ItemNameEditor
+      {...rest}
+      item={column}
+      noun="column"
+      maxLength={COLUMN_NAME_MAX}
+      rename={(name) => {
+        const r = renameColumn(columns, column.id, name);
+        return r.ok ? { ok: true, items: r.columns } : r;
+      }}
+      onRename={onRename}
+    />
+  );
+}
+
+/** A lane's name, renamed in place: the same editor as a column's, under the lane's rules. */
+export function LaneNameEditor({
+  lane,
+  lanes,
+  onRename,
+  ...rest
+}: EditorProps & {
+  lane: BoardLane;
+  /** The whole list — needed to reject a name another lane already has. */
+  lanes: readonly BoardLane[];
+  /** The write; it must REJECT on failure, as `ColumnNameEditor`'s does. */
+  onRename: (lanes: BoardLane[]) => Promise<unknown>;
+}) {
+  return (
+    <ItemNameEditor
+      {...rest}
+      item={lane}
+      noun="lane"
+      maxLength={LANE_NAME_MAX}
+      rename={(name) => {
+        const r = renameLane(lanes, lane.id, name);
+        return r.ok ? { ok: true, items: r.lanes } : r;
+      }}
+      onRename={onRename}
+    />
+  );
+}
+
+function ItemNameEditor<T extends Named>({
+  item,
+  noun,
+  maxLength,
+  rename,
+  onRename,
+  canEdit,
+  suffix,
+  center,
+  lines = 1,
+  bold,
+  busy,
+  run,
+  onError,
+  onEditingChange,
+}: EditorProps & {
+  item: T;
+  /** Says what is renamed, in every label: "Rename column To Do". */
+  noun: 'column' | 'lane';
+  maxLength: number;
+  /** The shared rule: the renamed list, or why not. */
+  rename: (name: string) => RenameResult<T>;
+  onRename: (items: T[]) => Promise<unknown>;
 }) {
   const t = useTheme();
   const [draft, setDraft] = useState<string | null>(null);
   const editing = draft !== null;
 
   function begin() {
-    setDraft(column.name);
+    setDraft(item.name);
     onEditingChange?.(true);
   }
 
@@ -92,13 +165,13 @@ export function ColumnNameEditor({
   // always had. One rule for both, rather than a note explaining why two
   // editors one screen apart behave differently.
   function commit() {
-    const result = renameColumn(columns, column.id, draft ?? '');
+    const result = rename(draft ?? '');
     if (!result.ok) {
       onError(result.error);
       return;
     }
     run(async () => {
-      await onRename(result.columns);
+      await onRename(result.items);
       close();
     });
   }
@@ -112,8 +185,8 @@ export function ColumnNameEditor({
             onChangeText={setDraft}
             onSubmit={commit}
             autoFocus
-            label={`Rename ${column.name}`}
-            maxLength={COLUMN_NAME_MAX}
+            label={`Rename ${item.name}`}
+            maxLength={maxLength}
           />
         </View>
         {/* Save is the affirmative and is tinted; cancel stays quiet. Two muted
@@ -121,7 +194,7 @@ export function ColumnNameEditor({
             phone — shape alone is not enough to tell them apart in a hurry. */}
         <IconAction
           icon="check"
-          label="Save column name"
+          label={`Save ${noun} name`}
           onPress={commit}
           accent
           disabled={busy}
@@ -167,13 +240,13 @@ export function ColumnNameEditor({
           center && styles.centerText,
         ]}
       >
-        {column.name}
+        {item.name}
         {suffix ? <Text style={{ color: t.text.muted }}>{suffix}</Text> : null}
       </Text>
       {canEdit ? (
         <IconAction
           icon="edit"
-          label={`Rename column ${column.name}`}
+          label={`Rename ${noun} ${item.name}`}
           onPress={begin}
           disabled={busy}
         />

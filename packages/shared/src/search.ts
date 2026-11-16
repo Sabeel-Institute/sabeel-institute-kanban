@@ -176,6 +176,12 @@ export function filterCards(
   cards: readonly SearchableCard[],
   filters: CardFilters,
   today: string,
+  /**
+   * Whether a card is finished (`isFinished` against its own board). A
+   * finished card is never Overdue, here as on the board; a caller that has no
+   * boards with lanes can leave it out.
+   */
+  isDone: (card: SearchableCard) => boolean = () => false,
 ): SearchableCard[] {
   const q = filters.text ? normalise(filters.text) : '';
 
@@ -207,7 +213,7 @@ export function filterCards(
 
     switch (filters.due) {
       case 'overdue':
-        if (!c.dueDate || c.dueDate >= today) return false;
+        if (!c.dueDate || c.dueDate >= today || isDone(c)) return false;
         break;
       case 'today':
         if (c.dueDate !== today) return false;

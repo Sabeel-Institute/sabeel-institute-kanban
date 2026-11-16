@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { BackHandler, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { canEditBoardLabels, canManageBoard } from '@sabeel/shared';
+import { canEditBoardLabels, canManageBoard, finishedColumnChoice } from '@sabeel/shared';
 import { useBoard, type BoardListItem } from '../boards';
 import {
   PAGE_TITLES,
@@ -19,6 +19,7 @@ import { BoardHistory } from '../components/BoardHistory';
 import { BoardLabelsSection } from '../components/LabelManager';
 import { ColumnsPage } from '../components/boardSettings/ColumnsPage';
 import { GeneralPage } from '../components/boardSettings/GeneralPage';
+import { LanesPage } from '../components/boardSettings/LanesPage';
 import { PeoplePage } from '../components/boardSettings/PeoplePage';
 import { radius, space, type, useTheme } from '../theme';
 import { useLayout } from '../theme/layout';
@@ -110,6 +111,9 @@ export function BoardSettingsScreen({
     members: b.memberUids.length,
     owners: b.boardOwnerUids.length,
     ownLabels,
+    lanesOn: b.lanesOn,
+    lanes: b.lanes.length,
+    finishedColumn: b.columns.find((c) => c.id === finishedColumnChoice(b))?.name ?? null,
   };
 
   function goBack() {
@@ -203,6 +207,8 @@ function PageBody({
       return <GeneralPage board={board} />;
     case 'columns':
       return <ColumnsPage board={board} />;
+    case 'lanes':
+      return <LanesPage board={board} />;
     case 'people':
       return <PeoplePage board={board} user={user} canManage={canManage} />;
     case 'labels':

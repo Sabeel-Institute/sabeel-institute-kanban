@@ -31,7 +31,11 @@ export function addDays(dayKey: string, days: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
-export type DueBucket = 'overdue' | 'today' | 'soon' | 'later' | 'none';
+/**
+ * `finished` is never a date's bucket (`bucketFor` does not return it): it is
+ * where `groupByDue` puts a finished card, which is due nowhere.
+ */
+export type DueBucket = 'overdue' | 'today' | 'soon' | 'later' | 'none' | 'finished';
 
 export const DUE_BUCKET_LABELS: Record<DueBucket, string> = {
   overdue: 'Overdue',
@@ -39,6 +43,7 @@ export const DUE_BUCKET_LABELS: Record<DueBucket, string> = {
   soon: 'Next 7 days',
   later: 'Later',
   none: 'No due date',
+  finished: 'Finished',
 };
 
 /** Order the buckets appear in. Overdue first — it is the thing to act on. */
@@ -48,6 +53,7 @@ export const DUE_BUCKET_ORDER: DueBucket[] = [
   'soon',
   'later',
   'none',
+  'finished',
 ];
 
 export function bucketFor(dueDate: string | undefined, today: string): DueBucket {
@@ -65,10 +71,15 @@ export function bucketFor(dueDate: string | undefined, today: string): DueBucket
 export function groupByDue<T extends { dueDate?: string; title: string }>(
   cards: readonly T[],
   today: string,
+  /**
+   * Whether a card is finished (`isFinished` on its own board). A finished card
+   * is never Overdue or due: it goes under Finished, last, whatever its date.
+   */
+  isDone: (card: T) => boolean = () => false,
 ): { bucket: DueBucket; label: string; cards: T[] }[] {
   const groups = new Map<DueBucket, T[]>();
   for (const c of cards) {
-    const b = bucketFor(c.dueDate, today);
+    const b = isDone(c) ? 'finished' : bucketFor(c.dueDate, today);
     const list = groups.get(b) ?? [];
     list.push(c);
     groups.set(b, list);

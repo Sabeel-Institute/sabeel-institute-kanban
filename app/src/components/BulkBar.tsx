@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import type { BoardColumn } from '@sabeel/shared';
+import type { BoardColumn, BoardLane } from '@sabeel/shared';
 import {
   bulkArchive,
   bulkAssign,
@@ -31,6 +31,7 @@ import { toUserMessage } from '../errors';
 export function BulkBar({
   currentBoardId,
   columns,
+  lanes,
   allCards,
   selection,
   members,
@@ -40,6 +41,12 @@ export function BulkBar({
 }: {
   currentBoardId: string;
   columns: readonly BoardColumn[];
+  /**
+   * The board's lanes when they are live. Move then offers a lane as well as a
+   * column, either or both, which is how a board that has just switched lanes
+   * on is sorted in a few taps. No new icon: five is what fits a 320px phone.
+   */
+  lanes?: readonly BoardLane[];
   allCards: readonly Card[];
   selection: Selection;
   members: readonly BoardMemberProfile[];
@@ -59,6 +66,9 @@ export function BulkBar({
   const [busy, setBusy] = useState(false);
   const [destBoardId, setDestBoardId] = useState('');
   const [destColumnId, setDestColumnId] = useState('');
+  // The Move mode's two choices on a board with lanes; '' keeps each card's own.
+  const [moveColumnId, setMoveColumnId] = useState('');
+  const [moveLaneId, setMoveLaneId] = useState('');
   // The boards you could move/copy to (yours, or every board if you are an admin).
   const boards = useMyBoards(user);
   // Every label, to tell a board's own from the institute's on a move. Copy and
@@ -86,6 +96,8 @@ export function BulkBar({
       await fn();
       selection.clear();
       setMode('idle');
+      setMoveColumnId('');
+      setMoveLaneId('');
     } catch (e) {
       onError(toUserMessage(e, 'bulkBar'));
     } finally {
@@ -166,7 +178,60 @@ export function BulkBar({
         </Row>
       ) : null}
 
-      {mode === 'move' ? (
+      {mode === 'move' && lanes ? (
+        <>
+          <Hint>Move the selection to</Hint>
+          <Select
+            label="Destination column"
+            value={moveColumnId}
+            options={[
+              { value: '', label: 'Keep their columns' },
+              ...columns.map((col) => ({ value: col.id, label: col.name })),
+            ]}
+            disabled={busy}
+            onChange={setMoveColumnId}
+          />
+          <Select
+            label="Lane"
+            value={moveLaneId}
+            options={[
+              { value: '', label: 'Keep their lanes' },
+              ...lanes.map((l) => ({ value: l.id, label: l.name })),
+            ]}
+            disabled={busy}
+            onChange={setMoveLaneId}
+          />
+          <Row style={styles.wrap}>
+            <Button
+              label="Move"
+              busy={busy}
+              disabled={!moveColumnId && !moveLaneId}
+              onPress={() =>
+                run(() =>
+                  bulkMove({
+                    cards: chosen,
+                    toColumnId: moveColumnId || undefined,
+                    toLaneId: moveLaneId || undefined,
+                    destinationCards: moveColumnId ? cardsInColumn(allCards, moveColumnId) : [],
+                    user,
+                  }),
+                )
+              }
+            />
+            <Button
+              label="Cancel"
+              variant="secondary"
+              onPress={() => {
+                setMode('idle');
+                setMoveColumnId('');
+                setMoveLaneId('');
+              }}
+            />
+          </Row>
+        </>
+      ) : null}
+
+      {mode === 'move' && !lanes ? (
         <>
           <Hint>Move the selection to</Hint>
           <Row style={styles.wrap}>

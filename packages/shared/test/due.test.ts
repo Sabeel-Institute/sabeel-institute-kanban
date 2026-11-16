@@ -154,3 +154,25 @@ describe('a finished card’s date', () => {
     expect(describeDue('2026-11-03', '2026-11-15')).toBe('12 days late');
   });
 });
+
+describe('groupByDue with finished cards', () => {
+  const today = '2026-11-15';
+  const cards = [
+    { title: 'late', dueDate: '2026-11-01' },
+    { title: 'done late', dueDate: '2026-11-01' },
+    { title: 'done soon', dueDate: '2026-11-17' },
+  ];
+  const isDone = (c: { title: string }) => c.title.startsWith('done');
+
+  it('files a finished card under Finished, last, whatever its date', () => {
+    const groups = groupByDue(cards, today, isDone);
+    expect(groups.map((g) => [g.label, g.cards.map((c) => c.title)])).toEqual([
+      ['Overdue', ['late']],
+      ['Finished', ['done late', 'done soon']],
+    ]);
+  });
+
+  it('has no Finished group without a finished card', () => {
+    expect(groupByDue(cards, today).map((g) => g.bucket)).toEqual(['overdue', 'soon']);
+  });
+});

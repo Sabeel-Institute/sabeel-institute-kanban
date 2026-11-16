@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import {
   filterCards,
   hasActiveFilters,
+  isFinished,
   orderCards,
   priorityLabel,
   todayInOrgTz,
@@ -122,6 +123,14 @@ export function SearchScreen({ user }: { user: SessionUser }) {
     for (const b of boards.data ?? []) m.set(b.id, b);
     return m;
   }, [boards.data]);
+  // A finished card (`isFinished`, on its own board) is never Overdue.
+  const finished = useCallback(
+    (c: SearchableCard) => {
+      const board = boardById.get(c.boardId);
+      return board ? isFinished(c, board) : false;
+    },
+    [boardById],
+  );
 
   // Load card metadata for the user's boards, then filter in memory as they
   // type — refetching per keystroke would be pointless traffic. This used to be
@@ -168,7 +177,10 @@ export function SearchScreen({ user }: { user: SessionUser }) {
             dueDate: d.data().dueDate as string | undefined,
             archived: Boolean(d.data().archived),
             parentId: d.data().parentId as string | undefined,
-            // All three feed `lastActivityOf`, which takes the max — see its
+            // No `laneId`: Search neither shows nor filters by lane. Whether a
+            // card is finished, which the Overdue chip needs, is its
+            // `columnId` against its board (`isFinished`), both already here.
+            // All three below feed `lastActivityOf`, which takes the max — see its
             // note in @sabeel/shared for why none of them is enough alone.
             updatedAt: (d.data().updatedAt as number) ?? 0,
             lastActivityAt: (d.data().lastActivityAt as number) ?? 0,
@@ -327,6 +339,7 @@ export function SearchScreen({ user }: { user: SessionUser }) {
         due: overdueOnly ? 'overdue' : undefined,
       },
       today,
+      finished,
     );
     // The cap slices AFTER the ordering, which is what makes "Oldest first"
     // honest: it shows the 200 oldest rather than 200 arbitrary cards sorted.
@@ -342,6 +355,7 @@ export function SearchScreen({ user }: { user: SessionUser }) {
     boardId,
     assigneeUid,
     sort,
+    finished,
   ]);
 
   return (
@@ -544,6 +558,7 @@ export function SearchScreen({ user }: { user: SessionUser }) {
                   card={c}
                   labels={allLabels.data ?? NO_LABELS}
                   boardMembers={board?.members ?? NO_MEMBERS}
+                  finished={finished(c)}
                 />
                 <Hint>
                   in {board?.name ?? 'a board'}

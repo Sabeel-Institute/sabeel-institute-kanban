@@ -7,11 +7,12 @@
  * so it is worked out here, without React, and the screen draws it.
  */
 
-export type BoardSettingsPage = 'general' | 'columns' | 'people' | 'labels' | 'history';
+export type BoardSettingsPage = 'general' | 'columns' | 'lanes' | 'people' | 'labels' | 'history';
 
 export const PAGE_TITLES: Record<BoardSettingsPage, string> = {
   general: 'General',
   columns: 'Columns',
+  lanes: 'Lanes',
   people: 'People',
   labels: 'Labels',
   history: 'History',
@@ -27,7 +28,7 @@ export const PAGE_TITLES: Record<BoardSettingsPage, string> = {
  */
 export function settingsPages(canManage: boolean): BoardSettingsPage[] {
   return canManage
-    ? ['general', 'columns', 'people', 'labels', 'history']
+    ? ['general', 'columns', 'lanes', 'people', 'labels', 'history']
     : ['people', 'labels', 'history'];
 }
 
@@ -83,6 +84,10 @@ export interface PageFacts {
   owners: number;
   /** The board's own labels; null while they load or when they could not. */
   ownLabels: number | null;
+  lanesOn: boolean;
+  lanes: number;
+  /** The finished column's name, while lanes are on. */
+  finishedColumn: string | null;
 }
 
 function count(n: number, one: string, many: string): string {
@@ -101,6 +106,12 @@ export function pageSummary(page: BoardSettingsPage, facts: PageFacts): string |
       return facts.archived ? 'Name, restore' : 'Name, archive';
     case 'columns':
       return facts.columns === 0 ? 'No columns' : count(facts.columns, 'column', 'columns');
+    case 'lanes':
+      if (!facts.lanesOn) return 'Off';
+      if (facts.lanes === 0) return 'On, no lanes yet';
+      return `On, ${count(facts.lanes, 'lane', 'lanes')}${
+        facts.finishedColumn ? `. Finished cards are in ${facts.finishedColumn}` : ''
+      }`;
     case 'people':
       return `${count(facts.members, 'person', 'people')}, ${
         facts.owners === 0 ? 'no owners' : count(facts.owners, 'owner', 'owners')

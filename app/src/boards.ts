@@ -16,6 +16,7 @@ import {
   newBoard,
   pushRecent,
   type BoardColumn,
+  type BoardLane,
   type BoardDoc,
 } from '@sabeel/shared';
 import { auth, db, functions } from './firebase';
@@ -55,6 +56,10 @@ export interface BoardListItem {
   columns: BoardColumn[];
   /** Non-archived cards on the board (server-maintained; shown in the Boards list). */
   activeCardCount: number;
+  /** Lanes, as stored: read through `lanesLive` and friends in @sabeel/shared. */
+  lanesOn: boolean;
+  lanes: BoardLane[];
+  doneColumnId?: string;
 }
 
 function toBoard(id: string, data: Record<string, unknown>): BoardListItem {
@@ -84,6 +89,9 @@ function toBoard(id: string, data: Record<string, unknown>): BoardListItem {
     createdBy: (data.createdBy as string) ?? '',
     columns: (data.columns as BoardColumn[]) ?? [],
     activeCardCount: (data.activeCardCount as number) ?? 0,
+    lanesOn: data.lanesOn === true,
+    lanes: (data.lanes as BoardLane[]) ?? [],
+    ...(typeof data.doneColumnId === 'string' ? { doneColumnId: data.doneColumnId } : {}),
   };
 }
 
@@ -153,7 +161,7 @@ export async function createBoard(name: string, user: SessionUser): Promise<stri
  * a bare PERMISSION_DENIED as the only clue. Build it with `columnsPatch()`.
  */
 export type BoardPatch = Partial<
-  Pick<BoardListItem, 'name' | 'description' | 'archived'>
+  Pick<BoardListItem, 'name' | 'description' | 'archived' | 'lanesOn' | 'lanes' | 'doneColumnId'>
 > &
   ({ columns: BoardColumn[]; columnIds: string[] } | { columns?: never; columnIds?: never });
 

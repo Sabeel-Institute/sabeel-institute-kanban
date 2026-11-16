@@ -37,6 +37,10 @@ function toMyWorkCards(docs: { id: string; data: Record<string, unknown> }[]): M
       assigneeUids: (d.data.assigneeUids as string[]) ?? [],
       archived: Boolean(d.data.archived),
       parentId: d.data.parentId as string | undefined,
+      // No `laneId`, on purpose rather than by the oversight that left
+      // `parentId` out of here once: My Work neither shows nor filters by
+      // lane. "Finished", which it does need, is the card's `columnId`
+      // against its board (`isFinished`), and both are already here.
     }))
     .filter((c) => !c.archived);
 }

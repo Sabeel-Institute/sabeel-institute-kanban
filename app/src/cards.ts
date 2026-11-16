@@ -53,6 +53,8 @@ export interface Card {
   attachmentCount: number;
   /** The card this one is a subtask of. Board-scoped — see CardDoc.parentId. */
   parentId?: string;
+  /** The card's lane. Board-scoped, unchecked — see CardDoc.laneId; read through `laneOf`. */
+  laneId?: string;
   createdBy: string;
   createdAt: number;
   updatedAt: number;
@@ -76,6 +78,7 @@ function toCard(id: string, d: Record<string, unknown>): Card {
     commentCount: (d.commentCount as number) ?? 0,
     attachmentCount: (d.attachmentCount as number) ?? 0,
     parentId: d.parentId as string | undefined,
+    laneId: typeof d.laneId === 'string' ? d.laneId : undefined,
     createdBy: (d.createdBy as string) ?? '',
     createdAt: (d.createdAt as number) ?? 0,
     updatedAt: (d.updatedAt as number) ?? 0,
@@ -182,6 +185,8 @@ export async function createCard(params: {
    * members, and an admin may create a card on a board they are not on.
    */
   subscribe: boolean;
+  /** Its lane, on a board with lanes; absent is No lane. */
+  laneId?: string;
 }): Promise<string> {
   const last = params.columnCards[params.columnCards.length - 1] ?? null;
   const now = Date.now();
@@ -202,6 +207,7 @@ export async function createCard(params: {
     createdBy: params.user.uid,
     updatedAt: now,
     updatedBy: params.user.uid,
+    ...(params.laneId ? { laneId: params.laneId } : {}),
   };
   const ref = await addDoc(cardsRef(), card);
   return ref.id;
@@ -263,12 +269,22 @@ export async function subscribeToCard(
 export async function moveCard(params: {
   card: Card;
   toColumnId: string;
+  /** A lane to move it into as well, on a board with lanes; absent leaves its lane alone. */
+  toLaneId?: string;
   before: Card | null;
   after: Card | null;
   user: SessionUser;
 }): Promise<void> {
   const rank = rankBetween(params.before?.rank ?? null, params.after?.rank ?? null);
-  await updateCard(params.card.id, { columnId: params.toColumnId, rank }, params.user);
+  await updateCard(
+    params.card.id,
+    {
+      columnId: params.toColumnId,
+      rank,
+      ...(params.toLaneId !== undefined ? { laneId: params.toLaneId } : {}),
+    },
+    params.user,
+  );
 }
 
 /** Members archive; only this board's owners and admins destroy. Rules enforce both. */
@@ -341,11 +357,20 @@ export async function deleteCard(cardId: string): Promise<void> {
 // Every bulk operation is ONE batch, so a partial application is impossible —
 // either the whole selection moves or none of it does.
 
-/** Move many cards into a column at once, preserving their relative order. */
+/**
+ * Move many cards into a column, a lane, or both, at once, preserving their
+ * relative order.
+ *
+ * A lane alone leaves each card in its column and its place: sorting a board
+ * into lanes should not reshuffle its columns.
+ */
 export async function bulkMove(params: {
   cards: readonly Card[];
-  toColumnId: string;
-  /** Cards already in the destination, so the moved block lands after them. */
+  /** Absent keeps each card in its own column. */
+  toColumnId?: string;
+  /** Absent keeps each card in its own lane. */
+  toLaneId?: string;
+  /** Cards already in the destination column, so the moved block lands after them. */
   destinationCards: readonly Card[];
   user: SessionUser;
 }): Promise<void> {
@@ -358,13 +383,18 @@ export async function bulkMove(params: {
   let prev = staying[staying.length - 1]?.rank ?? null;
 
   for (const card of moving) {
-    // Ranks are assigned in sequence so the selection keeps its order at the
-    // destination rather than arriving scrambled.
-    const rank = rankBetween(prev, null);
-    prev = rank;
+    const placed: Record<string, unknown> = {};
+    if (params.toColumnId !== undefined) {
+      // Ranks are assigned in sequence so the selection keeps its order at the
+      // destination rather than arriving scrambled.
+      const rank = rankBetween(prev, null);
+      prev = rank;
+      placed.columnId = params.toColumnId;
+      placed.rank = rank;
+    }
+    if (params.toLaneId !== undefined) placed.laneId = params.toLaneId;
     batch.update(cardRef(card.id), {
-      columnId: params.toColumnId,
-      rank,
+      ...placed,
       updatedAt: Date.now(),
       updatedBy: params.user.uid,
     });
@@ -496,6 +526,9 @@ export async function bulkMoveToBoard(params: {
       // Scoped to the cards travelling together: kept only when the parent is
       // coming too, otherwise cleared rather than left dangling.
       parentId: keptParent ?? deleteField(),
+      // Lanes belong to one board: a lane id from this one would mean nothing
+      // there, so the card arrives under No lane.
+      laneId: deleteField(),
       updatedAt: now,
       updatedBy: params.user.uid,
     });
@@ -537,8 +570,9 @@ export async function bulkCopyToBoard(params: {
       // subscribers chose the SOURCE. Only if they are on the destination
       // board, which rules require of every subscriber.
       subscriberUids: keepMembers([params.user.uid], params.destMemberUids),
-      // NOTE: `parentId` is deliberately absent — a copy is a new, independent
-      // card and must not inherit a subtask link to the SOURCE board's parent.
+      // NOTE: `parentId` and `laneId` are deliberately absent — a copy is a
+      // new, independent card and must not inherit a subtask link to the
+      // SOURCE board's parent, nor a lane that exists only there.
       // This literal is untyped, so nothing but this comment stops someone
       // spreading `...card` here and reintroducing it.
       //

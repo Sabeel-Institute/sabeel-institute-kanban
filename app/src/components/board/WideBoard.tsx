@@ -5,9 +5,15 @@ import {
   canManageBoard,
   columnDeleteBlocked,
   columnsPatch,
+  groupByLane,
+  isFinished,
   type Label,
+  laneInfo,
+  type LaneInfo,
+  lanesLive,
   parentTitles,
   subtaskCounts,
+  todayInOrgTz,
   watchKey,
 } from '@sabeel/shared';
 import {
@@ -40,6 +46,7 @@ import {
 } from '../ui';
 import { AddCardForm } from './AddCardForm';
 import { WatchColumnBell } from './Bells';
+import { LaneHeading } from './LaneHeading';
 import { setColumnWatched, useWatchedColumns } from '../../notifications';
 import { useLabels } from '../../labels';
 import { radius, space, useTheme } from '../../theme';
@@ -108,10 +115,22 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
     return map;
   }, [columns, cards.data]);
 
+  // Lanes, as the phone and the browser draw them: headings inside each column.
+  const laneBoard = board.data;
+  const live = laneBoard ? lanesLive(laneBoard) : false;
+  const infoByLane = useMemo(() => {
+    const map = new Map<string, LaneInfo>();
+    if (!laneBoard || !live) return map;
+    const today = todayInOrgTz();
+    for (const lane of laneBoard.lanes) {
+      map.set(lane.id, laneInfo(cards.data ?? EMPTY_CARDS, laneBoard, lane.id, today));
+    }
+    return map;
+  }, [laneBoard, live, cards.data]);
 
   // The title comes from `AddCardForm`, already trimmed and non-empty — the
   // draft lives there so typing one does not re-render the board.
-  async function addCard(columnId: string, title: string, subscribe: boolean) {
+  async function addCard(columnId: string, title: string, subscribe: boolean, laneId?: string) {
     setAdding(null);
     await run(() =>
       createCard({
@@ -121,6 +140,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         user,
         columnCards: byColumn.get(columnId) ?? [],
         subscribe,
+        laneId,
       }),
     );
   }
@@ -260,6 +280,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         canManage={canManage}
         currentBoardId={boardId}
         columns={columns}
+        lanes={live && laneBoard ? laneBoard.lanes : undefined}
         allCards={cards.data ?? []}
         selection={selection}
         members={members}
@@ -322,7 +343,22 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
               </Row>
 
               <ScrollView style={styles.fill} keyboardShouldPersistTaps="handled">
-                {colCards.map((card) => {
+                {(live && laneBoard
+                  ? groupByLane(colCards, laneBoard, cards.data ?? EMPTY_CARDS).flatMap((g) => [
+                      { lane: g.lane, card: null },
+                      ...g.cards.map((card) => ({ lane: g.lane, card })),
+                    ])
+                  : colCards.map((card) => ({ lane: null, card }))
+                ).map(({ lane, card }) => {
+                  if (!card) {
+                    return (
+                      <LaneHeading
+                        key={`lane:${lane?.id ?? 'none'}`}
+                        name={lane?.name ?? 'No lane'}
+                        info={lane ? (infoByLane.get(lane.id) ?? null) : null}
+                      />
+                    );
+                  }
                   const selected = selection.isSelected(card.id);
                   return (
                     <Pressable
@@ -355,6 +391,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
                         boardMembers={members}
                         subtaskCount={subtasksBy.get(card.id)}
                         parentTitle={parentsBy.get(card.id)}
+                        finished={laneBoard ? isFinished(card, laneBoard) : false}
                       />
                     </Pressable>
                   );
@@ -364,8 +401,9 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
 
               {adding === col.id ? (
                 <AddCardForm
-                  onAdd={(title, subscribe) => addCard(col.id, title, subscribe)}
+                  onAdd={(title, subscribe, laneId) => addCard(col.id, title, subscribe, laneId)}
                   canSubscribe={isMember}
+                  lanes={live && laneBoard ? laneBoard.lanes : undefined}
                   onCancel={() => setAdding(null)}
                 />
               ) : (

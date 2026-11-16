@@ -9,7 +9,7 @@ import {
 
 describe('settingsPages', () => {
   it('gives someone who runs the board every page, General first', () => {
-    expect(settingsPages(true)).toEqual(['general', 'columns', 'people', 'labels', 'history']);
+    expect(settingsPages(true)).toEqual(['general', 'columns', 'lanes', 'people', 'labels', 'history']);
   });
 
   it('gives anyone else the pages they can use, and no others', () => {
@@ -43,7 +43,16 @@ describe('shownPage', () => {
 });
 
 describe('pageSummary', () => {
-  const facts: PageFacts = { archived: false, columns: 3, members: 4, owners: 2, ownLabels: 2 };
+  const facts: PageFacts = {
+    archived: false,
+    columns: 3,
+    members: 4,
+    owners: 2,
+    ownLabels: 2,
+    lanesOn: true,
+    lanes: 6,
+    finishedColumn: 'Done',
+  };
 
   it('counts what each page holds', () => {
     expect(pageSummary('general', facts)).toBe('Name, archive');
@@ -54,12 +63,19 @@ describe('pageSummary', () => {
   });
 
   it('says one, and none, in words', () => {
-    const one: PageFacts = { archived: false, columns: 1, members: 1, owners: 1, ownLabels: 0 };
+    const one: PageFacts = { ...facts, columns: 1, members: 1, owners: 1, ownLabels: 0, lanes: 1 };
     expect(pageSummary('columns', one)).toBe('1 column');
     expect(pageSummary('people', one)).toBe('1 person, 1 owner');
     expect(pageSummary('labels', one)).toBe('None of its own yet');
     expect(pageSummary('columns', { ...one, columns: 0 })).toBe('No columns');
     expect(pageSummary('people', { ...one, owners: 0 })).toBe('1 person, no owners');
+  });
+
+  it('says whether lanes are on, how many, and where finished cards are', () => {
+    expect(pageSummary('lanes', facts)).toBe('On, 6 lanes. Finished cards are in Done');
+    expect(pageSummary('lanes', { ...facts, lanes: 1 })).toBe('On, 1 lane. Finished cards are in Done');
+    expect(pageSummary('lanes', { ...facts, lanes: 0 })).toBe('On, no lanes yet');
+    expect(pageSummary('lanes', { ...facts, lanesOn: false })).toBe('Off');
   });
 
   it('offers Restore on an archived board', () => {
