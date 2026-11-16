@@ -679,7 +679,7 @@ comments, newest first.
 
 ### A board's own history
 
-At the bottom of Board settings, for everyone who can see the board: who
+On the History page of Board settings, for everyone who can see the board: who
 created it, renamed it, archived or restored it, added or removed whom, made
 or unmade an owner, and added, removed, renamed or reordered its columns.
 

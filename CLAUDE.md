@@ -236,9 +236,9 @@ contact with untrusted users.
 ## A board's history
 
 Added 2026-10-29: `onBoardWritten` diffs every board write (`diffBoard`) into
-`boards/{id}/activity`, which everyone on the board reads at the foot of Board
-settings. **Who did it is the `updatedBy`/`updatedAt` stamp**, named only when
-the write moved it. Rules refuse a board update without a new stamp naming the
+`boards/{id}/activity`, which everyone on the board reads on the History page
+of Board settings. **Who did it is the `updatedBy`/`updatedAt` stamp**, named
+only when the write moved it. Rules refuse a board update without a new stamp naming the
 writer, so builds before 0.15.0, which do not know the stamp, cannot save a
 board (Faisal, 2026-11-03: "I want everyone to update"); changes they made
 before then name nobody. **Anything that writes a board stamps it** — client

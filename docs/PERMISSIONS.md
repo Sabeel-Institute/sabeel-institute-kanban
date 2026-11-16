@@ -79,13 +79,14 @@ Rules cannot look inside a card's `labelIds`, so that containment is the app's,
 not the rules': a build from before board labels ignores it until the version
 floor retires it, and a phone before 0.13.1 never reads the floor.
 
-Everyone else on a board opens the same screen as **Members and labels**: the
-member list, read-only, with owners marked, and the board's own labels to
-change like anyone on the board. The roster answers "who do I ask to add
-someone?" without a trip to an admin — which is what it used to take.
+Everyone else on a board opens Board settings as **Members and labels**, with
+the three pages they can use: **People**, the member list, read-only, with
+owners marked; **Labels**, the board's own to change like anyone on the board;
+and **History**. The roster answers "who do I ask to add someone?" without a
+trip to an admin — which is what it used to take.
 
-**The board's history is for everyone on the board**, at the bottom of that
-same screen, and for admins: who renamed or archived it, who added or removed
+**The board's history is for everyone on the board**, on that History page,
+and for admins: who renamed or archived it, who added or removed
 whom, who made someone an owner, what happened to its columns. Nobody writes
 it but the server, so nobody can edit or forge a line of it.
 

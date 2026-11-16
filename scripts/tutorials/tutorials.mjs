@@ -867,22 +867,26 @@ export const TUTORIALS = [
     start: (w) => w.board('weekend-school'),
     steps: [
       {
-        say: 'If you own a board, you can change how it works. Tap the gear to open its settings.',
+        say: 'If you own a board, you can change how it works. Tap the gear to open its settings. Each part of it has a page of its own.',
         do: async (t) => {
           await t.tap(t.btn('Board settings'));
-          await t.waitFor(t.btn('Save name'));
+          await t.waitFor(t.btn('History'));
         },
       },
       {
-        say: 'You can rename the board here. Type the new name, and tap Save name.',
+        say: "General is where you rename the board. Type the new name, and tap Save name.",
         do: async (t) => {
+          // A computer opens on General, beside the list; a phone opens on the list.
+          if (t.phone) await t.tap(t.btn('General'));
           await t.replace(t.placeholder('Board name'), 'Weekend School 2026');
           await t.tap(t.btn('Save name'));
         },
       },
       {
-        say: 'Under Columns, tap the pencil next to a column to rename it.',
+        say: 'Then Columns. Tap the pencil next to a column to rename it.',
         do: async (t) => {
+          if (t.phone) await t.tap(t.btn('Back'));
+          await t.tap(t.btn('Columns'));
           await t.tap(t.btn('Rename column To Do'));
           await t.replace(t.label('Rename To Do'), 'Up next');
           await t.tap(t.btn('Save column name'));
@@ -900,19 +904,22 @@ export const TUTORIALS = [
         do: (t) => t.highlight(t.label('Drag to reorder')),
       },
       {
-        say: "Right at the bottom there's the board's history. Everything you just did is already there, with your name on it.",
+        say: "History is the board's history. Everything you just did is already there, with your name on it.",
         do: async (t) => {
-          await t.scrollTo(t.text('History'));
+          if (t.phone) await t.tap(t.btn('Back'));
+          await t.tap(t.btn('History'));
           await t.highlight(t.text(/added the column “Waiting on parents”/, false));
         },
       },
       {
-        say: "People who don't own the board see this screen too. They can look after the board's own labels, and see the members and the history, so they know who to ask, and who changed what.",
+        say: "People who don't own the board see some of these pages too. They can look after the board's own labels, and see the members and the history, so they know who to ask, and who changed what.",
         do: (t) => t.wait(400),
       },
       {
         say: "A column can only be deleted once it's empty, so no cards go missing. You'll find delete on the board itself, right by the column's name.",
         do: async (t) => {
+          // Back to the list first on a phone; a computer's Back leaves settings.
+          if (t.phone) await t.tap(t.btn('Back'));
           await t.tap(t.btn('Back'));
           await t.highlight(t.btn(/^Delete column /));
         },
@@ -925,9 +932,10 @@ export const TUTORIALS = [
     start: (w) => w.board('weekend-school'),
     steps: [
       {
-        say: "Only the people on a board can see it. To add someone, open the board's settings.",
+        say: "Only the people on a board can see it. To add someone, open the board's settings, and then People.",
         do: async (t) => {
           await t.tap(t.btn('Board settings'));
+          await t.tap(t.btn('People'));
           await t.scrollTo(t.btn(/^Add someone/));
         },
       },
@@ -990,10 +998,10 @@ export const TUTORIALS = [
         do: (t) => t.tap(t.btn('Back')),
       },
       {
-        say: "Boards themselves are never deleted. When one's finished, open its settings, scroll down, and tap Archive board.",
+        say: "Boards themselves are never deleted. When one's finished, open its settings, then General, and tap Archive board.",
         do: async (t) => {
           await t.tap(t.btn('Board settings'));
-          await t.scrollTo(t.btn('Archive board'));
+          if (t.phone) await t.tap(t.btn('General'));
           await t.tap(t.btn('Archive board'));
           await t.waitFor(t.text('Boards'));
         },
@@ -1003,7 +1011,7 @@ export const TUTORIALS = [
         do: (t) => t.wait(600),
       },
       {
-        say: 'It waits under Archived, at the bottom of your boards. Open it from there, and use Restore board in its settings to bring it all back.',
+        say: 'It waits under Archived, at the bottom of your boards. Open it from there, and use Restore board in its settings, under General, to bring it all back.',
         do: async (t) => {
           await t.scrollTo(t.btn(/^Archived \(\d+\)$/));
           await t.tap(t.btn(/^Archived \(\d+\)$/));
@@ -1103,10 +1111,11 @@ export const TUTORIALS = [
         do: (t) => t.highlight(t.btn('New label')),
       },
       {
-        say: "In the board's settings, anyone on the board can rename, recolour or delete its own. The institute's have a lock, because they're changed in one place only.",
+        say: "In the board's settings, under Labels, anyone on the board can rename, recolour or delete its own. The institute's have a lock, because they're changed in one place only.",
         do: async (t) => {
           await t.tap(t.link(/^Open board Fundraising 2026/));
           await t.tap(t.btn('Board settings'));
+          await t.tap(t.btn('Labels'));
           await t.scrollTo(t.btn('Rename label Hall booking'));
         },
       },
@@ -1114,14 +1123,13 @@ export const TUTORIALS = [
         say: "That place is for admins: More, then Labels. Whatever you change here changes on every board.",
         do: async (t) => {
           // A phone shows its tab bar on the tab roots alone: back from the
-          // settings, the board and the card this film opened on.
-          if (t.phone) {
-            await t.tap(t.btn('Back'));
-            await t.tap(t.btn('Back'));
-            await t.tap(t.btn('Back'));
-          }
+          // Labels page, the settings, the board and the card this film
+          // opened on.
+          if (t.phone) await t.tap(t.btn('Back'), { times: 4 });
           await t.tap(t.btn('More'));
-          await t.tap(t.btn(/^Labels/));
+          // In the sheet: on a computer, Board settings behind it has a
+          // Labels page of its own.
+          await t.tap(t.page.getByRole('dialog').getByRole('button', { name: /^Labels/ }));
           await t.waitFor(t.btn('Rename label Events'));
         },
       },

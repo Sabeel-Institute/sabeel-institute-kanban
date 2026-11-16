@@ -36,7 +36,9 @@ purpose, it is listed here with what it lacks, and comes off the list when it
 is re-recorded and the set published. Re-record from this list.
 
 **As of v0.19.0** (Faisal, 2026-11-14: shipped with stale films, to start the
-next release sooner). The scripts already carry the new lines (the board film
+next release sooner), and the unreleased work on `main` since: lanes, details,
+templates and the overview change more filmed screens, and the set is
+re-recorded once, after the last of it. The scripts already carry the new lines (the board film
 explains the subtask chips, the clone film the bell); only the recording and
 publishing are missing. The clone film's narration is rendered.
 
@@ -49,12 +51,12 @@ publishing are missing. The clone film's narration is rendered.
 | `moving` | stale | The chips on the board; the board name's font (computer) |
 | `archiving` | stale | The chips on the board; the board name's font (computer) |
 | `bulk` | stale | The chips on the board; the board name's font (computer) |
-| `board-archive` | stale | The chips on the board it starts from; the board name's font (computer) |
-| `labels` | stale | The chips on the board it passes through; the board name's font (computer) |
+| `board-archive` | stale | The chips on the board it starts from; the board name's font (computer); Board settings as a list of pages, Archive under General (script and narration updated, not recorded) |
+| `labels` | stale | The chips on the board it passes through; the board name's font (computer); the board's labels on their own settings page (script and narration updated, not recorded) |
 | `search` | stale | "↳ Subtask" on Design the programme in the results |
 | `comments` | stale, computer only | The comment box's new line height |
-| `board-settings` | stale, computer only | The board name's font |
-| `board-people` | stale, computer only | The board name's font |
+| `board-settings` | stale | Board settings as a list of pages: General, Columns and History each on its own (script and narration updated, not recorded); the board name's font (computer) |
+| `board-people` | stale | The People page of Board settings (script and narration updated, not recorded); the board name's font (computer) |
 | `new-board` | stale, computer only | The new board's name in the app's font |
 | `signing-in`, `attachments`, `subtasks`, `my-work`, `notifications`, `report`, `people`, `roles`, `stats` | current | Nothing: they show none of v0.19.0's changes |
 
@@ -94,8 +96,8 @@ testing, and on iPhones through TestFlight:
 - Comments with @mentions — the picker opens **at the caret**, like code
   completion, rather than above the field — per-card **comment subscriptions**,
   and a tamper-proof per-card activity history.
-- **A board's own history**, at the bottom of Board settings for everyone on
-  the board: who created, renamed, archived or restored it, who added or
+- **A board's own history**, on the History page of Board settings for
+  everyone on the board: who created, renamed, archived or restored it, who added or
   removed whom, who made someone an owner, and what happened to its columns.
   Server-written like a card's. History from before it existed was recovered
   from the daily backups and the member callables' logs; most of those lines
