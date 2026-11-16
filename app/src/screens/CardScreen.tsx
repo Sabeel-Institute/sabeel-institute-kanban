@@ -512,7 +512,7 @@ export function CardScreen({
           }
           emptyHint={
             assignable.length <= 1
-              ? 'Only people added to this board can be assigned. Add them in Board settings → People — and an admin has to approve them in More → People first.'
+              ? 'Only people added to this board can be assigned. The board’s owners add them in its settings, under People, once an admin has approved them in More → People.'
               : undefined
           }
         />
