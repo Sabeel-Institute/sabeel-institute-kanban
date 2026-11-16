@@ -184,12 +184,15 @@ export function changeNoticeText(params: {
   nameFor: (uid: string) => string;
   columnNameFor: (columnId: string) => string;
   cardTitleFor?: (cardId: string) => string;
+  laneNameFor?: (laneId: string) => string | undefined;
 }): string {
   const subject = (uid: string) => (uid === params.recipientUid ? 'you' : params.nameFor(uid));
   const byActor = new Map<string, string[]>();
   for (const e of params.entries) {
     const phrases = byActor.get(e.actorUid) ?? [];
-    phrases.push(describeActivity(e, subject, params.columnNameFor, params.cardTitleFor));
+    phrases.push(
+      describeActivity(e, subject, params.columnNameFor, params.cardTitleFor, params.laneNameFor),
+    );
     byActor.set(e.actorUid, phrases);
   }
 

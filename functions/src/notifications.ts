@@ -13,9 +13,11 @@ import {
   NOTIFICATION_RETENTION_DAYS,
   ORG_TIMEZONE,
   addDays,
+  isFinished,
   notificationText,
   shouldNotify,
   todayInOrgTz,
+  type LaneBoard,
   type NotifyEvent,
   type PushTokenDoc,
 } from '@sabeel/shared';
@@ -495,36 +497,64 @@ export async function runNotificationSweep(
 export const dueSoonReminders = onSchedule(
   { schedule: '0 8 * * *', timeZone: ORG_TIMEZONE, secrets: [sentryDsn, ...PUSH_SECRETS] },
   guardedEvent(async () => {
-    const today = todayInOrgTz();
-    const horizon = addDays(today, 1);
-
-    const due = await db()
-      .collection('cards')
-      .where('archived', '==', false)
-      .where('dueDate', '>=', today)
-      .where('dueDate', '<=', horizon)
-      .get();
-
-    logger.info('due-soon sweep', { today, horizon, cards: due.size });
-
-    for (const card of due.docs) {
-      const assignees = (card.data().assigneeUids as string[]) ?? [];
-      if (assignees.length === 0) continue;
-
-      // boardId is a field now (cards are top-level, so there is no parent board
-      // to read it from).
-      const boardId = (card.data().boardId as string) ?? '';
-      await notify({
-        event: 'dueSoon',
-        recipients: await loadRecipients(assignees),
-        // No human actor: a schedule is not a person, and using a real uid here
-        // would suppress the reminder for whoever that was.
-        actorUid: '__scheduler__',
-        actorName: 'Sabeel Kanban',
-        boardId,
-        cardId: card.id,
-        cardTitle: card.data().title as string | undefined,
-      });
-    }
+    await runDueSoonReminders();
   }),
 );
+
+/**
+ * The reminder sweep, apart from its schedule for the reason
+ * `runNotificationSweep` is: there is no pubsub emulator, so a scheduled
+ * function's body is untestable unless it can be called directly.
+ *
+ * A card in the finished column of a board with lanes is finished, and a
+ * finished card is not due on any screen (`isFinished`), so it is not
+ * reminded about either. Each board is read once a run.
+ */
+export async function runDueSoonReminders(
+  today: string = todayInOrgTz(),
+): Promise<{ cards: number; reminded: number }> {
+  const horizon = addDays(today, 1);
+
+  const due = await db()
+    .collection('cards')
+    .where('archived', '==', false)
+    .where('dueDate', '>=', today)
+    .where('dueDate', '<=', horizon)
+    .get();
+
+  const boards = new Map<string, LaneBoard | null>();
+  async function boardFor(boardId: string): Promise<LaneBoard | null> {
+    if (!boards.has(boardId)) {
+      const snap = await db().doc(`boards/${boardId}`).get();
+      boards.set(boardId, snap.exists ? (snap.data() as LaneBoard) : null);
+    }
+    return boards.get(boardId) ?? null;
+  }
+
+  let reminded = 0;
+  for (const card of due.docs) {
+    const assignees = (card.data().assigneeUids as string[]) ?? [];
+    if (assignees.length === 0) continue;
+
+    // boardId is a field now (cards are top-level, so there is no parent board
+    // to read it from).
+    const boardId = (card.data().boardId as string) ?? '';
+    const board = await boardFor(boardId);
+    if (board && isFinished({ columnId: card.data().columnId as string }, board)) continue;
+    await notify({
+      event: 'dueSoon',
+      recipients: await loadRecipients(assignees),
+      // No human actor: a schedule is not a person, and using a real uid here
+      // would suppress the reminder for whoever that was.
+      actorUid: '__scheduler__',
+      actorName: 'Sabeel Kanban',
+      boardId,
+      cardId: card.id,
+      cardTitle: card.data().title as string | undefined,
+    });
+    reminded += 1;
+  }
+
+  logger.info('due-soon sweep', { today, horizon, cards: due.size, reminded });
+  return { cards: due.size, reminded };
+}

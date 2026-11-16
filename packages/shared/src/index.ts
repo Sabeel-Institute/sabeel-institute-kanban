@@ -9,6 +9,7 @@ export * from './boards';
 export * from './color';
 export * from './due';
 export * from './help';
+export * from './lanes';
 export * from './mentions';
 export * from './migration';
 export * from './notices';

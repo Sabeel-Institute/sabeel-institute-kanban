@@ -21,10 +21,14 @@ const card = (over: Partial<CloneSourceCard> & { id: string }): CloneSourceCard 
   ...over,
 });
 
-function clone(cards: CloneSourceCard[], subscribe = false) {
+function clone(
+  cards: CloneSourceCard[],
+  subscribe = false,
+  lanes: { lanesOn?: boolean; lanes?: { id: string; name: string }[]; doneColumnId?: string } = {},
+) {
   let n = 0;
   return boardClone({
-    source: { description: 'For every program', columns },
+    source: { description: 'For every program', columns, ...lanes },
     cards,
     labels,
     boardId: 'clone',
@@ -154,6 +158,56 @@ describe('boardClone: the cards', () => {
     expect(data.assigneeUids).toEqual([]);
     expect(data.priority).toBe('none');
     expect(data.commentCount).toBe(0);
+  });
+});
+
+describe('boardClone: lanes', () => {
+  const lanes = [
+    { id: 'ln_plan', name: 'Planning' },
+    { id: 'ln_mkt', name: 'Marketing' },
+  ];
+  const onLanes = { lanesOn: true, lanes, doneColumnId: 'c_done' };
+
+  it('carries lanes switched on, in order, under new ids, with the finished column mapped', () => {
+    const { board } = clone([], false, onLanes);
+    expect(board.lanesOn).toBe(true);
+    expect(board.lanes!.map((l) => l.name)).toEqual(['Planning', 'Marketing']);
+    expect(board.lanes!.map((l) => l.id)).not.toContain('ln_plan');
+    expect(board.doneColumnId).toBe(board.columns[1].id);
+  });
+
+  it('puts each card in its lane on the clone', () => {
+    const { board, cards } = clone([card({ id: 'a', laneId: 'ln_mkt' })], false, onLanes);
+    expect(cards[0].data.laneId).toBe(board.lanes![1].id);
+  });
+
+  it('clones a card whose lane is gone, or that has none, with no lane', () => {
+    const { cards } = clone(
+      [card({ id: 'a', laneId: 'ln_gone' }), card({ id: 'b' })],
+      false,
+      onLanes,
+    );
+    expect(cards.map((c) => 'laneId' in c.data)).toEqual([false, false]);
+  });
+
+  it('keeps lanes switched off as they were, lanes and all', () => {
+    const { board, cards } = clone([card({ id: 'a', laneId: 'ln_plan' })], false, {
+      ...onLanes,
+      lanesOn: false,
+    });
+    expect(board.lanesOn).toBeUndefined();
+    expect(board.lanes!.map((l) => l.name)).toEqual(['Planning', 'Marketing']);
+    expect(cards[0].data.laneId).toBe(board.lanes![0].id);
+  });
+
+  it('leaves a finished column that is gone on the source unset', () => {
+    expect(clone([], false, { ...onLanes, doneColumnId: 'c_gone' }).board.doneColumnId).toBeUndefined();
+  });
+
+  it('gives a board without lanes none of the lane fields', () => {
+    const { board, cards } = clone([card({ id: 'a' })]);
+    expect(['lanesOn', 'lanes', 'doneColumnId'].filter((k) => k in board)).toEqual([]);
+    expect('laneId' in cards[0].data).toBe(false);
   });
 });
 

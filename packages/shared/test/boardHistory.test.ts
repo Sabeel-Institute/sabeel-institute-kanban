@@ -127,6 +127,76 @@ describe('diffBoard', () => {
   });
 });
 
+describe('diffBoard on lanes', () => {
+  const lanes = [
+    { id: 'p', name: 'Planning' },
+    { id: 'm', name: 'Marketing' },
+    { id: 's', name: 'Supplies' },
+  ];
+  const withLanes = (over: BoardSnapshot = {}) =>
+    board({ lanesOn: true, lanes, doneColumnId: 'c', ...over });
+
+  it('records lanes turned on, without a second line for the finished column set with it', () => {
+    expect(diffBoard(board(), board({ lanesOn: true, doneColumnId: 'c' }))).toEqual([
+      { type: 'lanesOn' },
+    ]);
+  });
+
+  it('records lanes turned off, and nothing for the lanes it keeps', () => {
+    expect(diffBoard(withLanes(), withLanes({ lanesOn: false }))).toEqual([{ type: 'lanesOff' }]);
+  });
+
+  it('records a lane added, removed or renamed, matched by id', () => {
+    expect(
+      diffBoard(withLanes(), withLanes({ lanes: [...lanes, { id: 'w', name: 'Wrap-up' }] })),
+    ).toEqual([{ type: 'laneAdded', to: 'Wrap-up' }]);
+    expect(diffBoard(withLanes(), withLanes({ lanes: lanes.filter((l) => l.id !== 'm') }))).toEqual([
+      { type: 'laneRemoved', from: 'Marketing' },
+    ]);
+    expect(
+      diffBoard(
+        withLanes(),
+        withLanes({ lanes: lanes.map((l) => (l.id === 'm' ? { ...l, name: 'Outreach' } : l)) }),
+      ),
+    ).toEqual([{ type: 'laneRenamed', from: 'Marketing', to: 'Outreach' }]);
+  });
+
+  it('records a reorder, but not for an add or a removal on its own', () => {
+    const [p, m, s] = lanes;
+    expect(diffBoard(withLanes(), withLanes({ lanes: [m, p, s] }))).toEqual([
+      { type: 'lanesReordered' },
+    ]);
+    expect(diffBoard(withLanes(), withLanes({ lanes: [p, s] }))).toEqual([
+      { type: 'laneRemoved', from: 'Marketing' },
+    ]);
+  });
+
+  it('records the first lane added to a board that never had any', () => {
+    expect(
+      diffBoard(board({ lanesOn: true }), board({ lanesOn: true, lanes: [lanes[0]] })),
+    ).toEqual([{ type: 'laneAdded', to: 'Planning' }]);
+  });
+
+  it('records the finished column by name when it is chosen', () => {
+    expect(diffBoard(withLanes(), withLanes({ doneColumnId: 'b' }))).toEqual([
+      { type: 'finishedColumn', to: 'Doing' },
+    ]);
+  });
+
+  it('records a finished column first set while lanes are on, not one set by turning them on', () => {
+    expect(
+      diffBoard(withLanes({ lanesOn: false, doneColumnId: undefined }), withLanes()),
+    ).toEqual([{ type: 'lanesOn' }]);
+    expect(diffBoard(withLanes({ doneColumnId: undefined }), withLanes())).toEqual([
+      { type: 'finishedColumn', to: 'Done' },
+    ]);
+  });
+
+  it('records nothing for a board without lanes that does not change them', () => {
+    expect(diffBoard(board(), board({ name: 'Fundraising' }))).toEqual([]);
+  });
+});
+
 describe('boardChangeActor', () => {
   it('names the creator of a new board', () => {
     expect(boardChangeActor(null, board())).toBe('sara');
@@ -201,6 +271,28 @@ describe('describeBoardActivity', () => {
       'The column “Doing” was renamed to “Now”',
     );
     expect(describeBoardActivity({ type: 'columnsReordered' })).toBe('The columns were reordered');
+  });
+
+  it('words the lane entries', () => {
+    const by = { actorUid: 'sara', actorName: 'Sara' };
+    expect(describeBoardActivity({ type: 'lanesOn', ...by })).toBe('Sara turned lanes on');
+    expect(describeBoardActivity({ type: 'lanesOff' })).toBe('Lanes were turned off');
+    expect(describeBoardActivity({ type: 'laneAdded', to: 'Marketing', ...by })).toBe(
+      'Sara added the lane “Marketing”',
+    );
+    expect(describeBoardActivity({ type: 'laneRemoved', from: 'Marketing', ...by })).toBe(
+      'Sara removed the lane “Marketing”',
+    );
+    expect(
+      describeBoardActivity({ type: 'laneRenamed', from: 'Marketing', to: 'Outreach', ...by }),
+    ).toBe('Sara renamed the lane “Marketing” to “Outreach”');
+    expect(describeBoardActivity({ type: 'lanesReordered', ...by })).toBe('Sara reordered the lanes');
+    expect(describeBoardActivity({ type: 'finishedColumn', to: 'Done', ...by })).toBe(
+      'Sara set the finished column to “Done”',
+    );
+    for (const t of ['lanesOn', 'laneAdded', 'finishedColumn']) {
+      expect(isKnownBoardActivityType(t)).toBe(true);
+    }
   });
 
   it('falls back to Someone for a recorded person with no name', () => {

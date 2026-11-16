@@ -368,7 +368,8 @@ service cloud.firestore {
         && stampsChange()
         && incoming().keys().hasOnly(['name', 'description', 'archived', 'columns',
             'columnIds', 'memberUids', 'memberProfiles', 'boardOwnerUids',
-            'activeCardCount', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+            'activeCardCount', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy',
+            'lanesOn', 'lanes', 'doneColumnId'])
         && incoming().get('boardOwnerUids', []) is list
         && incoming().createdBy == existing().createdBy
         // History, not state. Neither is the client's to rewrite.
@@ -382,6 +383,14 @@ service cloud.firestore {
         && incoming().columnIds is list
         && (!('archived' in incoming()) || incoming().archived is bool)
         && (!('memberProfiles' in incoming()) || incoming().memberProfiles is map)
+        // Lanes: shape only. Rules cannot look inside a list of maps, so a
+        // lane's name and its uniqueness are the app's (LANE_NAME_MAX in
+        // @sabeel/shared), as a board's own labels are. 12 is LANES_MAX,
+        // held to it by functions/test/unit/ruleLimits.test.ts.
+        && (!('lanesOn' in incoming()) || incoming().lanesOn is bool)
+        && (!('lanes' in incoming()) || (incoming().lanes is list && incoming().lanes.size() <= 12))
+        && (!('doneColumnId' in incoming())
+            || (incoming().doneColumnId is string && incoming().doneColumnId.size() <= 200))
         && incoming().name is string
         && incoming().name.size() > 0
         && incoming().name.size() <= 120;
@@ -627,7 +636,7 @@ service cloud.firestore {
             'boardId', 'title', 'description', 'columnId', 'rank', 'assigneeUids',
             'subscriberUids',
             'dueDate', 'priority', 'labelIds', 'archived', 'archivedAt',
-            'commentCount', 'attachmentCount', 'parentId', 'createdAt',
+            'commentCount', 'attachmentCount', 'parentId', 'laneId', 'createdAt',
             'createdBy', 'updatedAt', 'updatedBy', 'lastActivityAt', 'sourceId',
           ])
           && newCard().boardId is string
@@ -654,6 +663,12 @@ service cloud.firestore {
           // renders as nothing. See CardDoc.parentId.
           && (!('parentId' in newCard())
               || (newCard().parentId is string && newCard().parentId.size() <= 200))
+          // The card's lane. Shape only, and never required, on purpose: a lane
+          // id that matches nothing is drawn under No lane, which loses
+          // nothing, so it needs no lookup and no `laneIds` mirror, and an app
+          // too old to know about lanes keeps adding cards. See CardDoc.laneId.
+          && (!('laneId' in newCard())
+              || (newCard().laneId is string && newCard().laneId.size() <= 200))
           && columnExists()
           && assigneesAreMembers()
           && subscribersAreMembers();

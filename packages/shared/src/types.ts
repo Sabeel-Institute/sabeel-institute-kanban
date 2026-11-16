@@ -63,6 +63,21 @@ export interface BoardColumn {
   name: string;
 }
 
+/**
+ * A lane: a second way to divide a board, running down it where columns run
+ * across. A card sits in one column and one lane (`CardDoc.laneId`).
+ *
+ * Unlike a column, a lane is NOT checked by the rules: there is no `laneIds`
+ * mirror, and a card naming a lane that is gone is simply drawn under "No
+ * lane" (`laneOf` in lanes.ts). A card in a column that does not exist would
+ * vanish from the board, which is why columns are checked; a stale lane loses
+ * nothing. It is the same choice as `parentId`.
+ */
+export interface BoardLane {
+  id: string;
+  name: string;
+}
+
 // ---- Labels ----------------------------------------------------------------
 
 /**
@@ -159,6 +174,22 @@ export interface BoardDoc {
    */
   updatedAt?: number;
   updatedBy?: string;
+  /**
+   * Whether the board is divided into lanes. Absent means off, and a board
+   * that never turns them on is exactly the board it was before lanes
+   * existed. Turning them off keeps `lanes` and every card's lane, so turning
+   * them on again restores the board. Read through `lanesLive`.
+   */
+  lanesOn?: boolean;
+  /** The lanes, in the order the board shows them. Kept while `lanesOn` is off. */
+  lanes?: BoardLane[];
+  /**
+   * The column whose cards count as finished: a lane's badge counts them, and
+   * they stop showing as late. Meaningful only while lanes are live, and read
+   * only through `finishedColumnId`, which falls back to the last column when
+   * this names one that is gone.
+   */
+  doneColumnId?: string;
 }
 
 // ---- Cards -----------------------------------------------------------------
@@ -246,6 +277,13 @@ export interface CardDoc {
    * move clears it unless the parent is travelling too.
    */
   parentId?: string;
+  /**
+   * The card's lane on its board, an id from `BoardDoc.lanes`. Absent means
+   * "No lane". Shape-checked by the rules and nothing more: a lane id that
+   * matches nothing, which an old app moving a card between boards can leave,
+   * is drawn under No lane. A cross-board move or copy clears it.
+   */
+  laneId?: string;
   createdAt: number;
   createdBy: string;
   updatedAt: number;
@@ -323,7 +361,10 @@ export type ActivityType =
   /** A file was attached. `to` carries its name. */
   | 'attached'
   /** A file was removed. `from` carries its name. */
-  | 'detached';
+  | 'detached'
+  /** The card changed lane on its board. `from`/`to` carry lane ids; `to`
+   *  absent is No lane. */
+  | 'lane';
 
 /**
  * One change to a board itself — its name, archiving, who is on it, who owns
@@ -347,7 +388,18 @@ export type BoardActivityType =
   | 'columnRemoved'
   /** `from`/`to` carry the old and new name. */
   | 'columnRenamed'
-  | 'columnsReordered';
+  | 'columnsReordered'
+  | 'lanesOn'
+  | 'lanesOff'
+  /** `to` carries the lane's name. */
+  | 'laneAdded'
+  /** `from` carries the lane's name. */
+  | 'laneRemoved'
+  /** `from`/`to` carry the old and new name. */
+  | 'laneRenamed'
+  | 'lanesReordered'
+  /** `to` carries the name of the column finished cards are in. */
+  | 'finishedColumn';
 
 /**
  * An entry in a board's history, at `boards/{boardId}/activity/{id}`.

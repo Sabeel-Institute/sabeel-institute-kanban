@@ -270,6 +270,35 @@ describe('cloneBoard: the clone', () => {
   });
 });
 
+describe('cloneBoard: lanes', () => {
+  it('carries the lanes, the finished column and each card’s lane', async () => {
+    await adminDb().doc('boards/cb_lanes').set(
+      board({
+        lanesOn: true,
+        lanes: [
+          { id: 'ln_plan', name: 'Planning' },
+          { id: 'ln_mkt', name: 'Marketing' },
+        ],
+        doneColumnId: 'c_run',
+      }),
+    );
+    await adminDb().doc('cards/cb_lane_card').set(card('cb_lanes', { laneId: 'ln_mkt' }));
+    await adminDb().doc('cards/cb_nolane_card').set(card('cb_lanes', { title: 'No lane yet', rank: 'n' }));
+
+    const id = newId();
+    const res = await callFunction('cloneBoard', { boardId: 'cb_lanes', name: 'Lanes Program', cloneId: id }, await idTokenFor(ORG));
+    expect(res.body.error).toBeUndefined();
+
+    const clone = (await adminDb().doc(`boards/${id}`).get()).data()!;
+    expect(clone.lanesOn).toBe(true);
+    expect(clone.lanes.map((l: { name: string }) => l.name)).toEqual(['Planning', 'Marketing']);
+    expect(clone.doneColumnId).toBe(clone.columns[1].id);
+    const cards = (await adminDb().collection('cards').where('boardId', '==', id).get()).docs.map((d) => d.data());
+    expect(cards.find((c) => c.title === 'A task')?.laneId).toBe(clone.lanes[1].id);
+    expect('laneId' in (cards.find((c) => c.title === 'No lane yet') ?? {})).toBe(false);
+  });
+});
+
 /**
  * Last: their cards fire the card triggers, which the emulator runs one at a
  * time. Stamped SYSTEM_ACTOR and assigned to nobody, so those return at once,

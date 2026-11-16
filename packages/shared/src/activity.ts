@@ -46,6 +46,13 @@ export function diffCard(
     out.push({ type: 'moved', from: before.columnId, to: after.columnId });
   }
 
+  // A lane change, logged like a column move (Faisal, 2026-11-15). Not on a
+  // move to another board: lane ids belong to one board, the move clears the
+  // lane, and "moved it to Done" already says what happened.
+  if (before.laneId !== after.laneId && before.boardId === after.boardId) {
+    out.push({ type: 'lane', from: before.laneId, to: after.laneId });
+  }
+
   if (Boolean(before.archived) !== Boolean(after.archived)) {
     out.push({
       type: 'archived',
@@ -120,6 +127,7 @@ const KNOWN_ACTIVITY_TYPES: Record<ActivityType, true> = {
   subtask: true,
   attached: true,
   detached: true,
+  lane: true,
 };
 
 /**
@@ -172,6 +180,9 @@ export function describeActivity(
    *  id rather than its title, so a rename never leaves stale history — the
    *  same reason `moved` stores a column id. */
   cardTitleFor: (cardId: string) => string = () => 'another card',
+  /** Resolves a lane id to its name on the card's board, or undefined for a
+   *  lane since removed. Stored as an id for the reason `moved` is. */
+  laneNameFor: (laneId: string) => string | undefined = () => undefined,
 ): string {
   switch (entry.type) {
     case 'created':
@@ -207,5 +218,10 @@ export function describeActivity(
       return `attached ${entry.to ?? 'a file'}`;
     case 'detached':
       return `removed ${entry.from ?? 'a file'}`;
+    case 'lane': {
+      if (!entry.to) return 'took it out of its lane';
+      const name = laneNameFor(entry.to);
+      return name ? `moved it to the ${name} lane` : 'moved it to another lane';
+    }
   }
 }

@@ -137,3 +137,20 @@ describe('describeDue', () => {
     expect(describeDue('2026-08-03', '2026-07-31')).toBe('In 3 days');
   });
 });
+
+describe('a finished card’s date', () => {
+  it('is the date itself once past, never "late"', () => {
+    expect(describeDue('2026-11-03', '2026-11-15', true)).toBe('3 Nov');
+    expect(describeDue('2025-12-30', '2026-11-15', true)).toBe('30 Dec 2025');
+    expect(describeDue('2026-11-14', '2026-11-15', true)).toBe('14 Nov');
+  });
+
+  it('reads as any other card’s from today on', () => {
+    expect(describeDue('2026-11-15', '2026-11-15', true)).toBe('Today');
+    expect(describeDue('2026-11-18', '2026-11-15', true)).toBe('In 3 days');
+  });
+
+  it('still says late for a card that is not finished', () => {
+    expect(describeDue('2026-11-03', '2026-11-15')).toBe('12 days late');
+  });
+});

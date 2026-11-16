@@ -14,6 +14,7 @@ import {
   shouldNotify,
   watchKey,
   type BoardColumn,
+  type BoardLane,
   type NoticeEntry,
 } from '@sabeel/shared';
 import { guardedEvent, reportError, sentryDsn } from './sentry';
@@ -136,6 +137,8 @@ async function noticesFor(cardId: string, entries: NoticeEntry[]): Promise<Notic
   const memberUids = (board.memberUids as string[]) ?? [];
   const columns = (board.columns as BoardColumn[]) ?? [];
   const columnNameFor = (id: string) => columns.find((c) => c.id === id)?.name ?? 'another column';
+  const lanes = (board.lanes as BoardLane[] | undefined) ?? [];
+  const laneNameFor = (id: string) => lanes.find((l) => l.id === id)?.name;
 
   const followers = noticeFollowers({
     entries,
@@ -201,6 +204,7 @@ async function noticesFor(cardId: string, entries: NoticeEntry[]): Promise<Notic
           nameFor,
           columnNameFor,
           cardTitleFor,
+          laneNameFor,
         }),
         actorUid,
         boardId,

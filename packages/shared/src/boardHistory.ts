@@ -98,6 +98,38 @@ export function diffBoard(
   const keptNow = (after.columns ?? []).map((c) => c.id).filter((id) => was.has(id));
   if (kept.some((id, i) => keptNow[i] !== id)) out.push({ type: 'columnsReordered' });
 
+  const turnedOn = !before.lanesOn && Boolean(after.lanesOn);
+  if (Boolean(before.lanesOn) !== Boolean(after.lanesOn)) {
+    out.push({ type: after.lanesOn ? 'lanesOn' : 'lanesOff' });
+  }
+
+  // Lanes are matched by id, exactly as columns are.
+  const wasLane = new Map((before.lanes ?? []).map((l) => [l.id, l.name]));
+  const nowLane = new Map((after.lanes ?? []).map((l) => [l.id, l.name]));
+  for (const [id, name] of nowLane) {
+    if (!wasLane.has(id)) out.push({ type: 'laneAdded', to: name });
+  }
+  for (const [id, name] of wasLane) {
+    if (!nowLane.has(id)) out.push({ type: 'laneRemoved', from: name });
+  }
+  for (const [id, name] of nowLane) {
+    const old = wasLane.get(id);
+    if (old !== undefined && old !== name) out.push({ type: 'laneRenamed', from: old, to: name });
+  }
+  const keptLanes = (before.lanes ?? []).map((l) => l.id).filter((id) => nowLane.has(id));
+  const keptLanesNow = (after.lanes ?? []).map((l) => l.id).filter((id) => wasLane.has(id));
+  if (keptLanes.some((id, i) => keptLanesNow[i] !== id)) out.push({ type: 'lanesReordered' });
+
+  // The finished column, by name, since the column may later be removed. Its
+  // first setting rides on turning lanes on and says nothing more than that.
+  if (
+    after.doneColumnId !== undefined &&
+    before.doneColumnId !== after.doneColumnId &&
+    !(turnedOn && before.doneColumnId === undefined)
+  ) {
+    out.push({ type: 'finishedColumn', to: now.get(after.doneColumnId) });
+  }
+
   return out;
 }
 
@@ -139,6 +171,13 @@ const KNOWN_BOARD_ACTIVITY_TYPES: Record<BoardActivityType, true> = {
   columnRemoved: true,
   columnRenamed: true,
   columnsReordered: true,
+  lanesOn: true,
+  lanesOff: true,
+  laneAdded: true,
+  laneRemoved: true,
+  laneRenamed: true,
+  lanesReordered: true,
+  finishedColumn: true,
 };
 
 export function isKnownBoardActivityType(value: unknown): value is BoardActivityType {
@@ -204,5 +243,27 @@ export function describeBoardActivity(e: Describable): string {
         : `The column ${quoted(e.from)} was renamed to ${quoted(e.to)}`;
     case 'columnsReordered':
       return known ? `${actor} reordered the columns` : 'The columns were reordered';
+    case 'lanesOn':
+      return known ? `${actor} turned lanes on` : 'Lanes were turned on';
+    case 'lanesOff':
+      return known ? `${actor} turned lanes off` : 'Lanes were turned off';
+    case 'laneAdded':
+      return known
+        ? `${actor} added the lane ${quoted(e.to)}`
+        : `The lane ${quoted(e.to)} was added`;
+    case 'laneRemoved':
+      return known
+        ? `${actor} removed the lane ${quoted(e.from)}`
+        : `The lane ${quoted(e.from)} was removed`;
+    case 'laneRenamed':
+      return known
+        ? `${actor} renamed the lane ${quoted(e.from)} to ${quoted(e.to)}`
+        : `The lane ${quoted(e.from)} was renamed to ${quoted(e.to)}`;
+    case 'lanesReordered':
+      return known ? `${actor} reordered the lanes` : 'The lanes were reordered';
+    case 'finishedColumn':
+      return known
+        ? `${actor} set the finished column to ${quoted(e.to)}`
+        : `The finished column was set to ${quoted(e.to)}`;
   }
 }
