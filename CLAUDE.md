@@ -883,12 +883,14 @@ factory rather than being silently dropped.
   release pull request and the GitHub release take their title and text from
   it) and the only record of why.
 - **The user manual is part of the app.** A change to any screen means
-  `docs/USER-MANUAL.md`, then `node scripts/manual-shots.mjs` for its images, then
-  `npx sabeel-ci render-manual` for the PDF (needs `uv` and `google-chrome`) —
-  all three, same batch. Add new
-  screens to the generator; an image with no generator goes stale unnoticed.
-  User-visible changes ship with their documentation in the same batch as the
-  code — never let the manual lag a release.
+  `docs/USER-MANUAL.md` in the same change, and a generator for any new picture
+  in `scripts/manual-shots.mjs`; an image with no generator goes stale
+  unnoticed. The pictures (`node scripts/manual-shots.mjs`) and the PDF (`npx
+  sabeel-ci render-manual`, needs `uv` and `google-chrome`) are taken ONCE per
+  release, at the end, right before it goes to the stores (Faisal,
+  2026-11-16): retaking them per change is wasted while later changes move
+  the same screens. `docs/PHASE_STATUS.md` § Before the next store release
+  lists what is owed. Never let the manual lag a release.
 - **So are the help films** (More → Help): one short narrated film per thing
   people do, in a phone cut and a computer cut, listed once in `HELP_VIDEOS`
   (`@sabeel/shared`) and scripted in `scripts/tutorials/tutorials.mjs`. A
@@ -896,10 +898,12 @@ factory rather than being silently dropped.
   the set (`docs/DEV-TOOLING.md`, "The help films"). The films live on their
   own public Hosting site, never in git, and show the guide world only — no
   real board, card or person. Their narration is a colleague talking you
-  through the screen, never labels read out. A film shipped stale on purpose
-  is listed in `docs/PHASE_STATUS.md` § Help films that lag the app, with what
-  it lacks: re-record from that list, add to it when a release leaves another
-  behind, and take each film off once the set is published with it.
+  through the screen, never labels read out. Films are recorded ONCE per
+  release, at the end, right before it goes to the stores, never per change
+  (Faisal, 2026-11-16). Until then a change lists each film whose screen it
+  moves, and each film it needs, in `docs/PHASE_STATUS.md` § Before the next
+  store release; re-record from that list, and take each film off once the set
+  is published with it.
 - Before ANY significant install (global/system/major framework), ask first;
   routine project-local npm deps of the locked stack are fine.
 - All repo artifacts (docs, plans, protocols) live in this repo.
