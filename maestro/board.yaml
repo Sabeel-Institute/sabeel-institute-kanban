@@ -146,23 +146,25 @@ name: Board, card, rich text and gestures
 
 # Board settings is a list of pages: each row a name, a line of what it holds
 # and a chevron, laid out by Yoga. A page replaces the list, and Back returns
-# to the list before it leaves settings.
+# to the list before it leaves settings. Waited on by the names a row and a
+# page's controls carry: on iOS a row is one element named by its page, and
+# the line under it is its hint, which Maestro does not read.
 - extendedWaitUntil:
     visible: "Tap a card to open it\\.[\\s\\S]*"
     timeout: 15000
 - tapOn: "Board settings"
 - extendedWaitUntil:
-    visible: "Who changed what"
+    visible: "History"
     timeout: 15000
 - takeScreenshot: 06-settings
 - tapOn: "Columns"
 - extendedWaitUntil:
-    visible: "New column name"
+    visible: "Add column"
     timeout: 15000
 - takeScreenshot: 07-settings-columns
 - tapOn: "Back"
 - extendedWaitUntil:
-    visible: "Who changed what"
+    visible: "History"
     timeout: 15000
 - tapOn: "Back"
 

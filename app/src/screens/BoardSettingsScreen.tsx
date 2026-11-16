@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { canEditBoardLabels, canManageBoard } from '@sabeel/shared';
 import { useBoard, type BoardListItem } from '../boards';
 import {
@@ -230,6 +230,16 @@ function PageList({
             key={p}
             accessibilityRole="button"
             accessibilityLabel={PAGE_TITLES[p]}
+            /**
+             * The summary as a HINT on a phone. The row is one element named by
+             * its page, and on iOS such an element hides the text inside it, so
+             * VoiceOver said "Columns" and never "9 columns" (seen by the
+             * iPhone simulator's Maestro run, which could not find it either).
+             * A hint is read after the name, on iOS and Android alike.
+             * react-native-web has no hint and forwards the prop as an unknown
+             * DOM attribute, so it is left off there.
+             */
+            accessibilityHint={Platform.OS === 'web' ? undefined : detail}
             accessibilityState={wide ? { selected: on } : undefined}
             /**
              * `aria-current` as well: react-native-web maps
