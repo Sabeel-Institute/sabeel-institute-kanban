@@ -29,7 +29,8 @@ const ORDER = [
   'rules', 'boards', 'boards-clone', 'mywork', 'search', 'alerts', 'stats', 'people', 'labels', 'more', 'report',
   'board', 'board-owner', 'board-member', 'roster-owner', 'roster-member',
   'board-longname', 'board-empty', 'bulk', 'card', 'card-editing', 'card-comment',
-  'settings', 'archive',
+  'settings', 'settings-general', 'settings-columns', 'settings-people', 'settings-labels',
+  'settings-history', 'archive',
 ];
 
 /**
@@ -68,12 +69,17 @@ const BLURB = {
   'card-comment': 'The comment composer in use, with Bold active.',
   'board-owner': 'The same board as an OWNER of it — delete-column and Board settings present, like an admin. Ownership is per board and has nothing to do with the org role.',
   'board-member': 'The same board as a MEMBER who does not own it — no delete-column, and the settings icon becomes Members and labels. The archive stays, because members archive and so must un-archive.',
-  'roster-owner': 'The member list as an OWNER: a toggle per person, and the creator\u2019s row locked, because only an admin may take ownership off whoever made the board.',
-  'roster-member': 'The same list as a MEMBER \u2014 read-only, owners marked. It answers \u201cwho do I ask to add someone?\u201d, which used to be a question you could only put to an admin. Reachable by nobody in the admin tour, since an admin owns every board.',
+  'roster-owner': 'Settings \u2192 People as an OWNER: a toggle per person, and the creator\u2019s row locked, because only an admin may take ownership off whoever made the board.',
+  'roster-member': 'Settings \u2192 People as a MEMBER \u2014 read-only, owners marked. It answers \u201cwho do I ask to add someone?\u201d. Reachable by nobody in the admin tour, since an admin owns every board.',
   bulk: 'Selection mode, with the action bar floating over the board. Six 44px actions do not fit one row at 320px, so it wraps rather than pushing the page sideways.',
   'board-empty': 'A board with no columns — reachable, since the last empty column can be deleted. Its board actions must survive having no column footer to live in.',
   'board-longname': 'A column name too long to centre — the name and its pencil slide left rather than truncating early. Narrow layouts only; the pager does not exist on wide.',
-  settings: 'Board settings — this board\u2019s owners and admins only.',
+  settings: 'Board settings as it opens: the list of pages on a narrow screen; on a wide one the list down the side with General beside it.',
+  'settings-general': 'Settings \u2192 General: the board\u2019s name, and Archive. Owners and admins only.',
+  'settings-columns': 'Settings \u2192 Columns: rename in place, drag to reorder, add at the foot. Owners and admins only.',
+  'settings-people': 'Settings \u2192 People: the members, an Owner switch on each row, and the add-person icon on the heading.',
+  'settings-labels': 'Settings \u2192 Labels: the institute\u2019s locked, then the board\u2019s own with their controls. Everyone on the board.',
+  'settings-history': 'Settings \u2192 History: what has happened to the board, newest first. Everyone on the board.',
   'boards-clone': 'Cloning a board: the sheet a long-press (or a right-click) on its row opens. Organizers and admins only, since a clone is a new board.',
   archive: 'Archived cards, most recently archived first.',
 };

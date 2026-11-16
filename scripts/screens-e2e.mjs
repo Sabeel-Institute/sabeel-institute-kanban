@@ -528,7 +528,7 @@ async function rulesScreen(page, tag, width) {
 }
 
 // ---- The tour --------------------------------------------------------------
-const SCREENS = 24;
+const SCREENS = 29;
 
 async function tour(page, tag, width) {
   /**
@@ -947,6 +947,17 @@ async function tour(page, tag, width) {
     await page.waitForTimeout(400);
   });
 
+  /**
+   * BOARD SETTINGS IS A LIST OF PAGES, and every page is its own layout.
+   *
+   * A phone opens on the list alone and a page replaces it; a wide screen
+   * opens on General with the list down the side. So the first visit is a
+   * different screen on each side of the breakpoint, and that is asserted, as
+   * is the way back: a page returns to the list on a phone.
+   */
+  const wide = width >= WIDE_BREAKPOINT;
+  const SETTINGS_PAGES = ['General', 'Columns', 'People', 'Labels', 'History'];
+  const pageRow = (name) => page.getByRole('button', { name, exact: true }).first();
   await visit('settings', async () => {
     // Close the sheet left open by `card-sheet` first — a modal swallows the
     // taps this navigation needs. Same shape as `card-comment` closing the
@@ -956,7 +967,39 @@ async function tour(page, tag, width) {
     await page.getByRole('button', { name: 'Back' }).first().click();
     await page.waitForTimeout(800);
     await page.getByRole('button', { name: 'Board settings' }).click();
+    await pageRow('History').waitFor({ timeout: 15000 });
   });
+  {
+    const opened = await page.evaluate(() => {
+      const shown = (sel) =>
+        [...document.querySelectorAll(sel)].filter((e) => e.getBoundingClientRect().width > 2);
+      return {
+        rows: shown('[role="button"]').map((e) => e.getAttribute('aria-label') || ''),
+        // General's own control: there on a wide screen, not on a phone's list.
+        general: shown('[aria-label="Save name"]').length > 0,
+      };
+    });
+    const listed = SETTINGS_PAGES.every((n) => opened.rows.includes(n));
+    check(
+      `${tag} / settings opens on ${wide ? 'General, with the pages beside it' : 'the list of pages'}`,
+      listed && opened.general === wide,
+      JSON.stringify(opened).slice(0, 160),
+    );
+  }
+  for (const name of SETTINGS_PAGES) {
+    await visit(`settings-${name.toLowerCase()}`, async () => {
+      await pageRow(name).click();
+      await page.waitForTimeout(600);
+    });
+    if (!wide) {
+      await page.getByRole('button', { name: 'Back' }).first().click();
+      await page.waitForTimeout(500);
+      check(
+        `${tag} / Back from ${name} returns to the list`,
+        await pageRow(SETTINGS_PAGES[0]).isVisible().catch(() => false),
+      );
+    }
+  }
   await visit('archive', async () => {
     await page.getByRole('button', { name: 'Back' }).first().click();
     await page.waitForTimeout(800);
@@ -998,6 +1041,7 @@ async function tour(page, tag, width) {
     );
     // …and the roster offers the switch that repairs it.
     await page.getByRole('button', { name: 'Board settings' }).click();
+    await page.getByRole('button', { name: 'People', exact: true }).click();
     const repairable = await page
       .getByRole('switch', { name: /^Owner of this board: Omar/ })
       .first()
@@ -1131,7 +1175,35 @@ async function tour(page, tag, width) {
       // The roster ITSELF, at phone width, on both sides. It is a screen the
       // admin tour can never reach: an admin always owns every board, so the
       // read-only version renders for nobody who is looking.
+      //
+      // Settings opens on its list of pages, which is the first thing that
+      // differs: its title, and which pages it offers. An owner gets every
+      // page; anyone else gets People, Labels and History and nothing drawn
+      // disabled.
       await rp.getByRole('button', { name: wants.settings ? 'Board settings' : 'Members and labels' }).click();
+      await rp.getByRole('button', { name: 'History', exact: true }).waitFor({ timeout: 20000 });
+      const list = await rp.evaluate(() => {
+        const nm = (e) => (e.getAttribute('aria-label') || '').trim();
+        const rows = [...document.querySelectorAll('[role="button"]')]
+          .filter((e) => e.getBoundingClientRect().width > 2)
+          .map(nm)
+          .filter((n) => ['General', 'Columns', 'People', 'Labels', 'History'].includes(n));
+        return {
+          title: (document.body.textContent || '').includes('Board settings') ? 'settings' : 'members',
+          rows,
+        };
+      });
+      const wantRows = wants.settings
+        ? ['General', 'Columns', 'People', 'Labels', 'History']
+        : ['People', 'Labels', 'History'];
+      check(
+        `${tag} / settings as ${role === 'owner' ? 'an owner' : 'a member'} lists its pages`,
+        list.title === (wants.settings ? 'settings' : 'members') &&
+          JSON.stringify(list.rows) === JSON.stringify(wantRows),
+        JSON.stringify(list),
+      );
+
+      await rp.getByRole('button', { name: 'People', exact: true }).click();
       await rp.getByText('Members (3)').first().waitFor({ timeout: 20000 });
       const roster = await rp.evaluate(() => {
         const nm = (e) => (e.getAttribute('aria-label') || '').trim();
@@ -1139,15 +1211,34 @@ async function tour(page, tag, width) {
           [...document.querySelectorAll(sel)].filter((e) => e.getBoundingClientRect().width > 2);
         const creator = vis('[role="switch"]').find((e) => /: Faisal$/.test(nm(e)));
         return {
-          title: (document.body.textContent || '').includes('Board settings')
-            ? 'settings'
-            : 'members',
           toggles: vis('[role="switch"]').filter((e) => nm(e).startsWith('Owner of this board')).length,
           creatorLocked: creator ? creator.getAttribute('aria-disabled') === 'true' : null,
           ownerHints: (document.body.textContent || '').split('Owner').length - 1,
-          // The board's own label carries its three controls for anyone on the
-          // board. An institute label carries NONE on a board, for anyone: it is
-          // a locked row, and its controls live in More → Labels alone.
+          bleed: document.documentElement.scrollWidth - window.innerWidth,
+        };
+      });
+      // An owner gets a toggle per member and cannot demote the creator; a
+      // member gets no toggle at all and reads who to ask instead.
+      const rosterOk = wants.settings
+        ? roster.toggles === 3 && roster.creatorLocked === true
+        : roster.toggles === 0 && roster.ownerHints >= 2;
+      check(
+        `${tag} / the roster as ${role === 'owner' ? 'an owner' : 'a member'}`,
+        rosterOk && roster.bleed <= 1,
+        JSON.stringify(roster),
+      );
+      await rp.screenshot({ path: join(SHOTS, `${tag}-roster-${role}.png`), fullPage: true });
+
+      // BOTH may change and add the board's own labels, and NEITHER sees a
+      // control on an institute label, which is locked here.
+      await rp.getByRole('button', { name: 'Back' }).first().click();
+      await rp.getByRole('button', { name: 'Labels', exact: true }).click();
+      await rp.getByRole('button', { name: 'Add label' }).waitFor({ timeout: 20000 });
+      const boardLabels = await rp.evaluate(() => {
+        const nm = (e) => (e.getAttribute('aria-label') || '').trim();
+        const vis = (sel) =>
+          [...document.querySelectorAll(sel)].filter((e) => e.getBoundingClientRect().width > 2);
+        return {
           boardLabelEdits: vis('[role="button"]').filter((e) =>
             /^(Rename label|Delete label|Change colour of) .*much longer answer$/.test(nm(e)),
           ).length,
@@ -1159,30 +1250,15 @@ async function tour(page, tag, width) {
           bleed: document.documentElement.scrollWidth - window.innerWidth,
         };
       });
-      // An owner gets a toggle per member and cannot demote the creator; a
-      // member gets no toggle at all and reads who to ask instead. BOTH may
-      // change and add the board's own labels, and NEITHER sees a control on an
-      // institute label, which is locked here.
-      const labelsOk =
-        roster.boardLabelEdits === 3 &&
-        roster.instituteLabelEdits === 0 &&
-        roster.locked === 3 &&
-        roster.canAddLabel;
-      const rosterOk = wants.settings
-        ? roster.title === 'settings' &&
-          roster.toggles === 3 &&
-          roster.creatorLocked === true &&
-          labelsOk
-        : roster.title === 'members' &&
-          roster.toggles === 0 &&
-          roster.ownerHints >= 2 &&
-          labelsOk;
       check(
-        `${tag} / the roster as ${role === 'owner' ? 'an owner' : 'a member'}`,
-        rosterOk && roster.bleed <= 1,
-        JSON.stringify(roster),
+        `${tag} / the board's labels as ${role === 'owner' ? 'an owner' : 'a member'}`,
+        boardLabels.boardLabelEdits === 3 &&
+          boardLabels.instituteLabelEdits === 0 &&
+          boardLabels.locked === 3 &&
+          boardLabels.canAddLabel &&
+          boardLabels.bleed <= 1,
+        JSON.stringify(boardLabels),
       );
-      await rp.screenshot({ path: join(SHOTS, `${tag}-roster-${role}.png`), fullPage: true });
 
       /**
        * THE ARCHIVE, where permanent deletion lives for anyone who never opens a
@@ -1193,6 +1269,8 @@ async function tour(page, tag, width) {
        * `sw_archived` is seeded on this board, so the row exists for both actors
        * and the difference is the bin, not the emptiness.
        */
+      // Back to the list, then to the board.
+      await rp.getByRole('button', { name: 'Back' }).first().click();
       await rp.getByRole('button', { name: 'Back' }).first().click();
       await rp.getByRole('button', { name: 'Archived cards' }).click();
       await rp.getByText('An archived card').first().waitFor({ timeout: 25000 });

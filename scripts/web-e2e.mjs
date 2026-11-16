@@ -520,13 +520,34 @@ try {
   await admin.getByRole('button', { name: 'Board settings' }).waitFor({ timeout: 15000 });
 
   // Board settings: add a column, add a label, add a member.
+  //
+  // A list of pages. At this width the list runs down the side and General is
+  // open beside it; a row swaps its page in, and Back leaves settings.
   await admin.getByRole('button', { name: 'Board settings' }).click();
   await admin.getByText('Board settings').waitFor({ timeout: 15000 });
+  check(
+    'board settings opens on General, with the pages down the side',
+    (await admin
+      .getByRole('button', { name: 'Save name' })
+      .waitFor({ timeout: 15000 })
+      .then(() => true, () => false)) &&
+      (await admin.getByRole('button', { name: 'General', exact: true }).getAttribute('aria-current')) === 'page',
+  );
+  const settingsPage = async (who, name) => {
+    await who.getByRole('button', { name, exact: true }).click();
+  };
+  await settingsPage(admin, 'Columns');
+  check(
+    'a page chosen from the side is marked as the open one',
+    (await admin.getByRole('button', { name: 'Columns', exact: true }).getAttribute('aria-current')) === 'page' &&
+      (await admin.getByRole('button', { name: 'General', exact: true }).getAttribute('aria-current')) === null,
+  );
   await admin.getByPlaceholder('New column name').fill('Blocked');
   await admin.getByRole('button', { name: 'Add column' }).click();
   await admin.getByText('Blocked').first().waitFor({ timeout: 15000 });
   check('a manager can add a column', true);
 
+  await settingsPage(admin, 'Labels');
   await admin.getByPlaceholder('New label name').fill('urgent');
   await admin.getByRole('button', { name: 'Add label' }).click();
   await admin.getByText('urgent').first().waitFor({ timeout: 15000 });
@@ -563,6 +584,7 @@ try {
   // Sara is active by now, so she should be addable to the board.
   // "Add someone" is the section-heading ICON (its accessible name carries the
   // count); the picker below only appears once it is pressed.
+  await settingsPage(admin, 'People');
   await admin.getByRole('button', { name: /^Add someone/ }).click();
   await admin.getByText('Add someone').waitFor({ timeout: 15000 });
   // Each candidate is one pressable row named "Add <person> to this board" —
@@ -616,6 +638,7 @@ try {
   );
   // The board's history is hers to read too, and it names who did what: the
   // column the admin added (a client write) and her own joining (a callable).
+  await settingsPage(sara, 'History');
   check(
     'a non-owner reads the board history, naming who changed what',
     await sara
@@ -661,6 +684,8 @@ try {
 
   await saraOwnerToggle.click();
   check('an accepted one does', await switchReads(saraOwnerToggle, true));
+  await admin.screenshot({ path: join(SHOTS, 'p2-owners-light.png'), fullPage: true });
+  await settingsPage(admin, 'History');
   check(
     'and the board history records it',
     await admin
@@ -670,7 +695,7 @@ try {
       .then(() => true)
       .catch(() => false),
   );
-  await admin.screenshot({ path: join(SHOTS, 'p2-owners-light.png'), fullPage: true });
+  await settingsPage(admin, 'People');
 
   // Live, with no reload: this is a board write, so her open app sees it.
   await sara.getByRole('button', { name: 'Board settings' }).waitFor({ timeout: 25000 });
@@ -678,6 +703,7 @@ try {
   await sara.getByRole('button', { name: 'Board settings' }).click();
   await sara.getByRole('button', { name: 'Archive board' }).waitFor({ timeout: 15000 });
   check('and the whole screen, not a roster', true);
+  await settingsPage(sara, 'People');
 
   // The creator's row is protected: an owner cannot demote the person who made
   // the board, and cannot remove them from it either. Only an admin can.
@@ -3121,15 +3147,7 @@ try {
   await admin.getByText('To Do').first().waitFor({ timeout: 25000 });
   await admin.getByRole('button', { name: 'Board settings' }).click();
   await admin.getByText('Board settings').first().waitFor({ timeout: 20000 });
-  // Wait for the screen to stop moving before clicking Archive. When the
-  // listAddableUsers callable answers, the Members heading gains the "Add
-  // someone" icon, or an empty hint appears, and Archive shifts down about
-  // 20px: a click that straddles the shift fires no press.
-  await admin
-    .getByRole('button', { name: /^Add someone/ })
-    .or(admin.getByText(/Nobody available to add/i))
-    .first()
-    .waitFor({ timeout: 15000 });
+  // General, open first at this width, holds Archive.
   await admin.getByRole('button', { name: 'Archive board' }).click();
   await admin.getByRole('button', { name: 'New board' }).waitFor({ timeout: 25000 });
   await admin.waitForTimeout(1500);

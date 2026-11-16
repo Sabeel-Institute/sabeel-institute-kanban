@@ -144,6 +144,28 @@ name: Board, card, rich text and gestures
     direction: UP
 - tapOn: "Back"
 
+# Board settings is a list of pages: each row a name, a line of what it holds
+# and a chevron, laid out by Yoga. A page replaces the list, and Back returns
+# to the list before it leaves settings.
+- extendedWaitUntil:
+    visible: "Tap a card to open it\\.[\\s\\S]*"
+    timeout: 15000
+- tapOn: "Board settings"
+- extendedWaitUntil:
+    visible: "Who changed what"
+    timeout: 15000
+- takeScreenshot: 06-settings
+- tapOn: "Columns"
+- extendedWaitUntil:
+    visible: "New column name"
+    timeout: 15000
+- takeScreenshot: 07-settings-columns
+- tapOn: "Back"
+- extendedWaitUntil:
+    visible: "Who changed what"
+    timeout: 15000
+- tapOn: "Back"
+
 # Long-press starts a selection. The board must be back and settled first: a
 # long-press that lands while it is still animating in starts nothing (the
 # iPhone simulator on a busy CI Mac, Kanban #29), so a missed one gets one
@@ -158,7 +180,7 @@ name: Board, card, rich text and gestures
       - extendedWaitUntil:
           visible: "1 selected[\\s\\S]*"
           timeout: 10000
-- takeScreenshot: 06-selection
+- takeScreenshot: 08-selection
 - tapOn: "Back"
 
 # Cloning the board: a long-press on its row in the boards list opens the
@@ -184,7 +206,7 @@ name: Board, card, rich text and gestures
 # neither the keyboard's edge nor a view with no content, and a tap on Cancel
 # landed even with the lift removed. Clone is tapped with the keyboard still
 # up, as a person would.
-- takeScreenshot: 07-clone-board
+- takeScreenshot: 09-clone-board
 # The button, above the sheet's explanation: Maestro also sees the keyboard's
 # suggestion strip, and with "clone" just typed its first suggestion is
 # "clone", which a bare `tapOn: "Clone"` picked instead (Kanban #97).
@@ -233,7 +255,7 @@ name: Board, card, rich text and gestures
       TARGET: "More"
       EXPECT: "Report a problem"
       SECONDS: 30
-- takeScreenshot: 08-more
+- takeScreenshot: 10-more
 
 # Help: a film opens in the platform's own player (expo-video), which is a
 # native module of its own. The player's frame is what is checked, so a
@@ -248,4 +270,4 @@ name: Board, card, rich text and gestures
     visible:
       id: "help-film"
     timeout: 20000
-- takeScreenshot: 09-help-film
+- takeScreenshot: 11-help-film

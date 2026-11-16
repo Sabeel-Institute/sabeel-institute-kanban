@@ -225,6 +225,13 @@ await admin.getByText('To Do').first().waitFor({ timeout: 30000 });
 
 await admin.getByRole('button', { name: 'Board settings' }).click();
 await admin.getByText('Board settings').waitFor({ timeout: 25000 });
+// Board settings is a list of pages; at this width the list runs down the side
+// and a row opens its page beside it.
+const settingsPage = async (name) => {
+  await admin.getByRole('button', { name, exact: true }).click();
+};
+await settingsPage('Columns');
+await admin.getByPlaceholder('New column name').waitFor({ timeout: 25000 });
 for (const name of COLUMNS) {
   if (await admin.getByText(name).first().isVisible().catch(() => false)) continue;
   await fillThen(admin, 'New column name', name, (o) =>
@@ -239,7 +246,8 @@ await admin.waitForTimeout(2000);
 // board's own in its settings.
 try {
   await admin.getByRole('button', { name: 'More' }).first().click();
-  await admin.getByRole('button', { name: /^Labels/ }).click();
+  // In the sheet: Board settings, behind it, has a Labels page of its own.
+  await admin.getByRole('dialog').getByRole('button', { name: /^Labels/ }).click();
   await admin.getByPlaceholder('New label name').waitFor({ timeout: 25000 });
   if (!(await admin.getByText('urgent', { exact: true }).first().isVisible().catch(() => false))) {
     await fillThen(admin, 'New label name', 'urgent', (o) =>
@@ -253,6 +261,8 @@ try {
 } catch (e) {
   console.warn('could not seed an institute label — continuing:', String(e).slice(0, 120));
 }
+await settingsPage('Labels');
+await admin.getByPlaceholder('New label name').waitFor({ timeout: 25000 });
 for (const label of ['donor-facing']) {
   if (await admin.getByText(label).first().isVisible().catch(() => false)) continue;
   try {
@@ -281,6 +291,8 @@ for (const label of ['donor-facing']) {
 // bare "Add" button, which is what this looked for until 2026-07-27. Since the
 // member picker became an icon + rows, the loop found nothing, broke on its
 // first pass and silently seeded a board with no members.
+await settingsPage('People');
+await admin.getByText(/^Members \(/).first().waitFor({ timeout: 25000 });
 await admin
   .getByRole('button', { name: /^Add someone/ })
   .click()
