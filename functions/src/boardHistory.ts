@@ -3,6 +3,7 @@ import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { guardedEvent, sentryDsn } from './sentry';
 import { getFirestore } from 'firebase-admin/firestore';
 import {
+  withCleanExtras,
   boardChangeActor,
   diffBoard,
   type BoardActivityDoc,
@@ -27,8 +28,12 @@ import {
 export const onBoardWritten = onDocumentWritten(
   { document: 'boards/{boardId}', secrets: [sentryDsn] },
   guardedEvent(async (event) => {
-    const before = (event.data?.before?.data() ?? null) as BoardSnapshot | null;
-    const after = (event.data?.after?.data() ?? null) as BoardSnapshot | null;
+    const raw = (snap: { data(): Record<string, unknown> | undefined } | undefined) => {
+      const data = snap?.data();
+      return data ? (withCleanExtras(data) as unknown as BoardSnapshot) : null;
+    };
+    const before = raw(event.data?.before);
+    const after = raw(event.data?.after);
 
     const changes = diffBoard(before, after);
     if (changes.length === 0) return;

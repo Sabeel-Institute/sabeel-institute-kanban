@@ -6,6 +6,7 @@ export * from './autoScroll';
 export * from './boardHistory';
 export * from './boardClone';
 export * from './boardFields';
+export * from './boardShape';
 export * from './boards';
 export * from './color';
 export * from './due';

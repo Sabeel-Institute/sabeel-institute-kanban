@@ -164,7 +164,9 @@ function DetailValue({
     );
   }
 
-  if (draft !== null) {
+  // Gated on canEdit like the pencil that opens it: a demotion while the
+  // editor is open closes it, rather than leaving a Save the rules refuse.
+  if (canEdit && draft !== null) {
     return (
       <View style={styles.field}>
         <Hint>{field.name}</Hint>

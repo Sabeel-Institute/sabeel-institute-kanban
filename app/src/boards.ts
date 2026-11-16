@@ -12,6 +12,9 @@ import {
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import {
+  cleanFields,
+  orphanDetailIds,
+  boardExtras,
   MAX_RECENT_BOARDS,
   canSeeEveryBoard,
   newBoard,
@@ -94,11 +97,9 @@ function toBoard(id: string, data: Record<string, unknown>): BoardListItem {
     createdBy: (data.createdBy as string) ?? '',
     columns: (data.columns as BoardColumn[]) ?? [],
     activeCardCount: (data.activeCardCount as number) ?? 0,
-    lanesOn: data.lanesOn === true,
-    lanes: (data.lanes as BoardLane[]) ?? [],
-    ...(typeof data.doneColumnId === 'string' ? { doneColumnId: data.doneColumnId } : {}),
-    fields: (data.fields as BoardField[]) ?? [],
-    details: (data.details as Record<string, string>) ?? {},
+    // Cleaned: rules cannot look inside these, and a malformed entry would
+    // otherwise throw in every reader (`boardExtras`).
+    ...boardExtras(data),
   };
 }
 
@@ -184,15 +185,36 @@ export async function updateBoard(
  * update rule pins it to its existing value so authorship cannot be rewritten,
  * and Firestore rules compare against the full incoming document.
  */
-async function writeBoard(boardId: string, patch: Record<string, unknown>): Promise<void> {
+async function writeBoard(
+  boardId: string,
+  patch: Record<string, unknown> | ((current: Record<string, unknown>) => Record<string, unknown>),
+): Promise<void> {
   const snap = await getDoc(doc(db, 'boards', boardId));
-  const createdBy = snap.data()?.createdBy;
-  await updateDoc(doc(db, 'boards', boardId), { ...patch, createdBy, ...changeStamp() });
+  const current = snap.data() ?? {};
+  const createdBy = current.createdBy;
+  const changes = typeof patch === 'function' ? patch(current) : patch;
+  await updateDoc(doc(db, 'boards', boardId), { ...changes, createdBy, ...changeStamp() });
 }
 
-/** Add, rename or reorder a board's details' fields: the list as it should be. */
+/** The value deletes that go with writing `fields`, from the board as stored. */
+function withoutOrphans(fields: readonly BoardField[]) {
+  return (current: Record<string, unknown>) => ({
+    fields,
+    ...Object.fromEntries(
+      orphanDetailIds(current.details as Record<string, unknown> | undefined, fields).map((id) => [
+        `details.${id}`,
+        deleteField(),
+      ]),
+    ),
+  });
+}
+
+/**
+ * Add, rename or reorder a board's details' fields: the list as it should be.
+ * Any value whose field is not in it goes in the same write (`orphanDetailIds`).
+ */
 export async function setBoardFields(boardId: string, fields: BoardField[]): Promise<void> {
-  await writeBoard(boardId, { fields });
+  await writeBoard(boardId, withoutOrphans(fields));
 }
 
 /**
@@ -205,10 +227,7 @@ export async function removeBoardField(
   fields: readonly BoardField[],
   fieldId: string,
 ): Promise<void> {
-  await writeBoard(boardId, {
-    fields: fields.filter((f) => f.id !== fieldId),
-    [`details.${fieldId}`]: deleteField(),
-  });
+  await writeBoard(boardId, withoutOrphans(fields.filter((f) => f.id !== fieldId)));
 }
 
 /**
@@ -220,7 +239,14 @@ export async function setBoardDetail(
   fieldId: string,
   value: string | null,
 ): Promise<void> {
-  await writeBoard(boardId, { [`details.${fieldId}`]: value ?? deleteField() });
+  await writeBoard(boardId, (current) => {
+    // A value for a field removed meanwhile would be left with nothing to
+    // show or clear it, so it is refused, and the editor stays open saying so.
+    if (value !== null && !cleanFields(current.fields).some((f) => f.id === fieldId)) {
+      throw new Error('That field has just been removed from the board.');
+    }
+    return { [`details.${fieldId}`]: value ?? deleteField() };
+  });
 }
 
 /**

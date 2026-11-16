@@ -205,3 +205,18 @@ export function namedFieldValue(
   const value = field ? board.details?.[field.id] : undefined;
   return value && isRealDate(value) ? value : null;
 }
+
+/**
+ * The ids in `details` with no field in `fields`: values left behind, to be
+ * deleted with the write that sets `fields`. Two owners editing the fields at
+ * once, one from an older copy, could otherwise leave a value no field shows,
+ * never cleared, and counting against the rules' bound of twenty until saving
+ * a real value is refused.
+ */
+export function orphanDetailIds(
+  details: Readonly<Record<string, unknown>> | undefined,
+  fields: readonly Pick<BoardField, 'id'>[],
+): string[] {
+  const kept = new Set(fields.map((f) => f.id));
+  return Object.keys(details ?? {}).filter((id) => !kept.has(id));
+}

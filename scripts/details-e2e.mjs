@@ -221,6 +221,29 @@ try {
     JSON.stringify(values),
   );
 
+  // Typed as a person types it, a key at a time, into the year of a date
+  // already set: the field passes through 0002, 0020 and 0202 on the way to
+  // 2028. One write, of the date meant, and nothing in between. (`fill` sets
+  // the whole value at once, which is how writing every keystroke went unseen.)
+  await page.getByLabel('Start date', { exact: true }).focus();
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.type('2028', { delay: 150 });
+  await page.keyboard.press('Enter');
+  const typed = await storedOnce((d) => d.details?.[startId] === '2028-06-21');
+  await page.waitForTimeout(3000);
+  const midway = (await db.collection(`boards/${boardId}/activity`).get()).docs
+    .map((d) => d.data())
+    .filter((e) => e.type === 'detailChanged' && /^0/.test(e.to ?? ''));
+  check(
+    'typing a year writes the date meant and nothing in between',
+    typed.details[startId] === '2028-06-21' && midway.length === 0,
+    `${typed.details[startId]}; midway ${midway.map((e) => e.to).join(',')}`,
+  );
+  await page.getByLabel('Start date', { exact: true }).fill('2027-06-21');
+  await page.getByLabel('Orientation', { exact: true }).focus();
+  await storedOnce((d) => d.details?.[startId] === '2027-06-21');
+
   await setValue('Teachers', '   ');
   const teachersId = await idOf('Teachers');
   check(
@@ -282,6 +305,19 @@ try {
     'and takes its value with it, in the same write',
     !after.fields.some((f) => f.id === feeId) && !(feeId in after.details),
     JSON.stringify(after.details),
+  );
+
+  // A value with no field, as two owners editing the fields at once could
+  // leave: the next write of the fields takes it away.
+  await db.doc(`boards/${boardId}`).update({ 'details.fld_ghost': 'left behind' });
+  await page.getByRole('button', { name: 'Rename field Instructors' }).click();
+  await page.getByLabel('Rename Instructors').fill('Tutors');
+  await page.getByRole('button', { name: 'Save field name' }).click();
+  const swept = await storedOnce((d) => !('fld_ghost' in d.details) && d.fields.some((f) => f.name === 'Tutors'));
+  check(
+    'a value left with no field is cleared by the next write of the fields',
+    !('fld_ghost' in swept.details) && swept.fields.some((f) => f.name === 'Tutors'),
+    JSON.stringify(swept.details),
   );
   await page.getByRole('button', { name: 'Done', exact: true }).click();
 

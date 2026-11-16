@@ -3,7 +3,7 @@ import { onCall, HttpsError, type CallableRequest } from 'firebase-functions/v2/
 import { guarded, sentryDsn } from './sentry';
 import { logger } from 'firebase-functions/v2';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import type { BoardDoc } from '@sabeel/shared';
+import { withCleanExtras, type BoardDoc } from '@sabeel/shared';
 import {
   boardClone,
   boardCloneBytes,
@@ -458,7 +458,7 @@ export const cloneBoard = onCall({ secrets: [sentryDsn] }, guarded(async (reques
       return { made: null, name: already.data()?.name as string };
     }
     if (!source.exists) throw new HttpsError('not-found', 'No such board.');
-    const board = source.data() as BoardDoc;
+    const board = withCleanExtras(source.data()!) as unknown as BoardDoc;
     if (!board.memberUids.includes(actor.uid) && !canSeeEveryBoard(actor)) {
       throw new HttpsError('permission-denied', 'You can only clone a board you are on.');
     }

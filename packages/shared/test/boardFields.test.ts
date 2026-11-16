@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BOARD_FIELDS_MAX,
+  orphanDetailIds,
   addField,
   addableFieldTypes,
   filledFields,
@@ -173,5 +174,12 @@ describe('a number', () => {
     expect(validateDetailValue('number', '7,5')).toMatchObject({ ok: false });
     expect(validateDetailValue('number', '1,2,3')).toMatchObject({ ok: false });
     expect(validateDetailValue('number', '12,00')).toMatchObject({ ok: false });
+  });
+});
+
+describe('orphanDetailIds', () => {
+  it('names the values whose field is gone', () => {
+    expect(orphanDetailIds({ a: '1', b: '2', c: '3' }, [{ id: 'a' }, { id: 'c' }])).toEqual(['b']);
+    expect(orphanDetailIds(undefined, [{ id: 'a' }])).toEqual([]);
   });
 });
