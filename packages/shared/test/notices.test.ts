@@ -150,6 +150,21 @@ describe('changeNoticeText', () => {
     expect(said).toBe('“Budget”: Sara moved it to the Marketing lane');
   });
 
+  it('reports a lane that changed twice at its last lane, as a column is', () => {
+    const said = changeNoticeText({
+      cardTitle: 'Budget',
+      entries: noticeEntriesFor(
+        [e('lane', 'sara', T, { from: 'p', to: 'm' }), e('lane', 'sara', T + 1, { from: 'm', to: 's' })],
+        'omar',
+      ),
+      recipientUid: 'omar',
+      nameFor: (u) => names[u] ?? 'Someone',
+      columnNameFor: (c) => columns[c] ?? 'a column',
+      laneNameFor: (l) => ({ m: 'Marketing', s: 'Supplies' })[l],
+    });
+    expect(said).toBe('“Budget”: Sara moved it to the Supplies lane');
+  });
+
   it('names the card, then the changes in the history’s words', () => {
     const burst = [
       e('moved', 'sara', T, { from: 'todo', to: 'done' }),

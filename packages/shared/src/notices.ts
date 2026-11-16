@@ -124,10 +124,15 @@ export function noticeFollowers(params: {
  * What folds into what. A state that changed twice is reported at its last
  * value ("moved it to Done", not to Review and then to Done); per actor, so
  * two people's moves both stay attributable.
+ *
+ * Every type is named, with no `default:`: a new type must be placed here on
+ * purpose, or this fails to compile. A default once took the lane change,
+ * which is a state like a column, and reported each one separately.
  */
 function foldKey(e: NoticeEntry): string {
   switch (e.type) {
     case 'moved':
+    case 'lane':
     case 'due':
     case 'priority':
     case 'archived':
@@ -139,7 +144,12 @@ function foldKey(e: NoticeEntry): string {
     case 'assigned':
     case 'unassigned':
       return `${e.actorUid}|assignment|${e.to ?? ''}`;
-    default:
+    // Events, not states: each is its own line.
+    case 'created':
+    case 'subtaskOf':
+    case 'subtask':
+    case 'attached':
+    case 'detached':
       return `${e.actorUid}|${e.type}|${e.from ?? ''}|${e.to ?? ''}`;
   }
 }
