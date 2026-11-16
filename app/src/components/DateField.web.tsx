@@ -19,7 +19,10 @@ import { getTheme, radius, space } from '../theme';
  * old value back under the typist's fingers. So the field holds what is typed,
  * and hands a date on only when it is whole and plausible (`plausibleDay`)
  * and typing has paused, or when the field is left or Enter is pressed. It
- * shows the typed date until the value catches up.
+ * shows the typed date until the write settles (`onChange`'s promise), then
+ * the value: the date as written, or as it was when a write is refused. A
+ * date waiting on the pause is written if the field goes away first, and one
+ * that is not a plausible date is taken back when the field is left.
  */
 const SETTLE_MS = 700;
 
@@ -40,7 +43,12 @@ export function DateField({
   emptyLabel = 'No due date',
 }: {
   value?: string;
-  onChange: (next: string | undefined) => void;
+  /**
+   * Write the date. Return the write, so the field shows the date until it
+   * settles; anything else counts as settled at once. Typed loosely because
+   * callers are checked against the native sibling's props.
+   */
+  onChange: (next: string | undefined) => unknown;
   label?: string;
   /** What it says with no date: a card's due date by default. */
   emptyLabel?: string;
@@ -49,24 +57,46 @@ export function DateField({
   // What is typed and not yet the value; null while the field shows the value.
   const [draft, setDraft] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // A plausible date waiting on the pause, written if the field goes away
+  // first: a date picked and then Back pressed within the pause was lost.
+  const waiting = useRef<string | null>(null);
+  const write = useRef(onChange);
+  write.current = onChange;
+  const stored = useRef(value);
+  stored.current = value;
 
   useEffect(() => {
     if (draft !== null && draft === (value ?? '')) setDraft(null);
   }, [value, draft]);
-  useEffect(() => () => {
-    if (timer.current) clearTimeout(timer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+      const date = waiting.current;
+      if (date !== null && date !== (stored.current ?? '')) void Promise.resolve(write.current(date));
+    },
+    [],
+  );
 
-  function settle(next: string) {
+  function stopWaiting() {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
-    if (next === (value ?? '')) {
-      setDraft(null);
-      return;
-    }
+    waiting.current = null;
+  }
+
+  /** Write `next`, showing it until the write settles, then the value. */
+  function hand(next: string | undefined) {
+    void Promise.resolve(onChange(next)).finally(() => setDraft(null));
+  }
+
+  function settle(next: string) {
+    stopWaiting();
+    if (next === (value ?? '')) setDraft(null);
     // Emptied by the keyboard: cleared, as the Clear button does.
-    if (next === '') onChange(undefined);
-    else if (plausibleDay(next)) onChange(next);
+    else if (next === '') hand(undefined);
+    else if (plausibleDay(next)) hand(next);
+    // Not a date anyone means (a year still being typed, or out of range):
+    // taken back, rather than left showing what was never written.
+    else setDraft(null);
   }
 
   return (
@@ -78,8 +108,11 @@ export function DateField({
         onChange={(e) => {
           const next = e.target.value;
           setDraft(next);
-          if (timer.current) clearTimeout(timer.current);
-          timer.current = plausibleDay(next) ? setTimeout(() => settle(next), SETTLE_MS) : null;
+          stopWaiting();
+          if (plausibleDay(next)) {
+            waiting.current = next;
+            timer.current = setTimeout(() => settle(next), SETTLE_MS);
+          }
         }}
         onBlur={(e) => settle(e.target.value)}
         onKeyDown={(e) => {
@@ -102,10 +135,8 @@ export function DateField({
           label="Clear"
           variant="secondary"
           onPress={() => {
-            if (timer.current) clearTimeout(timer.current);
-            timer.current = null;
-            setDraft(null);
-            onChange(undefined);
+            stopWaiting();
+            hand(undefined);
           }}
         />
       ) : (

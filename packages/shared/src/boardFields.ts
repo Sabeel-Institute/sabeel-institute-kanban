@@ -163,7 +163,8 @@ export function validateDetailValue(type: BoardFieldType, raw: string): DetailRe
     case 'number': {
       // A comma only between groups of three, as in 1,200: "7,5" is a
       // decimal comma or a slip, and taking it out would save 75.
-      if (!/^-?(\d+|\d{1,3}(,\d{3})+)(\.\d+)?$/.test(value))
+      // The first group cannot start with 0: "0,500" is a decimal comma.
+      if (!/^-?(\d+|[1-9]\d{0,2}(,\d{3})+)(\.\d+)?$/.test(value))
         return { ok: false, error: 'Enter a number, such as 1,200 or 7.5.' };
       return { ok: true, value: value.replace(/,/g, '') };
     }

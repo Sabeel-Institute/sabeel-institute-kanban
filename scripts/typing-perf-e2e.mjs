@@ -130,14 +130,13 @@ await board('perf_light', 'Empty board', [{ id: 'lc0', name: 'To Do' }], 0);
   await Promise.all(writes);
 }
 
-// Details: twenty filled fields on the busy board, one on the empty one. A
-// value's draft held by the Details page instead of its own editor would
-// re-render every field per keystroke.
-const fieldsOf = (n) => Array.from({ length: n }, (_, i) => ({ id: `pf${i}`, name: `Field ${i + 1}`, type: 'text' }));
-const detailsOf = (n) =>
-  Object.fromEntries(Array.from({ length: n }, (_, i) => [`pf${i}`, `A value long enough to wrap, for field ${i + 1}`]));
-await db.doc('boards/perf_heavy').update({ fields: fieldsOf(20), details: detailsOf(20) });
-await db.doc('boards/perf_light').update({ fields: fieldsOf(1), details: detailsOf(1) });
+// No arm for a board's detail values. One was tried: with the value's draft
+// hoisted into the Details page (every keystroke re-rendering all twenty
+// fields), two runs measured ratios of 3.00 and 0.92. Twenty rows of text cost
+// too little to re-render for a ratio to see it above the noise, so the arm
+// could not be relied on to fail. `DetailValue` owning its draft is held by
+// its structure instead (CLAUDE.md, "A text draft belongs to the component
+// that owns the field").
 
 // Both cards live on the EMPTY board: the card screen replaces the board, so
 // what is behind it cannot contribute to the measurement either way.
@@ -267,23 +266,6 @@ async function descriptionCost(title) {
   return measured;
 }
 report('description', await descriptionCost('Busy card'), await descriptionCost('Quiet card'));
-
-// ---- arm 4: a detail's value ------------------------------------------------
-async function detailCost(boardName) {
-  await openBoard(boardName);
-  await page.getByRole('button', { name: 'Board settings' }).click();
-  await page.getByRole('button', { name: 'Details', exact: true }).click();
-  // Exact: "Edit Field 1" is also the start of "Edit Field 10" to "19".
-  await page.getByRole('button', { name: 'Edit Field 1', exact: true }).click();
-  const input = page.getByLabel('Field 1', { exact: true });
-  await input.waitFor({ timeout: 15000 });
-  const measured = await msPerChar(input);
-  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await page.getByRole('button', { name: 'Back' }).first().click();
-  await page.waitForTimeout(400);
-  return measured;
-}
-report('detail value', await detailCost('Busy board'), await detailCost('Empty board'));
 
 await browser.close();
 

@@ -23,25 +23,35 @@ export interface BoardExtras {
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
 
+/**
+ * A lane with a string id and a name that is not blank (the app never writes
+ * one, and a blank name has nothing to measure or show). Kept as stored, any
+ * other property included: the lists are written back whole, and a property
+ * a later build adds must survive this one's writes.
+ */
 export function cleanLanes(raw: unknown): BoardLane[] {
   if (!Array.isArray(raw)) return [];
-  return raw
-    .filter(isObject)
-    .filter((l) => typeof l.id === 'string' && typeof l.name === 'string')
-    .map((l) => ({ id: l.id as string, name: l.name as string }));
+  return raw.filter(
+    (l): l is BoardLane =>
+      isObject(l) && typeof l.id === 'string' && typeof l.name === 'string' && l.name.trim() !== '',
+  );
 }
 
+/**
+ * A field of a type this build knows, kept as stored. A field of a type it
+ * does not know is left out, and its value goes with the next write of the
+ * fields: a new type needs the version floor raised with it, so no build
+ * that would do that is still in use.
+ */
 export function cleanFields(raw: unknown): BoardField[] {
   if (!Array.isArray(raw)) return [];
-  return raw
-    .filter(isObject)
-    .filter(
-      (f) =>
-        typeof f.id === 'string' &&
-        typeof f.name === 'string' &&
-        (FIELD_TYPES as readonly unknown[]).includes(f.type),
-    )
-    .map((f) => ({ id: f.id as string, name: f.name as string, type: f.type as BoardField['type'] }));
+  return raw.filter(
+    (f): f is BoardField =>
+      isObject(f) &&
+      typeof f.id === 'string' &&
+      typeof f.name === 'string' &&
+      (FIELD_TYPES as readonly unknown[]).includes(f.type),
+  );
 }
 
 export function cleanDetails(raw: unknown): Record<string, string> {

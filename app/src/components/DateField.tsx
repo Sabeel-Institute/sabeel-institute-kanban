@@ -35,7 +35,8 @@ export function DateField({
   emptyLabel = 'No due date',
 }: {
   value?: string;
-  onChange: (next: string | undefined) => void;
+  /** Write the date; what it returns is not used here (the web sibling waits on it). */
+  onChange: (next: string | undefined) => unknown;
   label?: string;
   /** What it says with no date: a card's due date by default. */
   emptyLabel?: string;

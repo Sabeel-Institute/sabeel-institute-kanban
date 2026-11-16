@@ -138,13 +138,14 @@ function DetailValue({
   const t = useTheme();
   const [draft, setDraft] = useState<string | null>(null);
 
-  function save(raw: string) {
+  /** Whether the value was written: a date field waits on it to drop its draft. */
+  function save(raw: string): Promise<boolean> {
     const result = validateDetailValue(field.type, raw);
     if (!result.ok) {
       onError(result.error);
-      return;
+      return Promise.resolve(false);
     }
-    void run(async () => {
+    return run(async () => {
       await setBoardDetail(boardId, field.id, result.value);
       setDraft(null);
     });

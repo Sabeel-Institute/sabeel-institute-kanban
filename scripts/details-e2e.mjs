@@ -185,7 +185,7 @@ try {
   await setValue('Fee', 'a lot');
   check(
     'a number that is not one is refused, and the field stays open',
-    (await page.getByText('Enter a number, such as 120 or 7.5.').isVisible()) &&
+    (await page.getByText('Enter a number, such as 1,200 or 7.5.').isVisible()) &&
       (await page.getByLabel('Fee', { exact: true }).isVisible()),
   );
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
@@ -231,10 +231,21 @@ try {
   await page.keyboard.type('2028', { delay: 150 });
   await page.keyboard.press('Enter');
   const typed = await storedOnce((d) => d.details?.[startId] === '2028-06-21');
-  await page.waitForTimeout(3000);
-  const midway = (await db.collection(`boards/${boardId}/activity`).get()).docs
-    .map((d) => d.data())
-    .filter((e) => e.type === 'detailChanged' && /^0/.test(e.to ?? ''));
+  // The history line for the date meant is waited for first, then the history
+  // is watched for two seconds more: triggers run in parallel on the
+  // emulator, so a line for an earlier write is not sure to land first.
+  const lines = async () =>
+    (await db.collection(`boards/${boardId}/activity`).get()).docs
+      .map((d) => d.data())
+      .filter((e) => e.type === 'detailChanged');
+  for (let i = 0; i < 60 && !(await lines()).some((e) => e.to === '2028-06-21'); i += 1) {
+    await page.waitForTimeout(300);
+  }
+  let midway = [];
+  for (let i = 0; i < 7 && midway.length === 0; i += 1) {
+    midway = (await lines()).filter((e) => /^0/.test(e.to ?? ''));
+    if (midway.length === 0) await page.waitForTimeout(300);
+  }
   check(
     'typing a year writes the date meant and nothing in between',
     typed.details[startId] === '2028-06-21' && midway.length === 0,
@@ -244,12 +255,38 @@ try {
   await page.getByLabel('Orientation', { exact: true }).focus();
   await storedOnce((d) => d.details?.[startId] === '2027-06-21');
 
+  // A date chosen and the screen left at once, inside the pause the field
+  // waits for: still written. Left by the browser's Back, with focus still in
+  // the field (a click on Back would blur it, and the blur would write it), so
+  // only the field's write on going away can save it.
+  await page.getByLabel('Orientation', { exact: true }).fill('2027-06-15');
+  await page.goBack();
+  const left = await storedOnce((d) => d.details?.[orientationId] === '2027-06-15');
+  check(
+    'a date chosen and the screen left at once is still written',
+    left.details?.[orientationId] === '2027-06-15',
+    String(left.details?.[orientationId]),
+  );
+  await page.getByRole('button', { name: 'Board settings' }).click();
+  await page.getByRole('button', { name: 'Details', exact: true }).click();
+  await page.getByLabel('Start date', { exact: true }).waitFor({ timeout: 15000 });
+
+  // Counted, not looked for: End date already says Not set, so one more is
+  // what clearing Teachers must add.
+  const notSet = page.getByText('Not set', { exact: true });
+  const notSetBefore = await notSet.count();
   await setValue('Teachers', '   ');
   const teachersId = await idOf('Teachers');
+  const cleared = !(teachersId in (await storedOnce((d) => !(teachersId in d.details))).details);
+  let notSetAfter = await notSet.count();
+  for (let i = 0; i < 30 && notSetAfter !== notSetBefore + 1; i += 1) {
+    await page.waitForTimeout(300);
+    notSetAfter = await notSet.count();
+  }
   check(
     'clearing a value removes it, and the field says Not set',
-    !(teachersId in (await storedOnce((d) => !(teachersId in d.details))).details) &&
-      (await page.getByText('Not set').first().isVisible()),
+    cleared && notSetAfter === notSetBefore + 1,
+    `Not set ${notSetBefore} → ${notSetAfter}`,
   );
   check(
     'the list says how many are filled in',

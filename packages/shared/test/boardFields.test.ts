@@ -174,6 +174,7 @@ describe('a number', () => {
     expect(validateDetailValue('number', '7,5')).toMatchObject({ ok: false });
     expect(validateDetailValue('number', '1,2,3')).toMatchObject({ ok: false });
     expect(validateDetailValue('number', '12,00')).toMatchObject({ ok: false });
+    expect(validateDetailValue('number', '0,500')).toMatchObject({ ok: false });
   });
 });
 
