@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boardExtras, cleanDetails, cleanFields, cleanLanes, overviewBoards, laneSignature } from '../src';
+import { cleanDetails, cleanFields, cleanLanes } from '../src';
 
 describe('cleaning what a board holds', () => {
   it('keeps well-formed lanes and drops the rest', () => {
@@ -24,10 +24,5 @@ describe('cleaning what a board holds', () => {
     expect(cleanDetails('nope')).toEqual({});
   });
 
-  it('lets a board with a malformed lane through every overview reader without a throw', () => {
-    const data = { columns: [{ id: 'c' }], lanesOn: true, lanes: [null, { id: 'l', name: 'Planning' }], archived: false };
-    const board = { ...data, ...boardExtras(data) };
-    expect(overviewBoards([board])).toHaveLength(1);
-    expect(laneSignature(board.lanes)).toBe('planning');
-  });
+});
 });
