@@ -63,6 +63,8 @@ board — is what lets you:
 - add, rename, reorder and delete columns
 - switch lanes on and off, add, rename, reorder and remove lanes, and choose
   the finished column (Board settings → Lanes)
+- add, rename, reorder and remove the board's details, and fill them in
+  (Board settings → Details), which everyone on the board reads
 - add and remove members
 - make another member an owner, or take it away
 - archive the board, and restore it
@@ -85,10 +87,10 @@ Rules cannot look inside a card's `labelIds`, so that containment is the app's,
 not the rules': a build from before board labels ignores it until the version
 floor retires it, and a phone before 0.13.1 never reads the floor.
 
-Everyone else on a board opens Board settings as **Members and labels**, with
-the three pages they can use: **People**, the member list, read-only, with
-owners marked; **Labels**, the board's own to change like anyone on the board;
-and **History**. The roster answers "who do I ask to add someone?" without a
+Everyone else on a board opens Board settings as **About this board**, with
+the four pages they can use: **Details**, which everyone on the board reads;
+**People**, the member list, read-only, with owners marked; **Labels**, the
+board's own to change like anyone on the board; and **History**. The roster answers "who do I ask to add someone?" without a
 trip to an admin — which is what it used to take.
 
 **The board's history is for everyone on the board**, on that History page,

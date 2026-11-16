@@ -234,6 +234,22 @@ its `laneId`. What is load-bearing:
 - **A board without lanes draws nothing new.** Every surface asks `lanesLive`
   before drawing a heading, asking for a lane, or calling a card finished.
 
+## A board's details
+
+Added 2026-11-15 with lanes (`docs/PRODUCT_BRIEF.md` § Details): typed fields
+on Board settings → Details, read by everyone on the board, changed by its
+owners and admins. `packages/shared/src/boardFields.ts` holds every rule.
+
+- **Contents are app-kept, not rule-kept.** Rules bound `fields` and `details`
+  at twenty (held to `BOARD_FIELDS_MAX` by `ruleLimits.test.ts`) and cannot look
+  inside either. Every value goes through `validateDetailValue`.
+- **A link opens only through `safeLink`** (http or https), at save and again
+  at tap: a `javascript:` value from another client would otherwise run.
+- **A value is written by its path (`details.<id>`), and a field is removed
+  with its value in one write** (`removeBoardField`), so the two cannot drift.
+- **Start date and End date are the only details anything else reads**,
+  through `namedFieldValue`. Nothing reads a field by its name.
+
 ## Attachments
 
 Added 2026-07-26, reversing the original "no attachments" decision. Multiple

@@ -54,10 +54,12 @@ The order, at the end, against a fresh `scripts/dev.sh web` seed:
    release command renders it again with the version line.
 
 Manual pictures that will change before then, so are retaken at the end:
-`settings-phone`/`-wide` (the list gains Details), `lanesettings-*`, every
-board picture once the overview's entry is in the Boards header, and the
-Boards list (Templates heading). New pictures go into `manual-shots.mjs` with
-the step that adds the screen, unrun until the end.
+`settings-phone`/`-wide` (the list gains Details), `roster-*` (a non-owner's
+settings are now "About this board", opening on Details), `lanesettings-*`,
+every board picture once the overview's entry is in the Boards header, and the
+Boards list (Templates heading). New, never yet taken: `details-*`. New
+pictures go into `manual-shots.mjs` with the step that adds the screen, unrun
+until the end.
 
 The films:
 
@@ -77,6 +79,7 @@ The films:
 | `board-settings` | stale | Board settings as a list of pages: General, Columns and History each on its own (script and narration updated, not recorded); the Lanes row in the list; the board name's font (computer) |
 | `lanes` | missing | A film for dividing a board into lanes: switching them on, adding a card to a lane, the counts, the finished column. Not yet scripted; the guide world (`world.mjs`) needs a board with lanes |
 | `board-people` | stale | The People page of Board settings (script and narration updated, not recorded); the board name's font (computer) |
+| `details` | missing | A film for a board's details: adding fields, filling them in, a member reading them. Not yet scripted |
 | `new-board` | stale, computer only | The new board's name in the app's font |
 | `signing-in`, `attachments`, `subtasks`, `my-work`, `notifications`, `report`, `people`, `roles`, `stats` | current | Nothing: they show none of v0.19.0's changes |
 

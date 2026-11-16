@@ -148,7 +148,7 @@ another column doesn't count.
 **On a phone the row along the bottom holds everything else**: beside **+ Add
 card** are icons to watch the column, delete it (owners of the board only), open the
 board's **archived cards**, and open the board's **settings** — or, if you do not
-own it, its **members and labels**, the pages of settings you can use. They sit
+own it, **About this board**, the pages of settings you can use. They sit
 there rather than in the header so the board's name has the top row to itself.
 
 ### Lanes
@@ -716,8 +716,8 @@ beside it; click another page to open it there, and **Back** returns to the
 board.
 
 If you don't own the board the icon is a **group of people** instead and says
-**Members and labels**: the same list with **People**, **Labels** and
-**History**, and nothing else.
+**About this board**: the same list with **Details**, **People**, **Labels**
+and **History**, and nothing else.
 
 <div class="pair">
   <figure class="ph"><img src="manual/img/roster-phone.png" alt="People as somebody who does not own the board, on a phone"><figcaption>The same on a phone</figcaption></figure>
@@ -754,6 +754,27 @@ The pages:
     <figure class="ph"><img src="manual/img/lanesettings-phone.png" alt="The Lanes page on a phone: the switch, the lanes with their handles, and where finished cards are"><figcaption>On a phone</figcaption></figure>
     <figure class="wd"><img src="manual/img/lanesettings-wide.png" alt="The Lanes page in a browser"><figcaption>In a browser</figcaption></figure>
   </div>
+- **Details** — facts about what the board is for, such as its start date,
+  the teachers or a meeting link. **Everyone on the board reads them**; its
+  owners change them.
+
+  <div class="pair">
+    <figure class="ph"><img src="manual/img/details-phone.png" alt="The Details page on a phone: each field's name and value, with a pencil to change it"><figcaption>On a phone</figcaption></figure>
+    <figure class="wd"><img src="manual/img/details-wide.png" alt="The Details page in a browser"><figcaption>In a browser</figcaption></figure>
+  </div>
+
+  To change a value, tap the **pencil** beside it, type, and tap the **tick**
+  (an empty value clears it). A date is picked from a calendar, and a link
+  opens when tapped. To add, rename, reorder or remove the fields themselves,
+  tap the **pencil** at the top, **Edit fields**: rename one with its pencil,
+  drag its handle, or remove it with its **bin**, which asks first and takes
+  its value with it. **Add a field** asks for its type (Text, Number, Date or
+  Link) and a name. A field's type is chosen once: to change it, remove the
+  field and add another. A board can have up to twenty.
+
+  **Start date** and **End date** are dates with fixed names, one of each at
+  most, and the only details other screens read. A link must start with
+  `http://` or `https://`.
 - **People** — who can see the board, and who owns it. Tap the **add-person**
   icon beside the *Members* heading to see who else can be added, and tap a name
   to add them. Removing someone (the **remove-person** icon on their row) also
@@ -839,8 +860,9 @@ since they can open any board's settings; a board they haven't joined shows a
 The **History** page lists what has happened to the board itself, newest
 first, and who did it: who created it, renamed it, archived or restored it;
 who added or removed whom; who made someone an owner or stopped being one;
-which columns or lanes were added, removed, renamed or reordered; and who
-turned lanes on or off, or chose the finished column. Everyone on the board
+which columns, lanes or details were added, removed, renamed or reordered; who
+turned lanes on or off, or chose the finished column; and each detail set or
+cleared, with its value. Everyone on the board
 sees it, owners or not. What happens to a card is in that card's own
 history, on the card.
 
@@ -1060,6 +1082,10 @@ Open the board → **settings** → **General**. That page is the only place tha
 **…rename or add columns?** *(the board's owners)*
 Open the board → **settings** → **Columns**.
 
+**…record a board's start date, its teachers or a meeting link?** *(the board's owners)*
+Open the board → **settings** → **Details** → **Add details**, add the fields,
+then fill them in.
+
 **…divide a board into lanes?** *(the board's owners)*
 Open the board → **settings** → **Lanes** → turn on **Lanes on this board**,
 then add the lanes.
@@ -1069,7 +1095,7 @@ Open any card → **+** beside its labels. It belongs to that board. A label for
 every board is an institute label: an admin adds it in **More → Labels**.
 
 **…rename or delete a label?** *(anyone on the board, for its own labels)*
-Open the board → **settings** (**Members and labels** if you don't own it) →
+Open the board → **settings** (**About this board** if you don't own it) →
 **Labels**. Labels with a lock are the institute's: an admin changes those in
 **More → Labels**. Deleting removes the label from every card that carries it,
 and tells you how many first — counting live cards and archived ones separately,
@@ -1131,11 +1157,11 @@ Board **settings → People** → add them. (They must be an approved account fi
 Board **settings → People** → turn on the switch on their row → confirm.
 
 **…find out who runs a board I'm on?** *(anyone)*
-Open the board → **Members and labels** — or **Board settings**, if you are one of
+Open the board → **About this board** — or **Board settings**, if you are one of
 them → **People**. Owners are marked on it either way.
 
 **…find out who archived a board, or who added or removed someone?** *(anyone on the board)*
-Open the board's settings (**Members and labels** if you don't own it) → **History**.
+Open the board's settings (**About this board** if you don't own it) → **History**.
 
 **…hand a board on when I created it?** *(needs an admin)*
 Ask an admin. Only they can take ownership off whoever created a board — the

@@ -57,6 +57,7 @@ in the app.
 | Offboarding | A disabled user **keeps their assignments**, rendered as inactive; a board's owners get a review list to reassign. Disabling **warns** if the person solely owns a board, and proceeds anyway. |
 | Theming | **Single light theme, no dark mode** (decided 2026-07-21). Semantic tokens throughout, so a re-theme stays a one-file change. |
 | Subtasks | A card may be a **subtask of one other card on the same board** (`parentId` on the child). The parent's detail view lists them and links straight through; the child shows "Subtask of". On a card's face (Faisal, 2026-11-14, the chips of three prototypes, because people were hand-labelling cards "Main Task" and "subtask" to see this on the board): the parent a grey chip with its count, the child one naming its parent (`parentTitles`), or "Subtask" where the parent is not among the cards loaded — archived, on another board after a move that left the child linked, or on a screen that loads no siblings (My Work, Search, the board's archive). A tile's accessible name says both (`cardTileName`). Deliberately NOT a checklist: a subtask is an ordinary card, with its own column, assignees and comments. Added 2026-07-25 — the ClickUp import had been faking it in description text. **`parentId` is an opaque string to the rules**: same-board is enforced by the picker, not by `firestore.rules`, which check only that it is a string under 200 chars. A child's read access comes from its OWN `boardId`, so a stale or cross-board link leaks nothing: it shows as a plain "Subtask" chip and a "Subtask of" line the child can unlink, never the other card's title. Do not add a rules lookup to "fix" this; it would cost a read on every card write to enforce something the UI already does and no one can exploit. |
+| Details | **A board may carry details** (2026-11-15): a short list of typed fields (Text, Number, Date, Link, and the fixed Start date and End date), filled in on Board settings → Details. Everyone on the board reads them; its owners and admins change them. See "Details". |
 | Lanes | **A board may be divided into lanes as well as columns** (2026-11-15), so a program board can stand in for a tracking spreadsheet. A switch on Board settings → Lanes, off by default; a card sits in one column and one lane. With lanes, one column holds **finished** cards: a lane's heading counts them, and a finished card is never late. See "Lanes". |
 | Explicitly NOT in v1 | Checklists (as a separate item type — see Subtasks), dependencies, recurring cards, alternate board views, automations, integrations, guest/external access. |
 | Layout | **Chosen by available WIDTH, not platform** (breakpoint **700px**, `WIDE_BREAKPOINT` in `app/src/theme/layout.ts` — the one definition; never restate it). Wide → columns side by side. Narrow → one column at a time, swipe between them. So a tablet gets columns and a phone browser gets the swipe board. |
@@ -165,11 +166,14 @@ boards/{boardId}
   lanesOn?: bool                                 # absent = off; off keeps `lanes` and every card's lane
   lanes?: [ { id, name } ]                       # at most 12 (LANES_MAX); order is the board's
   doneColumnId?                                  # the finished column, read only through `finishedColumnId`
+  fields?: [ { id, name, type } ]                # details' fields, at most 20; type text|number|date|link|start|end
+  details?: { fieldId: value }                   # every value a string; a date YYYY-MM-DD; no key = not set
 
 boards/{boardId}/activity/{entryId}              # the board's own history
   type: created|renamed|archived|restored|memberAdded|memberRemoved|ownerAdded|ownerRemoved
         |columnAdded|columnRemoved|columnRenamed|columnsReordered
         |lanesOn|lanesOff|laneAdded|laneRemoved|laneRenamed|lanesReordered|finishedColumn
+        |fieldAdded|fieldRemoved|fieldRenamed|fieldsReordered|detailChanged   # detailChanged carries `field`
   at, actorUid?, actorName?, subjectUid?, subjectName?, from?, to?, since?
   # Written ONLY by the onBoardWritten trigger. Names are stored, not looked up.
 
@@ -603,9 +607,10 @@ and opens when it lands.
 - **What comes along:** the columns, in order; every OPEN card's title and
   description, in the same column and order; subtask links, each pointing at
   its parent's clone; the institute's labels on those cards; the board's
-  description; and the board's lanes, switched on or off as they were, under
-  new ids, with each card's lane and the finished column. A card whose lane is
-  gone on the source has none on the clone.
+  description; the board's lanes, switched on or off as they were, under new
+  ids, with each card's lane and the finished column; and its details' fields,
+  under new ids, without their values. A card whose lane is gone on the source
+  has none on the clone.
 - **What stays behind:** archived cards, due dates, assignees, priorities,
   comments, history and attachments, and the template's own labels (Faisal,
   2026-11-13: institute labels only). A subtask whose parent is archived is
@@ -705,6 +710,37 @@ learn for boards that are not programs.
   lane. Lane names and lengths are the app's to keep, like a board's own labels.
 - **A clone carries** whether lanes are on, the lanes (under new ids), each
   card's lane and the finished column.
+
+## Details (2026-11-15)
+
+Facts about what a board is for: its start date, the teachers, a meeting
+link. Decided by Faisal with lanes, for program boards; a board that adds no
+field has an empty Details page and nothing else changes.
+
+- **A list of typed fields**, each a name, a type and a value: Text, Number,
+  Date, Link, plus **Start date** and **End date**, which are dates with fixed
+  names, one of each at most, and the only details anything else reads
+  (`namedFieldValue`). None is required; none has a default. A field's type is
+  chosen once; to change it, remove the field and add another. At most twenty
+  (`BOARD_FIELDS_MAX`, restated in the rules). No file field, no per-field
+  switch for the overview: both were proposed and rejected.
+- **Everyone on the board reads them** on Board settings → Details, the first
+  page for someone who does not run the board (whose settings are "About this
+  board"). **The board's owners and admins change them**: each value with its
+  own pencil and editor, a date from a picker, and the fields behind "Edit
+  fields". Removing a field removes its value in the same write.
+- **A link opens only when it is http or https** (`safeLink`), checked when
+  saved and again when tapped, since another client could have stored
+  anything.
+- **Values are strings in one map**, keyed by field id, written by path, so two
+  owners saving different values both land.
+- **Shapes are the app's, not the rules'**: rules bound the list and the map at
+  twenty and cannot look inside either, so a name's length, a date being a date
+  and a link being http hold because the app keeps them and only owners and
+  admins write a board. The same accepted gap as a board's own labels.
+- **History** records fields added, removed, renamed and reordered, and each
+  value set or cleared, naming the field. **A clone** carries the fields under
+  new ids and none of the values.
 
 ## Theming
 
@@ -807,6 +843,8 @@ Deny-by-default.
   archive: ownership of that board.
 - `columnId` on a card must match a column that exists on the board — clients
   cannot invent columns.
+- **A board's `fields` and `details` are bounded at twenty each and nothing
+  more**; their contents are the app's to keep (see "Details").
 - **`laneId` on a card is checked for shape only** (a string of at most 200),
   and never required, by decision: see "Lanes". A board holds at most 12
   `lanes`; their names, their uniqueness and the finished column naming a real
