@@ -179,7 +179,7 @@ function CommentComposer({
       {candidates.length <= 1 ? (
         <Hint>
           You are the only member of this board, so there is nobody to mention
-          yet. Add people under board Settings.
+          yet. Add people in Board settings → People.
         </Hint>
       ) : null}
     </Panel>

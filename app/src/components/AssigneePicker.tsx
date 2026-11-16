@@ -135,7 +135,7 @@ export function AssigneePicker({
       {available.length === 0 ? (
         <Hint>
           {emptyHint ??
-            'Everyone on this board is already assigned. Add more people in board Settings.'}
+            'Everyone on this board is already assigned. Add more people in Board settings → People.'}
         </Hint>
       ) : picking ? (
         <View

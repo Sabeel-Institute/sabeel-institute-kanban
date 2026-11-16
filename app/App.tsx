@@ -77,7 +77,7 @@ function renderScreen(route: Route, user: SessionUser) {
     case 'board':
       return <BoardScreen boardId={route.boardId} user={user} />;
     case 'boardSettings':
-      return <BoardSettingsScreen boardId={route.boardId} user={user} />;
+      return <BoardSettingsScreen boardId={route.boardId} page={route.page} user={user} />;
     case 'boardArchive':
       return <BoardArchiveScreen boardId={route.boardId} user={user} />;
     case 'card':

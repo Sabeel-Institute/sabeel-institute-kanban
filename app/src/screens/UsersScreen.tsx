@@ -106,7 +106,7 @@ export function UsersScreen({ actor }: { actor: SessionUser }) {
         Only admins approve accounts, change roles, manage the institute&rsquo;s
         labels and see every board. Organizers create boards; everyone else
         sees only the boards they&rsquo;re added to. Who can RUN a board is set on the board itself,
-        in Board settings, and has nothing to do with the role here.
+        in Board settings → People, and has nothing to do with the role here.
       </Hint>
 
       {error ? (

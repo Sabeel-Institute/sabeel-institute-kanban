@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { BackHandler } from 'react-native';
 import { goBackHistory, onPopState, pushHistory, replaceHistory } from './history';
+import type { BoardSettingsPage } from './boardSettingsPages';
 
 /**
  * A tiny navigation stack.
@@ -18,7 +19,8 @@ import { goBackHistory, onPopState, pushHistory, replaceHistory } from './histor
 export type Route =
   | { name: 'boards' }
   | { name: 'board'; boardId: string }
-  | { name: 'boardSettings'; boardId: string }
+  /** No page is the list of pages on a phone, and the first page on a wide screen. */
+  | { name: 'boardSettings'; boardId: string; page?: BoardSettingsPage }
   | { name: 'boardArchive'; boardId: string }
   | { name: 'newBoard' }
   | { name: 'card'; boardId: string; cardId: string }
@@ -64,6 +66,18 @@ function pop() {
   // Returns false on native, where we pop directly.
   if (goBackHistory()) return;
   popInternal();
+}
+
+/**
+ * Swap the screen on top for another without a step back to it: a choice made
+ * WITHIN one screen, such as a page from the side list of Board settings on a
+ * wide screen. Back then leaves the screen rather than walking every page that
+ * was looked at. The browser's current entry still stands for the top of the
+ * stack, so history is left alone.
+ */
+function replace(route: Route) {
+  stack = [...stack.slice(0, -1), route];
+  emit();
 }
 
 /** Replace the whole stack — used when signing out, or jumping to a root tab. */
@@ -118,6 +132,7 @@ export function useNav() {
     canGoBack: s.length > 1,
     push: useCallback(push, []),
     pop: useCallback(pop, []),
+    replace: useCallback(replace, []),
     reset: useCallback(reset, []),
   };
 }

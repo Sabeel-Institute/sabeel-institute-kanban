@@ -434,8 +434,8 @@ function ArchivedBoards({
       {open ? (
         <>
           <Hint>
-            Archived boards are hidden from everyone. Open one and use Restore in
-            its settings to bring it back.
+            Archived boards are hidden from everyone. Open one and use Restore
+            board in its settings, under General, to bring it back.
           </Hint>
           <CardGrid>
             {list.map((b) => (

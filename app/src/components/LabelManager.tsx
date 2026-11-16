@@ -31,7 +31,7 @@ import {
   type LabelUsage,
 } from '../labels';
 import type { SessionUser } from '../session';
-import { Body, Button, Card, Heading, Hint, IconAction, Row, Spinner, TextField } from './ui';
+import { Body, Button, Card, Hint, IconAction, Row, Spinner, TextField } from './ui';
 import { radius, space, useTheme } from '../theme';
 import { useAction } from '../useAction';
 
@@ -214,7 +214,7 @@ export function LabelManager({
 }
 
 /**
- * The Labels section of a board's own screen, for everyone on the board.
+ * Board settings → Labels, for everyone on the board.
  *
  * One list: institute labels first, locked, then the board's own with their
  * controls. Nothing explains the lock, by decision: the icon does.
@@ -234,27 +234,26 @@ export function BoardLabelsSection({
   const shown = labelsForBoard(all, boardId);
   const institute = shown.filter((l) => !l.boardId);
   const own = shown.filter((l) => l.boardId === boardId);
+  // No heading of its own: it is the whole of Board settings → Labels, whose
+  // name is already the page's title.
   return (
-    <>
-      <Heading>Labels</Heading>
-      <Card>
-        {labels.status === 'loading' ? <Spinner label="Loading labels…" /> : null}
-        {labels.status === 'ready' && shown.length === 0 ? <Hint>No labels yet.</Hint> : null}
-        {institute.map((l) => (
-          <LockedLabel key={l.id} label={l} />
-        ))}
-        {canEdit ? (
-          <LabelManager
-            boardId={boardId}
-            user={user}
-            labels={own}
-            known={labels.status === 'ready' ? shown : null}
-          />
-        ) : (
-          own.map((l) => <LockedLabel key={l.id} label={l} />)
-        )}
-      </Card>
-    </>
+    <Card>
+      {labels.status === 'loading' ? <Spinner label="Loading labels…" /> : null}
+      {labels.status === 'ready' && shown.length === 0 ? <Hint>No labels yet.</Hint> : null}
+      {institute.map((l) => (
+        <LockedLabel key={l.id} label={l} />
+      ))}
+      {canEdit ? (
+        <LabelManager
+          boardId={boardId}
+          user={user}
+          labels={own}
+          known={labels.status === 'ready' ? shown : null}
+        />
+      ) : (
+        own.map((l) => <LockedLabel key={l.id} label={l} />)
+      )}
+    </Card>
   );
 }
 
