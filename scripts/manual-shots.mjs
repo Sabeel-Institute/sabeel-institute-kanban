@@ -371,6 +371,15 @@ const SHOTS = {
     await p.getByRole('button', { name: 'Rename lane Planning' }).waitFor({ timeout: 30000 });
     await p.waitForTimeout(900);
   },
+  // Settings → Details on the lanes board, filled in by the seed.
+  details: async (p) => {
+    await nav(p, 'Boards');
+    await p.getByText('Summer Program 2027', { exact: true }).first().click();
+    await p.getByRole('button', { name: 'Board settings' }).click();
+    await p.getByRole('button', { name: 'Details', exact: true }).click();
+    await p.getByRole('button', { name: 'Edit fields' }).waitFor({ timeout: 30000 });
+    await p.waitForTimeout(900);
+  },
   // Settings → People, as an OWNER: the Owner switch beside each row.
   owners: async (p) => {
     await openBoard(p);
@@ -408,7 +417,7 @@ const SHOTS = {
   roster: async (p) => {
     await nav(p, 'Boards');
     await p.getByText(BOARD).first().click();
-    await p.getByRole('button', { name: 'Members and labels' }).click();
+    await p.getByRole('button', { name: 'About this board' }).click();
     await p.getByRole('button', { name: 'People', exact: true }).click();
     await p.getByText(/^Members \(/).first().waitFor({ timeout: 30000 });
     await p.waitForTimeout(900);

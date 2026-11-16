@@ -409,6 +409,37 @@ try {
       );
       await admin.getByRole('button', { name: `Rename lane ${lane}` }).waitFor({ timeout: 25000 });
     }
+    // Its details: the two dates other screens read, and two of its own.
+    await settingsPage('Details');
+    await admin.getByRole('button', { name: 'Add details' }).click();
+    const addField = async (typeLabel, name) => {
+      await admin.getByLabel('Type', { exact: true }).selectOption({ label: typeLabel });
+      if (name) {
+        await fillThen(admin, 'Field name, such as Teachers', name, (o) =>
+          admin.getByRole('button', { name: 'Add field' }).click(o),
+        );
+      } else {
+        await admin.getByRole('button', { name: 'Add field' }).click();
+      }
+      await admin.getByRole('button', { name: `Remove field ${name || typeLabel.split(' (')[0]}` }).waitFor({ timeout: 25000 });
+    };
+    await addField('Start date (read by other screens)');
+    await addField('End date (read by other screens)');
+    await addField('Text', 'Teachers');
+    await addField('Link', 'Zoom link');
+    await admin.getByRole('button', { name: 'Done', exact: true }).click();
+    await admin.getByLabel('Start date', { exact: true }).fill('2027-06-21');
+    await admin.getByText('21 Jun 2027').waitFor({ timeout: 25000 }).catch(() => undefined);
+    for (const [field, value] of [
+      ['Teachers', 'Sara and Omar'],
+      ['Zoom link', 'https://meet.example.org/summer'],
+    ]) {
+      await admin.getByRole('button', { name: `Edit ${field}` }).click();
+      await admin.getByLabel(field, { exact: true }).fill(value);
+      await admin.getByRole('button', { name: `Save ${field}` }).click();
+      await admin.getByText(value).waitFor({ timeout: 25000 });
+    }
+
     await settingsPage('People');
     await admin.getByRole('button', { name: /^Add someone/ }).click().catch(() => undefined);
     await pressEachUntilNone(

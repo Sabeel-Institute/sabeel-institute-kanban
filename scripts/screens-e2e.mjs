@@ -313,6 +313,20 @@ await db.doc(`boards/${LANES_BOARD}`).set({
     { id: 'ln_sup', name: 'Supplies' },
   ],
   doneColumnId: 'l3',
+  // Details at their widest: a long text value and a long link, which must
+  // wrap rather than push the page sideways at 320.
+  fields: [
+    { id: 'fd_s', name: 'Start date', type: 'start' },
+    { id: 'fd_e', name: 'End date', type: 'end' },
+    { id: 'fd_t', name: 'Teachers and volunteers for the mornings', type: 'text' },
+    { id: 'fd_l', name: 'Zoom link', type: 'link' },
+    { id: 'fd_n', name: 'Fee', type: 'number' },
+  ],
+  details: {
+    fd_s: '2027-06-21',
+    fd_t: 'Sara and Omar, with three volunteers from the parents’ committee on Saturdays',
+    fd_l: 'https://meet.example.org/j/84512237771?pwd=QWxhZGRpbjpvcGVuIHNlc2FtZQ',
+  },
   memberUids: [uid],
   boardOwnerUids: [uid],
   memberProfiles: { [uid]: { displayName: 'Faisal', email: 'faisal@oursabeel.com' } },
@@ -580,7 +594,7 @@ async function rulesScreen(page, tag, width) {
 }
 
 // ---- The tour --------------------------------------------------------------
-const SCREENS = 34;
+const SCREENS = 37;
 
 async function tour(page, tag, width) {
   /**
@@ -1008,7 +1022,7 @@ async function tour(page, tag, width) {
    * is the way back: a page returns to the list on a phone.
    */
   const wide = width >= WIDE_BREAKPOINT;
-  const SETTINGS_PAGES = ['General', 'Columns', 'Lanes', 'People', 'Labels', 'History'];
+  const SETTINGS_PAGES = ['General', 'Columns', 'Lanes', 'Details', 'People', 'Labels', 'History'];
   const pageRow = (name) => page.getByRole('button', { name, exact: true }).first();
   await visit('settings', async () => {
     // Close the sheet left open by `card-sheet` first — a modal swallows the
@@ -1113,6 +1127,20 @@ async function tour(page, tag, width) {
     await pageRow('Lanes').click();
     await page.getByRole('button', { name: `Rename lane ${LONG_LANE}` }).waitFor({ timeout: 15000 });
   });
+  // Details filled in, then its field editor, on the same board.
+  await visit('details-filled', async () => {
+    if (!wide) {
+      await page.getByRole('button', { name: 'Back' }).first().click();
+      await page.waitForTimeout(400);
+    }
+    await pageRow('Details').click();
+    await page.getByRole('button', { name: 'Edit fields' }).waitFor({ timeout: 15000 });
+  });
+  await visit('details-fields', async () => {
+    await page.getByRole('button', { name: 'Edit fields' }).click();
+    await page.getByRole('button', { name: 'Add field' }).waitFor({ timeout: 15000 });
+  });
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
 
 
   /**
@@ -1139,7 +1167,7 @@ async function tour(page, tag, width) {
       );
       return {
         settings: shown.some((e) => name(e) === 'Board settings'),
-        members: shown.some((e) => name(e) === 'Members and labels'),
+        members: shown.some((e) => name(e) === 'About this board'),
       };
     });
     check(
@@ -1265,7 +1293,7 @@ async function tour(page, tag, width) {
           deleteColumn: vis.some((e) => nm(e).startsWith('Delete column')),
           archived: vis.some((e) => nm(e) === 'Archived cards'),
           settings: vis.some((e) => nm(e) === 'Board settings'),
-          members: vis.some((e) => nm(e) === 'Members and labels'),
+          members: vis.some((e) => nm(e) === 'About this board'),
           bleed: document.documentElement.scrollWidth - window.innerWidth,
         };
       });
@@ -1288,22 +1316,24 @@ async function tour(page, tag, width) {
       // differs: its title, and which pages it offers. An owner gets every
       // page; anyone else gets People, Labels and History and nothing drawn
       // disabled.
-      await rp.getByRole('button', { name: wants.settings ? 'Board settings' : 'Members and labels' }).click();
+      await rp.getByRole('button', { name: wants.settings ? 'Board settings' : 'About this board' }).click();
       await rp.getByRole('button', { name: 'History', exact: true }).waitFor({ timeout: 20000 });
       const list = await rp.evaluate(() => {
         const nm = (e) => (e.getAttribute('aria-label') || '').trim();
         const rows = [...document.querySelectorAll('[role="button"]')]
           .filter((e) => e.getBoundingClientRect().width > 2)
           .map(nm)
-          .filter((n) => ['General', 'Columns', 'Lanes', 'People', 'Labels', 'History'].includes(n));
+          .filter((n) =>
+            ['General', 'Columns', 'Lanes', 'Details', 'People', 'Labels', 'History'].includes(n),
+          );
         return {
           title: (document.body.textContent || '').includes('Board settings') ? 'settings' : 'members',
           rows,
         };
       });
       const wantRows = wants.settings
-        ? ['General', 'Columns', 'Lanes', 'People', 'Labels', 'History']
-        : ['People', 'Labels', 'History'];
+        ? ['General', 'Columns', 'Lanes', 'Details', 'People', 'Labels', 'History']
+        : ['Details', 'People', 'Labels', 'History'];
       check(
         `${tag} / settings as ${role === 'owner' ? 'an owner' : 'a member'} lists its pages`,
         list.title === (wants.settings ? 'settings' : 'members') &&
