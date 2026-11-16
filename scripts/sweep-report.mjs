@@ -29,8 +29,9 @@ const ORDER = [
   'rules', 'boards', 'boards-clone', 'mywork', 'search', 'alerts', 'stats', 'people', 'labels', 'more', 'report',
   'board', 'board-owner', 'board-member', 'roster-owner', 'roster-member',
   'board-longname', 'board-empty', 'bulk', 'card', 'card-editing', 'card-comment',
-  'settings', 'settings-general', 'settings-columns', 'settings-people', 'settings-labels',
-  'settings-history', 'archive',
+  'settings', 'settings-general', 'settings-columns', 'settings-lanes', 'settings-people',
+  'settings-labels', 'settings-history', 'archive',
+  'lanes-board', 'lanes-add-card', 'lanes-move', 'lanes-settings',
 ];
 
 /**
@@ -77,11 +78,16 @@ const BLURB = {
   settings: 'Board settings as it opens: the list of pages on a narrow screen; on a wide one the list down the side with General beside it.',
   'settings-general': 'Settings \u2192 General: the board\u2019s name, and Archive. Owners and admins only.',
   'settings-columns': 'Settings \u2192 Columns: rename in place, drag to reorder, add at the foot. Owners and admins only.',
+  'settings-lanes': 'Settings \u2192 Lanes on a board without them: the switch, off, and nothing else.',
   'settings-people': 'Settings \u2192 People: the members, an Owner switch on each row, and the add-person icon on the heading.',
   'settings-labels': 'Settings \u2192 Labels: the institute\u2019s locked, then the board\u2019s own with their controls. Everyone on the board.',
   'settings-history': 'Settings \u2192 History: what has happened to the board, newest first. Everyone on the board.',
   'boards-clone': 'Cloning a board: the sheet a long-press (or a right-click) on its row opens. Organizers and admins only, since a clone is a new board.',
   archive: 'Archived cards, most recently archived first.',
+  'lanes-board': 'A board WITH LANES: each column lists every lane under a heading and one badge, finished of total \u2014 green when complete, red when a card is late \u2014 and No lane last. A lane name at the 40-character limit must shrink, not push its badge off the row.',
+  'lanes-add-card': 'Add card on a board with lanes: the title, a lane to choose with none chosen, and the bell.',
+  'lanes-move': 'The selection bar\u2019s Move mode on a board with lanes: a column, a lane, or both, then Move.',
+  'lanes-settings': 'Settings \u2192 Lanes on: the switch, the lanes with their handles, pencils and bins, the add row, and where finished cards are.',
 };
 
 const files = (await readdir(SHOTS)).filter((f) => f.endsWith('.png'));

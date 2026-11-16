@@ -285,6 +285,58 @@ await db.doc('boards/sw_ownerless').set({
   createdBy: uid,
 });
 
+/**
+ * A board WITH LANES, beside the plain one and never instead of it: the plain
+ * board must keep being swept as it was.
+ *
+ * Chosen to stress a lane heading: a name at LANE_NAME_MAX beside its badge,
+ * which must shrink rather than push the badge off a 320px row (Yoga's
+ * flexShrink is 0), and one lane in each state the badge colours: complete
+ * (green), late (red), and no cards. One card has no lane, so No lane shows.
+ */
+const LANES_BOARD = 'sw_lanes';
+const LONG_LANE = 'Marketing and outreach to local families';
+await db.doc(`boards/${LANES_BOARD}`).set({
+  name: 'Summer Program',
+  description: '',
+  archived: false,
+  columns: [
+    { id: 'l1', name: 'To Do' },
+    { id: 'l2', name: 'In Progress' },
+    { id: 'l3', name: 'Done' },
+  ],
+  columnIds: ['l1', 'l2', 'l3'],
+  lanesOn: true,
+  lanes: [
+    { id: 'ln_plan', name: 'Planning' },
+    { id: 'ln_mkt', name: LONG_LANE },
+    { id: 'ln_sup', name: 'Supplies' },
+  ],
+  doneColumnId: 'l3',
+  memberUids: [uid],
+  boardOwnerUids: [uid],
+  memberProfiles: { [uid]: { displayName: 'Faisal', email: 'faisal@oursabeel.com' } },
+  activeCardCount: 0,
+  createdAt: now,
+  createdBy: uid,
+});
+for (const [id, columnId, laneId, title, dueDate] of [
+  ['swl1', 'l3', 'ln_plan', 'Confirm the dates'],
+  ['swl2', 'l3', 'ln_plan', 'Book the hall'],
+  ['swl3', 'l1', 'ln_mkt', 'Design the flyer for the summer program', '2020-01-01'],
+  ['swl4', 'l2', 'ln_mkt', 'Open registration'],
+  ['swl5', 'l1', null, 'Find a photographer'],
+]) {
+  await db.doc(`cards/${id}`).set({
+    boardId: LANES_BOARD, title, columnId, priority: 'none', description: '',
+    ...(laneId ? { laneId } : {}),
+    ...(dueDate ? { dueDate } : {}),
+    rank: `V${id.slice(-1)}`, assigneeUids: [], subscriberUids: [], labelIds: [],
+    archived: false, commentCount: 0,
+    createdAt: now, createdBy: uid, updatedAt: now, updatedBy: uid,
+  });
+}
+
 // Content chosen to STRESS layout: a long title, every priority, labels and an
 // assignee on each, so card faces are at their widest.
 const CARDS = [
@@ -528,7 +580,7 @@ async function rulesScreen(page, tag, width) {
 }
 
 // ---- The tour --------------------------------------------------------------
-const SCREENS = 29;
+const SCREENS = 34;
 
 async function tour(page, tag, width) {
   /**
@@ -956,7 +1008,7 @@ async function tour(page, tag, width) {
    * is the way back: a page returns to the list on a phone.
    */
   const wide = width >= WIDE_BREAKPOINT;
-  const SETTINGS_PAGES = ['General', 'Columns', 'People', 'Labels', 'History'];
+  const SETTINGS_PAGES = ['General', 'Columns', 'Lanes', 'People', 'Labels', 'History'];
   const pageRow = (name) => page.getByRole('button', { name, exact: true }).first();
   await visit('settings', async () => {
     // Close the sheet left open by `card-sheet` first — a modal swallows the
@@ -1004,6 +1056,62 @@ async function tour(page, tag, width) {
     await page.getByRole('button', { name: 'Back' }).first().click();
     await page.waitForTimeout(800);
     await page.getByRole('button', { name: 'Archived cards' }).click();
+  });
+
+  /**
+   * THE BOARD WITH LANES: each column lists the board's lanes under a heading
+   * with one badge. Checked by what a screen reader hears of the headings in
+   * view, which carries both the name and what the badge's colour says.
+   */
+  await visit('lanes-board', async () => {
+    await nav('Boards');
+    await page.getByText('Summer Program', { exact: true }).first().click();
+    await page.locator('[role="heading"][aria-label^="Planning,"]').first().waitFor({ timeout: 20000 });
+  });
+  {
+    const headings = await page.evaluate(() =>
+      [...document.querySelectorAll('[role="heading"][aria-label]')]
+        .filter((h) => {
+          const r = h.getBoundingClientRect();
+          return r.width > 0 && r.left >= 0 && r.right <= window.innerWidth + 1;
+        })
+        .map((h) => h.getAttribute('aria-label')),
+    );
+    const want = [
+      'Planning, all 2 finished',
+      `${LONG_LANE}, 0 of 2 finished, a card is late`,
+      'Supplies, no cards',
+      'No lane',
+    ];
+    check(
+      `${tag} / lanes-board heads each lane with its state`,
+      want.every((w, i) => headings[i] === w),
+      headings.slice(0, 4).join(' | '),
+    );
+  }
+  await visit('lanes-add-card', async () => {
+    await page.getByRole('button', { name: '+ Add card' }).first().click();
+    await page.getByLabel('Lane', { exact: true }).first().waitFor({ timeout: 15000 });
+  });
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Cancel', exact: true }).first().click({ timeout: 3000 }).catch(() => {});
+  await page.waitForTimeout(500);
+  await visit('lanes-move', async () => {
+    if (wide) {
+      await page.getByRole('checkbox', { name: 'Select Find a photographer' }).click();
+    } else {
+      await page.locator('[data-testid="card-Find a photographer"]').first().click({ delay: 900 });
+    }
+    await page.getByRole('button', { name: 'Move selected cards' }).click();
+    await page.getByLabel('Lane', { exact: true }).first().waitFor({ timeout: 15000 });
+  });
+  await page.getByRole('button', { name: 'Cancel', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Clear selection' }).click();
+  await page.waitForTimeout(400);
+  await visit('lanes-settings', async () => {
+    await page.getByRole('button', { name: 'Board settings' }).click();
+    await pageRow('Lanes').click();
+    await page.getByRole('button', { name: `Rename lane ${LONG_LANE}` }).waitFor({ timeout: 15000 });
   });
 
 
@@ -1187,14 +1295,14 @@ async function tour(page, tag, width) {
         const rows = [...document.querySelectorAll('[role="button"]')]
           .filter((e) => e.getBoundingClientRect().width > 2)
           .map(nm)
-          .filter((n) => ['General', 'Columns', 'People', 'Labels', 'History'].includes(n));
+          .filter((n) => ['General', 'Columns', 'Lanes', 'People', 'Labels', 'History'].includes(n));
         return {
           title: (document.body.textContent || '').includes('Board settings') ? 'settings' : 'members',
           rows,
         };
       });
       const wantRows = wants.settings
-        ? ['General', 'Columns', 'People', 'Labels', 'History']
+        ? ['General', 'Columns', 'Lanes', 'People', 'Labels', 'History']
         : ['People', 'Labels', 'History'];
       check(
         `${tag} / settings as ${role === 'owner' ? 'an owner' : 'a member'} lists its pages`,
