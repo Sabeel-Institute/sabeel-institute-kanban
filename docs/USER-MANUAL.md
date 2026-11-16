@@ -745,9 +745,10 @@ The pages:
   the bottom, up to twelve. Rename one with its **pencil**, drag its handle to
   reorder, and remove it with its **bin**: only once it's empty, like a
   column. **Finished cards are in** chooses the column whose cards count as
-  finished; it starts as the last one. Turning lanes **off** draws the board
-  as before, and keeps the lanes and every card's lane for when you turn them
-  back on.
+  finished; it starts as the last one. If you delete that column, the last
+  column left takes its place, and the app says which before you confirm.
+  Turning lanes **off** draws the board as before, and keeps the lanes and
+  every card's lane for when you turn them back on.
 
   <div class="pair">
     <figure class="ph"><img src="manual/img/lanesettings-phone.png" alt="The Lanes page on a phone: the switch, the lanes with their handles, and where finished cards are"><figcaption>On a phone</figcaption></figure>
