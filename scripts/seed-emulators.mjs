@@ -368,6 +368,73 @@ try {
   console.warn('could not seed a comment — continuing:', String(e).slice(0, 120));
 }
 
+// A board with lanes, beside the plain one and never instead of it: a program
+// divided into Planning, Marketing and Supplies. One card is added before lanes
+// go on, so it sits under No lane; one is moved to the finished column, so a
+// lane's badge counts it.
+const LANES_BOARD = 'Summer Program 2027';
+const LANES = ['Planning', 'Marketing', 'Supplies'];
+const LANE_CARDS = [
+  ['Confirm the dates', 'Planning'],
+  ['Book the hall', 'Planning'],
+  ['Design the flyer', 'Marketing'],
+  ['Open registration', 'Marketing'],
+  ['Order the books', 'Supplies'],
+];
+try {
+  await admin.getByRole('button', { name: 'Boards' }).first().click();
+  await admin.getByRole('button', { name: 'New board' }).waitFor({ timeout: 25000 });
+  if (!(await admin.getByText(LANES_BOARD).first().isVisible().catch(() => false))) {
+    await admin.getByRole('button', { name: 'New board' }).click();
+    await fillThen(admin, 'Board name', LANES_BOARD, (o) =>
+      admin.getByRole('button', { name: 'Create', exact: true }).click(o),
+    );
+    await admin.getByText('To Do').first().waitFor({ timeout: 30000 });
+    const addTo = async (title, lane) => {
+      await admin.getByRole('button', { name: '+ Add card' }).first().click();
+      await admin.getByPlaceholder('Card title').fill(title);
+      if (lane) await admin.getByLabel('Lane', { exact: true }).selectOption({ label: lane });
+      await admin.getByRole('button', { name: 'Add card', exact: true }).click();
+      await admin.getByText(title).first().waitFor({ timeout: 25000 });
+    };
+    await addTo('Find a photographer');
+
+    await admin.getByRole('button', { name: 'Board settings' }).click();
+    await settingsPage('Lanes');
+    await admin.getByRole('switch', { name: 'Lanes on this board' }).click();
+    await admin.getByPlaceholder('New lane name').waitFor({ timeout: 25000 });
+    for (const lane of LANES) {
+      await fillThen(admin, 'New lane name', lane, (o) =>
+        admin.getByRole('button', { name: 'Add lane' }).click(o),
+      );
+      await admin.getByRole('button', { name: `Rename lane ${lane}` }).waitFor({ timeout: 25000 });
+    }
+    await settingsPage('People');
+    await admin.getByRole('button', { name: /^Add someone/ }).click().catch(() => undefined);
+    await pressEachUntilNone(
+      admin,
+      admin.getByRole('button', { name: /^Add .* to this board$/ }),
+      'adding a member to the lanes board',
+    );
+    await admin.getByRole('button', { name: 'Back' }).first().click();
+    await admin.getByText('To Do').first().waitFor({ timeout: 25000 });
+
+    for (const [title, lane] of LANE_CARDS) await addTo(title, lane);
+
+    await admin.getByText('Confirm the dates').first().click();
+    await admin.getByLabel('Column', { exact: true }).selectOption({ label: 'Done' });
+    await admin.waitForTimeout(1500);
+    await admin.getByRole('button', { name: 'Back' }).first().click();
+    await admin.getByText('To Do').first().waitFor({ timeout: 25000 });
+  }
+} catch (e) {
+  console.warn('could not seed the lanes board — continuing:', String(e).slice(0, 160));
+}
+
 await browser.close();
-console.log(`Seeded: 3 people, 1 board, ${COLUMNS.length + 3} columns, ${CARDS.length} cards.`);
+console.log(
+  `Seeded: 3 people, 2 boards (one with ${LANES.length} lanes), ${COLUMNS.length + 3} columns, ${
+    CARDS.length
+  } cards.`,
+);
 console.log(`Open ${BASE} and use the dev sign-in row.`);
