@@ -115,9 +115,23 @@ try {
   check('a clone of a template is not marked', (await generalSwitch().getAttribute('aria-checked')) === 'false');
   await page.getByRole('button', { name: 'History', exact: true }).click();
   await page.getByText(/ cloned this board from “Camp template” ·/).waitFor({ timeout: 25000 });
+  // The "cloned" line is written with the board; a "created" line, if the
+  // history trigger wrote one, would come later. So a later change is made and
+  // its line awaited first: once it is there, the trigger has had the board's
+  // creation too, and no "created" line means none was written.
+  await page.getByRole('button', { name: 'General', exact: true }).click();
+  await generalSwitch().click();
+  await page.getByText(/^Listed under Templates/).waitFor({ timeout: 15000 });
+  await generalSwitch().click();
+  await page.getByRole('button', { name: 'History', exact: true }).click();
+  const later = await page
+    .getByText(/ took the template mark off the board ·/)
+    .waitFor({ timeout: 25000 })
+    .then(() => true, () => false);
   check(
     'and its history opens with one line, where it was cloned from',
-    (await page.getByText(/ created the board ·/).count()) === 0,
+    later && (await page.getByText(/ created the board ·/).count()) === 0,
+    later ? 'a created line is there' : 'the later line never came',
   );
   await boards();
   check('the clone is listed with the boards, not the templates', (await sectionOf(CLONE)) !== 'Templates', String(await sectionOf(CLONE)));
