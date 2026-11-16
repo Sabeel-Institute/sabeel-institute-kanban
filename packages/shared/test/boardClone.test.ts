@@ -209,6 +209,11 @@ describe('boardClone: lanes', () => {
     expect(clone([], false, { ...onLanes, doneColumnId: 'c_gone' }).board.doneColumnId).toBeUndefined();
   });
 
+  it('never marks a clone as a template, though the callable passes the marked source whole', () => {
+    // `cloneBoard` hands the source BoardDoc over as it is, mark and all.
+    expect('template' in clone([], false, { template: true } as never).board).toBe(false);
+  });
+
   it('gives a board without lanes none of the lane fields', () => {
     const { board, cards } = clone([card({ id: 'a' })]);
     expect(['lanesOn', 'lanes', 'doneColumnId'].filter((k) => k in board)).toEqual([]);

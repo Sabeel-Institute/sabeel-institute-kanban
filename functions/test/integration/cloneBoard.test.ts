@@ -218,10 +218,12 @@ describe('cloneBoard: the clone', () => {
     for (const c of cards) {
       expect(await createdLines(c.id)).toEqual([{ type: 'created', actorUid: ORG, at: c.createdAt }]);
     }
-    await waitFor('board history created entry', async () => {
-      const entries = (await adminDb().collection(`boards/${cloneId}/activity`).get()).docs.map((d) => d.data());
-      return entries.some((e) => e.type === 'created') ? true : undefined;
-    });
+    // The board's history opens with "cloned from", written with the board;
+    // the history trigger adds no "created" beside it (checked below, once
+    // the triggers have had time to run).
+    const boardLines = async () =>
+      (await adminDb().collection(`boards/${cloneId}/activity`).get()).docs.map((d) => d.data().type);
+    expect(await boardLines()).toEqual(['cloned']);
     // Each card's "created" queues a notice, as any new card's does: once
     // they are all queued, the card triggers have had the clone too. Had they
     // not stayed out, the count, Stats and history would now be doubling.
@@ -233,6 +235,7 @@ describe('cloneBoard: the clone', () => {
       if ((await adminDb().doc(`boards/${cloneId}`).get()).data()?.activeCardCount !== 4) return false;
       if ((await createdToday()) !== 4) return false;
       for (const c of cards) if ((await createdLines(c.id)).length !== 1) return false;
+      if ((await boardLines()).join() !== 'cloned') return false;
       return true;
     });
     // The sweep sends the queued notices to nobody: the cloner made the cards
@@ -267,6 +270,28 @@ describe('cloneBoard: the clone', () => {
     const cards = (await adminDb().collection('cards').where('boardId', '==', quiet).get()).docs.map((d) => d.data());
     expect(cards).toHaveLength(4);
     for (const c of cards) expect(c.subscriberUids).toEqual([]);
+  });
+});
+
+describe('cloneBoard: a template', () => {
+  it('opens the clone’s history with one line, cloned from the source, and does not mark it', async () => {
+    await adminDb().doc('boards/cb_marked').set(board({ name: 'Camp template', template: true }));
+    const id = newId();
+    const res = await callFunction('cloneBoard', { boardId: 'cb_marked', name: 'Camp 2027', cloneId: id }, await idTokenFor(ORG));
+    expect(res.body.error).toBeUndefined();
+    const clone = (await adminDb().doc(`boards/${id}`).get()).data()!;
+    expect(clone.template).toBeUndefined();
+    // A later change's line proves the creation's trigger has run: the
+    // emulator runs them one at a time. Then every line is read.
+    await adminDb().doc(`boards/${id}`).update({ name: 'Camp 2027 renamed', updatedBy: ORG, updatedAt: Date.now() });
+    const lines = await waitFor('the rename in the clone’s history', async () => {
+      const all = (await adminDb().collection(`boards/${id}/activity`).orderBy('at').get()).docs.map((d) => d.data());
+      return all.some((l) => l.type === 'renamed') ? all : undefined;
+    });
+    expect(lines).toEqual([
+      expect.objectContaining({ type: 'cloned', from: 'Camp template', actorUid: ORG, actorName: 'Olive Organizer' }),
+      expect.objectContaining({ type: 'renamed', to: 'Camp 2027 renamed' }),
+    ]);
   });
 });
 

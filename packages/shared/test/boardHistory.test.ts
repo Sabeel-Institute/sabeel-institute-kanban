@@ -366,6 +366,25 @@ describe('describeBoardActivity', () => {
     }
   });
 
+  it('records the template mark set and taken off', () => {
+    expect(diffBoard(board(), board({ template: true }))).toEqual([{ type: 'templateOn' }]);
+    expect(diffBoard(board({ template: true }), board({ template: false }))).toEqual([
+      { type: 'templateOff' },
+    ]);
+    expect(diffBoard(board(), board({ template: false }))).toEqual([]);
+  });
+
+  it('words the template entries and a clone’s first line', () => {
+    const by = { actorUid: 'sara', actorName: 'Sara' };
+    expect(describeBoardActivity({ type: 'templateOn', ...by })).toBe('Sara marked the board as a template');
+    expect(describeBoardActivity({ type: 'templateOff', ...by })).toBe(
+      'Sara took the template mark off the board',
+    );
+    expect(describeBoardActivity({ type: 'cloned', from: 'Program template', ...by })).toBe(
+      'Sara cloned this board from “Program template”',
+    );
+  });
+
   it('words the detail entries, cutting a long value short', () => {
     const by = { actorUid: 'sara', actorName: 'Sara' };
     expect(describeBoardActivity({ type: 'fieldAdded', to: 'Fee', ...by })).toBe(

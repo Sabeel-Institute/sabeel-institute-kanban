@@ -218,6 +218,12 @@ export interface BoardDoc {
    * (`validateDetailValue`): rules can bound the map, not look inside it.
    */
   details?: Record<string, string>;
+  /**
+   * Marked as a template: listed under Templates in the Boards list, with a
+   * badge, and left out of the overview. Nothing else; any board can be
+   * cloned, marked or not, and a clone is never marked. Absent is not.
+   */
+  template?: boolean;
 }
 
 // ---- Cards -----------------------------------------------------------------
@@ -436,7 +442,12 @@ export type BoardActivityType =
   | 'fieldRenamed'
   | 'fieldsReordered'
   /** `field` carries the field's name, `to` its new value, absent when cleared. */
-  | 'detailChanged';
+  | 'detailChanged'
+  | 'templateOn'
+  | 'templateOff'
+  /** The board's first line when it was made by cloning: `from` carries the
+   *  source board's name. Written by `cloneBoard`, not by `diffBoard`. */
+  | 'cloned';
 
 /**
  * An entry in a board's history, at `boards/{boardId}/activity/{id}`.

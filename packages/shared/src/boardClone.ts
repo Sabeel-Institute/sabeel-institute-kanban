@@ -48,6 +48,13 @@ export const CLONE_BOARD_MAX_CARDS = 240;
  */
 export const CLONE_BOARD_MAX_BYTES = 8 * 1024 * 1024;
 
+/**
+ * The id of a clone's first history line, "cloned from", which `cloneBoard`
+ * writes with the board. Fixed, so `onBoardWritten` can tell a clone from a
+ * new board and not add a "created" line beside it.
+ */
+export const CLONED_ENTRY_ID = 'cloned';
+
 /** What a clone reads of each source card. */
 export interface CloneSourceCard {
   id: string;
