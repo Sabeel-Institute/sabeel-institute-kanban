@@ -117,8 +117,9 @@ try {
   await page.getByText(/ cloned this board from “Camp template” ·/).waitFor({ timeout: 25000 });
   // The "cloned" line is written with the board; a "created" line, if the
   // history trigger wrote one, would come later. So a later change is made and
-  // its line awaited first: once it is there, the trigger has had the board's
-  // creation too, and no "created" line means none was written.
+  // its line awaited first, and the history then watched a while: the
+  // emulator runs triggers in parallel, so the creation's is not sure to have
+  // finished first.
   await page.getByRole('button', { name: 'General', exact: true }).click();
   await generalSwitch().click();
   await page.getByText(/^Listed under Templates/).waitFor({ timeout: 15000 });
@@ -128,13 +129,20 @@ try {
     .getByText(/ took the template mark off the board ·/)
     .waitFor({ timeout: 25000 })
     .then(() => true, () => false);
+  let created = 0;
+  for (let i = 0; later && i < 10 && created === 0; i += 1) {
+    created = await page.getByText(/ created the board ·/).count();
+    if (created === 0) await page.waitForTimeout(300);
+  }
   check(
     'and its history opens with one line, where it was cloned from',
-    later && (await page.getByText(/ created the board ·/).count()) === 0,
+    later && created === 0,
     later ? 'a created line is there' : 'the later line never came',
   );
   await boards();
-  check('the clone is listed with the boards, not the templates', (await sectionOf(CLONE)) !== 'Templates', String(await sectionOf(CLONE)));
+  // Named positively: "not under Templates" would pass as well for a row not
+  // drawn at all. Just opened, the clone is under Recent.
+  check('the clone is listed with the boards, not the templates', (await sectionOf(CLONE)) === 'Recent', String(await sectionOf(CLONE)));
 
   // ---- Unmarked ---------------------------------------------------------------------
   await page.getByText(TEMPLATE, { exact: true }).first().click();
@@ -145,8 +153,9 @@ try {
   await boards();
   check(
     'unmarked, it leaves Templates, and the heading goes with the last one',
-    (await sectionOf(TEMPLATE)) !== 'Templates' &&
+    (await sectionOf(TEMPLATE)) === 'Recent' &&
       (await page.getByText('Templates', { exact: true }).count()) === 0,
+    String(await sectionOf(TEMPLATE)),
   );
 
   // ---- Archived, a template keeps its badge -------------------------------------------

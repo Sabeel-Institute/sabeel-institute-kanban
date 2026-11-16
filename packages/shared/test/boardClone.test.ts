@@ -29,6 +29,7 @@ function clone(
     lanes?: { id: string; name: string }[];
     doneColumnId?: string;
     fields?: { id: string; name: string; type: 'text' | 'start' }[];
+    details?: Record<string, string>;
   } = {},
 ) {
   let n = 0;
@@ -174,11 +175,13 @@ describe('boardClone: lanes', () => {
   const onLanes = { lanesOn: true, lanes, doneColumnId: 'c_done' };
 
   it('carries lanes switched on, in order, under new ids, with the finished column mapped', () => {
-    const { board } = clone([], false, onLanes);
+    // A finished column that is NOT the last, so a clone that dropped it and
+    // fell back to the last column would not pass.
+    const { board } = clone([], false, { ...onLanes, doneColumnId: 'c_todo' });
     expect(board.lanesOn).toBe(true);
     expect(board.lanes!.map((l) => l.name)).toEqual(['Planning', 'Marketing']);
     expect(board.lanes!.map((l) => l.id)).not.toContain('ln_plan');
-    expect(board.doneColumnId).toBe(board.columns[1].id);
+    expect(board.doneColumnId).toBe(board.columns[0].id);
   });
 
   it('puts each card in its lane on the clone', () => {
@@ -227,7 +230,8 @@ describe('boardClone: details', () => {
       { id: 'f1', name: 'Teachers', type: 'text' as const },
       { id: 'f2', name: 'Start date', type: 'start' as const },
     ];
-    const { board } = clone([], false, { fields });
+    // Values in the source, so leaving them behind is something the clone does.
+    const { board } = clone([], false, { fields, details: { f1: 'Sara', f2: '2027-06-01' } });
     expect(board.fields!.map((f) => [f.name, f.type])).toEqual([
       ['Teachers', 'text'],
       ['Start date', 'start'],

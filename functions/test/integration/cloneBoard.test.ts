@@ -281,17 +281,21 @@ describe('cloneBoard: a template', () => {
     expect(res.body.error).toBeUndefined();
     const clone = (await adminDb().doc(`boards/${id}`).get()).data()!;
     expect(clone.template).toBeUndefined();
-    // A later change's line proves the creation's trigger has run: the
-    // emulator runs them one at a time. Then every line is read.
+    // A later change's line is waited for, and then the history is held to
+    // its two lines for a while: the emulator runs triggers in parallel, so
+    // the creation's trigger is not sure to have finished before the rename's.
     await adminDb().doc(`boards/${id}`).update({ name: 'Camp 2027 renamed', updatedBy: ORG, updatedAt: Date.now() });
+    const read = async () =>
+      (await adminDb().collection(`boards/${id}/activity`).orderBy('at').get()).docs.map((d) => d.data());
     const lines = await waitFor('the rename in the clone’s history', async () => {
-      const all = (await adminDb().collection(`boards/${id}/activity`).orderBy('at').get()).docs.map((d) => d.data());
+      const all = await read();
       return all.some((l) => l.type === 'renamed') ? all : undefined;
     });
     expect(lines).toEqual([
       expect.objectContaining({ type: 'cloned', from: 'Camp template', actorUid: ORG, actorName: 'Olive Organizer' }),
       expect.objectContaining({ type: 'renamed', to: 'Camp 2027 renamed' }),
     ]);
+    await stays('no "created" line joins them', async () => !(await read()).some((l) => l.type === 'created'), 3000);
   });
 });
 
@@ -304,7 +308,8 @@ describe('cloneBoard: lanes and details', () => {
           { id: 'ln_plan', name: 'Planning' },
           { id: 'ln_mkt', name: 'Marketing' },
         ],
-        doneColumnId: 'c_run',
+        // Not the last column: a clone falling back to the last would differ.
+        doneColumnId: 'c_plan',
         fields: [
           { id: 'fld_s', name: 'Start date', type: 'start' },
           { id: 'fld_t', name: 'Teachers', type: 'text' },
@@ -322,7 +327,7 @@ describe('cloneBoard: lanes and details', () => {
     const clone = (await adminDb().doc(`boards/${id}`).get()).data()!;
     expect(clone.lanesOn).toBe(true);
     expect(clone.lanes.map((l: { name: string }) => l.name)).toEqual(['Planning', 'Marketing']);
-    expect(clone.doneColumnId).toBe(clone.columns[1].id);
+    expect(clone.doneColumnId).toBe(clone.columns[0].id);
     // The details' fields come, under new ids; what was typed in them does not.
     expect(clone.fields.map((f: { name: string; type: string }) => [f.name, f.type])).toEqual([
       ['Start date', 'start'],
