@@ -685,8 +685,12 @@ learn for boards that are not programs.
   drawn under **No lane**, last, in every column once any card on the board has
   none. A cross-board move or copy leaves the lane behind.
 - **The finished column exists only on a board with live lanes.** It is chosen
-  on the Lanes page and starts as the last column; a stored column that is gone
-  falls back to the last (`finishedColumnId`). A card in it is **finished**
+  on the Lanes page and starts as the last column. Every column write keeps it
+  pinned (`columnsPatch`): deleting it gives its place to the new last column,
+  written and recorded in the board's history, and the delete's confirmation
+  says which column that is. A stored column that is gone anyway, deleted by
+  an app too old to know about lanes, falls back to the last
+  (`finishedColumnId`). A card in it is **finished**
   (`isFinished`), and **a finished card is never late anywhere**: its face shows
   its date rather than how late it is, its card says nothing of Overdue, My
   Work files it under **Finished** (last), Search's Overdue chip leaves it out,
@@ -730,7 +734,9 @@ field has an empty Details page and nothing else changes.
 - **A list of typed fields**, each a name, a type and a value: Text, Number,
   Date, Link, plus **Start date** and **End date**, which are dates with fixed
   names, one of each at most, and the only details anything else reads
-  (`namedFieldValue`). None is required; none has a default. A field's type is
+  (`namedFieldValue`); no field of another type may take either name. A
+  number takes commas only between groups of three (1,200), so "7,5" is
+  refused rather than saved as 75. None is required; none has a default. A field's type is
   chosen once; to change it, remove the field and add another. At most twenty
   (`BOARD_FIELDS_MAX`, restated in the rules). No file field, no per-field
   switch for the overview: both were proposed and rejected.
@@ -781,25 +787,30 @@ lanes; read-only, and it stores two preferences per person and nothing else.
   holding the first board in the order comes first (`groupOverview`).
 - **Three orders, each either way, remembered per person**: start date
   (earliest first, where it opens), date created (oldest first) and most
-  overdue (the board whose latest card is most days late first). A board with
-  no start date goes last whichever way the start-date order runs. Ties go by
-  name (`sortOverview`). Nobody arranges the list by hand.
+  overdue (the board whose latest card is most days late first, counting only
+  cards in its lanes, the ones its row shows). A board with no start date goes
+  last whichever way the start-date order runs, and so does one whose cards
+  are still loading or could not be read under most overdue. Ties go by name
+  (`sortOverview`). Nobody arranges the list by hand.
 - **Each person hides boards from their own overview**, by a long press on the
   row (right-click on a computer), and shows them again from **Hidden (n)** at
   the foot; a board shown again returns to its place (decision E). Hiding
-  changes nothing for anyone else.
-- **The lane names are written in full.** Straight over their marks where each
-  fits its column on two lines; otherwise on a slant, every name starting at
-  its own mark (`laneColumns`). The columns narrow until the name that reaches
+  changes nothing for anyone else, and a hidden board stays hidden through
+  being archived and restored. Hiding is offered only once the person's
+  hidden list has been read.
+- **The lane names are written in full.** Each is measured as drawn, in the
+  platform's own font (`useMeasuredWidths`). Straight over their marks where
+  each fits its column on one line; otherwise on a slant, every name starting
+  at its own mark (`laneColumns`). The columns narrow until the name that reaches
   furthest right ends inside the row, and the slant is the gentlest at which
   neighbouring names stay a line apart. So every lane is on screen, nothing
   scrolls sideways, and on a small phone with twelve lanes the marks shrink
   rather than touch (decision F). There is no setting for the layout.
 - **Stored per person, on the user document**: `overviewSort`,
   `overviewReverse` and `overviewHiddenBoardIds`, written by the person alone,
-  each control writing its own field. The hidden list drops boards no longer
-  listed on each write and is bounded at 500 (`OVERVIEW_HIDDEN_MAX`, restated
-  in the rules). A display preference grants nothing, so hiding a board you
+  each control writing its own field. The hidden list keeps boards not listed
+  at the moment, so one archived and restored stays hidden, and holds the
+  latest 500 (`OVERVIEW_HIDDEN_MAX`, restated in the rules). A display preference grants nothing, so hiding a board you
   cannot see changes nothing.
 - **Each row listens to its own board's cards**, the board screen's query and
   rule, rather than one query across boards: a member's read of a card is

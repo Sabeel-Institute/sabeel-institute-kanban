@@ -226,7 +226,12 @@ its `laneId`. What is load-bearing:
   the rules or a `required` to the card.
 - **The finished column exists only with live lanes**, and is read only through
   `finishedColumnId`, which falls back to the last column when the stored one
-  is gone. **A finished card is never late, anywhere**: the board, the card,
+  is gone. **Every column write keeps it pinned**: `columnsPatch` takes the
+  board, so the compiler names every column write, and gives a deleted finished
+  column's place to the new last column, written, with the delete's
+  confirmation saying which (`finishedColumnDeleteNote`). Unpinned, deleting
+  Done made every card in Review finished, never late, and a later column add
+  moved it again, silently. **A finished card is never late, anywhere**: the board, the card,
   the archive, My Work (under Finished), Search's Overdue and the 08:00
   reminder. A board without lanes is unchanged; never apply the rule there.
 - **A lane change is history and a notice**, like a column move, except on a
@@ -244,7 +249,15 @@ owners and admins. `packages/shared/src/boardFields.ts` holds every rule.
 
 - **Contents are app-kept, not rule-kept.** Rules bound `fields` and `details`
   at twenty (held to `BOARD_FIELDS_MAX` by `ruleLimits.test.ts`) and cannot look
-  inside either. Every value goes through `validateDetailValue`.
+  inside either. Every value goes through `validateDetailValue`. **Every reader
+  takes the board through `boardExtras`** (`toBoard`, and `withCleanExtras` in
+  each function), which drops a lane, field or value in a shape the app never
+  writes: one would otherwise throw in every admin's overview and in the
+  history trigger on each write to its board.
+- **Every `fields` write deletes the values of fields not in it**
+  (`orphanDetailIds`, against the board as just read): two owners editing at
+  once could otherwise leave a value no field shows, counting against the
+  rules' twenty until saving a real one is refused.
 - **A link opens only through `safeLink`** (http or https), at save and again
   at tap: a `javascript:` value from another client would otherwise run.
 - **A value is written by its path (`details.<id>`), and a field is removed
@@ -264,11 +277,15 @@ shown only to someone it has a board for. Read-only.
   group's heading and its rows take one `laneColumns` answer, so a name sits
   over its own mark.
 - **Lane names are written in full, every lane is on screen, nothing scrolls
-  sideways** (Faisal's decisions). `laneColumns` narrows the columns until the
-  furthest-reaching slanted name ends inside the row, and steepens the slant
+  sideways** (Faisal's decisions). Names are MEASURED, laid out once in the
+  real font on each platform (`useMeasuredWidths`); an estimate from the
+  letters was short for capitals and cut names. `laneColumns` writes them
+  straight when each fits on one line, otherwise narrows the columns until the
+  furthest-reaching slanted name ends inside the row and steepens the slant
   until neighbours are a line apart. The sweep holds it at every width with a
   twelve-lane board whose longest name is last (`overviewFaults` in
-  `screens-e2e.mjs`). Do not cut names to make room.
+  `screens-e2e.mjs`, cut either way); the seed's eight-lane program puts slanted
+  names in front of the phones. Do not cut names to make room.
 - **Each control writes its own field** (`setOverviewSort`,
   `setOverviewReverse`): a write of both carried the other from the last
   render, and a choice made before that render put the old value back.
@@ -516,9 +533,14 @@ itself is deliberately NOT darkened — that would collapse it into
 - **An editor closes only once its write LANDS.** Closing first and handing the
   write up afterwards means a failed save takes your text with it and leaves an
   error pointing at something you can no longer see. So `close()`/`setDraft(null)`
-  goes INSIDE the `run` callback, after the `await`. This is why editors take
-  `run` plus a raw write that may reject, rather than a pre-wrapped one: `run`
-  resolves even on failure, so anything sequenced after it runs regardless.
+  goes INSIDE the `run` callback, after the `await`, or is gated on what `run`
+  returns: true once the work landed. `run` resolves even on failure, so a
+  statement after a bare `await run(...)` runs regardless; `runSeam.test.ts`
+  fails on one. **Adding a card is the one exception**, because the card is on
+  the board before the server confirms it and an add made offline waits in the
+  queue: its form closes at once, and a refused add reopens it with what was
+  typed. A form held open until the server answered sat over its own card and
+  closed whatever form was open by then.
 - **Card ordering is fractional string ranks** in `@sabeel/shared`; a move is one
   document write. Never reintroduce an array-of-ids ordering.
 - **Stats are server-written, ADMIN-gated, and must never be able to break what
@@ -772,6 +794,25 @@ change of that size. A review round checks them; it does not replace them.
    only for a check seen to fail without the code, on the surface it names.
    Large fix batches brought bugs of their own.
 
+A review of lanes, details, templates and the overview (2026-11-16) found
+about thirty more, and their causes added four:
+
+7. **Decide one thing in one place.** A rule made in several handlers or
+   layouts drifts: a drop refused by the lane but accepted by the card under
+   the pointer, a lane-state memo copied into three layouts with the same
+   stale day, six exits from a mode of which two reset it. Put it in one
+   function or hook and test that (`boardDrop.ts`, `useLaneInfo`, `toIdle`).
+8. **An absence check needs a positive signal first.** "Not there" passes just
+   as well before the thing could appear: wait for proof the producer ran (the
+   list answered, a later history line), then count zero.
+9. **Drive an input as a person does.** `fill()` sets a whole value at once,
+   which hid a date field writing every keystroke; type key by key where the
+   input reacts per key.
+10. **Look at each failure on screen.** Make each new read and write fail once
+    and look: a failed read drawn as "none", a refused add that lost its
+    title, a failed preferences read that let one hide wipe the list. The
+    three-state rule says this; only looking finds where it was missed.
+
 ### The width sweep is the DEFAULT check for layout, on both surfaces
 
 ```sh
@@ -782,8 +823,10 @@ SWEEP_WIDTHS=320 npm run test:screens      # while iterating
 Every authenticated screen at five widths straddling the breakpoint — including a
 card with the description editor open and one with the comment composer in use,
 because an editor is its own layout — each screenshotted to `shots/screens/` AND
-asserted: no sideways scroll, no same-layer control overlap, a way out of every
-screen, the right board layout. The widths straddle the breakpoint rather than
+asserted: no sideways scroll, no same-layer control overlap, every text's
+contrast against what it is drawn on (4.5:1, 3:1 large; captions, dimmed
+controls and text on images exempt), a way out of every screen, the right board
+layout. The widths straddle the breakpoint rather than
 looking thorough: a layout bug on one side of it is invisible from the other.
 
 **Prove a change on the web app unless it touches a seam a browser cannot

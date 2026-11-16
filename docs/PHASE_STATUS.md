@@ -48,7 +48,8 @@ The order, at the end, against a fresh `scripts/dev.sh web` seed:
    films"). Take each film off this table as the set is published.
 2. **Manual pictures.** `node scripts/manual-shots.mjs` with no arguments, so
    every picture is retaken from the same seed (the seed has the plain board,
-   two boards with the same lanes, one cloned from the other, and a template).
+   two programs with the same three lanes, one cloned from the other, a third
+   with eight lanes whose names slant on a phone, and a template).
    Look at each one, and keep only those that show a real change: the rest
    move only by dates and times in the seed.
 3. **The PDF.** `npx sabeel-ci render-manual`, last, after the pictures. The
@@ -59,7 +60,10 @@ Manual pictures that will change before then, so are retaken at the end:
 settings are now "About this board", opening on Details), `lanesettings-*`,
 the Boards list (`boards-*`: Templates, and the overview's icon in the
 header), and `clone-*` (the sheet over a list with Templates). New, never yet
-taken: `details-*` and `overview-*`. New pictures go into `manual-shots.mjs`
+taken: `details-*` and `overview-*`. Besides those, the High and Medium
+priority pills and a finished lane's green changed colour to reach 4.5:1
+(2026-11-16), so every picture showing a card face or a lane is retaken
+anyway. New pictures go into `manual-shots.mjs`
 with the step that adds the screen, unrun until the end.
 
 The films:
@@ -83,7 +87,8 @@ The films:
 | `details` | missing | A film for a board's details: adding fields, filling them in, a member reading them. Not yet scripted |
 | `overview` | missing | A film for the overview: opening it from Boards, reading a row's marks, changing the order, hiding a board and showing it again. Not yet scripted; needs the guide world to have two or more boards with lanes |
 | `new-board` | stale, computer only | The new board's name in the app's font |
-| `signing-in`, `attachments`, `subtasks`, `my-work`, `notifications`, `report`, `people`, `roles`, `stats` | current | Nothing: they show none of v0.19.0's changes |
+| `attachments`, `subtasks`, `my-work`, `notifications` | stale | The High and Medium priority pills' new colours, on the card faces they show |
+| `signing-in`, `report`, `people`, `roles`, `stats` | current | Nothing: they show none of v0.19.0's changes |
 
 ## What works today (2026-10-16)
 

@@ -216,7 +216,9 @@ start date. The app remembers your choice.
 
 **Hiding a board from your overview:** press and hold its row (right-click in
 a browser) and choose **Hide from my overview**. It's hidden for you only. To
-bring it back, open **Hidden** at the foot of the list and press **Show**.
+bring it back, open **Hidden** at the foot of the list and press the **show**
+icon beside it. A board you've hidden stays hidden, even if it's archived and
+later restored.
 
 Boards marked as templates and archived boards aren't in the overview, so
 archiving a program when it's over takes it out for everyone.
@@ -814,8 +816,9 @@ The pages:
   field and add another. A board can have up to twenty.
 
   **Start date** and **End date** are dates with fixed names, one of each at
-  most, and the only details other screens read. A link must start with
-  `http://` or `https://`.
+  most, and the only details other screens read, so no other field can be
+  called either. A link must start with `http://` or `https://`, and a number
+  can have commas between thousands, as in 1,200.
 - **People** — who can see the board, and who owns it. Tap the **add-person**
   icon beside the *Members* heading to see who else can be added, and tap a name
   to add them. Removing someone (the **remove-person** icon on their row) also
