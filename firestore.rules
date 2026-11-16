@@ -369,7 +369,7 @@ service cloud.firestore {
         && incoming().keys().hasOnly(['name', 'description', 'archived', 'columns',
             'columnIds', 'memberUids', 'memberProfiles', 'boardOwnerUids',
             'activeCardCount', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy',
-            'lanesOn', 'lanes', 'doneColumnId'])
+            'lanesOn', 'lanes', 'doneColumnId', 'fields', 'details'])
         && incoming().get('boardOwnerUids', []) is list
         && incoming().createdBy == existing().createdBy
         // History, not state. Neither is the client's to rewrite.
@@ -391,6 +391,12 @@ service cloud.firestore {
         && (!('lanes' in incoming()) || (incoming().lanes is list && incoming().lanes.size() <= 12))
         && (!('doneColumnId' in incoming())
             || (incoming().doneColumnId is string && incoming().doneColumnId.size() <= 200))
+        // Details: bounded, and nothing more. A field's name and type and a
+        // value's shape are the app's (BOARD_FIELDS_MAX and validateDetailValue
+        // in @sabeel/shared); only the board's owners and admins get this far.
+        // 20 is BOARD_FIELDS_MAX, held to it by ruleLimits.test.ts.
+        && (!('fields' in incoming()) || (incoming().fields is list && incoming().fields.size() <= 20))
+        && (!('details' in incoming()) || (incoming().details is map && incoming().details.size() <= 20))
         && incoming().name is string
         && incoming().name.size() > 0
         && incoming().name.size() <= 120;

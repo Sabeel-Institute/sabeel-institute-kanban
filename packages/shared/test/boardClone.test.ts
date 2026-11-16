@@ -24,7 +24,12 @@ const card = (over: Partial<CloneSourceCard> & { id: string }): CloneSourceCard 
 function clone(
   cards: CloneSourceCard[],
   subscribe = false,
-  lanes: { lanesOn?: boolean; lanes?: { id: string; name: string }[]; doneColumnId?: string } = {},
+  lanes: {
+    lanesOn?: boolean;
+    lanes?: { id: string; name: string }[];
+    doneColumnId?: string;
+    fields?: { id: string; name: string; type: 'text' | 'start' }[];
+  } = {},
 ) {
   let n = 0;
   return boardClone({
@@ -208,6 +213,26 @@ describe('boardClone: lanes', () => {
     const { board, cards } = clone([card({ id: 'a' })]);
     expect(['lanesOn', 'lanes', 'doneColumnId'].filter((k) => k in board)).toEqual([]);
     expect('laneId' in cards[0].data).toBe(false);
+  });
+});
+
+describe('boardClone: details', () => {
+  it('carries the fields under new ids, and none of their values', () => {
+    const fields = [
+      { id: 'f1', name: 'Teachers', type: 'text' as const },
+      { id: 'f2', name: 'Start date', type: 'start' as const },
+    ];
+    const { board } = clone([], false, { fields });
+    expect(board.fields!.map((f) => [f.name, f.type])).toEqual([
+      ['Teachers', 'text'],
+      ['Start date', 'start'],
+    ]);
+    expect(board.fields!.map((f) => f.id)).not.toContain('f1');
+    expect('details' in board).toBe(false);
+  });
+
+  it('gives a board without details none', () => {
+    expect('fields' in clone([]).board).toBe(false);
   });
 });
 

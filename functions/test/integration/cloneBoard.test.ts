@@ -270,8 +270,8 @@ describe('cloneBoard: the clone', () => {
   });
 });
 
-describe('cloneBoard: lanes', () => {
-  it('carries the lanes, the finished column and each card’s lane', async () => {
+describe('cloneBoard: lanes and details', () => {
+  it('carries the lanes, the finished column, each card’s lane and the details’ fields', async () => {
     await adminDb().doc('boards/cb_lanes').set(
       board({
         lanesOn: true,
@@ -280,6 +280,11 @@ describe('cloneBoard: lanes', () => {
           { id: 'ln_mkt', name: 'Marketing' },
         ],
         doneColumnId: 'c_run',
+        fields: [
+          { id: 'fld_s', name: 'Start date', type: 'start' },
+          { id: 'fld_t', name: 'Teachers', type: 'text' },
+        ],
+        details: { fld_s: '2027-06-01', fld_t: 'Sara' },
       }),
     );
     await adminDb().doc('cards/cb_lane_card').set(card('cb_lanes', { laneId: 'ln_mkt' }));
@@ -293,6 +298,12 @@ describe('cloneBoard: lanes', () => {
     expect(clone.lanesOn).toBe(true);
     expect(clone.lanes.map((l: { name: string }) => l.name)).toEqual(['Planning', 'Marketing']);
     expect(clone.doneColumnId).toBe(clone.columns[1].id);
+    // The details' fields come, under new ids; what was typed in them does not.
+    expect(clone.fields.map((f: { name: string; type: string }) => [f.name, f.type])).toEqual([
+      ['Start date', 'start'],
+      ['Teachers', 'text'],
+    ]);
+    expect(clone.details).toBeUndefined();
     const cards = (await adminDb().collection('cards').where('boardId', '==', id).get()).docs.map((d) => d.data());
     expect(cards.find((c) => c.title === 'A task')?.laneId).toBe(clone.lanes[1].id);
     expect('laneId' in (cards.find((c) => c.title === 'No lane yet') ?? {})).toBe(false);
