@@ -668,6 +668,55 @@ async function rulesScreen(page, tag, width) {
 const SCREENS = 38;
 
 /**
+ * Text that does not reach the brand's contrast against what it is drawn on:
+ * 4.5:1, or 3:1 for large text (24px, or 18.66px bold). Read from the page, so
+ * a token that passes on one background and fails on another is caught where
+ * it is drawn: the lane badge's green read on ivory and failed on a column.
+ *
+ * Exempt, as BRAND.md has it: `text.muted` (Caption, metadata you could delete
+ * without losing information), anything dimmed as disabled, and text on an
+ * image. The background is the nearest ancestor that paints one.
+ */
+const MUTED = 'rgb(165, 141, 122)';
+const contrastFaults = (page) =>
+  page.evaluate((muted) => {
+    const rgb = (s) => (s.match(/[\d.]+/g) || []).map(Number);
+    const lum = ([r, g, b]) => {
+      const f = (c) => ((c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+      return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+    };
+    const ratio = (a, b) => {
+      const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+      return (x + 0.05) / (y + 0.05);
+    };
+    const faults = new Set();
+    for (const el of document.querySelectorAll('body *')) {
+      const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+      if (!own) continue;
+      const style = getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0 || style.visibility === 'hidden' || style.color === muted) continue;
+      let bg = null;
+      let dimmed = false;
+      for (let n = el; n && n !== document.documentElement; n = n.parentElement) {
+        const s = getComputedStyle(n);
+        if (Number(s.opacity) < 1) dimmed = true;
+        if (s.backgroundImage !== 'none') { bg = 'image'; break; }
+        const c = rgb(s.backgroundColor);
+        if (c.length >= 3 && (c.length < 4 || c[3] > 0.5)) { bg = c; break; }
+      }
+      if (dimmed || bg === 'image' || !bg) continue;
+      const size = parseFloat(style.fontSize);
+      const large = size >= 24 || (size >= 18.66 && Number(style.fontWeight) >= 700);
+      const got = ratio(rgb(style.color), bg);
+      if (got < (large ? 3 : 4.5)) {
+        faults.add(`"${el.textContent.trim().slice(0, 24)}" ${got.toFixed(2)}:1 (${style.color} on rgb(${bg.slice(0, 3).join(', ')}))`);
+      }
+    }
+    return [...faults];
+  }, MUTED);
+
+/**
  * What the overview must hold at every width, read from the page: within a
  * row no two marks touch and each is on screen; every lane name is on screen,
  * drawn in full (no ellipsis), and ends above its group's first row.
@@ -741,6 +790,8 @@ async function tour(page, tag, width) {
     await page.waitForTimeout(500);
     const faults = await layoutFaults(page, width);
     check(`${tag} / ${name}`, faults.length === 0, faults.join('; ').slice(0, 160));
+    const dim = await contrastFaults(page);
+    check(`${tag} / ${name} text has its contrast`, dim.length === 0, dim.join('; ').slice(0, 300));
     const out = await escapes(page);
     check(`${tag} / ${name} has a way out`, out.back || out.tabs, 'no Back and no tab bar');
     const small = await smallTargets(page);
