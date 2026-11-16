@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, TextInput } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Icon } from '../icons';
 import { BOARD_NAME_MAX, sortBoardsForList } from '@sabeel/shared';
 import {
@@ -80,7 +80,17 @@ function BoardRow({
           style={styles.grow}
           accessibilityRole="button"
         >
-          <Body>{board.name}</Body>
+          <View style={styles.nameRow}>
+            <View style={styles.shrink}>
+              <Body>{board.name}</Body>
+            </View>
+            {/* On the row wherever the board is listed, Archived included. */}
+            {board.template ? (
+              <View style={[styles.badge, { backgroundColor: t.bg.inset, borderColor: t.border.subtle }]}>
+                <Text style={[type.caption, { color: t.text.secondary }]}>Template</Text>
+              </View>
+            ) : null}
+          </View>
           <Caption>
             {board.activeCardCount} card{board.activeCardCount === 1 ? '' : 's'} ·{' '}
             {board.memberUids.length} member{board.memberUids.length === 1 ? '' : 's'}
@@ -266,7 +276,11 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
   }
 
   const hasAny =
-    sections.favourites.length + sections.recents.length + sections.others.length > 0;
+    sections.favourites.length +
+      sections.recents.length +
+      sections.others.length +
+      sections.templates.length >
+    0;
 
   return (
     <Screen width="list">
@@ -381,6 +395,26 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
         </>
       ) : null}
 
+      {/* Boards marked as templates, last and apart, so the boards people work
+          in come first. Cloned by a long press, like any board. */}
+      {sections.templates.length > 0 ? (
+        <>
+          <Heading>Templates</Heading>
+          <CardGrid>
+            {sections.templates.map((b) => (
+              <BoardRow
+                key={b.id}
+                board={b}
+                isFavourite={favourites.includes(b.id)}
+                onOpen={() => open(b)}
+                onToggleFavourite={() => toggleFavourite(user, b.id, favourites)}
+                onClone={onCloneOf(b)}
+              />
+            ))}
+          </CardGrid>
+        </>
+      ) : null}
+
       {/* Archived boards live behind a disclosure, not mixed into the list.
           Archiving is meant to be the SAFE alternative to deleting, but the
           board list filters archived boards out and "Restore" lives inside
@@ -458,6 +492,14 @@ function ArchivedBoards({
 
 const styles = StyleSheet.create({
   between: { justifyContent: 'space-between' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space.sm },
+  shrink: { flexShrink: 1 },
+  badge: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 999,
+    paddingHorizontal: space.sm,
+    paddingVertical: 2,
+  },
   /** Wraps so no action can be pushed off a narrow screen. */
   grow: { flex: 1, gap: space.xs },
   /** Forms and messages stay a readable width inside the wide board grid. */

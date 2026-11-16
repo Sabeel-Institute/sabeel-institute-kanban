@@ -68,6 +68,8 @@ export interface BoardListItem {
   /** The board's details: its fields in order, and each one's value by id. */
   fields: BoardField[];
   details: Record<string, string>;
+  /** Marked as a template: listed under Templates, with a badge. */
+  template: boolean;
 }
 
 function toBoard(id: string, data: Record<string, unknown>): BoardListItem {
@@ -100,6 +102,7 @@ function toBoard(id: string, data: Record<string, unknown>): BoardListItem {
     // Cleaned: rules cannot look inside these, and a malformed entry would
     // otherwise throw in every reader (`boardExtras`).
     ...boardExtras(data),
+    template: data.template === true,
   };
 }
 
@@ -169,7 +172,10 @@ export async function createBoard(name: string, user: SessionUser): Promise<stri
  * a bare PERMISSION_DENIED as the only clue. Build it with `columnsPatch()`.
  */
 export type BoardPatch = Partial<
-  Pick<BoardListItem, 'name' | 'description' | 'archived' | 'lanesOn' | 'lanes' | 'doneColumnId'>
+  Pick<
+    BoardListItem,
+    'name' | 'description' | 'archived' | 'lanesOn' | 'lanes' | 'doneColumnId' | 'template'
+  >
 > &
   ({ columns: BoardColumn[]; columnIds: string[] } | { columns?: never; columnIds?: never });
 
