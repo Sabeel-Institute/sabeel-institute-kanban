@@ -23,6 +23,4 @@ describe('cleaning what a board holds', () => {
     expect(cleanDetails({ a: '1200', b: { x: 1 }, c: 5, d: null })).toEqual({ a: '1200' });
     expect(cleanDetails('nope')).toEqual({});
   });
-
-});
 });
