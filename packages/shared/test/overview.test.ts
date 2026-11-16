@@ -10,6 +10,7 @@ import {
   sortOverview,
   type OverviewRow,
 } from '../src/overview';
+import { boardExtras } from '../src/boardShape';
 
 const columns = [{ id: 'todo' }, { id: 'done' }];
 const lanes = [{ id: 'l1', name: 'Planning' }];
@@ -186,5 +187,14 @@ describe('describeMark', () => {
     );
     expect(describeMark('Wrap-up', { total: 0, done: 0, status: 'none' })).toBe('Wrap-up, no cards');
     expect(describeMark('Planning', { total: 3, done: 3, status: 'complete' })).toBe('Planning, all finished');
+  });
+});
+
+describe('a board with a malformed lane, as read', () => {
+  it('goes through every overview reader without a throw', () => {
+    const data = { columns: [{ id: 'c' }], lanesOn: true, lanes: [null, { id: 'l', name: 'Planning' }], archived: false };
+    const board = { ...data, ...boardExtras(data) };
+    expect(overviewBoards([board])).toHaveLength(1);
+    expect(laneSignature(board.lanes)).toBe('planning');
   });
 });
