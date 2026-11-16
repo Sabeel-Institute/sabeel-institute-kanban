@@ -37,7 +37,8 @@ export function LanesPage({ board }: { board: BoardListItem }) {
   const lanes = board.lanes;
   const finished = finishedColumnChoice(board);
 
-  // Returns whether the name was ACCEPTED, so the row clears itself only then.
+  // Returns whether the lane was ADDED, so the row clears itself only then:
+  // a name refused here or by the rules stays in the field.
   async function addLane(name: string): Promise<boolean> {
     const problem = laneAddBlocked(lanes) ?? validateLaneName(name, lanes);
     if (problem) {
@@ -45,8 +46,7 @@ export function LanesPage({ board }: { board: BoardListItem }) {
       return false;
     }
     const next: BoardLane[] = [...lanes, { id: localId('ln'), name: name.trim() }];
-    await run(() => updateBoard(board.id, { lanes: next }));
-    return true;
+    return run(() => updateBoard(board.id, { lanes: next }));
   }
 
   function askRemove(lane: BoardLane) {
