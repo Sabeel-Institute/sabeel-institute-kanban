@@ -151,6 +151,40 @@ board's **archived cards**, and open the board's **settings** — or, if you do 
 own it, its **members and labels**, the pages of settings you can use. They sit
 there rather than in the header so the board's name has the top row to itself.
 
+### Lanes
+
+<div class="pair">
+  <figure class="ph"><img src="manual/img/lanes-phone.png" alt="A board with lanes on a phone: the column lists each lane under a heading, with its count of finished cards"><figcaption>On a phone</figcaption></figure>
+  <figure class="wd"><img src="manual/img/lanes-wide.png" alt="A board with lanes in a browser: every column lists the same lanes"><figcaption>In a browser</figcaption></figure>
+</div>
+
+Some boards are divided into **lanes** as well as columns: a program's board
+might have *Planning*, *Marketing* and *Supplies*. A card then sits in one
+column and one lane. Every column lists the board's lanes in the same order,
+each under its own heading with that lane's cards beneath it. A lane keeps its
+heading even in a column that has none of its cards, so the lanes stay in the
+same place as you move between columns.
+
+Beside each lane's name is how many of its cards are **finished**, out of all
+its cards in every column: *2 of 4*. On a board with lanes, one column holds
+finished cards, usually the last (**Done**), and a card in it is finished. The
+count turns **green** once every card in the lane is finished, and **red**
+when a card that isn't finished is past its due date. A lane with no cards
+says *No cards*.
+
+**A finished card is never late.** Past its date it shows the date itself, not
+how late it is, and it isn't *Overdue* anywhere: not on the card, in My Work
+or in Search, and nobody is reminded about it.
+
+Cards without a lane, such as those added before the board had lanes, sit
+under **No lane**, at the foot of each column.
+
+**Adding a card** on a board with lanes asks which lane it goes in: choose one
+before **Add**. A subtask starts in the lane of the card it belongs to.
+
+A board without lanes looks exactly as described above. Lanes are switched on
+in the board's settings (Part 2).
+
 ## 1.5 Working with a card
 
 Tap any card to open the full view.
@@ -164,6 +198,8 @@ Tap any card to open the full view.
   **pencil** to edit it, then **Save**.
 - **Column** — a dropdown showing where the card sits. Change it to move the card
   without leaving it.
+- **Lane** — on a board with lanes, a second dropdown beside the column. Change
+  it to move the card to another lane.
 - **Description** — formatted text. A small row of buttons above the box gives
   you **bold**, *italic*, a **bulleted list**, a **numbered list** and a
   **link**. Select some words and tap a button, or tap it first and start
@@ -362,6 +398,9 @@ the link says so instead of opening a blank screen.
 and pick the destination column — dragging isn't used on a screen that already
 swipes between columns, where a drag would be ambiguous.
 
+On a board with lanes, a card dragged onto a lane in a browser lands in that
+lane; on a phone, change its lane on the card, or move several at once (below).
+
 ## 1.6 Doing several cards at once
 
 <div class="pair">
@@ -375,8 +414,13 @@ what you can do to the whole selection: **move**, **assign**, **archive**, or
 (owners of the board) **delete**. It shows how many are selected, and the **✕**
 beside that count leaves selection mode without doing anything.
 
+On a board with lanes, **move** asks for a column, a lane, or both: choose a
+lane alone and each card keeps its column. That is how a board that has just
+switched lanes on is sorted in a few taps.
+
 You can also **copy or move the selection to another board** — pick one of your
-boards, then a column in it.
+boards, then a column in it. A card that goes to another board leaves its lane
+behind.
 
 - A **move** takes each card over exactly as it is: comments, history and
   attached files all travel with it, because it stays the same card.
@@ -399,7 +443,8 @@ unassigned**, though; the sheet tells you before you confirm.
 Everything assigned to you, across every board, grouped by urgency: **overdue**
 first, then **today**, then the **next seven days**, then everything else. This is
 the fastest way to see what needs you — especially on a phone. Tap any card to
-open it.
+open it. A card that is **finished** on a board with lanes is listed last, under
+**Finished**, whatever its date.
 
 ## 1.8 Search
 
@@ -419,7 +464,8 @@ sort control:
 
 - **Archived** — shows **only** archived cards, and hides the live ones. This is
   the other way to find something you archived, alongside a board's own archive.
-- **Overdue** — only cards past their due date.
+- **Overdue** — only cards past their due date, leaving out finished ones on a
+  board with lanes.
 - **Sort** — see below.
 
 <div class="pair">
@@ -644,8 +690,9 @@ would otherwise tell you about every change to every card.
   <figure class="wd"><img src="manual/img/clone-wide.png" alt="Cloning a board in a browser"><figcaption>In a browser — right-click the board</figcaption></figure>
 </div>
 
-The clone has the same columns, and each open card in the same place, with its
-title, its description and its subtasks, and the institute's labels. It starts
+The clone has the same columns and lanes, and each open card in the same place
+and lane, with its title, its description and its subtasks, and the institute's
+labels. It starts
 fresh on everything that belongs to one run of the work: no due dates, nobody
 assigned, no priorities, comments, history or files. Archived cards and the
 board's own labels are not cloned. The board you cloned from does not change.
@@ -692,6 +739,19 @@ The pages:
   <div class="pair">
     <figure class="ph"><img src="manual/img/columns-phone.png" alt="The Columns page on a phone: each column with a handle and a pencil, and a field to add one"><figcaption>On a phone</figcaption></figure>
     <figure class="wd"><img src="manual/img/columns-wide.png" alt="The Columns page in a browser"><figcaption>In a browser</figcaption></figure>
+  </div>
+- **Lanes** — divide the board into lanes as well as columns (see *Lanes* in
+  Part 1). Turn on **Lanes on this board**, then add lanes with the field at
+  the bottom, up to twelve. Rename one with its **pencil**, drag its handle to
+  reorder, and remove it with its **bin**: only once it's empty, like a
+  column. **Finished cards are in** chooses the column whose cards count as
+  finished; it starts as the last one. Turning lanes **off** draws the board
+  as before, and keeps the lanes and every card's lane for when you turn them
+  back on.
+
+  <div class="pair">
+    <figure class="ph"><img src="manual/img/lanesettings-phone.png" alt="The Lanes page on a phone: the switch, the lanes with their handles, and where finished cards are"><figcaption>On a phone</figcaption></figure>
+    <figure class="wd"><img src="manual/img/lanesettings-wide.png" alt="The Lanes page in a browser"><figcaption>In a browser</figcaption></figure>
   </div>
 - **People** — who can see the board, and who owns it. Tap the **add-person**
   icon beside the *Members* heading to see who else can be added, and tap a name
@@ -776,10 +836,11 @@ since they can open any board's settings; a board they haven't joined shows a
 </div>
 
 The **History** page lists what has happened to the board itself, newest
-first, and who did it: who created it, renamed it, archived or
-restored it; who added or removed whom; who made someone an owner or stopped
-being one; which columns were added, removed, renamed or reordered. Everyone on
-the board sees it, owners or not. What happens to a card is in that card's own
+first, and who did it: who created it, renamed it, archived or restored it;
+who added or removed whom; who made someone an owner or stopped being one;
+which columns or lanes were added, removed, renamed or reordered; and who
+turned lanes on or off, or chose the finished column. Everyone on the board
+sees it, owners or not. What happens to a card is in that card's own
 history, on the card.
 
 Nobody can edit or delete a line of it. The newest twenty show first; **Show
@@ -997,6 +1058,10 @@ Open the board → **settings** → **General**. That page is the only place tha
 
 **…rename or add columns?** *(the board's owners)*
 Open the board → **settings** → **Columns**.
+
+**…divide a board into lanes?** *(the board's owners)*
+Open the board → **settings** → **Lanes** → turn on **Lanes on this board**,
+then add the lanes.
 
 **…add a label?** *(anyone on the board)*
 Open any card → **+** beside its labels. It belongs to that board. A label for

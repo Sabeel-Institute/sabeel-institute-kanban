@@ -55,7 +55,8 @@ publishing are missing. The clone film's narration is rendered.
 | `labels` | stale | The chips on the board it passes through; the board name's font (computer); the board's labels on their own settings page (script and narration updated, not recorded) |
 | `search` | stale | "↳ Subtask" on Design the programme in the results |
 | `comments` | stale, computer only | The comment box's new line height |
-| `board-settings` | stale | Board settings as a list of pages: General, Columns and History each on its own (script and narration updated, not recorded); the board name's font (computer) |
+| `board-settings` | stale | Board settings as a list of pages: General, Columns and History each on its own (script and narration updated, not recorded); the Lanes row in the list; the board name's font (computer) |
+| `lanes` | missing | A film for dividing a board into lanes: switching them on, adding a card to a lane, the counts, the finished column. Not yet scripted; the guide world (`world.mjs`) has no board with lanes |
 | `board-people` | stale | The People page of Board settings (script and narration updated, not recorded); the board name's font (computer) |
 | `new-board` | stale, computer only | The new board's name in the app's font |
 | `signing-in`, `attachments`, `subtasks`, `my-work`, `notifications`, `report`, `people`, `roles`, `stats` | current | Nothing: they show none of v0.19.0's changes |

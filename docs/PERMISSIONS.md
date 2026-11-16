@@ -61,6 +61,8 @@ board — is what lets you:
 - change the board's name — `description` exists on the document and the ClickUp
   importer sets it, but no screen edits one, so nothing here grants that
 - add, rename, reorder and delete columns
+- switch lanes on and off, add, rename, reorder and remove lanes, and choose
+  the finished column (Board settings → Lanes)
 - add and remove members
 - make another member an owner, or take it away
 - archive the board, and restore it
@@ -69,6 +71,10 @@ board — is what lets you:
 
 It grants nothing anywhere else. Owning three boards and owning none are the same
 thing on the fourth.
+
+**A card's lane is anyone's on the board**, like its column: everyone on the
+board files a new card in a lane, moves cards between lanes, on the card and
+in bulk. Only the lanes themselves are the owners'.
 
 **A board's own labels belong to everyone on it**, owners or not: anyone on the
 board adds, renames, recolours and deletes them, from the card's `+` and the

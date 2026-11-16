@@ -64,6 +64,8 @@ Do not silently change any of these.
 
 - **Restraint is the feature.** They left ClickUp because of interface bloat. No
   dashboards, integrations, automations, alternate board views, or time tracking.
+  Lanes (below) are part of the one board view, not another, and a board that
+  does not switch them on looks and behaves exactly as it would without them.
   Every addition must justify itself against "does the team actually use this?" —
   when in doubt, leave it out and ask.
 - **No board limit**, anywhere in the model, UI, or rules — the 5-board cap was a
@@ -204,6 +206,33 @@ disabling the account is the block, by decision.
   (`scripts/scope-labels.mjs`), whose card writes are stamped `SYSTEM_ACTOR`:
   the card triggers stay out of those, because a card moved onto its board's
   copy of a label shows exactly what it showed before.
+
+## Lanes and the finished column
+
+Added 2026-11-15 (Faisal, over a concept round; `docs/PRODUCT_BRIEF.md`
+§ Lanes is the full statement), so a program board can replace a tracking
+spreadsheet. A board may switch on lanes as well as columns; a card records
+its `laneId`. What is load-bearing:
+
+- **Every lane question goes through `packages/shared/src/lanes.ts`**:
+  `lanesLive`, `finishedColumnId`, `isFinished`, `laneOf`, `groupByLane`,
+  `laneInfo`. The app and the functions hold no copy of a rule.
+- **A lane id is unchecked, and a stale one is No lane.** No `laneIds` mirror,
+  rules check `laneId`'s shape only and NEVER require it: a card naming a lane
+  that is gone loses nothing, unlike one naming a gone column. That is what
+  makes every old app inert rather than refused. Do not add a lane lookup to
+  the rules or a `required` to the card.
+- **The finished column exists only with live lanes**, and is read only through
+  `finishedColumnId`, which falls back to the last column when the stored one
+  is gone. **A finished card is never late, anywhere**: the board, the card,
+  the archive, My Work (under Finished), Search's Overdue and the 08:00
+  reminder. A board without lanes is unchanged; never apply the rule there.
+- **A lane change is history and a notice**, like a column move, except on a
+  move to another board, which clears the lane and records none.
+- **12 lanes at most** (`LANES_MAX`), restated in `firestore.rules`, where
+  `functions/test/unit/ruleLimits.test.ts` holds the two to one number.
+- **A board without lanes draws nothing new.** Every surface asks `lanesLive`
+  before drawing a heading, asking for a lane, or calling a card finished.
 
 ## Attachments
 

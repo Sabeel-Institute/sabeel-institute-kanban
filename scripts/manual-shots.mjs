@@ -354,6 +354,23 @@ const SHOTS = {
     await p.getByPlaceholder('New column name').waitFor({ timeout: 30000 });
     await p.waitForTimeout(900);
   },
+  // A board with lanes (the seed's Summer Program 2027): the lane headings and
+  // their counts in every column.
+  lanes: async (p) => {
+    await nav(p, 'Boards');
+    await p.getByText('Summer Program 2027', { exact: true }).first().click();
+    await p.locator('[role="heading"][aria-label^="Planning,"]').first().waitFor({ timeout: 30000 });
+    await p.waitForTimeout(900);
+  },
+  // Settings → Lanes on that board: the switch, the lanes, the finished column.
+  lanesettings: async (p) => {
+    await nav(p, 'Boards');
+    await p.getByText('Summer Program 2027', { exact: true }).first().click();
+    await p.getByRole('button', { name: 'Board settings' }).click();
+    await p.getByRole('button', { name: 'Lanes', exact: true }).click();
+    await p.getByRole('button', { name: 'Rename lane Planning' }).waitFor({ timeout: 30000 });
+    await p.waitForTimeout(900);
+  },
   // Settings → People, as an OWNER: the Owner switch beside each row.
   owners: async (p) => {
     await openBoard(p);
