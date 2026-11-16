@@ -38,6 +38,12 @@ whoever made it (`cloneBoard`; `docs/PRODUCT_BRIEF.md` § Cloning a board).
 **Only an admin sees every board.** Everyone else, organizers included, sees the
 boards they are a member of. There is no third case anywhere in the rules.
 
+**The overview is everyone's, and shows nothing new.** It lists the boards
+with lanes that its reader can already see (an admin, every such board), so it
+needs no permission of its own. Its order and the boards hidden from it are
+each person's, on their own user document, and change nothing for anyone else
+(`docs/PRODUCT_BRIEF.md` § Overview).
+
 **Institute labels are admin work** because they are on every board: renaming
 or deleting one changes cards on boards the person doing it may not even be able
 to open. They change in More → Labels and nowhere else; on a board they are

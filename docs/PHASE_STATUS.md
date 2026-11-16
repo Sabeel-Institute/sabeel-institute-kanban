@@ -47,20 +47,20 @@ The order, at the end, against a fresh `scripts/dev.sh web` seed:
    `current`, both cuts, and publish the set (`docs/DEV-TOOLING.md`, "The help
    films"). Take each film off this table as the set is published.
 2. **Manual pictures.** `node scripts/manual-shots.mjs` with no arguments, so
-   every picture is retaken from the same seed (the seed has the plain board
-   and a board with lanes). Look at each one, and keep only those that show a
-   real change: the rest move only by dates and times in the seed.
+   every picture is retaken from the same seed (the seed has the plain board,
+   two boards with the same lanes, one cloned from the other, and a template).
+   Look at each one, and keep only those that show a real change: the rest
+   move only by dates and times in the seed.
 3. **The PDF.** `npx sabeel-ci render-manual`, last, after the pictures. The
    release command renders it again with the version line.
 
 Manual pictures that will change before then, so are retaken at the end:
 `settings-phone`/`-wide` (the list gains Details), `roster-*` (a non-owner's
 settings are now "About this board", opening on Details), `lanesettings-*`,
-every board picture once the overview's entry is in the Boards header, the
-Boards list (`boards-*`: the seed now has a template, under Templates), and
-`clone-*` (the sheet over a list with Templates). New, never yet taken: `details-*`. New
-pictures go into `manual-shots.mjs` with the step that adds the screen, unrun
-until the end.
+the Boards list (`boards-*`: Templates, and the overview's icon in the
+header), and `clone-*` (the sheet over a list with Templates). New, never yet
+taken: `details-*` and `overview-*`. New pictures go into `manual-shots.mjs`
+with the step that adds the screen, unrun until the end.
 
 The films:
 
@@ -81,6 +81,7 @@ The films:
 | `lanes` | missing | A film for dividing a board into lanes: switching them on, adding a card to a lane, the counts, the finished column. Not yet scripted; the guide world (`world.mjs`) needs a board with lanes |
 | `board-people` | stale | The People page of Board settings (script and narration updated, not recorded); the board name's font (computer) |
 | `details` | missing | A film for a board's details: adding fields, filling them in, a member reading them. Not yet scripted |
+| `overview` | missing | A film for the overview: opening it from Boards, reading a row's marks, changing the order, hiding a board and showing it again. Not yet scripted; needs the guide world to have two or more boards with lanes |
 | `new-board` | stale, computer only | The new board's name in the app's font |
 | `signing-in`, `attachments`, `subtasks`, `my-work`, `notifications`, `report`, `people`, `roles`, `stats` | current | Nothing: they show none of v0.19.0's changes |
 

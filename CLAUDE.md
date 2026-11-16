@@ -66,7 +66,9 @@ Do not silently change any of these.
   dashboards, integrations, automations, alternate board views, or time tracking.
   Lanes (below) are part of the one board view, not another, and a board that
   does not switch them on looks and behaves exactly as it would without them.
-  Every addition must justify itself against "does the team actually use this?" —
+  The overview (below) is the one cross-board summary, and it is a list of
+  boards, not a dashboard: no charts or figures, no settings, and nobody who
+  is on no board with lanes ever sees it. Every addition must justify itself against "does the team actually use this?" —
   when in doubt, leave it out and ask.
 - **No board limit**, anywhere in the model, UI, or rules — the 5-board cap was a
   reason they're leaving.
@@ -249,6 +251,34 @@ owners and admins. `packages/shared/src/boardFields.ts` holds every rule.
   with its value in one write** (`removeBoardField`), so the two cannot drift.
 - **Start date and End date are the only details anything else reads**,
   through `namedFieldValue`. Nothing reads a field by its name.
+
+## The overview
+
+Added 2026-11-15 with lanes (`docs/PRODUCT_BRIEF.md` § Overview): one row per
+board with lanes, one mark per lane, opened from an icon in the Boards header
+shown only to someone it has a board for. Read-only.
+
+- **Its rules are `packages/shared/src/overview.ts`** (which boards, the three
+  orders, the grouping by lane names, the hidden list) **and its geometry is
+  `app/src/overviewLayout.ts`** (`laneColumns`). The screen only draws; a
+  group's heading and its rows take one `laneColumns` answer, so a name sits
+  over its own mark.
+- **Lane names are written in full, every lane is on screen, nothing scrolls
+  sideways** (Faisal's decisions). `laneColumns` narrows the columns until the
+  furthest-reaching slanted name ends inside the row, and steepens the slant
+  until neighbours are a line apart. The sweep holds it at every width with a
+  twelve-lane board whose longest name is last (`overviewFaults` in
+  `screens-e2e.mjs`). Do not cut names to make room.
+- **Each control writes its own field** (`setOverviewSort`,
+  `setOverviewReverse`): a write of both carried the other from the last
+  render, and a choice made before that render put the old value back.
+- **Each row listens to its own board's cards** and is not virtualised: a
+  member's card read is checked against its board, which a cross-board query
+  could do ten times, and a row that stops listening loses its place in "most
+  overdue".
+- **Per person, it stores the order and the hidden boards, nothing else**, on
+  the user document, self-written; the hidden list is bounded at 500 in the
+  rules (`OVERVIEW_HIDDEN_MAX`, held by `ruleLimits.test.ts`).
 
 ## Attachments
 

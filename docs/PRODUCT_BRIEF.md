@@ -60,6 +60,7 @@ in the app.
 | Template mark | **A board may be marked as a template** (2026-11-15), by its owners and admins on General. The mark does exactly two things: the board is listed under Templates with a badge, and it is left out of the overview. Cloning stays a long press on any board; a clone is never marked; its history opens with one line, "cloned from", and nothing else ties it to its source. |
 | Details | **A board may carry details** (2026-11-15): a short list of typed fields (Text, Number, Date, Link, and the fixed Start date and End date), filled in on Board settings → Details. Everyone on the board reads them; its owners and admins change them. See "Details". |
 | Lanes | **A board may be divided into lanes as well as columns** (2026-11-15), so a program board can stand in for a tracking spreadsheet. A switch on Board settings → Lanes, off by default; a card sits in one column and one lane. With lanes, one column holds **finished** cards: a lane's heading counts them, and a finished card is never late. See "Lanes". |
+| Overview | **One screen of every program** (2026-11-15): a row per board with lanes, a mark per lane showing its state, boards with the same lanes under one heading, three orders either way, and boards each person may hide from their own. Opened from an icon in the Boards header, shown only to someone it has a board for. See "Overview". |
 | Explicitly NOT in v1 | Checklists (as a separate item type — see Subtasks), dependencies, recurring cards, alternate board views, automations, integrations, guest/external access. |
 | Layout | **Chosen by available WIDTH, not platform** (breakpoint **700px**, `WIDE_BREAKPOINT` in `app/src/theme/layout.ts` — the one definition; never restate it). Wide → columns side by side. Narrow → one column at a time, swipe between them. So a tablet gets columns and a phone browser gets the swipe board. |
 | Drag and drop | A web **capability** layered on the wide layout. Native has no HTML5 drag API, so a wide native surface (a tablet) offers the same explicit "Move to…" the narrow layout uses. |
@@ -150,6 +151,9 @@ users/{uid}
                                                  # board membership checked when a notice is sent
   favoriteBoardIds: [boardId, …]
   recentBoardIds: [boardId, …]                   # client-maintained, capped at 10
+  overviewSort?: start|created|late              # the overview's order; absent is start
+  overviewReverse?: bool                         # that order the other way
+  overviewHiddenBoardIds?: [boardId, …]          # boards hidden from my overview, at most 500
   unreadNotifCount
   # Mirrors custom claims for UI display. Rules trust the TOKEN, never this doc.
 
@@ -748,6 +752,61 @@ field has an empty Details page and nothing else changes.
   value set or cleared, naming the field. **A clone** carries the fields under
   new ids and none of the values.
 
+## Overview (2026-11-15)
+
+One screen that shows how every program is going, so the people running
+programs see what is late without opening each board. Decided by Faisal with
+lanes; read-only, and it stores two preferences per person and nothing else.
+
+- **Reached from an icon in the Boards header**, shown only to someone with at
+  least one board it lists (a hidden one counts), so people who never use
+  lanes never see it. Not a tab and not in More (decision D).
+- **It lists the boards you can see that have live lanes** (`lanesLive`), are
+  not marked as templates and are not archived (`overviewBoards`): the boards
+  you are on, and every such board for an admin, as in the Boards list.
+  Archiving a board is how a finished program leaves everyone's overview.
+- **One row per board**: its name, its Start date and End date if set, and one
+  mark per lane, the lane's state (`laneInfo`) as a shape and a colour, so it
+  reads without colour: a tick on green (all finished), an exclamation on red
+  (a card is late), filled (due soon), a ring (under way), a dashed ring
+  (cards, none dated) and a dash (no cards). A finished card is never late
+  here either. Nothing else is read from Details. A row opens its board; to a
+  screen reader it is one button that says each lane and its state
+  (`describeMark`). A board whose cards could not be loaded says so on its
+  row rather than drawing marks that would read as "nothing here".
+- **Boards with the same lanes share a heading.** "The same" is the lanes'
+  names in the same order, ignoring capitals and spaces at the ends
+  (`laneSignature`); a board that renames, adds or reorders a lane moves under
+  a heading of its own. Boards are ordered inside their group, and the group
+  holding the first board in the order comes first (`groupOverview`).
+- **Three orders, each either way, remembered per person**: start date
+  (earliest first, where it opens), date created (oldest first) and most
+  overdue (the board whose latest card is most days late first). A board with
+  no start date goes last whichever way the start-date order runs. Ties go by
+  name (`sortOverview`). Nobody arranges the list by hand.
+- **Each person hides boards from their own overview**, by a long press on the
+  row (right-click on a computer), and shows them again from **Hidden (n)** at
+  the foot; a board shown again returns to its place (decision E). Hiding
+  changes nothing for anyone else.
+- **The lane names are written in full.** Straight over their marks where each
+  fits its column on two lines; otherwise on a slant, every name starting at
+  its own mark (`laneColumns`). The columns narrow until the name that reaches
+  furthest right ends inside the row, and the slant is the gentlest at which
+  neighbouring names stay a line apart. So every lane is on screen, nothing
+  scrolls sideways, and on a small phone with twelve lanes the marks shrink
+  rather than touch (decision F). There is no setting for the layout.
+- **Stored per person, on the user document**: `overviewSort`,
+  `overviewReverse` and `overviewHiddenBoardIds`, written by the person alone,
+  each control writing its own field. The hidden list drops boards no longer
+  listed on each write and is bounded at 500 (`OVERVIEW_HIDDEN_MAX`, restated
+  in the rules). A display preference grants nothing, so hiding a board you
+  cannot see changes nothing.
+- **Each row listens to its own board's cards**, the board screen's query and
+  rule, rather than one query across boards: a member's read of a card is
+  checked against its board, and a query may make ten such lookups. Rows are
+  not virtualised, since a row that stops listening would lose its place in
+  "most overdue". Fine for the boards fewer than fifty people keep.
+
 ## Theming
 
 **The palette is the Sabeel Institute brand palette** — see `docs/BRAND.md`, the
@@ -845,6 +904,10 @@ Deny-by-default.
   members of the card's board, and an entry for a board you are not on yields
   nothing. `removeBoardMember` clears the removed person's entries for that
   board.
+- A user may write their own overview preferences: `overviewSort` one of the
+  three orders, `overviewReverse` a boolean, `overviewHiddenBoardIds` a list of
+  at most 500 (`OVERVIEW_HIDDEN_MAX`, held to it by `ruleLimits.test.ts`).
+  They grant nothing, so the ids are not checked.
 - Board create: `role in [organizer, admin]`. Settings, membership, ownership and
   archive: ownership of that board.
 - `columnId` on a card must match a column that exists on the board — clients

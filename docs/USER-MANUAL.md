@@ -187,6 +187,40 @@ before **Add**. A subtask starts in the lane of the card it belongs to.
 A board without lanes looks exactly as described above. Lanes are switched on
 in the board's settings (Part 2).
 
+### The overview
+
+<div class="pair">
+  <figure class="ph"><img src="manual/img/overview-phone.png" alt="The overview on a phone: each program's name and dates, a row of marks under the lane names written on a slant"><figcaption>On a phone</figcaption></figure>
+  <figure class="wd"><img src="manual/img/overview-wide.png" alt="The overview in a browser: each program on one line, its marks under the lane names"><figcaption>In a browser</figcaption></figure>
+</div>
+
+If you're on a board with lanes, the **Boards** screen has an **Overview**
+button at the top (a list with ticks). It shows every board with lanes that
+you can open, one row each: the board's name, its start and end dates if it
+has them, and a mark for each lane, under the lane's name.
+
+- a **tick on green**: every card in the lane is finished
+- an **exclamation mark on red**: a card in the lane is late
+- **filled in**: a card is due in the next few days
+- a **ring**: under way, nothing late
+- a **dashed ring**: it has cards, but none has a due date
+- a **dash**: the lane has no cards
+
+Boards with the same lanes sit together under one row of lane names. Tap a
+row to open its board.
+
+**Order** sorts the boards by **Start date** (where it starts), **Date
+created** or **Most overdue**, and the arrows beside it turn that order the
+other way. A board without a start date always comes last when sorting by
+start date. The app remembers your choice.
+
+**Hiding a board from your overview:** press and hold its row (right-click in
+a browser) and choose **Hide from my overview**. It's hidden for you only. To
+bring it back, open **Hidden** at the foot of the list and press **Show**.
+
+Boards marked as templates and archived boards aren't in the overview, so
+archiving a program when it's over takes it out for everyone.
+
 ## 1.5 Working with a card
 
 Tap any card to open the full view.
@@ -1096,6 +1130,10 @@ then fill them in.
 **…divide a board into lanes?** *(the board's owners)*
 Open the board → **settings** → **Lanes** → turn on **Lanes on this board**,
 then add the lanes.
+
+**…see how every program is going?**
+**Boards** → **Overview** at the top. It's there once you're on a board with
+lanes.
 
 **…add a label?** *(anyone on the board)*
 Open any card → **+** beside its labels. It belongs to that board. A label for
