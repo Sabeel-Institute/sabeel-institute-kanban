@@ -25,7 +25,7 @@ import {
 } from '../../boards';
 import { confirmAction } from '../../confirm';
 import { space, type, useTheme } from '../../theme';
-import { useAction } from '../../useAction';
+import { type Run, useAction } from '../../useAction';
 import { FieldNameEditor } from '../ColumnNameEditor';
 import { DateField } from '../DateField';
 import { ReorderList } from '../ReorderList';
@@ -132,7 +132,7 @@ function DetailValue({
   value: string | undefined;
   canEdit: boolean;
   busy: boolean;
-  run: (fn: () => Promise<unknown>) => Promise<void>;
+  run: Run;
   onError: (message: string) => void;
 }) {
   const t = useTheme();
@@ -238,7 +238,7 @@ function FieldsEditor({
 }: {
   board: BoardListItem;
   busy: boolean;
-  run: (fn: () => Promise<unknown>) => Promise<void>;
+  run: Run;
   onError: (message: string) => void;
   onDone: () => void;
 }) {
@@ -310,8 +310,7 @@ function FieldsEditor({
               onError(r.error);
               return false;
             }
-            await run(() => setBoardFields(board.id, r.fields));
-            return true;
+            return run(() => setBoardFields(board.id, r.fields));
           }}
         />
       )}
