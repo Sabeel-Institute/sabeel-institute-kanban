@@ -1,4 +1,5 @@
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { BackHandler, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { canEditBoardLabels, canManageBoard } from '@sabeel/shared';
 import { useBoard, type BoardListItem } from '../boards';
 import {
@@ -50,6 +51,26 @@ export function BoardSettingsScreen({
   const { isWide } = useLayout();
   const board = useBoard(boardId);
   const labels = useLabels();
+  // Android's hardware Back and its edge swipe take the same way out as the
+  // header's Back (`settingsBack`, below): the app-wide handler pops one
+  // entry, which is wrong when settings stands on two. Registered after it, so
+  // asked first. The browser's own Back still pops one, a residual.
+  const back = useRef<() => void>(() => nav.pop());
+  useEffect(() => {
+    if (Platform.OS === 'web') return undefined;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      back.current();
+      return true;
+    });
+    return () => sub.remove();
+  }, []);
+
+  // With no board to show, Back leaves settings, every entry of them: removed
+  // from the board while on a page, one press must not land on the list.
+  back.current = () => {
+    const r = settingsBack(nav.stack, boardId, true, true);
+    if ('pop' in r) nav.back(r.pop);
+  };
 
   if (board.status === 'loading') return <Spinner label="Loading board…" />;
   const b = board.data;
@@ -62,7 +83,7 @@ export function BoardSettingsScreen({
       <Screen width="read">
         <Row style={styles.between}>
           <Title>{board.status === 'error' ? 'Board unavailable' : 'Board not found'}</Title>
-          <IconAction icon="arrow-back" label="Back" onPress={nav.pop} />
+          <IconAction icon="arrow-back" label="Back" onPress={back.current} />
         </Row>
         {board.status === 'error' ? (
           <LoadError what="this board" code={board.error} />
@@ -96,6 +117,7 @@ export function BoardSettingsScreen({
     if ('pop' in r) nav.back(r.pop);
     else nav.replace({ name: 'boardSettings', boardId });
   }
+  back.current = goBack;
 
   function open(next: BoardSettingsPage) {
     const route = { name: 'boardSettings', boardId, page: next } as const;

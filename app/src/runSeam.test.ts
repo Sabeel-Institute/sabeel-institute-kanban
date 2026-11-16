@@ -20,18 +20,25 @@ function sources(dir: string): string[] {
   });
 }
 
-/** Each `await run(...)` used as a statement, and the statement after it. */
+/**
+ * Each `run(...)` used as a statement (awaited, fired with `void`, or called
+ * on an object such as `cloneAction.run(`), and the statement after it.
+ */
 export function actsAfterRun(source: string): { line: number; next: string }[] {
   const found: { line: number; next: string }[] = [];
-  const re = /(^|[;{}\n]\s*)await run\(/g;
+  const re = /(^|[;{}\n]\s*)(?:await\s+|void\s+)?(?:\w+\.)?run\(/g;
   for (let m = re.exec(source); m; m = re.exec(source)) {
     let i = m.index + m[0].length;
+    // `run()` with nothing to run is some other function: `useAction`'s takes
+    // the work.
+    if (source[i] === ')') continue;
     for (let depth = 1; depth > 0 && i < source.length; i += 1) {
       if (source[i] === '(') depth += 1;
       else if (source[i] === ')') depth -= 1;
     }
     const next = source.slice(i).replace(/^[\s;]*/, '').split('\n')[0].trim();
-    if (next && !/^[})]/.test(next)) {
+    // A chained `.finally(...)` runs either way, which is what it is for.
+    if (next && !/^[})]/.test(next) && !next.startsWith('.')) {
       found.push({ line: source.slice(0, m.index).split('\n').length + 1, next });
     }
   }
@@ -44,6 +51,8 @@ describe('acting after run', () => {
     expect(actsAfterRun('async () => {\n  await run(() => save(x));\n}')).toEqual([]);
     expect(actsAfterRun('async () => {\n  if (await run(() => save(x))) setName("");\n}')).toEqual([]);
     expect(actsAfterRun('async () => {\n  return run(() => save(x));\n}')).toEqual([]);
+    expect(actsAfterRun('async () => {\n  await cloneAction.run(() => save(x));\n  close();\n}')).toHaveLength(1);
+    expect(actsAfterRun('() => {\n  void run(() => save(x));\n  close();\n}')).toHaveLength(1);
   });
 
   it('happens nowhere in the app', () => {
