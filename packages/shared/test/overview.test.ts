@@ -56,9 +56,9 @@ describe('boardOverdueDays', () => {
     expect(
       boardOverdueDays(
         [
-          { columnId: 'todo', dueDate: '2026-11-10' },
-          { columnId: 'todo', dueDate: '2026-11-01' },
-          { columnId: 'todo', dueDate: '2026-11-20' },
+          { columnId: 'todo', laneId: 'l1', dueDate: '2026-11-10' },
+          { columnId: 'todo', laneId: 'l1', dueDate: '2026-11-01' },
+          { columnId: 'todo', laneId: 'l1', dueDate: '2026-11-20' },
         ],
         board,
         today,
@@ -70,15 +70,29 @@ describe('boardOverdueDays', () => {
     expect(
       boardOverdueDays(
         [
-          { columnId: 'done', dueDate: '2026-10-01' },
-          { columnId: 'todo', dueDate: '2026-10-01', archived: true },
-          { columnId: 'todo', dueDate: today },
-          { columnId: 'todo' },
+          { columnId: 'done', laneId: 'l1', dueDate: '2026-10-01' },
+          { columnId: 'todo', laneId: 'l1', dueDate: '2026-10-01', archived: true },
+          { columnId: 'todo', laneId: 'l1', dueDate: today },
+          { columnId: 'todo', laneId: 'l1' },
         ],
         board,
         today,
       ),
     ).toBe(0);
+  });
+
+  it('counts only cards in a lane, the cards the row has marks for', () => {
+    expect(
+      boardOverdueDays(
+        [
+          { columnId: 'todo', dueDate: '2026-01-01' },
+          { columnId: 'todo', laneId: 'gone', dueDate: '2026-01-01' },
+          { columnId: 'todo', laneId: 'l1', dueDate: '2026-11-14' },
+        ],
+        board,
+        today,
+      ),
+    ).toBe(1);
   });
 });
 

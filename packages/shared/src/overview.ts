@@ -1,4 +1,4 @@
-import { isFinished, lanesLive, type LaneBoard, type LaneCard, type LaneInfo, type LaneStatus } from './lanes';
+import { isFinished, laneOf, lanesLive, type LaneBoard, type LaneCard, type LaneInfo, type LaneStatus } from './lanes';
 import type { BoardLane } from './types';
 
 /**
@@ -52,7 +52,10 @@ function dayNumber(dayKey: string): number {
 
 /**
  * How many days late the board's most overdue unfinished card is, 0 if none
- * is: what "most overdue" orders by. Archived and finished cards do not count.
+ * is: what "most overdue" orders by. Only cards in one of the board's lanes
+ * count, since only those have a mark on the row: a board must not sort first
+ * for a late card the row does not show. Archived and finished cards do not
+ * count either.
  */
 export function boardOverdueDays(
   cards: readonly LaneCard[],
@@ -63,6 +66,7 @@ export function boardOverdueDays(
   const now = dayNumber(today);
   for (const c of cards) {
     if (c.archived || !c.dueDate || c.dueDate >= today || isFinished(c, board)) continue;
+    if (laneOf(c, board) === null) continue;
     most = Math.max(most, now - dayNumber(c.dueDate));
   }
   return most;
