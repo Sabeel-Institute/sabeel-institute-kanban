@@ -72,6 +72,41 @@ function placement(page) {
   });
 }
 
+/** The cards of one lane in one column, in the order drawn (lane null: No lane). */
+async function laneOrder(page, column, lane) {
+  return page.evaluate(
+    ([col, want]) => {
+      const list = document.querySelector(`[data-testid="column-cards-${col}"]`);
+      const out = [];
+      let current = null;
+      for (const el of list.querySelectorAll('[role="heading"], [data-testid^="card-"]')) {
+        if (el.getAttribute('role') === 'heading') current = (el.getAttribute('aria-label') || '').split(',')[0];
+        else if ((current === 'No lane' ? null : current) === want) out.push(el.getAttribute('data-testid').slice(5));
+      }
+      return out;
+    },
+    [column, lane],
+  );
+}
+
+/** Whether a drop bar is drawn inside one lane's group of a column right now. */
+function barIn(page, column, lane) {
+  return page.evaluate(
+    ([col, name]) => {
+      const h = [...document.querySelectorAll(`[data-testid="column-cards-${col}"] [role="heading"]`)].find((el) => {
+        const label = el.getAttribute('aria-label') || '';
+        return label === name || label.startsWith(`${name},`);
+      });
+      // No heading is a broken page, not a pass.
+      if (!h) throw new Error(`no ${name} heading in ${col}`);
+      let group = h;
+      while (group.parentElement && !group.parentElement.matches(`[data-testid="column-cards-${col}"]`)) group = group.parentElement;
+      return [...group.querySelectorAll('div')].some((d) => getComputedStyle(d).height === '3px');
+    },
+    [column, lane],
+  );
+}
+
 /** A lane heading's words, as a screen reader hears it: name, finished of total, late. */
 async function heading(page, lane) {
   const h = page.locator(`[role="heading"][aria-label^="${lane},"]`).first();
@@ -419,6 +454,61 @@ try {
     'a card dragged onto a lane heading in another column lands in that lane and column',
     await placed(page, 'Before lanes', 'In Progress', 'Supplies'),
   );
+
+  // ---- Where in a lane a drop lands --------------------------------------------
+  // Three cards in one lane and one in No lane, written straight in, ranked
+  // after everything else in To Do.
+  {
+    const boardDoc = (await db.collection('boards').where('name', '==', BOARD).get()).docs[0];
+    const bd = boardDoc.data();
+    const todo = bd.columns.find((c) => c.name === 'To Do').id;
+    const supplies = bd.lanes.find((l) => l.name === 'Supplies').id;
+    const by = bd.createdBy;
+    const put = (title, rank, laneId) =>
+      db.collection('cards').add({
+        boardId: boardDoc.id, title, description: '', columnId: todo, rank,
+        ...(laneId ? { laneId } : {}),
+        priority: 'none', assigneeUids: [], subscriberUids: [], labelIds: [],
+        archived: false, commentCount: 0,
+        createdAt: Date.now(), createdBy: by, updatedAt: Date.now(), updatedBy: by,
+      });
+    await put('Drag A', 'xa', supplies);
+    await put('Drag B', 'xb', supplies);
+    await put('Drag C', 'xc', supplies);
+    await put('Drag N', 'xd', null);
+    await page.locator('[data-testid="card-Drag N"]').waitFor({ timeout: 20000 });
+    const tail = async () => (await laneOrder(page, 'To Do', 'Supplies')).filter((t) => t.startsWith('Drag '));
+
+    await htmlDrag(page, '[data-testid="card-Drag A"]', '[data-testid="card-Drag C"]');
+    let order = await tail();
+    check('a card dragged down its lane lands where the bar was, above the card it was over', order.join() === 'Drag B,Drag A,Drag C', order.join());
+
+    // Over a card in No lane, a card with a lane is refused there: no bar in
+    // No lane, and the drop takes it to the end of its own lane.
+    const fire = (sel, type) =>
+      page.evaluate(
+        ([s, t]) => {
+          window.__dt ??= new DataTransfer();
+          document.querySelector(s).dispatchEvent(new DragEvent(t, { bubbles: true, cancelable: true, dataTransfer: window.__dt }));
+          if (t === 'dragend') window.__dt = undefined;
+        },
+        [sel, type],
+      );
+    await fire('[data-testid="card-Drag B"]', 'dragstart');
+    await page.waitForTimeout(250);
+    await fire('[data-testid="card-Drag N"]', 'dragover');
+    await page.waitForTimeout(250);
+    check('a card with a lane over a card in No lane draws no bar in No lane', !(await barIn(page, 'To Do', 'No lane')));
+    await fire('[data-testid="card-Drag N"]', 'drop');
+    await fire('[data-testid="card-Drag B"]', 'dragend');
+    await page.waitForTimeout(1200);
+    order = await tail();
+    check(
+      'and dropped there it goes to the end of its own lane',
+      order.join() === 'Drag A,Drag C,Drag B' && (await laneOrder(page, 'To Do', null)).includes('Drag N'),
+      order.join(),
+    );
+  }
 
   // ---- Removing a lane -----------------------------------------------------------
   await settingsPage('Lanes');

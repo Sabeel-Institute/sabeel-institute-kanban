@@ -54,6 +54,7 @@ import {
 } from '@sabeel/shared';
 import type { SessionUser } from '../../session';
 import { useNav } from '../../nav';
+import { acceptsDrop, dropPlacement } from '../../boardDrop';
 import { useListenerError } from '../../liveQuery';
 import { useLabels } from '../../labels';
 import { toUserMessage } from '../../errors';
@@ -410,21 +411,18 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
       const moving = (cards.data ?? []).find((c) => c.id === cardId);
       if (!moving) return;
 
-      const column = (byColumn.get(columnId) ?? []).filter((c) => c.id !== moving.id);
-      // With lanes, `index` counts the target lane's cards in this column, and
-      // the new rank falls between two of them; other lanes' cards in between
-      // are no matter, since each lane draws the column's order filtered.
+      const drawnColumn = byColumn.get(columnId) ?? [];
+      const column = drawnColumn.filter((c) => c.id !== moving.id);
+      // With lanes, `index` is a position in the target lane's cards as this
+      // column draws them, and the new rank falls between two of them; other
+      // lanes' cards in between are no matter, since each lane draws the
+      // column's order filtered. `dropPlacement` has the index rules.
       const inLane = target.laneId !== undefined && laneBoard;
-      const neighbours = inLane
-        ? column.filter((c) => laneOf(c, laneBoard) === target.laneId)
-        : column;
-      // Clamped: an end position counts the dragged card when it stays in its
-      // own column, one more than `neighbours` holds, and an index past the
-      // end found no card either side and dropped the card mid-column.
-      const at = Math.min(index, neighbours.length);
-      const before = at > 0 ? neighbours[at - 1] : null;
-      const after = at < neighbours.length ? neighbours[at] : null;
-      if (before?.id === moving.id || after?.id === moving.id) return;
+      const group = inLane
+        ? drawnColumn.filter((c) => laneOf(c, laneBoard) === target.laneId)
+        : drawnColumn;
+      const place = dropPlacement(group, index, moving.id);
+      if (!place) return;
 
       try {
         await moveCard({
@@ -432,8 +430,8 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
           toColumnId: columnId,
           // No lane is never written: a card is placed, not unplaced.
           ...(inLane && target.laneId ? { toLaneId: target.laneId } : {}),
-          before: before ?? null,
-          after: after ?? null,
+          before: place.before,
+          after: place.after,
           user,
         });
         // Background tidy-up; never blocks the user.
@@ -683,15 +681,15 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
           // The order the column DRAWS its cards in, which shift-click follows.
           const drawn = groups ? groups.flatMap((g) => g.cards) : colCards;
           // Dropped anywhere in the column but a lane: the end of the dragged
-          // card's own lane, or of the column on a board without lanes.
+          // card's own lane, or of the column on a board without lanes. The
+          // index counts the group as drawn, the dragged card included, so the
+          // bar is drawn after its last card (`dropPlacement`).
           const draggedLane = dragged && laneBoard && live ? laneOf(dragged, laneBoard) : null;
           const columnEnd: DropTarget = groups
             ? {
                 columnId: col.id,
                 laneId: draggedLane,
-                index: colCards.filter(
-                  (c) => c.id !== dragged?.id && laneOf(c, laneBoard!) === draggedLane,
-                ).length,
+                index: colCards.filter((c) => laneOf(c, laneBoard!) === draggedLane).length,
               }
             : { columnId: col.id, index: colCards.length };
           const marks = (laneId: string | null | undefined, i: number) =>
@@ -712,6 +710,10 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
             <div
               key={card.id}
               onDragOver={(e) => {
+                // Refused as its lane's group refuses it, or the bar would be
+                // drawn where the card will not go: left to the column, which
+                // takes it to the end of its own lane.
+                if (!acceptsDrop(laneId, draggedLane)) return;
                 e.preventDefault();
                 e.stopPropagation();
                 if (drag) setDropTarget({ columnId: col.id, laneId, index: i });
@@ -856,9 +858,8 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
                     // A card with a lane is not dropped INTO No lane, as the
                     // card screen never offers it one; over No lane such a
                     // card falls through to the column, keeping its lane.
-                    const accepts = laneId !== null || draggedLane === null;
                     const into = (index: number) => (e: React.DragEvent) => {
-                      if (!accepts) return;
+                      if (!acceptsDrop(laneId, draggedLane)) return;
                       e.preventDefault();
                       e.stopPropagation();
                       if (drag) setDropTarget({ columnId: col.id, laneId, index });
