@@ -54,6 +54,7 @@ import {
 import type { SessionUser } from '../../session';
 import { useNav } from '../../nav';
 import { acceptsDrop, dropPlacement } from '../../boardDrop';
+import type { AddCardDraft } from './AddCardForm';
 import { useListenerError } from '../../liveQuery';
 import { useLabels } from '../../labels';
 import { toUserMessage } from '../../errors';
@@ -208,26 +209,26 @@ function WebAddCardForm({
   onCancel,
   canSubscribe,
   lanes,
+  initial,
 }: {
   /** Called with a trimmed, non-empty title, whether to subscribe to it, and
    *  its lane on a board with lanes. */
-  /** Resolves once the add is settled; the form closes only on success. */
-  onAdd: (title: string, subscribe: boolean, laneId?: string) => Promise<void>;
+  onAdd: (title: string, subscribe: boolean, laneId?: string) => void;
   onCancel: () => void;
   /** Whether the bell is offered: only a member of the board may subscribe. */
   canSubscribe: boolean;
   /** The board's lanes when they are live; absent on a board without them. */
   lanes?: readonly BoardLane[];
+  /** What a refused add held, to start from instead of an empty form. */
+  initial?: AddCardDraft;
 }) {
   const t = useWebTheme();
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(initial?.title ?? '');
   // Unmount-scoped like the draft, so every new composer starts subscribed.
-  const [subscribe, setSubscribe] = useState(true);
+  const [subscribe, setSubscribe] = useState(initial?.subscribe ?? true);
   // None chosen to start, as in the native form: see `AddCardForm`.
-  const [laneId, setLaneId] = useState('');
+  const [laneId, setLaneId] = useState(initial?.laneId ?? '');
   const [needsLane, setNeedsLane] = useState(false);
-  // Open while its card is written, as in the native form: one card a submit.
-  const [adding, setAdding] = useState(false);
 
   function submit() {
     const trimmed = title.trim();
@@ -236,11 +237,7 @@ function WebAddCardForm({
       setNeedsLane(true);
       return;
     }
-    if (adding) return;
-    setAdding(true);
-    void onAdd(trimmed, canSubscribe && subscribe, lanes ? laneId : undefined).finally(() =>
-      setAdding(false),
-    );
+    onAdd(trimmed, canSubscribe && subscribe, lanes ? laneId : undefined);
   }
 
   return (
@@ -301,7 +298,7 @@ function WebAddCardForm({
         </>
       ) : null}
       <div style={{ display: 'flex', alignItems: 'center', gap: space.sm }}>
-        <button onClick={submit} disabled={adding} style={primaryBtn(t)}>
+        <button onClick={submit} style={primaryBtn(t)}>
           Add card
         </button>
         {canSubscribe ? (
@@ -325,6 +322,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   const [drag, setDrag] = useState<DragState>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
+  const [retry, setRetry] = useState<(AddCardDraft & { columnId: string }) | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Which column is mid-rename. Its delete button steps aside while editing, so
   // the cancel ✕ and the delete ✕ are never sitting next to each other.
@@ -443,9 +441,15 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
 
   // The title comes from `WebAddCardForm`, already trimmed and non-empty — the
   // draft lives there so typing one does not re-render the board.
-  // The form closes once the card is written: a refused add keeps its title
-  // and lane in front of the error.
+  // The form closes at once: the card is on the board at once (Firestore
+  // draws a write before the server confirms it), and an add made offline
+  // waits in the queue. Closing only once the server answered left a form
+  // open over its own card, and closed whatever form was open by then. A
+  // REFUSED add is given back instead: its form reopens with what was typed
+  // (`retry`), in front of the error.
   async function addCard(columnId: string, title: string, subscribe: boolean, laneId?: string) {
+    setAdding(null);
+    setRetry(null);
     try {
       await createCard({
         boardId,
@@ -456,9 +460,9 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         subscribe,
         laneId,
       });
-      setAdding(null);
     } catch (e) {
       setError(toUserMessage(e, 'createCard'));
+      setRetry({ columnId, title, subscribe, laneId });
     }
   }
 
@@ -885,14 +889,19 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
 
               </div>
 
-              {adding === col.id ? (
+              {/* A refused add reopens here, unless another form is open. */}
+              {adding === col.id || (adding === null && retry?.columnId === col.id) ? (
                 <WebAddCardForm
                   onAdd={(title, subscribe, laneId) =>
-                    addCard(col.id, title, subscribe, laneId)
+                    void addCard(col.id, title, subscribe, laneId)
                   }
                   canSubscribe={isMember}
                   lanes={live && laneBoard ? laneBoard.lanes : undefined}
-                  onCancel={() => setAdding(null)}
+                  initial={retry?.columnId === col.id ? retry : undefined}
+                  onCancel={() => {
+                    setAdding(null);
+                    setRetry((r) => (r?.columnId === col.id ? null : r));
+                  }}
                 />
               ) : (
                 <button onClick={() => setAdding(col.id)} style={{ ...btn(t), width: '100%' }}>

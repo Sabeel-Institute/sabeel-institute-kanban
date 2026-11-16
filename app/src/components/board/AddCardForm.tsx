@@ -30,35 +30,38 @@ import { NewCardBell } from './Bells';
  * non-scrolling screen; the wide board needs neither. That is each board's
  * layout, not the form's.
  */
+/** What an add-card form held: given back to a form reopened after a refusal. */
+export interface AddCardDraft {
+  title: string;
+  subscribe: boolean;
+  laneId?: string;
+}
+
 export function AddCardForm({
   onAdd,
   onCancel,
   canSubscribe,
   lanes,
+  initial,
 }: {
   /** Called with a trimmed, non-empty title, whether to subscribe to it, and
    *  its lane on a board with lanes. */
-  /**
-   * Resolves once the add is settled, either way. The parent closes the form
-   * only when the card is written, so a refused add keeps its title and lane.
-   */
-  onAdd: (title: string, subscribe: boolean, laneId?: string) => Promise<void>;
+  onAdd: (title: string, subscribe: boolean, laneId?: string) => void;
   onCancel: () => void;
   /** Whether the bell is offered: only a member of the board may subscribe. */
   canSubscribe: boolean;
   /** The board's lanes when they are live; absent on a board without them. */
   lanes?: readonly BoardLane[];
+  /** What a refused add held, to start from instead of an empty form. */
+  initial?: AddCardDraft;
 }) {
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(initial?.title ?? '');
   // Unmount-scoped like the draft, so every new composer starts subscribed.
-  const [subscribe, setSubscribe] = useState(true);
+  const [subscribe, setSubscribe] = useState(initial?.subscribe ?? true);
   // None chosen to start, and nothing remembered between cards (Faisal,
   // 2026-11-15): a lane picked for you is a card filed in the wrong place.
-  const [laneId, setLaneId] = useState('');
+  const [laneId, setLaneId] = useState(initial?.laneId ?? '');
   const [needsLane, setNeedsLane] = useState(false);
-  // The form stays open while its card is written, so a second tap must not
-  // write a second card.
-  const [adding, setAdding] = useState(false);
 
   // One path for both the Add button and the keyboard's submit, so they cannot
   // drift. An empty title is a no-op rather than a disabled button, which is
@@ -70,11 +73,7 @@ export function AddCardForm({
       setNeedsLane(true);
       return;
     }
-    if (adding) return;
-    setAdding(true);
-    void onAdd(trimmed, canSubscribe && subscribe, lanes ? laneId : undefined).finally(() =>
-      setAdding(false),
-    );
+    onAdd(trimmed, canSubscribe && subscribe, lanes ? laneId : undefined);
   }
 
   return (
@@ -105,7 +104,7 @@ export function AddCardForm({
         </>
       ) : null}
       <Row>
-        <Button label="Add" onPress={submit} busy={adding} />
+        <Button label="Add" onPress={submit} />
         <Button label="Cancel" variant="secondary" onPress={onCancel} />
         {canSubscribe ? (
           <NewCardBell on={subscribe} onToggle={() => setSubscribe((on) => !on)} />

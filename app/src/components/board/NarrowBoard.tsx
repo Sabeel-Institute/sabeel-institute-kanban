@@ -68,7 +68,7 @@ import {
   Spinner,
   Title,
 } from '../ui';
-import { AddCardForm } from './AddCardForm';
+import { AddCardForm, type AddCardDraft } from './AddCardForm';
 import { WatchColumnBell } from './Bells';
 import { LaneHeading } from './LaneHeading';
 import { useLaneInfo } from './useLaneInfo';
@@ -174,6 +174,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
   // Keyed by board so two boards do not inherit each other's position.
   const [page, setPage] = useState(() => lastPageByBoard.get(boardId) ?? 0);
   const [adding, setAdding] = useState(false);
+  const [retry, setRetry] = useState<(AddCardDraft & { columnId: string }) | null>(null);
   const { run, busy, error, setError } = useAction('narrowBoard');
   // Editing the column name takes over the pager row (see the header below).
   const [renaming, setRenaming] = useState(false);
@@ -321,11 +322,17 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
 
   // The title comes from `AddCardForm`, already trimmed and non-empty — the
   // draft lives there so typing one does not re-render the board.
-  // The form closes once the card is written: a refused add keeps its title
-  // and lane in front of the error.
+  // The form closes at once: the card is on the board at once (Firestore
+  // draws a write before the server confirms it), and an add made offline
+  // waits in the queue. Closing only once the server answered left a form
+  // open over its own card, and closed whatever form was open by then. A
+  // REFUSED add is given back instead: its form reopens with what was typed
+  // (`retry`), in front of the error.
   async function addCard(columnId: string, title: string, subscribe: boolean, laneId?: string) {
-    await run(async () => {
-      await createCard({
+    setAdding(false);
+    setRetry(null);
+    const added = await run(() =>
+      createCard({
         boardId,
         columnId,
         title,
@@ -333,9 +340,9 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
         columnCards: byColumn.get(columnId) ?? [],
         subscribe,
         laneId,
-      });
-      setAdding(false);
-    });
+      }),
+    );
+    if (!added) setRetry({ columnId, title, subscribe, laneId });
   }
 
 
@@ -694,7 +701,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
                   horizontal pager to reveal that focused input — the board
                   jumped from column 1 to column 7 the moment you tapped "+ Add
                   card", landing between pages with two forms side by side. */}
-              {adding && col.id === current?.id ? (
+              {col.id === current?.id && (adding || retry?.columnId === col.id) ? (
                 /* Lifted above the keyboard: this composer is pinned to the
                    bottom of a NON-scrolling screen, so nothing can scroll it
                    into view and the keyboard simply covered the field. */
@@ -712,7 +719,11 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
                       }
                       canSubscribe={isMember}
                       lanes={live ? lanes : undefined}
-                      onCancel={() => setAdding(false)}
+                      initial={retry?.columnId === col.id ? retry : undefined}
+                      onCancel={() => {
+                        setAdding(false);
+                        setRetry(null);
+                      }}
                     />
                   </Panel>
                 </KeyboardSticky>

@@ -42,7 +42,7 @@ import {
   Spinner,
   Title,
 } from '../ui';
-import { AddCardForm } from './AddCardForm';
+import { AddCardForm, type AddCardDraft } from './AddCardForm';
 import { WatchColumnBell } from './Bells';
 import { LaneHeading } from './LaneHeading';
 import { useLaneInfo } from './useLaneInfo';
@@ -80,6 +80,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   const t = useTheme();
 
   const [adding, setAdding] = useState<string | null>(null);
+  const [retry, setRetry] = useState<(AddCardDraft & { columnId: string }) | null>(null);
   const [moving, setMoving] = useState<Card | null>(null);
   // Which column is mid-rename — its delete icon steps aside while editing, so
   // the cancel ✕ and the delete ✕ are never adjacent.
@@ -121,11 +122,17 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
 
   // The title comes from `AddCardForm`, already trimmed and non-empty — the
   // draft lives there so typing one does not re-render the board.
-  // The form closes once the card is written: a refused add keeps its title
-  // and lane in front of the error.
+  // The form closes at once: the card is on the board at once (Firestore
+  // draws a write before the server confirms it), and an add made offline
+  // waits in the queue. Closing only once the server answered left a form
+  // open over its own card, and closed whatever form was open by then. A
+  // REFUSED add is given back instead: its form reopens with what was typed
+  // (`retry`), in front of the error.
   async function addCard(columnId: string, title: string, subscribe: boolean, laneId?: string) {
-    await run(async () => {
-      await createCard({
+    setAdding(null);
+    setRetry(null);
+    const added = await run(() =>
+      createCard({
         boardId,
         columnId,
         title,
@@ -133,9 +140,9 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         columnCards: byColumn.get(columnId) ?? [],
         subscribe,
         laneId,
-      });
-      setAdding(null);
-    });
+      }),
+    );
+    if (!added) setRetry({ columnId, title, subscribe, laneId });
   }
 
   async function moveTo(card: Card, column: BoardColumn) {
@@ -396,12 +403,17 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
                 {colCards.length === 0 && !(live && laneBoard) ? <Hint>No cards.</Hint> : null}
               </ScrollView>
 
-              {adding === col.id ? (
+              {/* A refused add reopens here, unless another form is open. */}
+              {adding === col.id || (adding === null && retry?.columnId === col.id) ? (
                 <AddCardForm
                   onAdd={(title, subscribe, laneId) => addCard(col.id, title, subscribe, laneId)}
                   canSubscribe={isMember}
                   lanes={live && laneBoard ? laneBoard.lanes : undefined}
-                  onCancel={() => setAdding(null)}
+                  initial={retry?.columnId === col.id ? retry : undefined}
+                  onCancel={() => {
+                    setAdding(null);
+                    setRetry((r) => (r?.columnId === col.id ? null : r));
+                  }}
                 />
               ) : (
                 <Button
