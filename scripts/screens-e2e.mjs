@@ -351,6 +351,24 @@ for (const [id, columnId, laneId, title, dueDate] of [
   });
 }
 
+// A board MARKED AS A TEMPLATE, so the Boards list draws its Templates heading
+// and a badge on a row, at every width. A long name, beside which the badge
+// must wrap rather than push the star off the row.
+await db.doc('boards/sw_template').set({
+  name: 'Weekend program template for the summer term',
+  description: '',
+  archived: false,
+  columns: [{ id: 't1', name: 'To Do' }],
+  columnIds: ['t1'],
+  template: true,
+  memberUids: [uid],
+  boardOwnerUids: [uid],
+  memberProfiles: { [uid]: { displayName: 'Faisal', email: 'faisal@oursabeel.com' } },
+  activeCardCount: 0,
+  createdAt: now,
+  createdBy: uid,
+});
+
 // Content chosen to STRESS layout: a long title, every priority, labels and an
 // assignee on each, so card faces are at their widest.
 const CARDS = [
@@ -642,6 +660,11 @@ async function tour(page, tag, width) {
   };
 
   await visit('boards', () => nav('Boards'));
+  check(
+    `${tag} / boards lists a template under Templates, with its badge`,
+    (await page.getByText('Templates', { exact: true }).isVisible().catch(() => false)) &&
+      (await page.getByText('Template', { exact: true }).first().isVisible().catch(() => false)),
+  );
 
   /*
    * The push nudge is ON this screenshot, and that has to be asserted or the

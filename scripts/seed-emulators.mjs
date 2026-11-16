@@ -462,9 +462,29 @@ try {
   console.warn('could not seed the lanes board — continuing:', String(e).slice(0, 160));
 }
 
+// A board marked as a template, so the Boards list has its Templates heading.
+const TEMPLATE_BOARD = 'Program template';
+try {
+  await admin.getByRole('button', { name: 'Boards' }).first().click();
+  await admin.getByRole('button', { name: 'New board' }).waitFor({ timeout: 25000 });
+  await admin.waitForTimeout(1500);
+  if (!(await admin.getByText(TEMPLATE_BOARD, { exact: true }).first().isVisible().catch(() => false))) {
+    await admin.getByRole('button', { name: 'New board' }).click();
+    await fillThen(admin, 'Board name', TEMPLATE_BOARD, (o) =>
+      admin.getByRole('button', { name: 'Create', exact: true }).click(o),
+    );
+    await admin.getByText('To Do').first().waitFor({ timeout: 30000 });
+    await admin.getByRole('button', { name: 'Board settings' }).click();
+    await admin.getByRole('switch', { name: 'This board is a template' }).click();
+    await admin.getByText(/^Listed under Templates/).waitFor({ timeout: 25000 });
+  }
+} catch (e) {
+  console.warn('could not seed the template board — continuing:', String(e).slice(0, 160));
+}
+
 await browser.close();
 console.log(
-  `Seeded: 3 people, 2 boards (one with ${LANES.length} lanes), ${COLUMNS.length + 3} columns, ${
+  `Seeded: 3 people, 3 boards (one with ${LANES.length} lanes, one a template), ${COLUMNS.length + 3} columns, ${
     CARDS.length
   } cards.`,
 );
