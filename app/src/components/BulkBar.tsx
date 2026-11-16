@@ -90,14 +90,23 @@ export function BulkBar({
       chosen.some((c) => c.labelIds.includes(l.id)),
   );
 
+  /**
+   * Back to the bar's actions, forgetting what a mode had chosen. One way out
+   * of every mode, so no exit (the ✕, a Cancel, a finished action) can leave
+   * a previous Move's column and lane chosen for the next selection.
+   */
+  function toIdle() {
+    setMode('idle');
+    setMoveColumnId('');
+    setMoveLaneId('');
+  }
+
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
     try {
       await fn();
       selection.clear();
-      setMode('idle');
-      setMoveColumnId('');
-      setMoveLaneId('');
+      toIdle();
     } catch (e) {
       onError(toUserMessage(e, 'bulkBar'));
     } finally {
@@ -134,7 +143,7 @@ export function BulkBar({
         <IconAction
           icon="close"
           label={mode === 'idle' ? 'Clear selection' : 'Cancel'}
-          onPress={() => (mode === 'idle' ? selection.clear() : setMode('idle'))}
+          onPress={() => (mode === 'idle' ? selection.clear() : toIdle())}
         />
       </Row>
       {mode === 'idle' ? (
@@ -221,11 +230,7 @@ export function BulkBar({
             <Button
               label="Cancel"
               variant="secondary"
-              onPress={() => {
-                setMode('idle');
-                setMoveColumnId('');
-                setMoveLaneId('');
-              }}
+              onPress={toIdle}
             />
           </Row>
         </>
@@ -257,7 +262,7 @@ export function BulkBar({
                 );
               }}
             />
-            <Button label="Cancel" variant="secondary" onPress={() => setMode('idle')} />
+            <Button label="Cancel" variant="secondary" onPress={toIdle} />
           </Row>
         </>
       ) : null}
@@ -381,7 +386,7 @@ export function BulkBar({
               </Row>
             );
           })}
-          <Button label="Cancel" variant="secondary" onPress={() => setMode('idle')} />
+          <Button label="Cancel" variant="secondary" onPress={toIdle} />
         </>
       ) : null}
 
@@ -399,7 +404,7 @@ export function BulkBar({
               busy={busy}
               onPress={() => run(() => bulkDelete(chosen))}
             />
-            <Button label="Cancel" variant="secondary" onPress={() => setMode('idle')} />
+            <Button label="Cancel" variant="secondary" onPress={toIdle} />
           </Row>
         </>
       ) : null}

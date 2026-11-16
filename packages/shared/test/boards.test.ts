@@ -177,14 +177,14 @@ describe('columnsPatch', () => {
       { id: 'c3', name: 'Doing' },
       { id: 'c2', name: 'Done' },
     ];
-    expect(columnsPatch(columns)).toEqual({
+    expect(columnsPatch({ columns }, columns)).toEqual({
       columns,
       columnIds: ['c1', 'c3', 'c2'],
     });
   });
 
   it('handles an empty column list', () => {
-    expect(columnsPatch([])).toEqual({ columns: [], columnIds: [] });
+    expect(columnsPatch({ columns: [] }, [])).toEqual({ columns: [], columnIds: [] });
   });
 
   it('keeps columnIds in sync after a column is removed', () => {
@@ -192,8 +192,35 @@ describe('columnsPatch', () => {
       { id: 'c1', name: 'To Do' },
       { id: 'c2', name: 'Done' },
     ];
-    const { columnIds } = columnsPatch(columns.filter((c) => c.id !== 'c1'));
+    const { columnIds } = columnsPatch({ columns }, columns.filter((c) => c.id !== 'c1'));
     expect(columnIds).toEqual(['c2']);
+  });
+
+  describe('on a board with lanes switched on', () => {
+    const cols3 = [
+      { id: 'todo', name: 'To Do' },
+      { id: 'review', name: 'Review' },
+      { id: 'done', name: 'Done' },
+    ];
+    const board = { columns: cols3, lanesOn: true, doneColumnId: 'done' };
+
+    it('gives a deleted finished column’s place to the new last column, written', () => {
+      expect(columnsPatch(board, cols3.filter((c) => c.id !== 'done')).doneColumnId).toBe('review');
+    });
+
+    it('keeps the finished column where it is when another goes or one is added', () => {
+      expect(columnsPatch(board, cols3.filter((c) => c.id !== 'todo'))).not.toHaveProperty('doneColumnId');
+      expect(columnsPatch(board, [...cols3, { id: 'new', name: 'Later' }])).not.toHaveProperty('doneColumnId');
+    });
+
+    it('writes a finished column never stored, so reordering cannot move it', () => {
+      const unstored = { columns: cols3, lanesOn: true };
+      expect(columnsPatch(unstored, [cols3[2], cols3[0], cols3[1]]).doneColumnId).toBe('done');
+    });
+
+    it('leaves a board with lanes off alone', () => {
+      expect(columnsPatch({ columns: cols3 }, cols3.slice(0, 2))).not.toHaveProperty('doneColumnId');
+    });
   });
 });
 
@@ -346,7 +373,7 @@ describe('renameColumn', () => {
     // Renaming must never desync columns from columnIds — rules validate card
     // writes against the flat mirror.
     const r = renameColumn(cols(), 'c2', 'Doing');
-    expect(r.ok && columnsPatch(r.columns).columnIds).toEqual(['c1', 'c2', 'c3']);
+    expect(r.ok && columnsPatch({ columns: cols() }, r.columns).columnIds).toEqual(['c1', 'c2', 'c3']);
   });
 
   it('is a no-op for an unknown column id', () => {

@@ -32,25 +32,24 @@ import { BulkBar } from '../BulkBar';
 import { IconAction, LoadError } from '../ui';
 import { NewCardBell, WatchColumnBell } from './Bells';
 import { LaneHeading } from './LaneHeading';
+import { useLaneInfo } from './useLaneInfo';
 import { setColumnWatched, useWatchedColumns } from '../../notifications';
 import {
   CARD_TITLE_MAX,
   canManageBoard,
   columnDeleteBlocked,
   columnsPatch,
+  finishedColumnDeleteNote,
   groupByLane,
   isFinished,
-  laneInfo,
   laneOf,
   lanesLive,
   parentTitles,
   subtaskCounts,
-  todayInOrgTz,
   watchKey,
   type BoardColumn,
   type BoardLane,
   type Label,
-  type LaneInfo,
 } from '@sabeel/shared';
 import type { SessionUser } from '../../session';
 import { useNav } from '../../nav';
@@ -212,7 +211,8 @@ function WebAddCardForm({
 }: {
   /** Called with a trimmed, non-empty title, whether to subscribe to it, and
    *  its lane on a board with lanes. */
-  onAdd: (title: string, subscribe: boolean, laneId?: string) => void;
+  /** Resolves once the add is settled; the form closes only on success. */
+  onAdd: (title: string, subscribe: boolean, laneId?: string) => Promise<void>;
   onCancel: () => void;
   /** Whether the bell is offered: only a member of the board may subscribe. */
   canSubscribe: boolean;
@@ -226,6 +226,8 @@ function WebAddCardForm({
   // None chosen to start, as in the native form: see `AddCardForm`.
   const [laneId, setLaneId] = useState('');
   const [needsLane, setNeedsLane] = useState(false);
+  // Open while its card is written, as in the native form: one card a submit.
+  const [adding, setAdding] = useState(false);
 
   function submit() {
     const trimmed = title.trim();
@@ -234,7 +236,11 @@ function WebAddCardForm({
       setNeedsLane(true);
       return;
     }
-    onAdd(trimmed, canSubscribe && subscribe, lanes ? laneId : undefined);
+    if (adding) return;
+    setAdding(true);
+    void onAdd(trimmed, canSubscribe && subscribe, lanes ? laneId : undefined).finally(() =>
+      setAdding(false),
+    );
   }
 
   return (
@@ -295,7 +301,7 @@ function WebAddCardForm({
         </>
       ) : null}
       <div style={{ display: 'flex', alignItems: 'center', gap: space.sm }}>
-        <button onClick={submit} style={primaryBtn(t)}>
+        <button onClick={submit} disabled={adding} style={primaryBtn(t)}>
           Add card
         </button>
         {canSubscribe ? (
@@ -383,15 +389,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   // does, not bands across the board).
   const laneBoard = board.data;
   const live = laneBoard ? lanesLive(laneBoard) : false;
-  const infoByLane = useMemo(() => {
-    const map = new Map<string, LaneInfo>();
-    if (!laneBoard || !live) return map;
-    const today = todayInOrgTz();
-    for (const lane of laneBoard.lanes) {
-      map.set(lane.id, laneInfo(cards.data ?? EMPTY_CARDS, laneBoard, lane.id, today));
-    }
-    return map;
-  }, [laneBoard, live, cards.data]);
+  const infoByLane = useLaneInfo(laneBoard ?? null, live, cards.data ?? EMPTY_CARDS);
 
   const drop = useCallback(
     async (target: DropTarget, cardIdFromEvent: string | null) => {
@@ -445,8 +443,9 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
 
   // The title comes from `WebAddCardForm`, already trimmed and non-empty — the
   // draft lives there so typing one does not re-render the board.
+  // The form closes once the card is written: a refused add keeps its title
+  // and lane in front of the error.
   async function addCard(columnId: string, title: string, subscribe: boolean, laneId?: string) {
-    setAdding(null);
     try {
       await createCard({
         boardId,
@@ -457,6 +456,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         subscribe,
         laneId,
       });
+      setAdding(null);
     } catch (e) {
       setError(toUserMessage(e, 'createCard'));
     }
@@ -465,7 +465,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   async function saveColumns(next: BoardColumn[]) {
     // Same shape as removeColumn below: this surface reports failures through its
     // own `error` banner rather than useAction.
-    await updateBoard(boardId, columnsPatch(next));
+    await updateBoard(boardId, columnsPatch(board.data ?? { columns: next }, next));
   }
 
   /**
@@ -632,6 +632,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         <div style={banner(t)}>
           Delete the column “{pendingDelete.name}”? It is empty, but this cannot be
           undone.{' '}
+          {board.data ? `${finishedColumnDeleteNote(board.data, pendingDelete.id) ?? ''} ` : ''}
           <button
             onClick={() => confirmRemoveColumn(pendingDelete)}
             style={{ ...btn(t), marginLeft: 8, color: t.text.danger }}
@@ -887,7 +888,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
               {adding === col.id ? (
                 <WebAddCardForm
                   onAdd={(title, subscribe, laneId) =>
-                    void addCard(col.id, title, subscribe, laneId)
+                    addCard(col.id, title, subscribe, laneId)
                   }
                   canSubscribe={isMember}
                   lanes={live && laneBoard ? laneBoard.lanes : undefined}

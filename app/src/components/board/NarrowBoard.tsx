@@ -32,15 +32,13 @@ import {
   canManageBoard,
   columnDeleteBlocked,
   columnsPatch,
+  finishedColumnDeleteNote,
   groupByLane,
   isFinished,
   type Label,
-  laneInfo,
-  type LaneInfo,
   lanesLive,
   parentTitles,
   subtaskCounts,
-  todayInOrgTz,
   watchKey,
 } from '@sabeel/shared';
 import {
@@ -73,6 +71,7 @@ import {
 import { AddCardForm } from './AddCardForm';
 import { WatchColumnBell } from './Bells';
 import { LaneHeading } from './LaneHeading';
+import { useLaneInfo } from './useLaneInfo';
 import { setColumnWatched, useWatchedColumns } from '../../notifications';
 import { useLabels } from '../../labels';
 import { radius, space, useTheme } from '../../theme';
@@ -240,15 +239,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
   const laneBoard = board.data;
   const live = laneBoard ? lanesLive(laneBoard) : false;
   const lanes = laneBoard?.lanes ?? NO_LANES;
-  const infoByLane = useMemo(() => {
-    const map = new Map<string, LaneInfo>();
-    if (!laneBoard || !live) return map;
-    const today = todayInOrgTz();
-    for (const lane of laneBoard.lanes) {
-      map.set(lane.id, laneInfo(cards.data ?? EMPTY_CARDS, laneBoard, lane.id, today));
-    }
-    return map;
-  }, [laneBoard, live, cards.data]);
+  const infoByLane = useLaneInfo(laneBoard ?? null, live, cards.data ?? EMPTY_CARDS);
   const rowsByColumn = useMemo(() => {
     const map = new Map<string, ColumnRow[]>();
     for (const [columnId, colCards] of byColumn) {
@@ -330,10 +321,11 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
 
   // The title comes from `AddCardForm`, already trimmed and non-empty — the
   // draft lives there so typing one does not re-render the board.
+  // The form closes once the card is written: a refused add keeps its title
+  // and lane in front of the error.
   async function addCard(columnId: string, title: string, subscribe: boolean, laneId?: string) {
-    setAdding(false);
-    await run(() =>
-      createCard({
+    await run(async () => {
+      await createCard({
         boardId,
         columnId,
         title,
@@ -341,8 +333,9 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
         columnCards: byColumn.get(columnId) ?? [],
         subscribe,
         laneId,
-      }),
-    );
+      });
+      setAdding(false);
+    });
   }
 
 
@@ -370,11 +363,13 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
       }
       const ok = await confirmAction(
         `Delete “${col.name}”?`,
-        'The column is empty, but deleting it cannot be undone.',
+        ['The column is empty, but deleting it cannot be undone.', board.data ? finishedColumnDeleteNote(board.data, col.id) : null]
+          .filter(Boolean)
+          .join(' '),
       );
       if (!ok) return;
       await run(() =>
-        updateBoard(boardId, columnsPatch(columns.filter((c) => c.id !== col.id))),
+        updateBoard(boardId, columnsPatch(board.data ?? { columns }, columns.filter((c) => c.id !== col.id))),
       );
     })();
   }
@@ -497,7 +492,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
               busy={busy}
               onError={setError}
               onEditingChange={setRenaming}
-              onRename={(next) => updateBoard(boardId, columnsPatch(next))}
+              onRename={(next) => updateBoard(boardId, columnsPatch(b, next))}
               run={run}
             />
           ) : (

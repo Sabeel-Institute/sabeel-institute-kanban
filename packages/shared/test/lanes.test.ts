@@ -15,6 +15,7 @@ import {
   laneInfo,
   laneOf,
   lanesLive,
+  finishedColumnDeleteNote,
   lanesSwitchPatch,
   renameLane,
   validateLaneName,
@@ -252,11 +253,36 @@ describe('lanesSwitchPatch', () => {
     expect(lanesSwitchPatch({ columns, doneColumnId: 'doing' }, true)).toEqual({ lanesOn: true });
   });
 
+  it('replaces a chosen column deleted while lanes were off', () => {
+    expect(lanesSwitchPatch({ columns, doneColumnId: 'gone' }, true)).toEqual({
+      lanesOn: true,
+      doneColumnId: 'done',
+    });
+  });
+
   it('turns them off and keeps everything else', () => {
     expect(lanesSwitchPatch(board, false)).toEqual({ lanesOn: false });
   });
 
   it('writes no finished column on a board with no columns', () => {
     expect(lanesSwitchPatch({ columns: [] }, true)).toEqual({ lanesOn: true });
+  });
+});
+
+describe('finishedColumnDeleteNote', () => {
+  const named = [
+    { id: 'todo', name: 'To Do' },
+    { id: 'review', name: 'Review' },
+    { id: 'done', name: 'Done' },
+  ];
+  const board = { columns: named, lanesOn: true, lanes, doneColumnId: 'done' };
+
+  it('names the column that becomes finished when the finished one is deleted', () => {
+    expect(finishedColumnDeleteNote(board, 'done')).toMatch(/“Done”.*“Review” count as finished/);
+  });
+
+  it('says nothing for another column, or on a board without live lanes', () => {
+    expect(finishedColumnDeleteNote(board, 'todo')).toBeNull();
+    expect(finishedColumnDeleteNote({ ...board, lanesOn: false }, 'done')).toBeNull();
   });
 });

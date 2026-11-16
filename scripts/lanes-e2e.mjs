@@ -407,6 +407,16 @@ try {
     'Move offers a lane as well as a column on a board with lanes',
     (await page.getByLabel('Lane', { exact: true }).count()) === 1,
   );
+  // Left by the ✕ at the top (named Cancel in a mode, and first), then opened
+  // again: nothing the last Move chose is still chosen.
+  await page.getByLabel('Lane', { exact: true }).selectOption({ label: 'Supplies' });
+  await page.getByRole('button', { name: 'Cancel', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Move selected cards' }).click();
+  check(
+    'leaving Move by its ✕ forgets the lane it had chosen',
+    (await page.getByLabel('Lane', { exact: true }).inputValue()) === '',
+    await page.getByLabel('Lane', { exact: true }).inputValue(),
+  );
   await page.getByLabel('Lane', { exact: true }).selectOption({ label: 'Planning' });
   await page.getByRole('button', { name: 'Move', exact: true }).click();
   check(
@@ -510,6 +520,31 @@ try {
     );
   }
 
+  // ---- A refused add keeps its form ---------------------------------------------
+  // The rules check a new card's column against the board's `columnIds`
+  // mirror; with To Do taken out of it, the board still draws To Do and the
+  // add is refused.
+  {
+    const boardDoc = (await db.collection('boards').where('name', '==', BOARD).get()).docs[0];
+    const bd = boardDoc.data();
+    const todo = bd.columns.find((c) => c.name === 'To Do').id;
+    await boardDoc.ref.update({ columnIds: bd.columnIds.filter((id) => id !== todo) });
+    await page.getByRole('button', { name: '+ Add card' }).first().click();
+    await page.getByPlaceholder('Card title').fill('Refused card');
+    await page.getByLabel('Lane', { exact: true }).selectOption({ label: 'Planning' });
+    await page.getByRole('button', { name: 'Add card', exact: true }).click();
+    await page.waitForTimeout(3000);
+    const kept = await page.getByPlaceholder('Card title').inputValue().catch(() => null);
+    const lane = await page.getByLabel('Lane', { exact: true }).inputValue().catch(() => null);
+    check(
+      'a card the rules refuse leaves the form open, its title and lane still in it',
+      kept === 'Refused card' && Boolean(lane) && (await page.locator('[data-testid="card-Refused card"]').count()) === 0,
+      `title ${kept}, lane ${lane}`,
+    );
+    await boardDoc.ref.update({ columnIds: bd.columnIds });
+    await page.getByRole('button', { name: 'Cancel', exact: true }).first().click();
+  }
+
   // ---- Removing a lane -----------------------------------------------------------
   await settingsPage('Lanes');
   dialogs.length = 0;
@@ -563,6 +598,43 @@ try {
       (await placed(page, 'Design the flyer', 'Done', 'Marketing')),
   );
   await page.screenshot({ path: join(SHOTS, 'lanes-board-end.png'), fullPage: true });
+
+  // ---- Deleting the finished column --------------------------------------------
+  // A new last column, made the finished one, then deleted from the board: the
+  // confirmation says which column becomes finished, and that one is written,
+  // so adding a column afterwards does not move it again.
+  {
+    await settingsPage('Columns');
+    await fillThen(page, 'New column name', 'Wrap-up', (o) =>
+      page.getByRole('button', { name: 'Add column' }).click(o),
+    );
+    await page.getByRole('button', { name: 'Rename column Wrap-up' }).waitFor({ timeout: 20000 });
+    await page.getByRole('button', { name: 'Lanes', exact: true }).click();
+    await page.getByLabel('Finished cards are in', { exact: true }).selectOption({ label: 'Wrap-up' });
+    await page.waitForTimeout(1200);
+    await back();
+    await page.getByRole('button', { name: 'Delete column Wrap-up' }).click();
+    const note = page.getByText(/count as finished instead/);
+    check(
+      'deleting the finished column says which column becomes finished',
+      await note.waitFor({ timeout: 10000 }).then(
+        async () => /“Wrap-up”.*“Done” count as finished/.test(await note.innerText()),
+        () => false,
+      ),
+    );
+    await page.getByRole('button', { name: 'Delete column', exact: true }).click();
+    const boardDoc = async () => (await db.collection('boards').where('name', '==', BOARD).get()).docs[0].data();
+    let stored = null;
+    for (let i = 0; i < 40; i += 1) {
+      const d = await boardDoc();
+      if (!d.columns.some((c) => c.name === 'Wrap-up')) {
+        stored = d.columns.find((c) => c.id === d.doneColumnId)?.name ?? null;
+        break;
+      }
+      await page.waitForTimeout(300);
+    }
+    check('and that column is written as the finished one', stored === 'Done', String(stored));
+  }
 
   await ctx.close();
 } finally {

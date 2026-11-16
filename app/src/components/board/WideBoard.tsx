@@ -5,15 +5,13 @@ import {
   canManageBoard,
   columnDeleteBlocked,
   columnsPatch,
+  finishedColumnDeleteNote,
   groupByLane,
   isFinished,
   type Label,
-  laneInfo,
-  type LaneInfo,
   lanesLive,
   parentTitles,
   subtaskCounts,
-  todayInOrgTz,
   watchKey,
 } from '@sabeel/shared';
 import {
@@ -47,6 +45,7 @@ import {
 import { AddCardForm } from './AddCardForm';
 import { WatchColumnBell } from './Bells';
 import { LaneHeading } from './LaneHeading';
+import { useLaneInfo } from './useLaneInfo';
 import { setColumnWatched, useWatchedColumns } from '../../notifications';
 import { useLabels } from '../../labels';
 import { radius, space, useTheme } from '../../theme';
@@ -118,22 +117,15 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   // Lanes, as the phone and the browser draw them: headings inside each column.
   const laneBoard = board.data;
   const live = laneBoard ? lanesLive(laneBoard) : false;
-  const infoByLane = useMemo(() => {
-    const map = new Map<string, LaneInfo>();
-    if (!laneBoard || !live) return map;
-    const today = todayInOrgTz();
-    for (const lane of laneBoard.lanes) {
-      map.set(lane.id, laneInfo(cards.data ?? EMPTY_CARDS, laneBoard, lane.id, today));
-    }
-    return map;
-  }, [laneBoard, live, cards.data]);
+  const infoByLane = useLaneInfo(laneBoard ?? null, live, cards.data ?? EMPTY_CARDS);
 
   // The title comes from `AddCardForm`, already trimmed and non-empty — the
   // draft lives there so typing one does not re-render the board.
+  // The form closes once the card is written: a refused add keeps its title
+  // and lane in front of the error.
   async function addCard(columnId: string, title: string, subscribe: boolean, laneId?: string) {
-    setAdding(null);
-    await run(() =>
-      createCard({
+    await run(async () => {
+      await createCard({
         boardId,
         columnId,
         title,
@@ -141,8 +133,9 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         columnCards: byColumn.get(columnId) ?? [],
         subscribe,
         laneId,
-      }),
-    );
+      });
+      setAdding(null);
+    });
   }
 
   async function moveTo(card: Card, column: BoardColumn) {
@@ -176,7 +169,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   async function confirmRemoveColumn(col: BoardColumn) {
     setPendingDelete(null);
     await run(() =>
-      updateBoard(boardId, columnsPatch(columns.filter((c) => c.id !== col.id))),
+      updateBoard(boardId, columnsPatch(board.data ?? { columns }, columns.filter((c) => c.id !== col.id))),
     );
   }
 
@@ -259,6 +252,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
           <Body>
             Delete the column “{pendingDelete.name}”? It is empty, but this cannot
             be undone.
+            {board.data ? ` ${finishedColumnDeleteNote(board.data, pendingDelete.id) ?? ''}` : ''}
           </Body>
           <Row>
             <Button
@@ -314,7 +308,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
                   bold
                   busy={busy}
                   onError={setError}
-                  onRename={(next) => updateBoard(boardId, columnsPatch(next))}
+                  onRename={(next) => updateBoard(boardId, columnsPatch(b, next))}
                   run={run}
                   onEditingChange={(on) => setRenamingCol(on ? col.id : null)}
                 />
@@ -396,7 +390,10 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
                     </Pressable>
                   );
                 })}
-                {colCards.length === 0 ? <Hint>No cards.</Hint> : null}
+                {/* With lanes the headings stand in a column with no cards, each
+                    saying its own count, and a line under the last would read
+                    as that lane being empty. */}
+                {colCards.length === 0 && !(live && laneBoard) ? <Hint>No cards.</Hint> : null}
               </ScrollView>
 
               {adding === col.id ? (

@@ -38,7 +38,11 @@ export function AddCardForm({
 }: {
   /** Called with a trimmed, non-empty title, whether to subscribe to it, and
    *  its lane on a board with lanes. */
-  onAdd: (title: string, subscribe: boolean, laneId?: string) => void;
+  /**
+   * Resolves once the add is settled, either way. The parent closes the form
+   * only when the card is written, so a refused add keeps its title and lane.
+   */
+  onAdd: (title: string, subscribe: boolean, laneId?: string) => Promise<void>;
   onCancel: () => void;
   /** Whether the bell is offered: only a member of the board may subscribe. */
   canSubscribe: boolean;
@@ -52,6 +56,9 @@ export function AddCardForm({
   // 2026-11-15): a lane picked for you is a card filed in the wrong place.
   const [laneId, setLaneId] = useState('');
   const [needsLane, setNeedsLane] = useState(false);
+  // The form stays open while its card is written, so a second tap must not
+  // write a second card.
+  const [adding, setAdding] = useState(false);
 
   // One path for both the Add button and the keyboard's submit, so they cannot
   // drift. An empty title is a no-op rather than a disabled button, which is
@@ -63,7 +70,11 @@ export function AddCardForm({
       setNeedsLane(true);
       return;
     }
-    onAdd(trimmed, canSubscribe && subscribe, lanes ? laneId : undefined);
+    if (adding) return;
+    setAdding(true);
+    void onAdd(trimmed, canSubscribe && subscribe, lanes ? laneId : undefined).finally(() =>
+      setAdding(false),
+    );
   }
 
   return (
@@ -94,7 +105,7 @@ export function AddCardForm({
         </>
       ) : null}
       <Row>
-        <Button label="Add" onPress={submit} />
+        <Button label="Add" onPress={submit} busy={adding} />
         <Button label="Cancel" variant="secondary" onPress={onCancel} />
         {canSubscribe ? (
           <NewCardBell on={subscribe} onToggle={() => setSubscribe((on) => !on)} />

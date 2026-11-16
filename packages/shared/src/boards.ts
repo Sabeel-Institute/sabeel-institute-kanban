@@ -1,4 +1,5 @@
 import { DEFAULT_COLUMNS } from './constants';
+import { finishedColumnChoice, type LaneBoard } from './lanes';
 import type { BoardColumn, BoardDoc, Label, LabelDoc } from './types';
 
 /**
@@ -72,12 +73,26 @@ export function newBoard(params: {
  * Columns and their flat id list must always move together — rules check card
  * writes against `columnIds`, so a desynced pair would either reject valid cards
  * or accept invented columns. Never write `columns` without this.
+ *
+ * On a board with lanes switched on, the finished column moves with them: kept
+ * while its column stays, given to the new last column when its column goes,
+ * and written either way, so a later add or reorder cannot move it. Without
+ * that, deleting the finished column silently made the column before it
+ * finished (every card in Review never late, and no reminder), and adding a
+ * column afterwards silently moved it again.
  */
-export function columnsPatch(columns: BoardColumn[]): {
-  columns: BoardColumn[];
-  columnIds: string[];
-} {
-  return { columns, columnIds: columns.map((c) => c.id) };
+export function columnsPatch(
+  board: LaneBoard,
+  columns: BoardColumn[],
+): { columns: BoardColumn[]; columnIds: string[]; doneColumnId?: string } {
+  const patch = { columns, columnIds: columns.map((c) => c.id) };
+  if (!board.lanesOn) return patch;
+  const current = finishedColumnChoice(board);
+  const pinned =
+    current !== null && columns.some((c) => c.id === current)
+      ? current
+      : columns[columns.length - 1]?.id;
+  return pinned && pinned !== board.doneColumnId ? { ...patch, doneColumnId: pinned } : patch;
 }
 
 export const BOARD_NAME_MAX = 120;

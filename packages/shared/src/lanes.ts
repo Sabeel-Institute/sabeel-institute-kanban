@@ -50,9 +50,10 @@ export function lanesLive(board: LaneBoard): boolean {
  * The column whose cards count as finished, or null on a board without live
  * lanes, where nothing is finished and every past date is late, as before.
  *
- * The stored id is used while it is still one of the board's columns. Deleting
- * that column, which an app too old to know about lanes can do, falls back to
- * the last column rather than leaving the board with no finish.
+ * The stored id is used while it is still one of the board's columns. The app
+ * moves it with every column write (`columnsPatch`); a stored id that is gone
+ * anyway, deleted by an app too old to know about lanes, falls back to the last
+ * column rather than leaving the board with no finish.
  */
 export function finishedColumnId(board: LaneBoard): string | null {
   return lanesLive(board) ? finishedColumnChoice(board) : null;
@@ -234,15 +235,36 @@ export function laneDeleteBlocked(name: string, cardCount: number): string | nul
 /**
  * The write that switches lanes on or off.
  *
- * Off keeps the lanes and every card's lane, so on restores the board. The
- * first time lanes go on, the finished column is set to the last column, so
- * adding a column later does not move it.
+ * Off keeps the lanes and every card's lane, so on restores the board. On
+ * writes the finished column (`finishedColumnChoice`: the stored one while it
+ * exists, else the last), so adding a column later does not move it, and a
+ * stored column deleted while lanes were off is replaced, not left to drift.
  */
 export function lanesSwitchPatch(
   board: LaneBoard,
   on: boolean,
 ): { lanesOn: boolean; doneColumnId?: string } {
-  const last = board.columns[board.columns.length - 1]?.id;
-  if (on && !board.doneColumnId && last) return { lanesOn: true, doneColumnId: last };
+  const choice = finishedColumnChoice(board);
+  if (on && choice && choice !== board.doneColumnId) return { lanesOn: true, doneColumnId: choice };
   return { lanesOn: on };
+}
+
+/**
+ * What deleting a column does to the finished column, for its confirmation,
+ * or null when it does nothing: deleting the finished column of a board with
+ * lanes makes the column before it the finished one (`columnsPatch`).
+ */
+export function finishedColumnDeleteNote(
+  board: Omit<LaneBoard, 'columns'> & { columns: readonly { id: string; name: string }[] },
+  columnId: string,
+): string | null {
+  if (!lanesLive(board) || finishedColumnChoice(board) !== columnId) return null;
+  const gone = board.columns.find((c) => c.id === columnId);
+  const rest = board.columns.filter((c) => c.id !== columnId);
+  const next = rest[rest.length - 1];
+  if (!gone || !next) return null;
+  return (
+    `Finished cards are the ones in “${gone.name}”. Once it is gone, the cards in ` +
+    `“${next.name}” count as finished instead, and none of them shows as late.`
+  );
 }

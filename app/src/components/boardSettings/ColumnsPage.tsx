@@ -25,7 +25,7 @@ export function ColumnsPage({ board }: { board: BoardListItem }) {
     // against the flat `columnIds` mirror, so a desynced pair means cards cannot
     // be created in the new column at all — with a bare PERMISSION_DENIED as the
     // only clue.
-    return run(() => updateBoard(board.id, columnsPatch(next)));
+    return run(() => updateBoard(board.id, columnsPatch(board, next)));
   }
 
   return (
@@ -51,11 +51,11 @@ export function ColumnsPage({ board }: { board: BoardListItem }) {
               canEdit
               busy={busy}
               onError={setError}
-              onRename={(next) => updateBoard(board.id, columnsPatch(next))}
+              onRename={(next) => updateBoard(board.id, columnsPatch(board, next))}
               run={run}
             />
           )}
-          onReorder={(next) => run(() => updateBoard(board.id, columnsPatch(next)))}
+          onReorder={(next) => run(() => updateBoard(board.id, columnsPatch(board, next)))}
         />
         <Hint>
           Columns are removed from the board screen, and only once they are
