@@ -293,12 +293,21 @@ name: Board, card, rich text and gestures
       EXPECT: "Reverse the order"
       SECONDS: 30
 # A row's words, which only the overview says: the board, then each lane and
-# its mark. Both board names are on the Boards list too.
-- assertVisible: "Summer Program 2027[\\s\\S]*: Planning, [\\s\\S]*"
-- assertVisible: "Autumn Program 2027[\\s\\S]*: Planning, [\\s\\S]*"
+# its mark. Both board names are on the Boards list too. Each row reads its
+# own board's cards, and a row this phone has never opened waits for the
+# server: 20 s on a macOS runner at a load of 120 (2026-11-18), past
+# assertVisible's 17, so each waits as long as a slow runner needs.
+- extendedWaitUntil:
+    visible: "Summer Program 2027[\\s\\S]*: Planning, [\\s\\S]*"
+    timeout: 60000
+- extendedWaitUntil:
+    visible: "Autumn Program 2027[\\s\\S]*: Planning, [\\s\\S]*"
+    timeout: 60000
 # Eight lanes: too many for a phone to write their names straight, so they
 # are slanted, a rotated Text on each platform's own layout and font.
-- assertVisible: "Summer Camp 2027[\\s\\S]*: Planning, [\\s\\S]*"
+- extendedWaitUntil:
+    visible: "Summer Camp 2027[\\s\\S]*: Planning, [\\s\\S]*"
+    timeout: 60000
 - takeScreenshot: 13-overview
 - tapOn: "Back"
 
