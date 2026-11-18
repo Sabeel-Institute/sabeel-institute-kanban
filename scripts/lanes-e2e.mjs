@@ -580,7 +580,14 @@ try {
   await page.getByLabel('Destination column').selectOption({ index: 1 });
   await page.getByRole('button', { name: 'Move', exact: true }).click();
   await page.locator('[data-testid="card-Order the books"]').waitFor({ state: 'detached', timeout: 20000 });
-  const moved = await cardId('Order the books');
+  // The card leaves this board's view on the local write, before the server
+  // has it: the stored card is read once it is on the other board.
+  const otherId = (await db.collection('boards').where('name', '==', OTHER).get()).docs[0].id;
+  let moved = await cardId('Order the books');
+  for (let i = 0; i < 60 && moved?.data().boardId !== otherId; i += 1) {
+    await page.waitForTimeout(250);
+    moved = await cardId('Order the books');
+  }
   check(
     'a card moved to another board leaves its lane behind',
     moved && !('laneId' in moved.data()),
