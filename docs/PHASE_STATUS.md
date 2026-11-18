@@ -27,20 +27,54 @@ web. "The code looks right" is not verification.
 | 14 | ClickUp import + launch | **complete** (2026-07-26) — three boards imported from a CSV export in one pass; `scripts/import-clickup.mjs` and the `sourceId` field remain so a re-run would update, not duplicate. See `docs/MIGRATION.md`. |
 | — | Since launch | The app is **in production and in daily use**. Work now ships as numbered releases rather than phases; the **deploy log** below is the running record. |
 
-## Help films that lag the app
+## Before the next store release: films and manual pictures
 
-The films on More → Help are recorded from the guide world
-(`scripts/tutorials/`) and published as one set. A release that changes a
-screen re-records the films that show it; when one is shipped stale on
-purpose, it is listed here with what it lacks, and comes off the list when it
-is re-recorded and the set published. Re-record from this list.
+**Done once, at the end, right before the release goes to the stores, and not
+before** (Faisal, 2026-11-16: re-recording or re-photographing per step is
+wasted work while later steps change the same screens). This covers the
+batch now on `main` or in review: settings as pages, lanes, details, the
+template mark and the overview. Until then each step keeps the manual's TEXT
+current, which is cheap and mostly additive, and lists here what its screens
+need; nobody records a film, retakes a picture or renders the PDF.
 
-**As of v0.19.0** (Faisal, 2026-11-14: shipped with stale films, to start the
-next release sooner), and the unreleased work on `main` since: lanes, details,
-templates and the overview change more filmed screens, and the set is
-re-recorded once, after the last of it. The scripts already carry the new lines (the board film
-explains the subtask chips, the clone film the bell); only the recording and
-publishing are missing. The clone film's narration is rendered.
+The order, at the end, against a fresh `scripts/dev.sh web` seed:
+
+1. **Films.** Script what is missing (below), add each new film to
+   `HELP_VIDEOS` in `@sabeel/shared` in the same change as its recording, never
+   before (the Help screen lists what is there). Render narration for every
+   line whose words changed (`scripts/tutorials/tts.py`; `record.mjs` refuses
+   a WAV of other words), record every film in the table that is not
+   `current`, both cuts, and publish the set (`docs/DEV-TOOLING.md`, "The help
+   films"). Take each film off this table as the set is published.
+2. **Manual pictures.** `node scripts/manual-shots.mjs` with no arguments, so
+   every picture is retaken from the same seed (the seed has the plain board,
+   two programs with the same three lanes, one cloned from the other, a third
+   with eight lanes whose names slant on a phone, and a template).
+   Look at each one, and keep only those that show a real change: the rest
+   move only by dates and times in the seed.
+3. **The PDF.** `npx sabeel-ci render-manual`, last, after the pictures. The
+   release command renders it again with the version line.
+
+After the release is out on the web, Play and TestFlight, **raise the version
+floor to that release** (Faisal, 2026-11-17: "Yes, update the version floor"),
+last, as `docs/DEPLOY.md` § Retiring old builds says: `node
+scripts/set-min-version.mjs <X.Y.Z>`. A build from before lanes shows no lane,
+calls a finished card late on its own screens, and can delete a finished column
+without moving the finish; every phone from 0.13.1 and every web tab from
+0.17.0 reads the floor and asks for the update.
+
+Manual pictures that will change before then, so are retaken at the end:
+`settings-phone`/`-wide` (the list gains Details), `roster-*` (a non-owner's
+settings are now "About this board", opening on Details), `lanesettings-*`,
+the Boards list (`boards-*`: Templates, and the overview's icon in the
+header), and `clone-*` (the sheet over a list with Templates). New, never yet
+taken: `details-*` and `overview-*`. Besides those, the High and Medium
+priority pills and a finished lane's green changed colour to reach 4.5:1
+(2026-11-16), so every picture showing a card face or a lane is retaken
+anyway. New pictures go into `manual-shots.mjs`
+with the step that adds the screen, unrun until the end.
+
+The films:
 
 | Film | Stale? | What it lacks |
 |---|---|---|
@@ -55,10 +89,14 @@ publishing are missing. The clone film's narration is rendered.
 | `labels` | stale | The chips on the board it passes through; the board name's font (computer); the board's labels on their own settings page (script and narration updated, not recorded) |
 | `search` | stale | "↳ Subtask" on Design the programme in the results |
 | `comments` | stale, computer only | The comment box's new line height |
-| `board-settings` | stale | Board settings as a list of pages: General, Columns and History each on its own (script and narration updated, not recorded); the board name's font (computer) |
+| `board-settings` | stale | Board settings as a list of pages: General, Columns and History each on its own (script and narration updated, not recorded); the Lanes row in the list; the board name's font (computer) |
+| `lanes` | missing | A film for dividing a board into lanes: switching them on, adding a card to a lane, the counts, the finished column. Not yet scripted; the guide world (`world.mjs`) needs a board with lanes |
 | `board-people` | stale | The People page of Board settings (script and narration updated, not recorded); the board name's font (computer) |
+| `details` | missing | A film for a board's details: adding fields, filling them in, a member reading them. Not yet scripted |
+| `overview` | missing | A film for the overview: opening it from Boards, reading a row's marks, changing the order, hiding a board and showing it again. **It carries the legend** (Faisal, 2026-11-17): the screen has none, so the film lays the six marks over the picture as an overlay and spends time on each (all finished, late, due soon, under way, no due dates, no cards). Not yet scripted; needs the guide world to have two or more boards with lanes, in each state |
 | `new-board` | stale, computer only | The new board's name in the app's font |
-| `signing-in`, `attachments`, `subtasks`, `my-work`, `notifications`, `report`, `people`, `roles`, `stats` | current | Nothing: they show none of v0.19.0's changes |
+| `attachments`, `subtasks`, `my-work`, `notifications` | stale | The High and Medium priority pills' new colours, on the card faces they show |
+| `signing-in`, `report`, `people`, `roles`, `stats` | current | Nothing: they show none of v0.19.0's changes |
 
 ## What works today (2026-10-16)
 

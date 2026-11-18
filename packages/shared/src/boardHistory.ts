@@ -12,7 +12,7 @@ export type BoardSnapshot = Partial<BoardDoc>;
 /** One change, before anyone is attached to it. */
 export type BoardChange = Pick<
   BoardActivityDoc,
-  'type' | 'subjectUid' | 'subjectName' | 'from' | 'to'
+  'type' | 'subjectUid' | 'subjectName' | 'from' | 'to' | 'field'
 >;
 
 function missingFrom(a: readonly string[] = [], b: readonly string[] = []): string[] {
@@ -98,6 +98,70 @@ export function diffBoard(
   const keptNow = (after.columns ?? []).map((c) => c.id).filter((id) => was.has(id));
   if (kept.some((id, i) => keptNow[i] !== id)) out.push({ type: 'columnsReordered' });
 
+  const turnedOn = !before.lanesOn && Boolean(after.lanesOn);
+  if (Boolean(before.lanesOn) !== Boolean(after.lanesOn)) {
+    out.push({ type: after.lanesOn ? 'lanesOn' : 'lanesOff' });
+  }
+
+  // Lanes are matched by id, exactly as columns are.
+  const wasLane = new Map((before.lanes ?? []).map((l) => [l.id, l.name]));
+  const nowLane = new Map((after.lanes ?? []).map((l) => [l.id, l.name]));
+  for (const [id, name] of nowLane) {
+    if (!wasLane.has(id)) out.push({ type: 'laneAdded', to: name });
+  }
+  for (const [id, name] of wasLane) {
+    if (!nowLane.has(id)) out.push({ type: 'laneRemoved', from: name });
+  }
+  for (const [id, name] of nowLane) {
+    const old = wasLane.get(id);
+    if (old !== undefined && old !== name) out.push({ type: 'laneRenamed', from: old, to: name });
+  }
+  const keptLanes = (before.lanes ?? []).map((l) => l.id).filter((id) => nowLane.has(id));
+  const keptLanesNow = (after.lanes ?? []).map((l) => l.id).filter((id) => wasLane.has(id));
+  if (keptLanes.some((id, i) => keptLanesNow[i] !== id)) out.push({ type: 'lanesReordered' });
+
+  // The finished column, by name, since the column may later be removed. Its
+  // first setting rides on turning lanes on and says nothing more than that.
+  if (
+    after.doneColumnId !== undefined &&
+    before.doneColumnId !== after.doneColumnId &&
+    !(turnedOn && before.doneColumnId === undefined)
+  ) {
+    out.push({ type: 'finishedColumn', to: now.get(after.doneColumnId) });
+  }
+
+  if (Boolean(before.template) !== Boolean(after.template)) {
+    out.push({ type: after.template ? 'templateOn' : 'templateOff' });
+  }
+
+  // Details: fields by id, as columns and lanes are, so a rename is a rename.
+  const wasField = new Map((before.fields ?? []).map((f) => [f.id, f.name]));
+  const nowField = new Map((after.fields ?? []).map((f) => [f.id, f.name]));
+  for (const [id, name] of nowField) {
+    if (!wasField.has(id)) out.push({ type: 'fieldAdded', to: name });
+  }
+  for (const [id, name] of wasField) {
+    if (!nowField.has(id)) out.push({ type: 'fieldRemoved', from: name });
+  }
+  for (const [id, name] of nowField) {
+    const old = wasField.get(id);
+    if (old !== undefined && old !== name) out.push({ type: 'fieldRenamed', from: old, to: name });
+  }
+  const keptFields = (before.fields ?? []).map((f) => f.id).filter((id) => nowField.has(id));
+  const keptFieldsNow = (after.fields ?? []).map((f) => f.id).filter((id) => wasField.has(id));
+  if (keptFields.some((id, i) => keptFieldsNow[i] !== id)) out.push({ type: 'fieldsReordered' });
+
+  // A value, one entry per field whose value changed, named by the field as it
+  // is now. A removed field's value goes with it, which "removed the field"
+  // already says.
+  for (const [id, name] of nowField) {
+    const was = before.details?.[id];
+    const value = after.details?.[id];
+    if (was !== value) {
+      out.push({ type: 'detailChanged', field: name, ...(value !== undefined ? { to: value } : {}) });
+    }
+  }
+
   return out;
 }
 
@@ -139,6 +203,21 @@ const KNOWN_BOARD_ACTIVITY_TYPES: Record<BoardActivityType, true> = {
   columnRemoved: true,
   columnRenamed: true,
   columnsReordered: true,
+  lanesOn: true,
+  lanesOff: true,
+  laneAdded: true,
+  laneRemoved: true,
+  laneRenamed: true,
+  lanesReordered: true,
+  finishedColumn: true,
+  fieldAdded: true,
+  fieldRemoved: true,
+  fieldRenamed: true,
+  fieldsReordered: true,
+  detailChanged: true,
+  templateOn: true,
+  templateOff: true,
+  cloned: true,
 };
 
 export function isKnownBoardActivityType(value: unknown): value is BoardActivityType {
@@ -150,8 +229,14 @@ export function isKnownBoardActivityType(value: unknown): value is BoardActivity
 
 type Describable = Pick<
   BoardActivityDoc,
-  'type' | 'actorUid' | 'actorName' | 'subjectUid' | 'subjectName' | 'from' | 'to'
+  'type' | 'actorUid' | 'actorName' | 'subjectUid' | 'subjectName' | 'from' | 'to' | 'field'
 >;
+
+/** A value as a history line quotes it: whole when short, cut with an ellipsis when not. */
+const DETAIL_SHOWN = 80;
+function shortValue(value: string): string {
+  return value.length > DETAIL_SHOWN ? `${value.slice(0, DETAIL_SHOWN - 1)}…` : value;
+}
 
 /**
  * The entry as a sentence. With nobody recorded it reads in the passive —
@@ -204,5 +289,58 @@ export function describeBoardActivity(e: Describable): string {
         : `The column ${quoted(e.from)} was renamed to ${quoted(e.to)}`;
     case 'columnsReordered':
       return known ? `${actor} reordered the columns` : 'The columns were reordered';
+    case 'lanesOn':
+      return known ? `${actor} turned lanes on` : 'Lanes were turned on';
+    case 'lanesOff':
+      return known ? `${actor} turned lanes off` : 'Lanes were turned off';
+    case 'laneAdded':
+      return known
+        ? `${actor} added the lane ${quoted(e.to)}`
+        : `The lane ${quoted(e.to)} was added`;
+    case 'laneRemoved':
+      return known
+        ? `${actor} removed the lane ${quoted(e.from)}`
+        : `The lane ${quoted(e.from)} was removed`;
+    case 'laneRenamed':
+      return known
+        ? `${actor} renamed the lane ${quoted(e.from)} to ${quoted(e.to)}`
+        : `The lane ${quoted(e.from)} was renamed to ${quoted(e.to)}`;
+    case 'lanesReordered':
+      return known ? `${actor} reordered the lanes` : 'The lanes were reordered';
+    case 'finishedColumn':
+      return known
+        ? `${actor} set the finished column to ${quoted(e.to)}`
+        : `The finished column was set to ${quoted(e.to)}`;
+    case 'fieldAdded':
+      return known
+        ? `${actor} added the field ${quoted(e.to)}`
+        : `The field ${quoted(e.to)} was added`;
+    case 'fieldRemoved':
+      return known
+        ? `${actor} removed the field ${quoted(e.from)}`
+        : `The field ${quoted(e.from)} was removed`;
+    case 'fieldRenamed':
+      return known
+        ? `${actor} renamed the field ${quoted(e.from)} to ${quoted(e.to)}`
+        : `The field ${quoted(e.from)} was renamed to ${quoted(e.to)}`;
+    case 'fieldsReordered':
+      return known ? `${actor} reordered the details` : 'The details were reordered';
+    case 'detailChanged':
+      if (e.to === undefined) {
+        return known ? `${actor} cleared ${quoted(e.field)}` : `${quoted(e.field)} was cleared`;
+      }
+      return known
+        ? `${actor} set ${quoted(e.field)} to ${quoted(shortValue(e.to))}`
+        : `${quoted(e.field)} was set to ${quoted(shortValue(e.to))}`;
+    case 'templateOn':
+      return known ? `${actor} marked the board as a template` : 'The board was marked as a template';
+    case 'templateOff':
+      return known
+        ? `${actor} took the template mark off the board`
+        : 'The board stopped being a template';
+    case 'cloned':
+      return known
+        ? `${actor} cloned this board from ${quoted(e.from)}`
+        : `This board was cloned from ${quoted(e.from)}`;
   }
 }

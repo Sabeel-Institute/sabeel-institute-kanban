@@ -509,6 +509,161 @@ describe('updating a board', () => {
  * genuinely bad outcome in a delegation model is a delegate unseating the
  * delegator. Only an admin lifts that, including for the creator themselves.
  */
+describe('lanes on a board', () => {
+  const lanes = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ id: `ln_${i}`, name: `Lane ${i}` }));
+
+  it('an owner switches lanes on, adds lanes and chooses the finished column', async () => {
+    await assertSucceeds(
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), {
+        ...stamp('owner1'),
+        lanesOn: true,
+        lanes: lanes(3),
+        doneColumnId: 'c1',
+      }),
+    );
+  });
+
+  it('a member of the board who is not an owner cannot change them', async () => {
+    await assertFails(
+      updateDoc(doc(ctx('member1', 'member'), 'boards/b_member'), {
+        ...stamp('member1'),
+        lanesOn: true,
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(ctx('member1', 'member'), 'boards/b_member'), {
+        ...stamp('member1'),
+        lanes: lanes(1),
+      }),
+    );
+  });
+
+  it('a board holds at most twelve lanes', async () => {
+    const db = ctx('owner1', 'member');
+    await assertSucceeds(
+      updateDoc(doc(db, 'boards/b_member'), { ...stamp('owner1'), lanes: lanes(12) }),
+    );
+    await assertFails(
+      updateDoc(doc(db, 'boards/b_member'), { ...stamp('owner1'), lanes: lanes(13) }),
+    );
+  });
+
+  it('refuses each lane field in the wrong shape', async () => {
+    const db = ctx('owner1', 'member');
+    await assertFails(
+      updateDoc(doc(db, 'boards/b_member'), { ...stamp('owner1'), lanesOn: 'yes' }),
+    );
+    await assertFails(
+      updateDoc(doc(db, 'boards/b_member'), { ...stamp('owner1'), lanes: { a: 1 } }),
+    );
+    await assertFails(
+      updateDoc(doc(db, 'boards/b_member'), { ...stamp('owner1'), doneColumnId: 7 }),
+    );
+    await assertFails(
+      updateDoc(doc(db, 'boards/b_member'), {
+        ...stamp('owner1'),
+        doneColumnId: 'x'.repeat(201),
+      }),
+    );
+  });
+
+  it('a board that has lanes still takes an ordinary change, as one without them does', async () => {
+    await env.withSecurityRulesDisabled(async (c) => {
+      await updateDoc(doc(c.firestore(), 'boards/b_member'), {
+        lanesOn: true,
+        lanes: lanes(2),
+        doneColumnId: 'c1',
+      });
+    });
+    await assertSucceeds(
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), {
+        ...stamp('owner1'),
+        name: 'Renamed, lanes and all',
+      }),
+    );
+    // And a board from before lanes, which carries none of the fields.
+    await assertSucceeds(
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_two'), {
+        ...stamp('owner1'),
+        name: 'Still editable',
+      }),
+    );
+  });
+});
+
+describe('a board’s details', () => {
+  const fields = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ id: `fld_${i}`, name: `Field ${i}`, type: 'text' }));
+  const details = (n: number) =>
+    Object.fromEntries(Array.from({ length: n }, (_, i) => [`fld_${i}`, `value ${i}`]));
+
+  it('an owner writes fields and their values, and a value alone by its path', async () => {
+    const db = ctx('owner1', 'member');
+    await assertSucceeds(
+      updateDoc(doc(db, 'boards/b_member'), { ...stamp('owner1'), fields: fields(2), details: details(2) }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(db, 'boards/b_member'), { ...stamp('owner1'), 'details.fld_1': 'changed' }),
+    );
+  });
+
+  it('a member of the board who is not an owner cannot change them', async () => {
+    await assertFails(
+      updateDoc(doc(ctx('member1', 'member'), 'boards/b_member'), {
+        ...stamp('member1'),
+        'details.fld_0': 'mine now',
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(ctx('member1', 'member'), 'boards/b_member'), {
+        ...stamp('member1'),
+        fields: fields(1),
+      }),
+    );
+  });
+
+  it('a board holds at most twenty fields and twenty values', async () => {
+    const db = ctx('owner1', 'member');
+    await assertSucceeds(
+      updateDoc(doc(db, 'boards/b_member'), { ...stamp('owner1'), fields: fields(20), details: details(20) }),
+    );
+    await assertFails(
+      updateDoc(doc(db, 'boards/b_member'), { ...stamp('owner1'), fields: fields(21) }),
+    );
+    await assertFails(
+      updateDoc(doc(db, 'boards/b_member'), { ...stamp('owner1'), 'details.fld_20': 'one more' }),
+    );
+  });
+
+  it('refuses fields that are not a list, or values that are not a map', async () => {
+    const db = ctx('owner1', 'member');
+    await assertFails(
+      updateDoc(doc(db, 'boards/b_member'), { ...stamp('owner1'), fields: { a: 1 } }),
+    );
+    await assertFails(
+      updateDoc(doc(db, 'boards/b_member'), { ...stamp('owner1'), details: ['x'] }),
+    );
+  });
+});
+
+describe('the template mark', () => {
+  it('an owner sets and clears it; a member cannot; it is a boolean', async () => {
+    await assertSucceeds(
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), { ...stamp('owner1'), template: true }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), { ...stamp('owner1'), template: false }),
+    );
+    await assertFails(
+      updateDoc(doc(ctx('member1', 'member'), 'boards/b_member'), { ...stamp('member1'), template: true }),
+    );
+    await assertFails(
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), { ...stamp('owner1'), template: 'yes' }),
+    );
+  });
+});
+
 describe('granting and revoking ownership', () => {
   it('an owner promotes another member', async () => {
     await assertSucceeds(

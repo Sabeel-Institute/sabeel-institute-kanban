@@ -614,8 +614,11 @@ try {
   // But she does get a way in — the roster, read-only. The control SAYS which
   // one it is, because "Board settings" opening a member list would be a button
   // that does not describe what it does.
-  await sara.getByRole('button', { name: 'Members and labels' }).click();
-  await sara.getByText('Members and labels').first().waitFor({ timeout: 15000 });
+  await sara.getByRole('button', { name: 'About this board' }).click();
+  await sara.getByText('About this board').first().waitFor({ timeout: 15000 });
+  // Details opens first for someone who does not run the board; the roster
+  // is its own page.
+  await settingsPage(sara, 'People');
   check('a non-owner reaches a read-only roster instead', true);
   check(
     'the roster names the owner, so there is somebody to ask',
@@ -769,7 +772,7 @@ try {
     'revoking asks too — it is not a one-way door',
     /no longer be able to change it/.test(lastConfirm.get(admin) ?? ''),
   );
-  await sara.getByRole('button', { name: 'Members and labels' }).waitFor({ timeout: 25000 });
+  await sara.getByRole('button', { name: 'About this board' }).waitFor({ timeout: 25000 });
   check('and the demotion reaches her open app', true);
 
   const saraSeesNewBoard = await sara

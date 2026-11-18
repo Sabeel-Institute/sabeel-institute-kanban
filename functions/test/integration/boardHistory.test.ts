@@ -136,6 +136,24 @@ describe('board history', () => {
     expect(new Set(h.slice(1).map((e) => e.at)).size).toBe(1);
   });
 
+  it('records a detail set by its path, naming the field and the value', async () => {
+    const details = freshBoard('bh_details');
+    await adminDb()
+      .doc(`boards/${details}`)
+      .set(board({ fields: [{ id: 'fld_t', name: 'Teachers', type: 'text' }] }));
+    await historyOf(details, 1);
+    await adminDb()
+      .doc(`boards/${details}`)
+      .update({ 'details.fld_t': 'Sara and Omar', updatedBy: SARA, updatedAt: 30 });
+    const h = await historyOf(details, 2);
+    expect(h[1]).toMatchObject({
+      type: 'detailChanged',
+      field: 'Teachers',
+      to: 'Sara and Omar',
+      actorUid: SARA,
+    });
+  });
+
   it('records people added and removed through the callables, by whoever did it', async () => {
     const people = freshBoard('bh_people');
     await adminDb().doc(`boards/${people}`).set(board());

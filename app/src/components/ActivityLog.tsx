@@ -5,6 +5,7 @@ import {
   isKnownActivityType,
   type ActivityType,
   type BoardColumn,
+  type BoardLane,
 } from '@sabeel/shared';
 import { db } from '../firebase';
 import { when } from '../activityTime';
@@ -40,11 +41,14 @@ export function ActivityLog({
   cardId,
   members,
   columns,
+  lanes,
   cardTitleFor,
 }: {
   cardId: string;
   members: readonly BoardMemberProfile[];
   columns: readonly BoardColumn[];
+  /** The board's lanes, kept or live, so a lane change names its lane. */
+  lanes: readonly BoardLane[];
   /** Resolves a card id to a title, for subtask entries. Those store the other
    *  card's ID rather than its title, so history never goes stale on a rename —
    *  the same reason `moved` stores a column id. */
@@ -82,6 +86,11 @@ export function ActivityLog({
     return (id: string) => m.get(id) ?? 'another column';
   }, [columns]);
 
+  const laneNameFor = useMemo(() => {
+    const m = new Map(lanes.map((l) => [l.id, l.name]));
+    return (id: string) => m.get(id);
+  }, [lanes]);
+
   if (log.status === 'loading') return <Spinner />;
 
   const entries = log.data ?? [];
@@ -101,6 +110,7 @@ export function ActivityLog({
                   nameFor,
                   columnNameFor,
                   cardTitleFor,
+                  laneNameFor,
                 )}{' '}
             · {when(e.at)}
           </Hint>

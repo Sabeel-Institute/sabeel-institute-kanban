@@ -1,13 +1,15 @@
 import { SYSTEM_ACTOR } from './activity';
 import { localId, newBoard } from './boards';
-import type { BoardColumn, BoardDoc, CardDoc } from './types';
+import type { BoardColumn, BoardDoc, BoardField, BoardLane, CardDoc } from './types';
 
 /**
  * Cloning a board: a new board laid out like the source, holding a fresh copy
  * of each of its open cards (Faisal, 2026-11-13, for program templates).
  *
  * A clone is a NEW board, so whoever clones is its only member and owner, as
- * when they press New board. A card keeps what a template means — its title,
+ * when they press New board. It is laid out like the source: its columns, and
+ * its lanes switched on or off as they were, with the finished column and each
+ * card's lane. A card keeps what a template means — its title,
  * its description, its place, the subtasks under it and the institute's labels
  * — and starts without what belongs to one run of the work: no due date, no
  * assignees, no priority, no comments, no attachments, and a history of one
@@ -46,6 +48,13 @@ export const CLONE_BOARD_MAX_CARDS = 240;
  */
 export const CLONE_BOARD_MAX_BYTES = 8 * 1024 * 1024;
 
+/**
+ * The id of a clone's first history line, "cloned from", which `cloneBoard`
+ * writes with the board. Fixed, so `onBoardWritten` can tell a clone from a
+ * new board and not add a "created" line beside it.
+ */
+export const CLONED_ENTRY_ID = 'cloned';
+
 /** What a clone reads of each source card. */
 export interface CloneSourceCard {
   id: string;
@@ -56,6 +65,7 @@ export interface CloneSourceCard {
   labelIds: readonly string[];
   archived: boolean;
   parentId?: string;
+  laneId?: string;
 }
 
 /** A card's first history line, as `onCardWritten` would have written it. */
@@ -73,7 +83,14 @@ export interface BoardClone {
 }
 
 export function boardClone(params: {
-  source: { description: string; columns: readonly BoardColumn[] };
+  source: {
+    description: string;
+    columns: readonly BoardColumn[];
+    lanesOn?: boolean;
+    lanes?: readonly BoardLane[];
+    doneColumnId?: string;
+    fields?: readonly BoardField[];
+  };
   cards: readonly CloneSourceCard[];
   /** Every label, so only the institute's are kept: a board's own has no `boardId` match on the clone. */
   labels: readonly { id: string; boardId?: string }[];
@@ -98,6 +115,13 @@ export function boardClone(params: {
   // able to mistake the clone's column for the template's.
   const columnIdFor = new Map(params.source.columns.map((c) => [c.id, localId('col')]));
   const columns = params.source.columns.map((c) => ({ id: columnIdFor.get(c.id)!, name: c.name }));
+  // Fresh lane ids for the same reason. Kept whether lanes are on or off, as
+  // the source keeps them.
+  const laneIdFor = new Map((params.source.lanes ?? []).map((l) => [l.id, localId('ln')]));
+  const lanes = (params.source.lanes ?? []).map((l) => ({ id: laneIdFor.get(l.id)!, name: l.name }));
+  const doneColumnId = params.source.doneColumnId
+    ? columnIdFor.get(params.source.doneColumnId)
+    : undefined;
 
   const open = params.cards.filter((c) => !c.archived);
   const cardIdFor = new Map(open.map((c) => [c.id, params.newCardId()]));
@@ -114,6 +138,8 @@ export function boardClone(params: {
     // A subtask stays one when its parent is cloned too; under an archived
     // parent, which is not, it becomes an ordinary card.
     const parentId = c.parentId ? cardIdFor.get(c.parentId) : undefined;
+    // A lane that is gone on the source is No lane on the clone, as it was there.
+    const laneId = c.laneId ? laneIdFor.get(c.laneId) : undefined;
     const data: CardDoc = {
       boardId: params.boardId,
       title: c.title,
@@ -135,6 +161,7 @@ export function boardClone(params: {
       // person reads it: `createdBy`, and the history line below.
       updatedBy: SYSTEM_ACTOR,
       ...(parentId ? { parentId } : {}),
+      ...(laneId ? { laneId } : {}),
     };
     const created: CloneCreatedEntry = { type: 'created', actorUid: cloner, at: now };
     return { id: cardIdFor.get(c.id)!, data, created };
@@ -151,6 +178,16 @@ export function boardClone(params: {
     columns,
     columnIds: columns.map((c) => c.id),
     activeCardCount: cards.length,
+    ...(params.source.lanesOn ? { lanesOn: true } : {}),
+    ...(lanes.length > 0 ? { lanes } : {}),
+    // A finished column that is gone on the source is left unset: the clone
+    // falls back to its last column, as the source did.
+    ...(doneColumnId ? { doneColumnId } : {}),
+    // The details' fields under new ids, and none of their values: what was
+    // typed belongs to one run of the work, as a due date does.
+    ...((params.source.fields ?? []).length > 0
+      ? { fields: params.source.fields!.map((f) => ({ ...f, id: localId('fld') })) }
+      : {}),
   };
   return { board, cards };
 }

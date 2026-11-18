@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { deleteCard, restoreCard, useArchivedBoardCards } from '../cards';
-import { canManageBoard } from '@sabeel/shared';
+import { canManageBoard, isFinished } from '@sabeel/shared';
 import { useBoard } from '../boards';
 import { useLabels } from '../labels';
 import { confirmAction } from '../confirm';
@@ -138,6 +138,7 @@ export function BoardArchiveScreen({
                 card={card}
                 labels={allLabels.data ?? NO_LABELS}
                 boardMembers={b.members}
+                finished={isFinished(card, b)}
                 unnamed
               />
             </View>

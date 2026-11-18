@@ -137,3 +137,42 @@ describe('describeDue', () => {
     expect(describeDue('2026-08-03', '2026-07-31')).toBe('In 3 days');
   });
 });
+
+describe('a finished card’s date', () => {
+  it('is the date itself once past, never "late"', () => {
+    expect(describeDue('2026-11-03', '2026-11-15', true)).toBe('3 Nov');
+    expect(describeDue('2025-12-30', '2026-11-15', true)).toBe('30 Dec 2025');
+    expect(describeDue('2026-11-14', '2026-11-15', true)).toBe('14 Nov');
+  });
+
+  it('reads as any other card’s from today on', () => {
+    expect(describeDue('2026-11-15', '2026-11-15', true)).toBe('Today');
+    expect(describeDue('2026-11-18', '2026-11-15', true)).toBe('In 3 days');
+  });
+
+  it('still says late for a card that is not finished', () => {
+    expect(describeDue('2026-11-03', '2026-11-15')).toBe('12 days late');
+  });
+});
+
+describe('groupByDue with finished cards', () => {
+  const today = '2026-11-15';
+  const cards = [
+    { title: 'late', dueDate: '2026-11-01' },
+    { title: 'done late', dueDate: '2026-11-01' },
+    { title: 'done soon', dueDate: '2026-11-17' },
+  ];
+  const isDone = (c: { title: string }) => c.title.startsWith('done');
+
+  it('files a finished card under Finished, last, whatever its date', () => {
+    const groups = groupByDue(cards, today, isDone);
+    expect(groups.map((g) => [g.label, g.cards.map((c) => c.title)])).toEqual([
+      ['Overdue', ['late']],
+      ['Finished', ['done late', 'done soon']],
+    ]);
+  });
+
+  it('has no Finished group without a finished card', () => {
+    expect(groupByDue(cards, today).map((g) => g.bucket)).toEqual(['overdue', 'soon']);
+  });
+});

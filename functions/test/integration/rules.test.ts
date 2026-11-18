@@ -23,6 +23,7 @@ import {
 import {
   EMULATOR_PROJECT_ID,
   MAX_WATCHED_COLUMNS,
+  OVERVIEW_HIDDEN_MAX,
   PASSWORD_SIGN_IN_EMAIL,
   RULES_VERSION,
   watchKey,
@@ -316,6 +317,27 @@ describe('preference self-writes', () => {
     );
     await assertFails(updateDoc(doc(db, 'users/member1'), { watchedColumns: 'b1/c1' }));
     await assertSucceeds(updateDoc(doc(db, 'users/member1'), { watchedColumns: [] }));
+  });
+
+  it('an active user keeps their own overview order and hidden boards, within bounds', async () => {
+    const db = ctx('member1', 'member', 'active');
+    await assertSucceeds(
+      updateDoc(doc(db, 'users/member1'), {
+        overviewSort: 'late',
+        overviewReverse: true,
+        overviewHiddenBoardIds: ['b1'],
+      }),
+    );
+    const full = Array.from({ length: OVERVIEW_HIDDEN_MAX }, (_, i) => `b${i}`);
+    await assertSucceeds(updateDoc(doc(db, 'users/member1'), { overviewHiddenBoardIds: full }));
+    await assertFails(
+      updateDoc(doc(db, 'users/member1'), { overviewHiddenBoardIds: arrayUnion('one-more') }),
+    );
+    await assertFails(updateDoc(doc(db, 'users/member1'), { overviewSort: 'by hand' }));
+    await assertFails(updateDoc(doc(db, 'users/member1'), { overviewReverse: 'yes' }));
+    await assertFails(updateDoc(doc(db, 'users/member1'), { overviewHiddenBoardIds: 'b1' }));
+    // Someone else's, never.
+    await assertFails(updateDoc(doc(db, 'users/org1'), { overviewSort: 'late' }));
   });
 
   it('nobody may watch columns on someone else’s behalf', async () => {

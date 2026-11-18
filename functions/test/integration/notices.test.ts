@@ -103,6 +103,12 @@ beforeAll(async () => {
       { id: 'done', name: 'Done' },
     ],
     columnIds: ['todo', 'review', 'done'],
+    lanesOn: true,
+    lanes: [
+      { id: 'ln_plan', name: 'Planning' },
+      { id: 'ln_mkt', name: 'Marketing' },
+    ],
+    doneColumnId: 'done',
     memberUids: [ADA, FAY, WES, WYN, UMA, RAE, GUS],
     memberProfiles: {},
     createdAt: 1,
@@ -156,6 +162,24 @@ describe('a burst of changes', () => {
     await runNoticeSweep(later());
     const sent = await inbox(FAY, C, 'cardChanged');
     expect(sent.map((n) => n.text)).toEqual(['“Budget”: Ada attached plan.pdf']);
+  });
+});
+
+describe('a lane change', () => {
+  it('is one line in the card’s history and one notice, naming the lane', async () => {
+    const C = 'ns_lane';
+    await seed(C, { subscriberUids: [FAY], laneId: 'ln_plan' });
+
+    await edit(C, { laneId: 'ln_mkt' });
+    await waitForPending(C, 1);
+    await runNoticeSweep(later());
+
+    const sent = await inbox(FAY, C, 'cardChanged');
+    expect(sent.map((n) => n.text)).toEqual(['“Budget”: Ada moved it to the Marketing lane']);
+    const history = (await adminDb().collection(`cards/${C}/activity`).get()).docs.map((d) => d.data());
+    expect(history.filter((h) => h.type === 'lane')).toEqual([
+      expect.objectContaining({ type: 'lane', from: 'ln_plan', to: 'ln_mkt', actorUid: ADA }),
+    ]);
   });
 });
 

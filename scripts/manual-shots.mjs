@@ -354,6 +354,40 @@ const SHOTS = {
     await p.getByPlaceholder('New column name').waitFor({ timeout: 30000 });
     await p.waitForTimeout(900);
   },
+  // A board with lanes (the seed's Summer Program 2027): the lane headings and
+  // their counts in every column.
+  lanes: async (p) => {
+    await nav(p, 'Boards');
+    await p.getByText('Summer Program 2027', { exact: true }).first().click();
+    await p.locator('[role="heading"][aria-label^="Planning,"]').first().waitFor({ timeout: 30000 });
+    await p.waitForTimeout(900);
+  },
+  // Settings → Lanes on that board: the switch, the lanes, the finished column.
+  lanesettings: async (p) => {
+    await nav(p, 'Boards');
+    await p.getByText('Summer Program 2027', { exact: true }).first().click();
+    await p.getByRole('button', { name: 'Board settings' }).click();
+    await p.getByRole('button', { name: 'Lanes', exact: true }).click();
+    await p.getByRole('button', { name: 'Rename lane Planning' }).waitFor({ timeout: 30000 });
+    await p.waitForTimeout(900);
+  },
+  // Settings → Details on the lanes board, filled in by the seed.
+  details: async (p) => {
+    await nav(p, 'Boards');
+    await p.getByText('Summer Program 2027', { exact: true }).first().click();
+    await p.getByRole('button', { name: 'Board settings' }).click();
+    await p.getByRole('button', { name: 'Details', exact: true }).click();
+    await p.getByRole('button', { name: 'Edit fields' }).waitFor({ timeout: 30000 });
+    await p.waitForTimeout(900);
+  },
+  // The overview, from its icon in the Boards header: the seed's two programs
+  // under one heading of lane names.
+  overview: async (p) => {
+    await nav(p, 'Boards');
+    await p.getByRole('button', { name: 'Overview', exact: true }).click();
+    await p.getByTestId('overview-row:Autumn Program 2027').waitFor({ timeout: 30000 });
+    await p.waitForTimeout(1200);
+  },
   // Settings → People, as an OWNER: the Owner switch beside each row.
   owners: async (p) => {
     await openBoard(p);
@@ -391,7 +425,7 @@ const SHOTS = {
   roster: async (p) => {
     await nav(p, 'Boards');
     await p.getByText(BOARD).first().click();
-    await p.getByRole('button', { name: 'Members and labels' }).click();
+    await p.getByRole('button', { name: 'About this board' }).click();
     await p.getByRole('button', { name: 'People', exact: true }).click();
     await p.getByText(/^Members \(/).first().waitFor({ timeout: 30000 });
     await p.waitForTimeout(900);

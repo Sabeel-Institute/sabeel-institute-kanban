@@ -4,7 +4,10 @@ import { Icon } from '../icons';
 import {
   PRIORITIES,
   canManageBoard,
+  isFinished,
   labelsForBoard,
+  laneOf,
+  lanesLive,
   priorityLabel,
   readableInkOn,
   todayInOrgTz,
@@ -164,7 +167,15 @@ export function CardScreen({
   }
 
   const today = todayInOrgTz();
-  const overdue = c.dueDate !== undefined && c.dueDate < today;
+  // A finished card is never late (`isFinished`), here as on the board.
+  const overdue = c.dueDate !== undefined && c.dueDate < today && !isFinished(c, b);
+  // The card's lane, on a board that uses lanes; null is No lane.
+  const live = lanesLive(b);
+  const lane = laneOf(c, b);
+  // A subtask starts in its parent's lane, silently (Faisal, 2026-11-15) —
+  // kept while lanes are switched off too, so switching them on finds the
+  // family together.
+  const parentLane = c.laneId && b.lanes.some((l) => l.id === c.laneId) ? c.laneId : undefined;
 
   /**
    * What this card's picker offers: the institute labels and this board's own,
@@ -327,7 +338,7 @@ export function CardScreen({
             moving a card meant leaving the detail view, finding it on the board
             and using a separate move action — for the one property you most
             often change while reading a card. */}
-        <Row>
+        <Row style={styles.wrap}>
           <Hint>in</Hint>
           <Select
             label="Column"
@@ -350,6 +361,26 @@ export function CardScreen({
               })
             }
           />
+          {/* The lane, beside the column, on a board with lanes. "No lane" is
+              offered only while the card has none: a card is placed, not
+              unplaced. */}
+          {/* Said on screen, as "in" says the column: a lane called Planning
+              read as another column or a stage. */}
+          {live ? <Hint>lane</Hint> : null}
+          {live ? (
+            <Select
+              label="Lane"
+              value={lane ?? ''}
+              disabled={busy}
+              options={[
+                ...(lane === null ? [{ value: '', label: 'No lane' }] : []),
+                ...b.lanes.map((l) => ({ value: l.id, label: l.name })),
+              ]}
+              onChange={(laneId) => {
+                if (laneId) void run(() => updateCard(cardId, { laneId }, user));
+              }}
+            />
+          ) : null}
         </Row>
       </Panel>
 
@@ -404,6 +435,7 @@ export function CardScreen({
                 // a phone; the subtask is a card its creator made, so they
                 // follow it, and its own bell turns that off.
                 subscribe: isMember,
+                laneId: parentLane,
               });
               await updateCard(newId, { parentId: cardId }, user);
             })
@@ -621,6 +653,7 @@ export function CardScreen({
           cardId={cardId}
           members={assignable}
           columns={b.columns}
+          lanes={b.lanes}
           cardTitleFor={cardTitleFor}
         />
       </Panel>

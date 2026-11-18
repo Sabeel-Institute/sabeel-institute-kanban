@@ -5,7 +5,11 @@ import {
   canManageBoard,
   columnDeleteBlocked,
   columnsPatch,
+  finishedColumnDeleteNote,
+  groupByLane,
+  isFinished,
   type Label,
+  lanesLive,
   parentTitles,
   subtaskCounts,
   watchKey,
@@ -38,8 +42,10 @@ import {
   Spinner,
   Title,
 } from '../ui';
-import { AddCardForm } from './AddCardForm';
+import { AddCardForm, type AddCardDraft } from './AddCardForm';
 import { WatchColumnBell } from './Bells';
+import { LaneHeading } from './LaneHeading';
+import { useLaneInfo } from './useLaneInfo';
 import { setColumnWatched, useWatchedColumns } from '../../notifications';
 import { useLabels } from '../../labels';
 import { radius, space, useTheme } from '../../theme';
@@ -74,6 +80,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   const t = useTheme();
 
   const [adding, setAdding] = useState<string | null>(null);
+  const [retry, setRetry] = useState<(AddCardDraft & { columnId: string }) | null>(null);
   const [moving, setMoving] = useState<Card | null>(null);
   // Which column is mid-rename — its delete icon steps aside while editing, so
   // the cancel ✕ and the delete ✕ are never adjacent.
@@ -108,12 +115,24 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
     return map;
   }, [columns, cards.data]);
 
+  // Lanes, as the phone and the browser draw them: headings inside each column.
+  const laneBoard = board.data;
+  const live = laneBoard ? lanesLive(laneBoard) : false;
+  const infoByLane = useLaneInfo(laneBoard ?? null, live, cards.data ?? EMPTY_CARDS);
 
   // The title comes from `AddCardForm`, already trimmed and non-empty — the
   // draft lives there so typing one does not re-render the board.
-  async function addCard(columnId: string, title: string, subscribe: boolean) {
+  // The form closes at once: the card is on the board at once (Firestore
+  // draws a write before the server confirms it), and an add made offline
+  // waits in the queue. Closing only once the server answered left a form
+  // open over its own card, and closed whatever form was open by then. A
+  // REFUSED add is given back instead: its form reopens with what was typed
+  // (`retry`), in front of the error.
+  async function addCard(columnId: string, title: string, subscribe: boolean, laneId?: string) {
     setAdding(null);
-    await run(() =>
+    // Only this column's: a refused add waiting elsewhere is kept.
+    setRetry((r) => (r?.columnId === columnId ? null : r));
+    const added = await run(() =>
       createCard({
         boardId,
         columnId,
@@ -121,8 +140,10 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         user,
         columnCards: byColumn.get(columnId) ?? [],
         subscribe,
+        laneId,
       }),
     );
+    if (!added) setRetry({ columnId, title, subscribe, laneId });
   }
 
   async function moveTo(card: Card, column: BoardColumn) {
@@ -156,7 +177,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   async function confirmRemoveColumn(col: BoardColumn) {
     setPendingDelete(null);
     await run(() =>
-      updateBoard(boardId, columnsPatch(columns.filter((c) => c.id !== col.id))),
+      updateBoard(boardId, columnsPatch(board.data ?? { columns }, columns.filter((c) => c.id !== col.id))),
     );
   }
 
@@ -216,7 +237,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
               control that does not say what it does. */}
           <IconAction
             icon={canManage ? 'settings' : 'group'}
-            label={canManage ? 'Board settings' : 'Members and labels'}
+            label={canManage ? 'Board settings' : 'About this board'}
             onPress={() => nav.push({ name: 'boardSettings', boardId })}
           />
           <IconAction icon="arrow-back" label="Back" onPress={nav.pop} />
@@ -239,6 +260,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
           <Body>
             Delete the column “{pendingDelete.name}”? It is empty, but this cannot
             be undone.
+            {board.data ? ` ${finishedColumnDeleteNote(board.data, pendingDelete.id) ?? ''}` : ''}
           </Body>
           <Row>
             <Button
@@ -260,6 +282,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         canManage={canManage}
         currentBoardId={boardId}
         columns={columns}
+        lanes={live && laneBoard ? laneBoard.lanes : undefined}
         allCards={cards.data ?? []}
         selection={selection}
         members={members}
@@ -293,7 +316,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
                   bold
                   busy={busy}
                   onError={setError}
-                  onRename={(next) => updateBoard(boardId, columnsPatch(next))}
+                  onRename={(next) => updateBoard(boardId, columnsPatch(b, next))}
                   run={run}
                   onEditingChange={(on) => setRenamingCol(on ? col.id : null)}
                 />
@@ -322,7 +345,22 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
               </Row>
 
               <ScrollView style={styles.fill} keyboardShouldPersistTaps="handled">
-                {colCards.map((card) => {
+                {(live && laneBoard
+                  ? groupByLane(colCards, laneBoard, cards.data ?? EMPTY_CARDS).flatMap((g) => [
+                      { lane: g.lane, card: null },
+                      ...g.cards.map((card) => ({ lane: g.lane, card })),
+                    ])
+                  : colCards.map((card) => ({ lane: null, card }))
+                ).map(({ lane, card }) => {
+                  if (!card) {
+                    return (
+                      <LaneHeading
+                        key={`lane:${lane?.id ?? 'none'}`}
+                        name={lane?.name ?? 'No lane'}
+                        info={lane ? (infoByLane.get(lane.id) ?? null) : null}
+                      />
+                    );
+                  }
                   const selected = selection.isSelected(card.id);
                   return (
                     <Pressable
@@ -355,18 +393,28 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
                         boardMembers={members}
                         subtaskCount={subtasksBy.get(card.id)}
                         parentTitle={parentsBy.get(card.id)}
+                        finished={laneBoard ? isFinished(card, laneBoard) : false}
                       />
                     </Pressable>
                   );
                 })}
-                {colCards.length === 0 ? <Hint>No cards.</Hint> : null}
+                {/* With lanes the headings stand in a column with no cards, each
+                    saying its own count, and a line under the last would read
+                    as that lane being empty. */}
+                {colCards.length === 0 && !(live && laneBoard) ? <Hint>No cards.</Hint> : null}
               </ScrollView>
 
-              {adding === col.id ? (
+              {/* A refused add reopens here, unless another form is open. */}
+              {adding === col.id || (adding === null && retry?.columnId === col.id) ? (
                 <AddCardForm
-                  onAdd={(title, subscribe) => addCard(col.id, title, subscribe)}
+                  onAdd={(title, subscribe, laneId) => addCard(col.id, title, subscribe, laneId)}
                   canSubscribe={isMember}
-                  onCancel={() => setAdding(null)}
+                  lanes={live && laneBoard ? laneBoard.lanes : undefined}
+                  initial={retry?.columnId === col.id ? retry : undefined}
+                  onCancel={() => {
+                    setAdding(null);
+                    setRetry((r) => (r?.columnId === col.id ? null : r));
+                  }}
                 />
               ) : (
                 <Button

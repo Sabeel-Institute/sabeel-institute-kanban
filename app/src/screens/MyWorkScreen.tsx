@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { groupByDue, todayInOrgTz, type Label } from '@sabeel/shared';
+import { groupByDue, isFinished, todayInOrgTz, type Label } from '@sabeel/shared';
 import { useLabels } from '../labels';
 import { myWorkView, useMySubscriptions, useMyWork, type MyWorkCard } from '../myWork';
 import { useMyBoards, type BoardListItem, type BoardMemberProfile } from '../boards';
@@ -85,7 +85,19 @@ export function MyWorkScreen({ user }: { user: SessionUser }) {
   // the two answer different questions, and hiding it from one would make the
   // counts disagree with what you can see.
   const visible = mode === 'assigned' ? assigned : subscribed;
-  const groups = useMemo(() => groupByDue(visible, today), [visible, today]);
+  // A finished card (`isFinished`, on its own board) is never Overdue: it goes
+  // under Finished, last.
+  const finished = useCallback(
+    (c: MyWorkCard) => {
+      const board = boardById.get(c.boardId);
+      return board ? isFinished(c, board) : false;
+    },
+    [boardById],
+  );
+  const groups = useMemo(
+    () => groupByDue(visible, today, finished),
+    [visible, today, finished],
+  );
 
   // Wait for BOTH: filtering against a board list that has not arrived yet would
   // briefly show "nothing assigned to you" to someone who has plenty.
@@ -171,6 +183,7 @@ export function MyWorkScreen({ user }: { user: SessionUser }) {
                       card={c}
                       labels={allLabels.data ?? NO_LABELS}
                       boardMembers={board?.members ?? NO_MEMBERS}
+                      finished={finished(c)}
                     />
                     <Hint>in {board?.name ?? 'a board'}</Hint>
                   </Panel>

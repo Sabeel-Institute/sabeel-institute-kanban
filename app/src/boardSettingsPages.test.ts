@@ -9,17 +9,27 @@ import {
 
 describe('settingsPages', () => {
   it('gives someone who runs the board every page, General first', () => {
-    expect(settingsPages(true)).toEqual(['general', 'columns', 'people', 'labels', 'history']);
+    expect(settingsPages(true, false)).toEqual([
+      'general',
+      'columns',
+      'lanes',
+      'details',
+      'people',
+      'labels',
+      'history',
+    ]);
   });
 
   it('gives anyone else the pages they can use, and no others', () => {
-    expect(settingsPages(false)).toEqual(['people', 'labels', 'history']);
+    expect(settingsPages(false, true)).toEqual(['details', 'people', 'labels', 'history']);
+    // No details: nothing for them on that page, and it would be the first.
+    expect(settingsPages(false, false)).toEqual(['people', 'labels', 'history']);
   });
 });
 
 describe('shownPage', () => {
-  const owner = settingsPages(true);
-  const member = settingsPages(false);
+  const owner = settingsPages(true, false);
+  const member = settingsPages(false, true);
 
   it('shows the list alone on a phone until a page is chosen', () => {
     expect(shownPage(undefined, owner, false)).toBeNull();
@@ -27,7 +37,7 @@ describe('shownPage', () => {
 
   it('opens the first page on a wide screen', () => {
     expect(shownPage(undefined, owner, true)).toBe('general');
-    expect(shownPage(undefined, member, true)).toBe('people');
+    expect(shownPage(undefined, member, true)).toBe('details');
   });
 
   it('shows the page asked for, at either width', () => {
@@ -38,12 +48,23 @@ describe('shownPage', () => {
   // A live demotion re-renders a route the person can no longer use.
   it('treats a page the person cannot use as no page', () => {
     expect(shownPage('columns', member, false)).toBeNull();
-    expect(shownPage('columns', member, true)).toBe('people');
+    expect(shownPage('columns', member, true)).toBe('details');
   });
 });
 
 describe('pageSummary', () => {
-  const facts: PageFacts = { archived: false, columns: 3, members: 4, owners: 2, ownLabels: 2 };
+  const facts: PageFacts = {
+    archived: false,
+    columns: 3,
+    members: 4,
+    owners: 2,
+    ownLabels: 2,
+    lanesOn: true,
+    lanes: 6,
+    finishedColumn: 'Done',
+    fields: 5,
+    filled: 3,
+  };
 
   it('counts what each page holds', () => {
     expect(pageSummary('general', facts)).toBe('Name, archive');
@@ -54,12 +75,24 @@ describe('pageSummary', () => {
   });
 
   it('says one, and none, in words', () => {
-    const one: PageFacts = { archived: false, columns: 1, members: 1, owners: 1, ownLabels: 0 };
+    const one: PageFacts = { ...facts, columns: 1, members: 1, owners: 1, ownLabels: 0, lanes: 1 };
     expect(pageSummary('columns', one)).toBe('1 column');
     expect(pageSummary('people', one)).toBe('1 person, 1 owner');
     expect(pageSummary('labels', one)).toBe('None of its own yet');
     expect(pageSummary('columns', { ...one, columns: 0 })).toBe('No columns');
     expect(pageSummary('people', { ...one, owners: 0 })).toBe('1 person, no owners');
+  });
+
+  it('says whether lanes are on, how many, and where finished cards are', () => {
+    expect(pageSummary('lanes', facts)).toBe('On, 6 lanes. Finished cards are in Done');
+    expect(pageSummary('lanes', { ...facts, lanes: 1 })).toBe('On, 1 lane. Finished cards are in Done');
+    expect(pageSummary('lanes', { ...facts, lanes: 0 })).toBe('On, no lanes yet');
+    expect(pageSummary('lanes', { ...facts, lanesOn: false })).toBe('Off');
+  });
+
+  it('says how many details are filled in, or that there are none', () => {
+    expect(pageSummary('details', facts)).toBe('3 of 5 filled in');
+    expect(pageSummary('details', { ...facts, fields: 0, filled: 0 })).toBe('None yet');
   });
 
   it('offers Restore on an archived board', () => {

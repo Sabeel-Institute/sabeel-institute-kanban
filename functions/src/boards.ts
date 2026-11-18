@@ -3,7 +3,7 @@ import { onCall, HttpsError, type CallableRequest } from 'firebase-functions/v2/
 import { guarded, sentryDsn } from './sentry';
 import { logger } from 'firebase-functions/v2';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import type { BoardDoc } from '@sabeel/shared';
+import { withCleanExtras, type BoardActivityDoc, type BoardDoc } from '@sabeel/shared';
 import {
   boardClone,
   boardCloneBytes,
@@ -14,6 +14,7 @@ import {
   canUnseatCreator,
   CLONE_BOARD_MAX_BYTES,
   CLONE_BOARD_MAX_CARDS,
+  CLONED_ENTRY_ID,
   validateBoardName,
   watchKeyOnBoard,
   type CloneSourceCard,
@@ -458,7 +459,7 @@ export const cloneBoard = onCall({ secrets: [sentryDsn] }, guarded(async (reques
       return { made: null, name: already.data()?.name as string };
     }
     if (!source.exists) throw new HttpsError('not-found', 'No such board.');
-    const board = source.data() as BoardDoc;
+    const board = withCleanExtras(source.data()!) as unknown as BoardDoc;
     if (!board.memberUids.includes(actor.uid) && !canSeeEveryBoard(actor)) {
       throw new HttpsError('permission-denied', 'You can only clone a board you are on.');
     }
@@ -507,6 +508,17 @@ export const cloneBoard = onCall({ secrets: [sentryDsn] }, guarded(async (reques
     }
 
     tx.create(cloneRef, clone.board);
+    // The clone's history opens with where it came from, and that is the only
+    // record of it (Faisal, 2026-11-15: a clone is only a clone). Under a fixed
+    // id, so `onBoardWritten` knows not to add a "created" line of its own.
+    const cloned: BoardActivityDoc = {
+      type: 'cloned',
+      from: board.name,
+      at: now,
+      actorUid: actor.uid,
+      ...(typeof me.data()?.displayName === 'string' ? { actorName: me.data()!.displayName as string } : {}),
+    };
+    tx.create(cloneRef.collection('activity').doc(CLONED_ENTRY_ID), cloned);
     for (const card of clone.cards) {
       const cardRef = db.doc(`cards/${card.id}`);
       tx.create(cardRef, card.data);

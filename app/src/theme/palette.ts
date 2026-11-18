@@ -50,7 +50,12 @@ export const palette = {
 
   danger: '#A32218',
   dangerSoft: '#F8E4E1',
-  success: '#4E7A43', // Soft Sage, darkened enough to read on ivory
+  // Soft Sage, darkened until it reads as TEXT on every background it sits
+  // on: a lane's finished count is drawn in it on a column (inset). #456B3B
+  // measures 4.58:1 on inset, 5.22 on canvas, 5.72 on surface, and carries
+  // the light tick of the overview's mark at 5.53. A lighter sage that reads
+  // on ivory can still fail on inset (#4E7A43: 4.26 and 3.74).
+  success: '#456B3B',
   // Antique Gold deepened to #977535 so a warning actually reads — true gold
   // #C6A15B is ~2.1:1 on ivory. Gold stays true where it is decoration, not
   // signal (borders, dividers); the semantic tokens keep those separate.
@@ -77,10 +82,13 @@ export const palette = {
 
   // Priority is a FUNCTIONAL scale, not brand colour: it must read as urgency.
   // With raspberry now plum, these oranges/reds no longer risk reading as it.
+  // Each is a pill's fill under its own word, so each carries its better ink
+  // at 4.5:1 or more (`readableInkOn`; the sweep's contrast check): High is
+  // darkened for light ink (4.58), Medium lightened for dark ink (4.52).
   priorityNone: '#A58D7A',
   priorityLow: '#4E7A43',
-  priorityMedium: '#B8860B',
-  priorityHigh: '#C2611F',
+  priorityMedium: '#C58F0C',
+  priorityHigh: '#AD561C',
   priorityUrgent: '#A32218',
 
   overlay: '#3A2F2866',

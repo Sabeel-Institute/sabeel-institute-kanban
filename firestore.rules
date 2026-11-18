@@ -112,7 +112,21 @@ service cloud.firestore {
       function selfWritableOnly() {
         return request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['favoriteBoardIds', 'recentBoardIds', 'mutedBoardIds',
-                    'notifyPrefs', 'unreadNotifCount', 'watchedColumns']);
+                    'notifyPrefs', 'unreadNotifCount', 'watchedColumns',
+                    'overviewSort', 'overviewReverse', 'overviewHiddenBoardIds']);
+      }
+      // The overview's order and the boards hidden from it: display
+      // preferences, granting nothing. Hiding a board you cannot see changes
+      // nothing either, since the overview lists only boards you can. 500 is
+      // OVERVIEW_HIDDEN_MAX, held to it by ruleLimits.test.ts.
+      function overviewPrefsWellFormed() {
+        return (!('overviewSort' in request.resource.data)
+                || request.resource.data.overviewSort in ['start', 'created', 'late'])
+          && (!('overviewReverse' in request.resource.data)
+              || request.resource.data.overviewReverse is bool)
+          && (!('overviewHiddenBoardIds' in request.resource.data)
+              || (request.resource.data.overviewHiddenBoardIds is list
+                  && request.resource.data.overviewHiddenBoardIds.size() <= 500));
       }
       // The columns whose arrivals notify you. Naming a column on a board you
       // are not on gains nothing: the notice sweep sends arrivals to that
@@ -137,7 +151,8 @@ service cloud.firestore {
       allow update: if isActive()
         && request.auth.uid == userId
         && selfWritableOnly()
-        && watchesBounded();
+        && watchesBounded()
+        && overviewPrefsWellFormed();
 
       // Accounts are created by the auth trigger and never deleted by clients.
       allow create, delete: if false;
@@ -368,7 +383,8 @@ service cloud.firestore {
         && stampsChange()
         && incoming().keys().hasOnly(['name', 'description', 'archived', 'columns',
             'columnIds', 'memberUids', 'memberProfiles', 'boardOwnerUids',
-            'activeCardCount', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+            'activeCardCount', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy',
+            'lanesOn', 'lanes', 'doneColumnId', 'fields', 'details', 'template'])
         && incoming().get('boardOwnerUids', []) is list
         && incoming().createdBy == existing().createdBy
         // History, not state. Neither is the client's to rewrite.
@@ -382,6 +398,21 @@ service cloud.firestore {
         && incoming().columnIds is list
         && (!('archived' in incoming()) || incoming().archived is bool)
         && (!('memberProfiles' in incoming()) || incoming().memberProfiles is map)
+        // Lanes: shape only. Rules cannot look inside a list of maps, so a
+        // lane's name and its uniqueness are the app's (LANE_NAME_MAX in
+        // @sabeel/shared), as a board's own labels are. 12 is LANES_MAX,
+        // held to it by functions/test/unit/ruleLimits.test.ts.
+        && (!('lanesOn' in incoming()) || incoming().lanesOn is bool)
+        && (!('lanes' in incoming()) || (incoming().lanes is list && incoming().lanes.size() <= 12))
+        && (!('doneColumnId' in incoming())
+            || (incoming().doneColumnId is string && incoming().doneColumnId.size() <= 200))
+        // Details: bounded, and nothing more. A field's name and type and a
+        // value's shape are the app's (BOARD_FIELDS_MAX and validateDetailValue
+        // in @sabeel/shared); only the board's owners and admins get this far.
+        // 20 is BOARD_FIELDS_MAX, held to it by ruleLimits.test.ts.
+        && (!('fields' in incoming()) || (incoming().fields is list && incoming().fields.size() <= 20))
+        && (!('details' in incoming()) || (incoming().details is map && incoming().details.size() <= 20))
+        && (!('template' in incoming()) || incoming().template is bool)
         && incoming().name is string
         && incoming().name.size() > 0
         && incoming().name.size() <= 120;
@@ -627,7 +658,7 @@ service cloud.firestore {
             'boardId', 'title', 'description', 'columnId', 'rank', 'assigneeUids',
             'subscriberUids',
             'dueDate', 'priority', 'labelIds', 'archived', 'archivedAt',
-            'commentCount', 'attachmentCount', 'parentId', 'createdAt',
+            'commentCount', 'attachmentCount', 'parentId', 'laneId', 'createdAt',
             'createdBy', 'updatedAt', 'updatedBy', 'lastActivityAt', 'sourceId',
           ])
           && newCard().boardId is string
@@ -654,6 +685,12 @@ service cloud.firestore {
           // renders as nothing. See CardDoc.parentId.
           && (!('parentId' in newCard())
               || (newCard().parentId is string && newCard().parentId.size() <= 200))
+          // The card's lane. Shape only, and never required, on purpose: a lane
+          // id that matches nothing is drawn under No lane, which loses
+          // nothing, so it needs no lookup and no `laneIds` mirror, and an app
+          // too old to know about lanes keeps adding cards. See CardDoc.laneId.
+          && (!('laneId' in newCard())
+              || (newCard().laneId is string && newCard().laneId.size() <= 200))
           && columnExists()
           && assigneesAreMembers()
           && subscribersAreMembers();

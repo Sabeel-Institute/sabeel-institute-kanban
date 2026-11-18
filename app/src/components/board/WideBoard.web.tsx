@@ -31,26 +31,44 @@ import { createAutoScroller } from './autoScroll';
 import { BulkBar } from '../BulkBar';
 import { IconAction, LoadError } from '../ui';
 import { NewCardBell, WatchColumnBell } from './Bells';
+import { LaneHeading } from './LaneHeading';
+import { useLaneInfo } from './useLaneInfo';
 import { setColumnWatched, useWatchedColumns } from '../../notifications';
 import {
   CARD_TITLE_MAX,
   canManageBoard,
   columnDeleteBlocked,
   columnsPatch,
+  finishedColumnDeleteNote,
+  groupByLane,
+  isFinished,
+  laneOf,
+  lanesLive,
   parentTitles,
   subtaskCounts,
   watchKey,
   type BoardColumn,
+  type BoardLane,
   type Label,
 } from '@sabeel/shared';
 import type { SessionUser } from '../../session';
 import { useNav } from '../../nav';
+import { acceptsDrop, dropPlacement } from '../../boardDrop';
+import type { AddCardDraft } from './AddCardForm';
 import { useListenerError } from '../../liveQuery';
 import { useLabels } from '../../labels';
 import { toUserMessage } from '../../errors';
 import { getTheme, radius, space, type Theme } from '../../theme';
 
 type DragState = { cardId: string; fromColumnId: string } | null;
+
+/**
+ * Where a dragged card would land. On a board with lanes, a column holds the
+ * board's lanes, so the place is a lane too: `index` counts that lane's cards
+ * in the column, and `laneId` null is No lane. Without lanes `laneId` is
+ * absent and `index` counts the column.
+ */
+type DropTarget = { columnId: string; laneId?: string | null; index: number };
 
 /** Stable empty, so the selection hook does not churn on every render. */
 const EMPTY_CARDS: Card[] = [];
@@ -67,6 +85,7 @@ function CardTile({
   boardMembers,
   subtaskCount,
   parentTitle,
+  finished,
   t,
   canEdit,
   selected,
@@ -82,6 +101,7 @@ function CardTile({
   boardMembers: readonly BoardMemberProfile[];
   subtaskCount?: number;
   parentTitle?: string;
+  finished: boolean;
   t: Theme;
   canEdit: boolean;
   selected: boolean;
@@ -133,6 +153,7 @@ function CardTile({
             boardMembers={boardMembers}
             subtaskCount={subtaskCount}
             parentTitle={parentTitle}
+            finished={finished}
           />
         </div>
       </div>
@@ -187,22 +208,39 @@ function WebAddCardForm({
   onAdd,
   onCancel,
   canSubscribe,
+  lanes,
+  initial,
 }: {
-  /** Called with a trimmed, non-empty title, and whether to subscribe to it. */
-  onAdd: (title: string, subscribe: boolean) => void;
+  /** Called with a trimmed, non-empty title, whether to subscribe to it, and
+   *  its lane on a board with lanes. */
+  onAdd: (title: string, subscribe: boolean, laneId?: string) => void;
   onCancel: () => void;
   /** Whether the bell is offered: only a member of the board may subscribe. */
   canSubscribe: boolean;
+  /** The board's lanes when they are live; absent on a board without them. */
+  lanes?: readonly BoardLane[];
+  /** What a refused add held, to start from instead of an empty form. */
+  initial?: AddCardDraft;
 }) {
   const t = useWebTheme();
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(initial?.title ?? '');
   // Unmount-scoped like the draft, so every new composer starts subscribed.
-  const [subscribe, setSubscribe] = useState(true);
+  const [subscribe, setSubscribe] = useState(initial?.subscribe ?? true);
+  // None chosen to start, as in the native form: see `AddCardForm`.
+  // A lane given back is kept only while the board still has it.
+  const [laneId, setLaneId] = useState(
+    initial?.laneId && lanes?.some((l) => l.id === initial.laneId) ? initial.laneId : '',
+  );
+  const [needsLane, setNeedsLane] = useState(false);
 
   function submit() {
     const trimmed = title.trim();
     if (!trimmed) return;
-    onAdd(trimmed, canSubscribe && subscribe);
+    if (lanes && !laneId) {
+      setNeedsLane(true);
+      return;
+    }
+    onAdd(trimmed, canSubscribe && subscribe, lanes ? laneId : undefined);
   }
 
   return (
@@ -227,6 +265,41 @@ function WebAddCardForm({
           color: t.text.primary,
         }}
       />
+      {lanes ? (
+        <>
+          <select
+            aria-label="Lane"
+            value={laneId}
+            onChange={(e) => {
+              setLaneId(e.target.value);
+              if (e.target.value) setNeedsLane(false);
+            }}
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              marginTop: space.sm,
+              padding: space.sm,
+              borderRadius: radius.sm,
+              border: `1px solid ${t.border.subtle}`,
+              background: t.bg.surface,
+              color: t.text.primary,
+              colorScheme: 'light',
+            }}
+          >
+            <option value="">Choose a lane</option>
+            {lanes.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+          {needsLane ? (
+            <div style={{ color: t.text.secondary, fontSize: 12, marginTop: space.xs }}>
+              Choose a lane for the card first.
+            </div>
+          ) : null}
+        </>
+      ) : null}
       <div style={{ display: 'flex', alignItems: 'center', gap: space.sm }}>
         <button onClick={submit} style={primaryBtn(t)}>
           Add card
@@ -250,10 +323,9 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   const t = useWebTheme();
 
   const [drag, setDrag] = useState<DragState>(null);
-  const [dropTarget, setDropTarget] = useState<{ columnId: string; index: number } | null>(
-    null,
-  );
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
+  const [retry, setRetry] = useState<(AddCardDraft & { columnId: string }) | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Which column is mid-rename. Its delete button steps aside while editing, so
   // the cancel ✕ and the delete ✕ are never sitting next to each other.
@@ -313,8 +385,16 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
     return map;
   }, [board.data?.columns, cards.data]);
 
+  // Lanes, on a board that uses them: each column draws the board's lanes in
+  // order (decision A, 2026-11-15: headings inside each column, as the phone
+  // does, not bands across the board).
+  const laneBoard = board.data;
+  const live = laneBoard ? lanesLive(laneBoard) : false;
+  const infoByLane = useLaneInfo(laneBoard ?? null, live, cards.data ?? EMPTY_CARDS);
+
   const drop = useCallback(
-    async (columnId: string, index: number, cardIdFromEvent: string | null) => {
+    async (target: DropTarget, cardIdFromEvent: string | null) => {
+      const { columnId, index } = target;
       // The card id comes from the DataTransfer, not from React state.
       //
       // State is set in onDragStart, but React batches updates — a drop handled
@@ -330,32 +410,50 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
       const moving = (cards.data ?? []).find((c) => c.id === cardId);
       if (!moving) return;
 
-      const target = (byColumn.get(columnId) ?? []).filter((c) => c.id !== moving.id);
-      const before = index > 0 ? target[index - 1] : null;
-      const after = index < target.length ? target[index] : null;
-      if (before?.id === moving.id || after?.id === moving.id) return;
+      const drawnColumn = byColumn.get(columnId) ?? [];
+      const column = drawnColumn.filter((c) => c.id !== moving.id);
+      // With lanes, `index` is a position in the target lane's cards as this
+      // column draws them, and the new rank falls between two of them; other
+      // lanes' cards in between are no matter, since each lane draws the
+      // column's order filtered. `dropPlacement` has the index rules.
+      const inLane = target.laneId !== undefined && laneBoard;
+      const group = inLane
+        ? drawnColumn.filter((c) => laneOf(c, laneBoard) === target.laneId)
+        : drawnColumn;
+      const place = dropPlacement(group, index, moving.id);
+      if (!place) return;
 
       try {
         await moveCard({
           card: moving,
           toColumnId: columnId,
-          before: before ?? null,
-          after: after ?? null,
+          // No lane is never written: a card is placed, not unplaced.
+          ...(inLane && target.laneId ? { toLaneId: target.laneId } : {}),
+          before: place.before,
+          after: place.after,
           user,
         });
         // Background tidy-up; never blocks the user.
-        void rerankColumnIfNeeded(target).catch(() => {});
+        void rerankColumnIfNeeded(column).catch(() => {});
       } catch (e) {
         setError(toUserMessage(e, 'moveCard'));
       }
     },
-    [drag, cards.data, byColumn, user, autoScroll],
+    [drag, cards.data, byColumn, laneBoard, user, autoScroll],
   );
 
   // The title comes from `WebAddCardForm`, already trimmed and non-empty — the
   // draft lives there so typing one does not re-render the board.
-  async function addCard(columnId: string, title: string, subscribe: boolean) {
+  // The form closes at once: the card is on the board at once (Firestore
+  // draws a write before the server confirms it), and an add made offline
+  // waits in the queue. Closing only once the server answered left a form
+  // open over its own card, and closed whatever form was open by then. A
+  // REFUSED add is given back instead: its form reopens with what was typed
+  // (`retry`), in front of the error.
+  async function addCard(columnId: string, title: string, subscribe: boolean, laneId?: string) {
     setAdding(null);
+    // Only this column's: a refused add waiting elsewhere is kept.
+    setRetry((r) => (r?.columnId === columnId ? null : r));
     try {
       await createCard({
         boardId,
@@ -364,16 +462,18 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         user,
         columnCards: byColumn.get(columnId) ?? [],
         subscribe,
+        laneId,
       });
     } catch (e) {
       setError(toUserMessage(e, 'createCard'));
+      setRetry({ columnId, title, subscribe, laneId });
     }
   }
 
   async function saveColumns(next: BoardColumn[]) {
     // Same shape as removeColumn below: this surface reports failures through its
     // own `error` banner rather than useAction.
-    await updateBoard(boardId, columnsPatch(next));
+    await updateBoard(boardId, columnsPatch(board.data ?? { columns: next }, next));
   }
 
   /**
@@ -452,6 +552,9 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
     );
   }
 
+  // The card being dragged, for where a drop outside any lane lands.
+  const dragged = drag ? (cards.data ?? []).find((c) => c.id === drag.cardId) : undefined;
+
   return (
     <div
       style={{
@@ -506,7 +609,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
               control that does not say what it does. */}
           <IconAction
             icon={canManage ? 'settings' : 'group'}
-            label={canManage ? 'Board settings' : 'Members and labels'}
+            label={canManage ? 'Board settings' : 'About this board'}
             onPress={() => nav.push({ name: 'boardSettings', boardId })}
           />
           <IconAction icon="arrow-back" label="Back" onPress={nav.pop} />
@@ -518,6 +621,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
           canManage={canManage}
           currentBoardId={boardId}
           columns={b.columns}
+          lanes={live && laneBoard ? laneBoard.lanes : undefined}
           allCards={cards.data ?? []}
           selection={selection}
           members={members}
@@ -536,6 +640,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         <div style={banner(t)}>
           Delete the column “{pendingDelete.name}”? It is empty, but this cannot be
           undone.{' '}
+          {board.data ? `${finishedColumnDeleteNote(board.data, pendingDelete.id) ?? ''} ` : ''}
           <button
             onClick={() => confirmRemoveColumn(pendingDelete)}
             style={{ ...btn(t), marginLeft: 8, color: t.text.danger }}
@@ -581,19 +686,100 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
       >
         {b.columns.map((col) => {
           const colCards = byColumn.get(col.id) ?? [];
+          const groups = live && laneBoard ? groupByLane(colCards, laneBoard, cards.data ?? EMPTY_CARDS) : null;
+          // The order the column DRAWS its cards in, which shift-click follows.
+          const drawn = groups ? groups.flatMap((g) => g.cards) : colCards;
+          // Dropped anywhere in the column but a lane: the end of the dragged
+          // card's own lane, or of the column on a board without lanes. The
+          // index counts the group as drawn, the dragged card included, so the
+          // bar is drawn after its last card (`dropPlacement`).
+          const draggedLane = dragged && laneBoard && live ? laneOf(dragged, laneBoard) : null;
+          const columnEnd: DropTarget = groups
+            ? {
+                columnId: col.id,
+                laneId: draggedLane,
+                index: colCards.filter((c) => laneOf(c, laneBoard!) === draggedLane).length,
+              }
+            : { columnId: col.id, index: colCards.length };
+          const marks = (laneId: string | null | undefined, i: number) =>
+            dropTarget?.columnId === col.id &&
+            dropTarget.laneId === laneId &&
+            dropTarget.index === i;
+          const dropBar = (
+            <div
+              style={{
+                height: 3,
+                background: t.accent.base,
+                borderRadius: 2,
+                marginBottom: space.sm,
+              }}
+            />
+          );
+          const renderCard = (card: Card, i: number, laneId: string | null | undefined) => (
+            <div
+              key={card.id}
+              onDragOver={(e) => {
+                // Refused as its lane's group refuses it, or the bar would be
+                // drawn where the card will not go: left to the column, which
+                // takes it to the end of its own lane.
+                if (!acceptsDrop(laneId, draggedLane)) return;
+                e.preventDefault();
+                e.stopPropagation();
+                if (drag) setDropTarget({ columnId: col.id, laneId, index: i });
+                // stopPropagation above means the column handler will not
+                // fire, so drive it here too — otherwise scrolling dies the
+                // moment the pointer passes over a card.
+                driveAutoScroll(e.clientX, e.clientY, col.id);
+              }}
+            >
+              {marks(laneId, i) ? dropBar : null}
+              <CardTile
+                card={card}
+                labels={labels}
+                boardMembers={members}
+                subtaskCount={subtasksBy.get(card.id)}
+                parentTitle={parentsBy.get(card.id)}
+                finished={isFinished(card, b)}
+                t={t}
+                canEdit={canEdit}
+                selected={selection.isSelected(card.id)}
+                dragging={drag?.cardId === card.id}
+                onToggleSelect={(shiftKey) =>
+                  shiftKey
+                    ? selection.selectRangeTo(card.id, drawn)
+                    : selection.toggle(card.id)
+                }
+                onOpen={() =>
+                  selection.active
+                    ? selection.toggle(card.id)
+                    : nav.push({ name: 'card', boardId, cardId: card.id })
+                }
+                onArchive={() => archiveCard(card.id, user)}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('text/plain', card.id);
+                  e.dataTransfer.effectAllowed = 'move';
+                  setDrag({ cardId: card.id, fromColumnId: col.id });
+                }}
+                onDragEnd={() => {
+                  autoScroll.stop();
+                  setDrag(null);
+                  setDropTarget(null);
+                }}
+              />
+            </div>
+          );
           return (
             <div
               key={col.id}
               onDragOver={(e) => {
                 e.preventDefault();
-                if (drag) setDropTarget({ columnId: col.id, index: colCards.length });
+                if (drag) setDropTarget(columnEnd);
                 driveAutoScroll(e.clientX, e.clientY, col.id);
               }}
               onDrop={(e) => {
                 e.preventDefault();
                 void drop(
-                  col.id,
-                  dropTarget?.columnId === col.id ? dropTarget.index : colCards.length,
+                  dropTarget?.columnId === col.id ? dropTarget : columnEnd,
                   e.dataTransfer.getData('text/plain') || null,
                 );
               }}
@@ -675,71 +861,51 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
                   minHeight: 0,
                 }}
               >
-              {colCards.map((card, i) => (
-                <div
-                  key={card.id}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (drag) setDropTarget({ columnId: col.id, index: i });
-                    // stopPropagation above means the column handler will not
-                    // fire, so drive it here too — otherwise scrolling dies the
-                    // moment the pointer passes over a card.
-                    driveAutoScroll(e.clientX, e.clientY, col.id);
-                  }}
-                >
-                  {dropTarget?.columnId === col.id && dropTarget.index === i ? (
-                    <div
-                      style={{
-                        height: 3,
-                        background: t.accent.base,
-                        borderRadius: 2,
-                        marginBottom: space.sm,
-                      }}
-                    />
-                  ) : null}
-                  <CardTile
-                    card={card}
-                    labels={labels}
-                    boardMembers={members}
-                    subtaskCount={subtasksBy.get(card.id)}
-                    parentTitle={parentsBy.get(card.id)}
-                    t={t}
-                    canEdit={canEdit}
-                    selected={selection.isSelected(card.id)}
-                    dragging={drag?.cardId === card.id}
-                    onToggleSelect={(shiftKey) =>
-                      shiftKey
-                        ? selection.selectRangeTo(card.id, colCards)
-                        : selection.toggle(card.id)
-                    }
-                    onOpen={() =>
-                      selection.active
-                        ? selection.toggle(card.id)
-                        : nav.push({ name: 'card', boardId, cardId: card.id })
-                    }
-                    onArchive={() => archiveCard(card.id, user)}
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData('text/plain', card.id);
-                      e.dataTransfer.effectAllowed = 'move';
-                      setDrag({ cardId: card.id, fromColumnId: col.id });
-                    }}
-                    onDragEnd={() => {
-                      autoScroll.stop();
-                      setDrag(null);
-                      setDropTarget(null);
-                    }}
-                  />
-                </div>
-              ))}
+              {groups
+                ? groups.map((g) => {
+                    const laneId = g.lane?.id ?? null;
+                    // A card with a lane is not dropped INTO No lane, as the
+                    // card screen never offers it one; over No lane such a
+                    // card falls through to the column, keeping its lane.
+                    const into = (index: number) => (e: React.DragEvent) => {
+                      if (!acceptsDrop(laneId, draggedLane)) return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (drag) setDropTarget({ columnId: col.id, laneId, index });
+                      driveAutoScroll(e.clientX, e.clientY, col.id);
+                    };
+                    return (
+                      <div key={laneId ?? 'none'} onDragOver={into(g.cards.length)}>
+                        {/* Over the heading: the top of the lane. */}
+                        <div onDragOver={into(0)}>
+                          <LaneHeading
+                            name={g.lane?.name ?? 'No lane'}
+                            info={g.lane ? (infoByLane.get(g.lane.id) ?? null) : null}
+                          />
+                        </div>
+                        <div style={{ height: space.xs }} />
+                        {g.cards.map((card, i) => renderCard(card, i, laneId))}
+                        {marks(laneId, g.cards.length) ? dropBar : null}
+                      </div>
+                    );
+                  })
+                : colCards.map((card, i) => renderCard(card, i, undefined))}
 
               </div>
 
-              {adding === col.id ? (
+              {/* A refused add reopens here, unless another form is open. */}
+              {adding === col.id || (adding === null && retry?.columnId === col.id) ? (
                 <WebAddCardForm
-                  onAdd={(title, subscribe) => void addCard(col.id, title, subscribe)}
+                  onAdd={(title, subscribe, laneId) =>
+                    void addCard(col.id, title, subscribe, laneId)
+                  }
                   canSubscribe={isMember}
-                  onCancel={() => setAdding(null)}
+                  lanes={live && laneBoard ? laneBoard.lanes : undefined}
+                  initial={retry?.columnId === col.id ? retry : undefined}
+                  onCancel={() => {
+                    setAdding(null);
+                    setRetry((r) => (r?.columnId === col.id ? null : r));
+                  }}
                 />
               ) : (
                 <button onClick={() => setAdding(col.id)} style={{ ...btn(t), width: '100%' }}>

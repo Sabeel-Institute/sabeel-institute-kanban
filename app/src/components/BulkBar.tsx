@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import type { BoardColumn } from '@sabeel/shared';
+import type { BoardColumn, BoardLane } from '@sabeel/shared';
 import {
   bulkArchive,
   bulkAssign,
@@ -31,6 +31,7 @@ import { toUserMessage } from '../errors';
 export function BulkBar({
   currentBoardId,
   columns,
+  lanes,
   allCards,
   selection,
   members,
@@ -40,6 +41,12 @@ export function BulkBar({
 }: {
   currentBoardId: string;
   columns: readonly BoardColumn[];
+  /**
+   * The board's lanes when they are live. Move then offers a lane as well as a
+   * column, either or both, which is how a board that has just switched lanes
+   * on is sorted in a few taps. No new icon: five is what fits a 320px phone.
+   */
+  lanes?: readonly BoardLane[];
   allCards: readonly Card[];
   selection: Selection;
   members: readonly BoardMemberProfile[];
@@ -59,6 +66,9 @@ export function BulkBar({
   const [busy, setBusy] = useState(false);
   const [destBoardId, setDestBoardId] = useState('');
   const [destColumnId, setDestColumnId] = useState('');
+  // The Move mode's two choices on a board with lanes; '' keeps each card's own.
+  const [moveColumnId, setMoveColumnId] = useState('');
+  const [moveLaneId, setMoveLaneId] = useState('');
   // The boards you could move/copy to (yours, or every board if you are an admin).
   const boards = useMyBoards(user);
   // Every label, to tell a board's own from the institute's on a move. Copy and
@@ -80,12 +90,23 @@ export function BulkBar({
       chosen.some((c) => c.labelIds.includes(l.id)),
   );
 
+  /**
+   * Back to the bar's actions, forgetting what a mode had chosen. One way out
+   * of every mode, so no exit (the ✕, a Cancel, a finished action) can leave
+   * a previous Move's column and lane chosen for the next selection.
+   */
+  function toIdle() {
+    setMode('idle');
+    setMoveColumnId('');
+    setMoveLaneId('');
+  }
+
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
     try {
       await fn();
       selection.clear();
-      setMode('idle');
+      toIdle();
     } catch (e) {
       onError(toUserMessage(e, 'bulkBar'));
     } finally {
@@ -122,7 +143,7 @@ export function BulkBar({
         <IconAction
           icon="close"
           label={mode === 'idle' ? 'Clear selection' : 'Cancel'}
-          onPress={() => (mode === 'idle' ? selection.clear() : setMode('idle'))}
+          onPress={() => (mode === 'idle' ? selection.clear() : toIdle())}
         />
       </Row>
       {mode === 'idle' ? (
@@ -166,7 +187,56 @@ export function BulkBar({
         </Row>
       ) : null}
 
-      {mode === 'move' ? (
+      {mode === 'move' && lanes ? (
+        <>
+          <Hint>Move the selection to</Hint>
+          <Select
+            label="Destination column"
+            value={moveColumnId}
+            options={[
+              { value: '', label: 'Keep their columns' },
+              ...columns.map((col) => ({ value: col.id, label: col.name })),
+            ]}
+            disabled={busy}
+            onChange={setMoveColumnId}
+          />
+          <Select
+            label="Lane"
+            value={moveLaneId}
+            options={[
+              { value: '', label: 'Keep their lanes' },
+              ...lanes.map((l) => ({ value: l.id, label: l.name })),
+            ]}
+            disabled={busy}
+            onChange={setMoveLaneId}
+          />
+          <Row style={styles.wrap}>
+            <Button
+              label="Move"
+              busy={busy}
+              disabled={!moveColumnId && !moveLaneId}
+              onPress={() =>
+                run(() =>
+                  bulkMove({
+                    cards: chosen,
+                    toColumnId: moveColumnId || undefined,
+                    toLaneId: moveLaneId || undefined,
+                    destinationCards: moveColumnId ? cardsInColumn(allCards, moveColumnId) : [],
+                    user,
+                  }),
+                )
+              }
+            />
+            <Button
+              label="Cancel"
+              variant="secondary"
+              onPress={toIdle}
+            />
+          </Row>
+        </>
+      ) : null}
+
+      {mode === 'move' && !lanes ? (
         <>
           <Hint>Move the selection to</Hint>
           <Row style={styles.wrap}>
@@ -192,7 +262,7 @@ export function BulkBar({
                 );
               }}
             />
-            <Button label="Cancel" variant="secondary" onPress={() => setMode('idle')} />
+            <Button label="Cancel" variant="secondary" onPress={toIdle} />
           </Row>
         </>
       ) : null}
@@ -316,7 +386,7 @@ export function BulkBar({
               </Row>
             );
           })}
-          <Button label="Cancel" variant="secondary" onPress={() => setMode('idle')} />
+          <Button label="Cancel" variant="secondary" onPress={toIdle} />
         </>
       ) : null}
 
@@ -334,7 +404,7 @@ export function BulkBar({
               busy={busy}
               onPress={() => run(() => bulkDelete(chosen))}
             />
-            <Button label="Cancel" variant="secondary" onPress={() => setMode('idle')} />
+            <Button label="Cancel" variant="secondary" onPress={toIdle} />
           </Row>
         </>
       ) : null}
