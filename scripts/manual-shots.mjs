@@ -313,9 +313,12 @@ const SHOTS = {
     await nav(p, 'Alerts');
     await p.waitForTimeout(1500);
   },
+  // Board settings: the list of pages on a phone; on a computer the same list
+  // down the side with General open beside it.
   settings: async (p) => {
     await openBoard(p);
     await p.getByRole('button', { name: 'Board settings' }).click();
+    await p.getByRole('button', { name: 'History', exact: true }).waitFor({ timeout: 30000 });
     await p.waitForTimeout(1500);
   },
   // Cloning a board: the sheet a long-press on its row opens, a new name
@@ -343,27 +346,62 @@ const SHOTS = {
     await p.getByText('in this period', { exact: false }).first().waitFor({ timeout: 30000 });
     await p.waitForTimeout(1200);
   },
-  // The Members section of settings, as an OWNER — the Owner switch beside each
-  // row, which is the whole of what this release added and what `settings`
-  // cannot show: that shot is the top of the same screen, and Members is below
-  // the fold at both capture sizes. Scrolled to the heading rather than to a
-  // pixel offset, so it survives a column being added to the seed.
+  // Settings → Columns: rename in place, drag to reorder, add at the foot.
+  columns: async (p) => {
+    await openBoard(p);
+    await p.getByRole('button', { name: 'Board settings' }).click();
+    await p.getByRole('button', { name: 'Columns', exact: true }).click();
+    await p.getByPlaceholder('New column name').waitFor({ timeout: 30000 });
+    await p.waitForTimeout(900);
+  },
+  // A board with lanes (the seed's Summer Program 2027): the lane headings and
+  // their counts in every column.
+  lanes: async (p) => {
+    await nav(p, 'Boards');
+    await p.getByText('Summer Program 2027', { exact: true }).first().click();
+    await p.locator('[role="heading"][aria-label^="Planning,"]').first().waitFor({ timeout: 30000 });
+    await p.waitForTimeout(900);
+  },
+  // Settings → Lanes on that board: the switch, the lanes, the finished column.
+  lanesettings: async (p) => {
+    await nav(p, 'Boards');
+    await p.getByText('Summer Program 2027', { exact: true }).first().click();
+    await p.getByRole('button', { name: 'Board settings' }).click();
+    await p.getByRole('button', { name: 'Lanes', exact: true }).click();
+    await p.getByRole('button', { name: 'Rename lane Planning' }).waitFor({ timeout: 30000 });
+    await p.waitForTimeout(900);
+  },
+  // Settings → Details on the lanes board, filled in by the seed.
+  details: async (p) => {
+    await nav(p, 'Boards');
+    await p.getByText('Summer Program 2027', { exact: true }).first().click();
+    await p.getByRole('button', { name: 'Board settings' }).click();
+    await p.getByRole('button', { name: 'Details', exact: true }).click();
+    await p.getByRole('button', { name: 'Edit fields' }).waitFor({ timeout: 30000 });
+    await p.waitForTimeout(900);
+  },
+  // The overview, from its icon in the Boards header: the seed's two programs
+  // under one heading of lane names.
+  overview: async (p) => {
+    await nav(p, 'Boards');
+    await p.getByRole('button', { name: 'Overview', exact: true }).click();
+    await p.getByTestId('overview-row:Autumn Program 2027').waitFor({ timeout: 30000 });
+    await p.waitForTimeout(1200);
+  },
+  // Settings → People, as an OWNER: the Owner switch beside each row.
   owners: async (p) => {
     await openBoard(p);
     await p.getByRole('button', { name: 'Board settings' }).click();
-    const members = p.getByText(/^Members \(/).first();
-    await members.waitFor({ timeout: 30000 });
-    await members.scrollIntoViewIfNeeded();
+    await p.getByRole('button', { name: 'People', exact: true }).click();
+    await p.getByText(/^Members \(/).first().waitFor({ timeout: 30000 });
     await p.waitForTimeout(900);
   },
   // A board's labels: the institute's, locked, then the board's own with controls.
   boardlabels: async (p) => {
     await openBoard(p);
     await p.getByRole('button', { name: 'Board settings' }).click();
-    const heading = p.getByText('Labels', { exact: true }).first();
-    await heading.waitFor({ timeout: 30000 });
+    await p.getByRole('button', { name: 'Labels', exact: true }).click();
     await p.getByRole('button', { name: 'Rename label Hall booking' }).waitFor({ timeout: 30000 });
-    await heading.evaluate((el) => el.scrollIntoView({ block: 'start' }));
     await p.waitForTimeout(900);
   },
   // More → Labels, the admin's panel for the institute labels.
@@ -374,15 +412,12 @@ const SHOTS = {
     await p.getByRole('button', { name: 'Rename label Fundraising' }).waitFor({ timeout: 30000 });
     await p.waitForTimeout(900);
   },
-  // The board's history, at the foot of settings: scrolled so its heading
-  // sits at the top and the lines fill the rest.
+  // Settings → History.
   history: async (p) => {
     await openBoard(p);
     await p.getByRole('button', { name: 'Board settings' }).click();
-    const heading = p.getByText('History', { exact: true });
-    await heading.waitFor({ timeout: 30000 });
+    await p.getByRole('button', { name: 'History', exact: true }).click();
     await p.getByText(/created the board/).first().waitFor({ timeout: 30000 });
-    await heading.evaluate((el) => el.scrollIntoView({ block: 'start' }));
     await p.waitForTimeout(900);
   },
   // The member list as somebody who does NOT own the board: owners marked, and
@@ -390,7 +425,8 @@ const SHOTS = {
   roster: async (p) => {
     await nav(p, 'Boards');
     await p.getByText(BOARD).first().click();
-    await p.getByRole('button', { name: 'Members and labels' }).click();
+    await p.getByRole('button', { name: 'About this board' }).click();
+    await p.getByRole('button', { name: 'People', exact: true }).click();
     await p.getByText(/^Members \(/).first().waitFor({ timeout: 30000 });
     await p.waitForTimeout(900);
   },

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, TextInput } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Icon } from '../icons';
-import { BOARD_NAME_MAX, sortBoardsForList } from '@sabeel/shared';
+import { BOARD_NAME_MAX, overviewBoards, sortBoardsForList } from '@sabeel/shared';
 import {
   boardsView,
   cloneBoard,
@@ -27,6 +27,7 @@ import {
   Card,
   CardGrid,
   Heading,
+  IconAction,
   LoadError,
   Row,
   Screen,
@@ -80,7 +81,17 @@ function BoardRow({
           style={styles.grow}
           accessibilityRole="button"
         >
-          <Body>{board.name}</Body>
+          <View style={styles.nameRow}>
+            <View style={styles.shrink}>
+              <Body>{board.name}</Body>
+            </View>
+            {/* On the row wherever the board is listed, Archived included. */}
+            {board.template ? (
+              <View style={[styles.badge, { backgroundColor: t.bg.inset, borderColor: t.border.subtle }]}>
+                <Text style={[type.caption, { color: t.text.secondary }]}>Template</Text>
+              </View>
+            ) : null}
+          </View>
           <Caption>
             {board.activeCardCount} card{board.activeCardCount === 1 ? '' : 's'} ·{' '}
             {board.memberUids.length} member{board.memberUids.length === 1 ? '' : 's'}
@@ -265,15 +276,29 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
     );
   }
 
+  // Hidden boards count: hiding one from the overview should not take away
+  // the way back to it.
+  const hasOverview = overviewBoards(boards.data ?? []).length > 0;
   const hasAny =
-    sections.favourites.length + sections.recents.length + sections.others.length > 0;
+    sections.favourites.length +
+      sections.recents.length +
+      sections.others.length +
+      sections.templates.length >
+    0;
 
   return (
     <Screen width="list">
       {/* Section actions (Search, My work, Alerts, People, Sign out) live in the
           app-wide nav bar now — bottom bar on a phone, left rail on wide. This
-          screen keeps only its own title and the create-board control. */}
-      <Title>Boards</Title>
+          screen keeps only its own title, the create-board control, and the
+          overview's entry for whoever has a board it lists (Faisal,
+          2026-11-15): someone with no board with lanes never sees it. */}
+      <Row style={styles.between}>
+        <Title>Boards</Title>
+        {hasOverview ? (
+          <IconAction icon="checklist" label="Overview" onPress={() => nav.push({ name: 'overview' })} />
+        ) : null}
+      </Row>
 
       {/* Top of the content, below the alert only. Same place in all three apps:
           first thing after anything that needs acting on today. This screen has
@@ -381,6 +406,26 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
         </>
       ) : null}
 
+      {/* Boards marked as templates, last and apart, so the boards people work
+          in come first. Cloned by a long press, like any board. */}
+      {sections.templates.length > 0 ? (
+        <>
+          <Heading>Templates</Heading>
+          <CardGrid>
+            {sections.templates.map((b) => (
+              <BoardRow
+                key={b.id}
+                board={b}
+                isFavourite={favourites.includes(b.id)}
+                onOpen={() => open(b)}
+                onToggleFavourite={() => toggleFavourite(user, b.id, favourites)}
+                onClone={onCloneOf(b)}
+              />
+            ))}
+          </CardGrid>
+        </>
+      ) : null}
+
       {/* Archived boards live behind a disclosure, not mixed into the list.
           Archiving is meant to be the SAFE alternative to deleting, but the
           board list filters archived boards out and "Restore" lives inside
@@ -434,8 +479,8 @@ function ArchivedBoards({
       {open ? (
         <>
           <Hint>
-            Archived boards are hidden from everyone. Open one and use Restore in
-            its settings to bring it back.
+            Archived boards are hidden from everyone. Open one and use Restore
+            board in its settings, under General, to bring it back.
           </Hint>
           <CardGrid>
             {list.map((b) => (
@@ -458,6 +503,14 @@ function ArchivedBoards({
 
 const styles = StyleSheet.create({
   between: { justifyContent: 'space-between' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space.sm },
+  shrink: { flexShrink: 1 },
+  badge: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 999,
+    paddingHorizontal: space.sm,
+    paddingVertical: 2,
+  },
   /** Wraps so no action can be pushed off a narrow screen. */
   grow: { flex: 1, gap: space.xs },
   /** Forms and messages stay a readable width inside the wide board grid. */

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { StyleSheet } from 'react-native';
-import { type MentionCandidate } from '@sabeel/shared';
+import { COMMENT_BODY_MAX, storedLength, type MentionCandidate } from '@sabeel/shared';
 import { addComment, deleteComment, editComment, useComments } from '../comments';
 import type { SessionUser } from '../session';
 import type { BoardMemberProfile } from '../boards';
@@ -74,10 +74,11 @@ function CommentEditor({
         testID="comment-edit-editor"
         minHeight={72}
       />
+      <CommentLimit draft={draft} verb="save" />
       <Row>
         <Button
           busy={busy}
-          disabled={draft.trim().length === 0 || busy}
+          disabled={draft.trim().length === 0 || busy || overLimit(draft)}
           label="Save"
           onPress={() => onSave(draft)}
         />
@@ -85,6 +86,30 @@ function CommentEditor({
       </Row>
     </>
   );
+}
+
+/** Whether a draft is past what the rules accept for a comment. */
+function overLimit(draft: string): boolean {
+  return storedLength(draft) > COMMENT_BODY_MAX;
+}
+
+/**
+ * The comment's length, said only when it matters, as the description's is:
+ * nothing under 90%, then what is left, then how far over, with the button
+ * held. Without it the rules refused a long comment and the person was told
+ * their access might have changed.
+ */
+function CommentLimit({ draft, verb }: { draft: string; verb: 'post' | 'save' }) {
+  const length = storedLength(draft);
+  if (length > COMMENT_BODY_MAX) {
+    return (
+      <Hint>
+        {length - COMMENT_BODY_MAX} characters over the {COMMENT_BODY_MAX} limit — shorten it to{' '}
+        {verb}.
+      </Hint>
+    );
+  }
+  return length > COMMENT_BODY_MAX * 0.9 ? <Hint>{COMMENT_BODY_MAX - length} characters left.</Hint> : null;
 }
 
 /**
@@ -136,6 +161,7 @@ function CommentComposer({
         testID="comment-editor"
         minHeight={72}
       />
+      <CommentLimit draft={draft} verb="post" />
 
       {/* Submit sits DIRECTLY under the field. The mention hint used to be
           between them, pushing the button ~50dp lower — far enough that the
@@ -144,7 +170,7 @@ function CommentComposer({
           keyboard. The hint is guidance, not a step, so it reads fine after. */}
       <Button
         label="Comment"
-        disabled={draft.trim().length === 0 || busy}
+        disabled={draft.trim().length === 0 || busy || overLimit(draft)}
         busy={busy}
         onPress={() => {
           // Clear the box IMMEDIATELY rather than after the server
@@ -179,7 +205,7 @@ function CommentComposer({
       {candidates.length <= 1 ? (
         <Hint>
           You are the only member of this board, so there is nobody to mention
-          yet. Add people under board Settings.
+          yet. The board’s owners add people in its settings, under People.
         </Hint>
       ) : null}
     </Panel>

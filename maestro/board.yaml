@@ -144,6 +144,30 @@ name: Board, card, rich text and gestures
     direction: UP
 - tapOn: "Back"
 
+# Board settings is a list of pages: each row a name, a line of what it holds
+# and a chevron, laid out by Yoga. A page replaces the list, and Back returns
+# to the list before it leaves settings. Waited on by the names a row and a
+# page's controls carry: on iOS a row is one element named by its page, and
+# the line under it is its hint, which Maestro does not read.
+- extendedWaitUntil:
+    visible: "Tap a card to open it\\.[\\s\\S]*"
+    timeout: 15000
+- tapOn: "Board settings"
+- extendedWaitUntil:
+    visible: "History"
+    timeout: 15000
+- takeScreenshot: 06-settings
+- tapOn: "Columns"
+- extendedWaitUntil:
+    visible: "Add column"
+    timeout: 15000
+- takeScreenshot: 07-settings-columns
+- tapOn: "Back"
+- extendedWaitUntil:
+    visible: "History"
+    timeout: 15000
+- tapOn: "Back"
+
 # Long-press starts a selection. The board must be back and settled first: a
 # long-press that lands while it is still animating in starts nothing (the
 # iPhone simulator on a busy CI Mac, Kanban #29), so a missed one gets one
@@ -158,7 +182,7 @@ name: Board, card, rich text and gestures
       - extendedWaitUntil:
           visible: "1 selected[\\s\\S]*"
           timeout: 10000
-- takeScreenshot: 06-selection
+- takeScreenshot: 08-selection
 - tapOn: "Back"
 
 # Cloning the board: a long-press on its row in the boards list opens the
@@ -184,7 +208,7 @@ name: Board, card, rich text and gestures
 # neither the keyboard's edge nor a view with no content, and a tap on Cancel
 # landed even with the lift removed. Clone is tapped with the keyboard still
 # up, as a person would.
-- takeScreenshot: 07-clone-board
+- takeScreenshot: 09-clone-board
 # The button, above the sheet's explanation: Maestro also sees the keyboard's
 # suggestion strip, and with "clone" just typed its first suggestion is
 # "clone", which a bare `tapOn: "Clone"` picked instead (Kanban #97).
@@ -207,6 +231,85 @@ name: Board, card, rich text and gestures
       TARGET: "Back"
       EXPECT: "New board"
       SECONDS: 30
+
+# A board with lanes, the seed's Summer Program 2027: each column lists the
+# board's lanes under a heading with one badge, a list of a new shape on a
+# phone (Yoga lays out the heading's name and badge, and a long name must not
+# push the badge off). Add card asks for a lane, through a sheet opened while
+# the keyboard is up.
+- runFlow:
+    file: ci-tools/tap-until.yaml
+    env:
+      TARGET: "Summer Program 2027[\\s\\S]*"
+      EXPECT: "Planning, [\\s\\S]*"
+      SECONDS: 30
+- assertVisible: "No lane"
+- takeScreenshot: 10-lanes-board
+- tapOn: "\\+ Add card"
+- extendedWaitUntil:
+    visible: "Lane: Choose a lane"
+    timeout: 15000
+- takeScreenshot: 11-lanes-add-card
+- tapOn: "Cancel"
+
+# The board's details: a value typed with the phone's own keyboard into an
+# editor that holds its own draft, saved, and read back from the page.
+- tapOn: "Board settings"
+- extendedWaitUntil:
+    visible: "History"
+    timeout: 15000
+- tapOn: "Details"
+- extendedWaitUntil:
+    visible: "Edit Teachers"
+    timeout: 15000
+- tapOn: "Edit Teachers"
+- inputText: " and Ali"
+- tapOn: "Save Teachers"
+# The pencil comes back only once the write lands: the editor holds the same
+# text while it is open, so the text alone would pass before the save. Where
+# the caret lands on focus differs by platform, so the word typed is what is
+# checked, not the whole line.
+- extendedWaitUntil:
+    visible: "Edit Teachers"
+    timeout: 15000
+- assertVisible: "[\\s\\S]*and Ali[\\s\\S]*"
+- takeScreenshot: 12-details
+- tapOn: "Back"
+- runFlow:
+    file: ci-tools/tap-until.yaml
+    env:
+      TARGET: "Back"
+      EXPECT: "New board"
+      SECONDS: 30
+
+# The overview, from its icon in the Boards header: the seed's two programs
+# under one heading of lane names, written on a slant. A rotated Text is a
+# Yoga and text-layout seam no browser shows: the screenshot is the evidence
+# that each name is drawn whole, over its own mark, and clear of the rows.
+- runFlow:
+    file: ci-tools/tap-until.yaml
+    env:
+      TARGET: "Overview"
+      EXPECT: "Reverse the order"
+      SECONDS: 30
+# A row's words, which only the overview says: the board, then each lane and
+# its mark. Both board names are on the Boards list too. Each row reads its
+# own board's cards, and a row this phone has never opened waits for the
+# server: 20 s on a macOS runner at a load of 120 (2026-11-18), past
+# assertVisible's 17, so each waits as long as a slow runner needs.
+- extendedWaitUntil:
+    visible: "Summer Program 2027[\\s\\S]*: Planning, [\\s\\S]*"
+    timeout: 60000
+- extendedWaitUntil:
+    visible: "Autumn Program 2027[\\s\\S]*: Planning, [\\s\\S]*"
+    timeout: 60000
+# Eight lanes: too many for a phone to write their names straight, so they
+# are slanted, a rotated Text on each platform's own layout and font.
+- extendedWaitUntil:
+    visible: "Summer Camp 2027[\\s\\S]*: Planning, [\\s\\S]*"
+    timeout: 60000
+- takeScreenshot: 13-overview
+- tapOn: "Back"
 
 # Every tab answers, each with something only its own screen shows.
 - runFlow:
@@ -233,7 +336,7 @@ name: Board, card, rich text and gestures
       TARGET: "More"
       EXPECT: "Report a problem"
       SECONDS: 30
-- takeScreenshot: 08-more
+- takeScreenshot: 14-more
 
 # Help: a film opens in the platform's own player (expo-video), which is a
 # native module of its own. The player's frame is what is checked, so a
@@ -248,4 +351,4 @@ name: Board, card, rich text and gestures
     visible:
       id: "help-film"
     timeout: 20000
-- takeScreenshot: 09-help-film
+- takeScreenshot: 15-help-film

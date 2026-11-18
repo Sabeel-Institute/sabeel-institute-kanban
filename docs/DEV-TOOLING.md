@@ -609,10 +609,12 @@ node scripts/tutorials/publish.mjs --from $S/films  # every film, or none
    export draws no dev sign-in row), in the browser itself (`channel:
    'chromium'`). Before every film it rebuilds the guide world
    (`world.mjs`): Firestore emptied and written afresh with the Admin SDK —
-   three boards, labels, comments, a year of Stats, and Amina waiting for
-   approval — and the accounts' claims reset, so what one film changes is not
-   in the next. Each world gives its boards and cards fresh ids, and a film
-   opens them through the world (`start: (w) => w.card(...)`): emptying
+   five boards (two of them programs with the same lanes, for the lanes,
+   details and overview films), labels, comments, a year of Stats, and Amina
+   waiting for approval — and the accounts' claims reset, so what one film
+   changes is not in the next. Each world gives its boards and cards fresh
+   ids, and a film opens them through the world (`start: (w) =>
+   w.card(...)`): emptying
    Firestore starts `onCardDeleted` for every old card, and one that ran
    after the new world was written deleted the new card of the same id. The accounts themselves are the ones `scripts/dev.sh web`'s
    seed makes; Auth keeps them across worlds. Each film signs in off camera in

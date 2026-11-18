@@ -38,6 +38,12 @@ whoever made it (`cloneBoard`; `docs/PRODUCT_BRIEF.md` § Cloning a board).
 **Only an admin sees every board.** Everyone else, organizers included, sees the
 boards they are a member of. There is no third case anywhere in the rules.
 
+**The overview is everyone's, and shows nothing new.** It lists the boards
+with lanes that its reader can already see (an admin, every such board), so it
+needs no permission of its own. Its order and the boards hidden from it are
+each person's, on their own user document, and change nothing for anyone else
+(`docs/PRODUCT_BRIEF.md` § Overview).
+
 **Institute labels are admin work** because they are on every board: renaming
 or deleting one changes cards on boards the person doing it may not even be able
 to open. They change in More → Labels and nowhere else; on a board they are
@@ -61,6 +67,11 @@ board — is what lets you:
 - change the board's name — `description` exists on the document and the ClickUp
   importer sets it, but no screen edits one, so nothing here grants that
 - add, rename, reorder and delete columns
+- switch lanes on and off, add, rename, reorder and remove lanes, and choose
+  the finished column (Board settings → Lanes)
+- add, rename, reorder and remove the board's details, and fill them in
+  (Board settings → Details), which everyone on the board reads
+- mark the board as a template, or take the mark off (Board settings → General)
 - add and remove members
 - make another member an owner, or take it away
 - archive the board, and restore it
@@ -69,6 +80,10 @@ board — is what lets you:
 
 It grants nothing anywhere else. Owning three boards and owning none are the same
 thing on the fourth.
+
+**A card's lane is anyone's on the board**, like its column: everyone on the
+board files a new card in a lane, moves cards between lanes, on the card and
+in bulk. Only the lanes themselves are the owners'.
 
 **A board's own labels belong to everyone on it**, owners or not: anyone on the
 board adds, renames, recolours and deletes them, from the card's `+` and the
@@ -79,13 +94,15 @@ Rules cannot look inside a card's `labelIds`, so that containment is the app's,
 not the rules': a build from before board labels ignores it until the version
 floor retires it, and a phone before 0.13.1 never reads the floor.
 
-Everyone else on a board opens the same screen as **Members and labels**: the
-member list, read-only, with owners marked, and the board's own labels to
-change like anyone on the board. The roster answers "who do I ask to add
-someone?" without a trip to an admin — which is what it used to take.
+Everyone else on a board opens Board settings as **About this board**, with
+the pages they can use: **Details**, which everyone on the board reads, when
+the board has any;
+**People**, the member list, read-only, with owners marked; **Labels**, the
+board's own to change like anyone on the board; and **History**. The roster answers "who do I ask to add someone?" without a
+trip to an admin — which is what it used to take.
 
-**The board's history is for everyone on the board**, at the bottom of that
-same screen, and for admins: who renamed or archived it, who added or removed
+**The board's history is for everyone on the board**, on that History page,
+and for admins: who renamed or archived it, who added or removed
 whom, who made someone an owner, what happened to its columns. Nobody writes
 it but the server, so nobody can edit or forge a line of it.
 

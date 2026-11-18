@@ -285,6 +285,144 @@ await db.doc('boards/sw_ownerless').set({
   createdBy: uid,
 });
 
+/**
+ * A board WITH LANES, beside the plain one and never instead of it: the plain
+ * board must keep being swept as it was.
+ *
+ * Chosen to stress a lane heading: a name at LANE_NAME_MAX beside its badge,
+ * which must shrink rather than push the badge off a 320px row (Yoga's
+ * flexShrink is 0), and one lane in each state the badge colours: complete
+ * (green), late (red), and no cards. One card has no lane, so No lane shows.
+ */
+const LANES_BOARD = 'sw_lanes';
+const LONG_LANE = 'Marketing and outreach to local families';
+await db.doc(`boards/${LANES_BOARD}`).set({
+  name: 'Summer Program',
+  description: '',
+  archived: false,
+  columns: [
+    { id: 'l1', name: 'To Do' },
+    { id: 'l2', name: 'In Progress' },
+    { id: 'l3', name: 'Done' },
+  ],
+  columnIds: ['l1', 'l2', 'l3'],
+  lanesOn: true,
+  lanes: [
+    { id: 'ln_plan', name: 'Planning' },
+    { id: 'ln_mkt', name: LONG_LANE },
+    { id: 'ln_sup', name: 'Supplies' },
+  ],
+  doneColumnId: 'l3',
+  // Details at their widest: a long text value and a long link, which must
+  // wrap rather than push the page sideways at 320.
+  fields: [
+    { id: 'fd_s', name: 'Start date', type: 'start' },
+    { id: 'fd_e', name: 'End date', type: 'end' },
+    { id: 'fd_t', name: 'Teachers and volunteers for the mornings', type: 'text' },
+    { id: 'fd_l', name: 'Zoom link', type: 'link' },
+    { id: 'fd_n', name: 'Fee', type: 'number' },
+  ],
+  details: {
+    fd_s: '2027-06-21',
+    fd_t: 'Sara and Omar, with three volunteers from the parents’ committee on Saturdays',
+    fd_l: 'https://meet.example.org/j/84512237771?pwd=QWxhZGRpbjpvcGVuIHNlc2FtZQ',
+  },
+  memberUids: [uid],
+  boardOwnerUids: [uid],
+  memberProfiles: { [uid]: { displayName: 'Faisal', email: 'faisal@oursabeel.com' } },
+  activeCardCount: 0,
+  createdAt: now,
+  createdBy: uid,
+});
+for (const [id, columnId, laneId, title, dueDate] of [
+  ['swl1', 'l3', 'ln_plan', 'Confirm the dates'],
+  ['swl2', 'l3', 'ln_plan', 'Book the hall'],
+  ['swl3', 'l1', 'ln_mkt', 'Design the flyer for the summer program', '2020-01-01'],
+  ['swl4', 'l2', 'ln_mkt', 'Open registration'],
+  ['swl5', 'l1', null, 'Find a photographer'],
+]) {
+  await db.doc(`cards/${id}`).set({
+    boardId: LANES_BOARD, title, columnId, priority: 'none', description: '',
+    ...(laneId ? { laneId } : {}),
+    ...(dueDate ? { dueDate } : {}),
+    rank: `V${id.slice(-1)}`, assigneeUids: [], subscriberUids: [], labelIds: [],
+    archived: false, commentCount: 0,
+    createdAt: now, createdBy: uid, updatedAt: now, updatedBy: uid,
+  });
+}
+
+// Two more boards with lanes, for the overview: six lanes, and the most a
+// board may have, twelve, among them the longest name. On a 320px phone the
+// twelve must fit with every name in full on a slant, the marks shrunk rather
+// than touching or scrolling (docs/PRODUCT_BRIEF.md § Overview). The longest
+// name is last, where a slant reaches furthest right. One card in
+// each state a mark draws: complete, late, soon, under way, no due dates.
+const SOON = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
+const OVERVIEW_BOARDS = [
+  // Capitals, which an estimate from letter counts once drew too narrow.
+  ['sw_six', 'Tajweed Course', ['Planning', 'Curriculum', 'MARKETING & PR', 'Staffing', 'Supplies', 'Wrap-up']],
+  ['sw_twelve', 'Summer Camp 2027', [
+    'Planning', 'Curriculum', 'Staffing', 'Supplies', 'Venue', 'Registration',
+    'Volunteers', 'Food', 'Transport', 'Photography', 'Wrap-up', LONG_LANE,
+  ]],
+];
+for (const [id, name, laneNames] of OVERVIEW_BOARDS) {
+  await db.doc(`boards/${id}`).set({
+    name,
+    description: '',
+    archived: false,
+    columns: [
+      { id: 'o1', name: 'To Do' },
+      { id: 'o2', name: 'Done' },
+    ],
+    columnIds: ['o1', 'o2'],
+    lanesOn: true,
+    lanes: laneNames.map((n, i) => ({ id: `${id}_l${i}`, name: n })),
+    doneColumnId: 'o2',
+    fields: [{ id: 'of_s', name: 'Start date', type: 'start' }],
+    details: { of_s: '2027-07-05' },
+    memberUids: [uid],
+    boardOwnerUids: [uid],
+    memberProfiles: { [uid]: { displayName: 'Faisal', email: 'faisal@oursabeel.com' } },
+    activeCardCount: 0,
+    createdAt: now,
+    createdBy: uid,
+  });
+  for (const [n, lane, columnId, dueDate] of [
+    [0, 0, 'o2', null],
+    [1, 1, 'o1', '2020-01-01'],
+    [2, 2, 'o1', SOON],
+    [3, 3, 'o1', '2099-01-01'],
+    [4, 4, 'o1', null],
+  ]) {
+    await db.doc(`cards/${id}_c${n}`).set({
+      boardId: id, title: `Card ${n}`, columnId, laneId: `${id}_l${lane}`, priority: 'none',
+      description: '', ...(dueDate ? { dueDate } : {}),
+      rank: `V${n}`, assigneeUids: [], subscriberUids: [], labelIds: [],
+      archived: false, commentCount: 0,
+      createdAt: now, createdBy: uid, updatedAt: now, updatedBy: uid,
+    });
+  }
+}
+
+// A board MARKED AS A TEMPLATE, so the Boards list draws its Templates heading
+// and a badge on a row, at every width. A long name, beside which the badge
+// must wrap rather than push the star off the row.
+await db.doc('boards/sw_template').set({
+  name: 'Weekend program template for the summer term',
+  description: '',
+  archived: false,
+  columns: [{ id: 't1', name: 'To Do' }],
+  columnIds: ['t1'],
+  template: true,
+  memberUids: [uid],
+  boardOwnerUids: [uid],
+  memberProfiles: { [uid]: { displayName: 'Faisal', email: 'faisal@oursabeel.com' } },
+  activeCardCount: 0,
+  createdAt: now,
+  createdBy: uid,
+});
+
 // Content chosen to STRESS layout: a long title, every priority, labels and an
 // assignee on each, so card faces are at their widest.
 const CARDS = [
@@ -528,7 +666,97 @@ async function rulesScreen(page, tag, width) {
 }
 
 // ---- The tour --------------------------------------------------------------
-const SCREENS = 24;
+const SCREENS = 38;
+
+/**
+ * Text that does not reach the brand's contrast against what it is drawn on:
+ * 4.5:1, or 3:1 for large text (24px, or 18.66px bold). Read from the page, so
+ * a token that passes on one background and fails on another is caught where
+ * it is drawn: the lane badge's green read on ivory and failed on a column.
+ *
+ * Exempt, as BRAND.md has it: `text.muted` (Caption, metadata you could delete
+ * without losing information), anything dimmed as disabled, and text on an
+ * image. The background is the nearest ancestor that paints one.
+ */
+const MUTED = 'rgb(165, 141, 122)';
+const contrastFaults = (page) =>
+  page.evaluate((muted) => {
+    const rgb = (s) => (s.match(/[\d.]+/g) || []).map(Number);
+    const lum = ([r, g, b]) => {
+      const f = (c) => ((c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+      return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+    };
+    const ratio = (a, b) => {
+      const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+      return (x + 0.05) / (y + 0.05);
+    };
+    const faults = new Set();
+    for (const el of document.querySelectorAll('body *')) {
+      const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+      if (!own) continue;
+      const style = getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0 || style.visibility === 'hidden' || style.color === muted) continue;
+      let bg = null;
+      let dimmed = false;
+      for (let n = el; n && n !== document.documentElement; n = n.parentElement) {
+        const s = getComputedStyle(n);
+        if (Number(s.opacity) < 1) dimmed = true;
+        if (s.backgroundImage !== 'none') { bg = 'image'; break; }
+        const c = rgb(s.backgroundColor);
+        if (c.length >= 3 && (c.length < 4 || c[3] > 0.5)) { bg = c; break; }
+      }
+      if (dimmed || bg === 'image' || !bg) continue;
+      const size = parseFloat(style.fontSize);
+      const large = size >= 24 || (size >= 18.66 && Number(style.fontWeight) >= 700);
+      const got = ratio(rgb(style.color), bg);
+      if (got < (large ? 3 : 4.5)) {
+        faults.add(`"${el.textContent.trim().slice(0, 24)}" ${got.toFixed(2)}:1 (${style.color} on rgb(${bg.slice(0, 3).join(', ')}))`);
+      }
+    }
+    return [...faults];
+  }, MUTED);
+
+/**
+ * What the overview must hold at every width, read from the page: within a
+ * row no two marks touch and each is on screen; every lane name is on screen,
+ * drawn in full (no ellipsis across, no clamp downwards), and ends above its
+ * group's first row.
+ */
+const overviewFaults = (page) =>
+  page.evaluate(() => {
+    const faults = [];
+    const w = window.innerWidth;
+    for (const group of document.querySelectorAll('[data-testid="overview-group"]')) {
+      const firstRow = group.querySelector('[data-testid^="overview-row:"]');
+      const rowTop = firstRow ? firstRow.getBoundingClientRect().top : Infinity;
+      for (const name of group.querySelectorAll('[data-testid="overview-names"] > div > div')) {
+        const r = name.getBoundingClientRect();
+        const text = name.textContent;
+        if (r.left < -0.5 || r.right > w + 0.5) faults.push(`"${text}" off screen (${Math.round(r.left)}–${Math.round(r.right)})`);
+        // Cut either way: an ellipsis across, or a clamp downwards.
+        if (name.scrollWidth > name.clientWidth + 1 || name.scrollHeight > name.clientHeight + 1) {
+          faults.push(`"${text}" cut short`);
+        }
+        if (r.bottom > rowTop + 0.5) faults.push(`"${text}" runs into the row below`);
+      }
+      for (const row of group.querySelectorAll('[data-testid^="overview-row:"]')) {
+        const marks = [...row.querySelectorAll('[data-testid="overview-mark"]')].map((c) => c.firstElementChild);
+        let lastRight = -Infinity;
+        for (const m of marks) {
+          if (!m) {
+            faults.push(`${row.dataset.testid}: a lane has no mark`);
+            continue;
+          }
+          const r = m.getBoundingClientRect();
+          if (r.left < -0.5 || r.right > w + 0.5) faults.push(`${row.dataset.testid}: a mark off screen`);
+          if (r.left < lastRight + 1) faults.push(`${row.dataset.testid}: two marks touch`);
+          lastRight = r.right;
+        }
+      }
+    }
+    return faults;
+  });
 
 async function tour(page, tag, width) {
   /**
@@ -567,6 +795,8 @@ async function tour(page, tag, width) {
     await page.waitForTimeout(500);
     const faults = await layoutFaults(page, width);
     check(`${tag} / ${name}`, faults.length === 0, faults.join('; ').slice(0, 160));
+    const dim = await contrastFaults(page);
+    check(`${tag} / ${name} text has its contrast`, dim.length === 0, dim.join('; ').slice(0, 300));
     const out = await escapes(page);
     check(`${tag} / ${name} has a way out`, out.back || out.tabs, 'no Back and no tab bar');
     const small = await smallTargets(page);
@@ -576,6 +806,11 @@ async function tour(page, tag, width) {
   };
 
   await visit('boards', () => nav('Boards'));
+  check(
+    `${tag} / boards lists a template under Templates, with its badge`,
+    (await page.getByText('Templates', { exact: true }).isVisible().catch(() => false)) &&
+      (await page.getByText('Template', { exact: true }).first().isVisible().catch(() => false)),
+  );
 
   /*
    * The push nudge is ON this screenshot, and that has to be asserted or the
@@ -609,6 +844,29 @@ async function tour(page, tag, width) {
     await page.getByLabel('Name of the clone').waitFor({ timeout: 15000 });
   });
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+
+  // The overview, from its icon in the Boards header: three boards with lanes,
+  // the twelve-lane one being the case the layout is for.
+  await visit('overview', async () => {
+    await nav('Boards');
+    await page.getByRole('button', { name: 'Overview', exact: true }).click();
+    await page.getByTestId('overview-row:Summer Camp 2027').waitFor({ timeout: 20000 });
+    await page.waitForFunction(
+      () =>
+        document.querySelectorAll('[data-testid="overview-mark"] > *').length >= 21 &&
+        ![...document.querySelectorAll('[data-testid^="overview-row:"]')].some((r) =>
+          /: loading$/.test(r.getAttribute('aria-label') || ''),
+        ),
+      null,
+      { timeout: 20000 },
+    );
+  });
+  const ovFaults = await overviewFaults(page);
+  check(
+    `${tag} / overview: every mark apart and on screen, every lane name in full`,
+    ovFaults.length === 0,
+    ovFaults.join('; ').slice(0, 200),
+  );
   await page.getByLabel('Name of the clone').waitFor({ state: 'detached', timeout: 15000 });
 
   await visit('mywork', () => nav('My Work'));
@@ -947,6 +1205,17 @@ async function tour(page, tag, width) {
     await page.waitForTimeout(400);
   });
 
+  /**
+   * BOARD SETTINGS IS A LIST OF PAGES, and every page is its own layout.
+   *
+   * A phone opens on the list alone and a page replaces it; a wide screen
+   * opens on General with the list down the side. So the first visit is a
+   * different screen on each side of the breakpoint, and that is asserted, as
+   * is the way back: a page returns to the list on a phone.
+   */
+  const wide = width >= WIDE_BREAKPOINT;
+  const SETTINGS_PAGES = ['General', 'Columns', 'Lanes', 'Details', 'People', 'Labels', 'History'];
+  const pageRow = (name) => page.getByRole('button', { name, exact: true }).first();
   await visit('settings', async () => {
     // Close the sheet left open by `card-sheet` first — a modal swallows the
     // taps this navigation needs. Same shape as `card-comment` closing the
@@ -956,12 +1225,129 @@ async function tour(page, tag, width) {
     await page.getByRole('button', { name: 'Back' }).first().click();
     await page.waitForTimeout(800);
     await page.getByRole('button', { name: 'Board settings' }).click();
+    await pageRow('History').waitFor({ timeout: 15000 });
   });
+  {
+    const opened = await page.evaluate(() => {
+      const shown = (sel) =>
+        [...document.querySelectorAll(sel)].filter((e) => e.getBoundingClientRect().width > 2);
+      return {
+        rows: shown('[role="button"]').map((e) => e.getAttribute('aria-label') || ''),
+        // General's own control: there on a wide screen, not on a phone's list.
+        general: shown('[aria-label="Save name"]').length > 0,
+      };
+    });
+    const listed = SETTINGS_PAGES.every((n) => opened.rows.includes(n));
+    check(
+      `${tag} / settings opens on ${wide ? 'General, with the pages beside it' : 'the list of pages'}`,
+      listed && opened.general === wide,
+      JSON.stringify(opened).slice(0, 160),
+    );
+  }
+  for (const name of SETTINGS_PAGES) {
+    await visit(`settings-${name.toLowerCase()}`, async () => {
+      await pageRow(name).click();
+      // Proof the page opened, or the checks would run on the page before
+      // it: on a wide screen its row is marked current, on a phone the list
+      // gives way to the page.
+      if (wide) {
+        await page.waitForFunction(
+          (n) =>
+            [...document.querySelectorAll('[aria-current="page"]')].some(
+              (el) => el.getAttribute('aria-label') === n,
+            ),
+          name,
+          { timeout: 15000 },
+        );
+      } else {
+        await pageRow(SETTINGS_PAGES[0]).waitFor({ state: 'hidden', timeout: 15000 });
+      }
+      await page.waitForTimeout(300);
+    });
+    if (!wide) {
+      await page.getByRole('button', { name: 'Back' }).first().click();
+      await page.waitForTimeout(500);
+      check(
+        `${tag} / Back from ${name} returns to the list`,
+        await pageRow(SETTINGS_PAGES[0]).isVisible().catch(() => false),
+      );
+    }
+  }
   await visit('archive', async () => {
     await page.getByRole('button', { name: 'Back' }).first().click();
     await page.waitForTimeout(800);
     await page.getByRole('button', { name: 'Archived cards' }).click();
   });
+
+  /**
+   * THE BOARD WITH LANES: each column lists the board's lanes under a heading
+   * with one badge. Checked by what a screen reader hears of the headings in
+   * view, which carries both the name and what the badge's colour says.
+   */
+  await visit('lanes-board', async () => {
+    await nav('Boards');
+    await page.getByText('Summer Program', { exact: true }).first().click();
+    await page.locator('[role="heading"][aria-label^="Planning,"]').first().waitFor({ timeout: 20000 });
+  });
+  {
+    const headings = await page.evaluate(() =>
+      [...document.querySelectorAll('[role="heading"][aria-label]')]
+        .filter((h) => {
+          const r = h.getBoundingClientRect();
+          return r.width > 0 && r.left >= 0 && r.right <= window.innerWidth + 1;
+        })
+        .map((h) => h.getAttribute('aria-label')),
+    );
+    const want = [
+      'Planning, all 2 finished',
+      `${LONG_LANE}, 0 of 2 finished, a card is late`,
+      'Supplies, no cards',
+      'No lane',
+    ];
+    check(
+      `${tag} / lanes-board heads each lane with its state`,
+      want.every((w, i) => headings[i] === w),
+      headings.slice(0, 4).join(' | '),
+    );
+  }
+  await visit('lanes-add-card', async () => {
+    await page.getByRole('button', { name: '+ Add card' }).first().click();
+    await page.getByLabel('Lane', { exact: true }).first().waitFor({ timeout: 15000 });
+  });
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Cancel', exact: true }).first().click({ timeout: 3000 }).catch(() => {});
+  await page.waitForTimeout(500);
+  await visit('lanes-move', async () => {
+    if (wide) {
+      await page.getByRole('checkbox', { name: 'Select Find a photographer' }).click();
+    } else {
+      await page.locator('[data-testid="card-Find a photographer"]').first().click({ delay: 900 });
+    }
+    await page.getByRole('button', { name: 'Move selected cards' }).click();
+    await page.getByLabel('Lane', { exact: true }).first().waitFor({ timeout: 15000 });
+  });
+  await page.getByRole('button', { name: 'Cancel', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Clear selection' }).click();
+  await page.waitForTimeout(400);
+  await visit('lanes-settings', async () => {
+    await page.getByRole('button', { name: 'Board settings' }).click();
+    await pageRow('Lanes').click();
+    await page.getByRole('button', { name: `Rename lane ${LONG_LANE}` }).waitFor({ timeout: 15000 });
+  });
+  // Details filled in, then its field editor, on the same board.
+  await visit('details-filled', async () => {
+    if (!wide) {
+      await page.getByRole('button', { name: 'Back' }).first().click();
+      await page.waitForTimeout(400);
+    }
+    await pageRow('Details').click();
+    await page.getByRole('button', { name: 'Edit fields' }).waitFor({ timeout: 15000 });
+  });
+  await visit('details-fields', async () => {
+    await page.getByRole('button', { name: 'Edit fields' }).click();
+    await page.getByRole('button', { name: 'Add field' }).waitFor({ timeout: 15000 });
+  });
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
 
 
   /**
@@ -988,7 +1374,7 @@ async function tour(page, tag, width) {
       );
       return {
         settings: shown.some((e) => name(e) === 'Board settings'),
-        members: shown.some((e) => name(e) === 'Members and labels'),
+        members: shown.some((e) => name(e) === 'About this board'),
       };
     });
     check(
@@ -998,6 +1384,7 @@ async function tour(page, tag, width) {
     );
     // …and the roster offers the switch that repairs it.
     await page.getByRole('button', { name: 'Board settings' }).click();
+    await page.getByRole('button', { name: 'People', exact: true }).click();
     const repairable = await page
       .getByRole('switch', { name: /^Owner of this board: Omar/ })
       .first()
@@ -1113,7 +1500,7 @@ async function tour(page, tag, width) {
           deleteColumn: vis.some((e) => nm(e).startsWith('Delete column')),
           archived: vis.some((e) => nm(e) === 'Archived cards'),
           settings: vis.some((e) => nm(e) === 'Board settings'),
-          members: vis.some((e) => nm(e) === 'Members and labels'),
+          members: vis.some((e) => nm(e) === 'About this board'),
           bleed: document.documentElement.scrollWidth - window.innerWidth,
         };
       });
@@ -1131,7 +1518,39 @@ async function tour(page, tag, width) {
       // The roster ITSELF, at phone width, on both sides. It is a screen the
       // admin tour can never reach: an admin always owns every board, so the
       // read-only version renders for nobody who is looking.
-      await rp.getByRole('button', { name: wants.settings ? 'Board settings' : 'Members and labels' }).click();
+      //
+      // Settings opens on its list of pages, which is the first thing that
+      // differs: its title, and which pages it offers. An owner gets every
+      // page; anyone else gets People, Labels and History and nothing drawn
+      // disabled.
+      await rp.getByRole('button', { name: wants.settings ? 'Board settings' : 'About this board' }).click();
+      await rp.getByRole('button', { name: 'History', exact: true }).waitFor({ timeout: 20000 });
+      const list = await rp.evaluate(() => {
+        const nm = (e) => (e.getAttribute('aria-label') || '').trim();
+        const rows = [...document.querySelectorAll('[role="button"]')]
+          .filter((e) => e.getBoundingClientRect().width > 2)
+          .map(nm)
+          .filter((n) =>
+            ['General', 'Columns', 'Lanes', 'Details', 'People', 'Labels', 'History'].includes(n),
+          );
+        return {
+          title: (document.body.textContent || '').includes('Board settings') ? 'settings' : 'members',
+          rows,
+        };
+      });
+      // Fundraising 2026 has no details, so a member is not shown the page:
+      // they could add none, and it would be the first they land on.
+      const wantRows = wants.settings
+        ? ['General', 'Columns', 'Lanes', 'Details', 'People', 'Labels', 'History']
+        : ['People', 'Labels', 'History'];
+      check(
+        `${tag} / settings as ${role === 'owner' ? 'an owner' : 'a member'} lists its pages`,
+        list.title === (wants.settings ? 'settings' : 'members') &&
+          JSON.stringify(list.rows) === JSON.stringify(wantRows),
+        JSON.stringify(list),
+      );
+
+      await rp.getByRole('button', { name: 'People', exact: true }).click();
       await rp.getByText('Members (3)').first().waitFor({ timeout: 20000 });
       const roster = await rp.evaluate(() => {
         const nm = (e) => (e.getAttribute('aria-label') || '').trim();
@@ -1139,15 +1558,34 @@ async function tour(page, tag, width) {
           [...document.querySelectorAll(sel)].filter((e) => e.getBoundingClientRect().width > 2);
         const creator = vis('[role="switch"]').find((e) => /: Faisal$/.test(nm(e)));
         return {
-          title: (document.body.textContent || '').includes('Board settings')
-            ? 'settings'
-            : 'members',
           toggles: vis('[role="switch"]').filter((e) => nm(e).startsWith('Owner of this board')).length,
           creatorLocked: creator ? creator.getAttribute('aria-disabled') === 'true' : null,
           ownerHints: (document.body.textContent || '').split('Owner').length - 1,
-          // The board's own label carries its three controls for anyone on the
-          // board. An institute label carries NONE on a board, for anyone: it is
-          // a locked row, and its controls live in More → Labels alone.
+          bleed: document.documentElement.scrollWidth - window.innerWidth,
+        };
+      });
+      // An owner gets a toggle per member and cannot demote the creator; a
+      // member gets no toggle at all and reads who to ask instead.
+      const rosterOk = wants.settings
+        ? roster.toggles === 3 && roster.creatorLocked === true
+        : roster.toggles === 0 && roster.ownerHints >= 2;
+      check(
+        `${tag} / the roster as ${role === 'owner' ? 'an owner' : 'a member'}`,
+        rosterOk && roster.bleed <= 1,
+        JSON.stringify(roster),
+      );
+      await rp.screenshot({ path: join(SHOTS, `${tag}-roster-${role}.png`), fullPage: true });
+
+      // BOTH may change and add the board's own labels, and NEITHER sees a
+      // control on an institute label, which is locked here.
+      await rp.getByRole('button', { name: 'Back' }).first().click();
+      await rp.getByRole('button', { name: 'Labels', exact: true }).click();
+      await rp.getByRole('button', { name: 'Add label' }).waitFor({ timeout: 20000 });
+      const boardLabels = await rp.evaluate(() => {
+        const nm = (e) => (e.getAttribute('aria-label') || '').trim();
+        const vis = (sel) =>
+          [...document.querySelectorAll(sel)].filter((e) => e.getBoundingClientRect().width > 2);
+        return {
           boardLabelEdits: vis('[role="button"]').filter((e) =>
             /^(Rename label|Delete label|Change colour of) .*much longer answer$/.test(nm(e)),
           ).length,
@@ -1159,30 +1597,15 @@ async function tour(page, tag, width) {
           bleed: document.documentElement.scrollWidth - window.innerWidth,
         };
       });
-      // An owner gets a toggle per member and cannot demote the creator; a
-      // member gets no toggle at all and reads who to ask instead. BOTH may
-      // change and add the board's own labels, and NEITHER sees a control on an
-      // institute label, which is locked here.
-      const labelsOk =
-        roster.boardLabelEdits === 3 &&
-        roster.instituteLabelEdits === 0 &&
-        roster.locked === 3 &&
-        roster.canAddLabel;
-      const rosterOk = wants.settings
-        ? roster.title === 'settings' &&
-          roster.toggles === 3 &&
-          roster.creatorLocked === true &&
-          labelsOk
-        : roster.title === 'members' &&
-          roster.toggles === 0 &&
-          roster.ownerHints >= 2 &&
-          labelsOk;
       check(
-        `${tag} / the roster as ${role === 'owner' ? 'an owner' : 'a member'}`,
-        rosterOk && roster.bleed <= 1,
-        JSON.stringify(roster),
+        `${tag} / the board's labels as ${role === 'owner' ? 'an owner' : 'a member'}`,
+        boardLabels.boardLabelEdits === 3 &&
+          boardLabels.instituteLabelEdits === 0 &&
+          boardLabels.locked === 3 &&
+          boardLabels.canAddLabel &&
+          boardLabels.bleed <= 1,
+        JSON.stringify(boardLabels),
       );
-      await rp.screenshot({ path: join(SHOTS, `${tag}-roster-${role}.png`), fullPage: true });
 
       /**
        * THE ARCHIVE, where permanent deletion lives for anyone who never opens a
@@ -1193,6 +1616,8 @@ async function tour(page, tag, width) {
        * `sw_archived` is seeded on this board, so the row exists for both actors
        * and the difference is the bin, not the emptiness.
        */
+      // Back to the list, then to the board.
+      await rp.getByRole('button', { name: 'Back' }).first().click();
       await rp.getByRole('button', { name: 'Back' }).first().click();
       await rp.getByRole('button', { name: 'Archived cards' }).click();
       await rp.getByText('An archived card').first().waitFor({ timeout: 25000 });

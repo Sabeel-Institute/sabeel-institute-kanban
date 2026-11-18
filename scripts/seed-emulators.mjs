@@ -225,6 +225,13 @@ await admin.getByText('To Do').first().waitFor({ timeout: 30000 });
 
 await admin.getByRole('button', { name: 'Board settings' }).click();
 await admin.getByText('Board settings').waitFor({ timeout: 25000 });
+// Board settings is a list of pages; at this width the list runs down the side
+// and a row opens its page beside it.
+const settingsPage = async (name) => {
+  await admin.getByRole('button', { name, exact: true }).click();
+};
+await settingsPage('Columns');
+await admin.getByPlaceholder('New column name').waitFor({ timeout: 25000 });
 for (const name of COLUMNS) {
   if (await admin.getByText(name).first().isVisible().catch(() => false)) continue;
   await fillThen(admin, 'New column name', name, (o) =>
@@ -239,7 +246,8 @@ await admin.waitForTimeout(2000);
 // board's own in its settings.
 try {
   await admin.getByRole('button', { name: 'More' }).first().click();
-  await admin.getByRole('button', { name: /^Labels/ }).click();
+  // In the sheet: Board settings, behind it, has a Labels page of its own.
+  await admin.getByRole('dialog').getByRole('button', { name: /^Labels/ }).click();
   await admin.getByPlaceholder('New label name').waitFor({ timeout: 25000 });
   if (!(await admin.getByText('urgent', { exact: true }).first().isVisible().catch(() => false))) {
     await fillThen(admin, 'New label name', 'urgent', (o) =>
@@ -253,6 +261,8 @@ try {
 } catch (e) {
   console.warn('could not seed an institute label — continuing:', String(e).slice(0, 120));
 }
+await settingsPage('Labels');
+await admin.getByPlaceholder('New label name').waitFor({ timeout: 25000 });
 for (const label of ['donor-facing']) {
   if (await admin.getByText(label).first().isVisible().catch(() => false)) continue;
   try {
@@ -281,6 +291,8 @@ for (const label of ['donor-facing']) {
 // bare "Add" button, which is what this looked for until 2026-07-27. Since the
 // member picker became an icon + rows, the loop found nothing, broke on its
 // first pass and silently seeded a board with no members.
+await settingsPage('People');
+await admin.getByText(/^Members \(/).first().waitFor({ timeout: 25000 });
 await admin
   .getByRole('button', { name: /^Add someone/ })
   .click()
@@ -356,6 +368,192 @@ try {
   console.warn('could not seed a comment — continuing:', String(e).slice(0, 120));
 }
 
+// A board with lanes, beside the plain one and never instead of it: a program
+// divided into Planning, Marketing and Supplies. One card is added before lanes
+// go on, so it sits under No lane; two are moved to the finished column and
+// one is given a past due date, so the lanes' badges, and the overview's
+// marks, show three different states.
+const LANES_BOARD = 'Summer Program 2027';
+const LANES = ['Planning', 'Marketing', 'Supplies'];
+const LANE_CARDS = [
+  ['Confirm the dates', 'Planning'],
+  ['Book the hall', 'Planning'],
+  ['Design the flyer', 'Marketing'],
+  ['Open registration', 'Marketing'],
+  ['Order the books', 'Supplies'],
+];
+try {
+  await admin.getByRole('button', { name: 'Boards' }).first().click();
+  await admin.getByRole('button', { name: 'New board' }).waitFor({ timeout: 25000 });
+  if (!(await admin.getByText(LANES_BOARD).first().isVisible().catch(() => false))) {
+    await admin.getByRole('button', { name: 'New board' }).click();
+    await fillThen(admin, 'Board name', LANES_BOARD, (o) =>
+      admin.getByRole('button', { name: 'Create', exact: true }).click(o),
+    );
+    await admin.getByText('To Do').first().waitFor({ timeout: 30000 });
+    const addTo = async (title, lane) => {
+      await admin.getByRole('button', { name: '+ Add card' }).first().click();
+      await admin.getByPlaceholder('Card title').fill(title);
+      if (lane) await admin.getByLabel('Lane', { exact: true }).selectOption({ label: lane });
+      await admin.getByRole('button', { name: 'Add card', exact: true }).click();
+      await admin.getByText(title).first().waitFor({ timeout: 25000 });
+    };
+    await addTo('Find a photographer');
+
+    await admin.getByRole('button', { name: 'Board settings' }).click();
+    await settingsPage('Lanes');
+    await admin.getByRole('switch', { name: 'Lanes on this board' }).click();
+    await admin.getByPlaceholder('New lane name').waitFor({ timeout: 25000 });
+    for (const lane of LANES) {
+      await fillThen(admin, 'New lane name', lane, (o) =>
+        admin.getByRole('button', { name: 'Add lane' }).click(o),
+      );
+      await admin.getByRole('button', { name: `Rename lane ${lane}` }).waitFor({ timeout: 25000 });
+    }
+    // Its details: the two dates other screens read, and two of its own.
+    await settingsPage('Details');
+    await admin.getByRole('button', { name: 'Add details' }).click();
+    const addField = async (typeLabel, name) => {
+      await admin.getByLabel('Type', { exact: true }).selectOption({ label: typeLabel });
+      if (name) {
+        await fillThen(admin, 'Field name, such as Teachers', name, (o) =>
+          admin.getByRole('button', { name: 'Add field' }).click(o),
+        );
+      } else {
+        await admin.getByRole('button', { name: 'Add field' }).click();
+      }
+      await admin.getByRole('button', { name: `Remove field ${name || typeLabel.split(' (')[0]}` }).waitFor({ timeout: 25000 });
+    };
+    await addField('Start date (read by other screens)');
+    await addField('End date (read by other screens)');
+    await addField('Text', 'Teachers');
+    await addField('Link', 'Zoom link');
+    await admin.getByRole('button', { name: 'Done', exact: true }).click();
+    await admin.getByLabel('Start date', { exact: true }).fill('2027-06-21');
+    await admin.getByText('21 Jun 2027').waitFor({ timeout: 25000 }).catch(() => undefined);
+    for (const [field, value] of [
+      ['Teachers', 'Sara and Omar'],
+      ['Zoom link', 'https://meet.example.org/summer'],
+    ]) {
+      await admin.getByRole('button', { name: `Edit ${field}` }).click();
+      await admin.getByLabel(field, { exact: true }).fill(value);
+      await admin.getByRole('button', { name: `Save ${field}` }).click();
+      await admin.getByText(value).waitFor({ timeout: 25000 });
+    }
+
+    await settingsPage('People');
+    await admin.getByRole('button', { name: /^Add someone/ }).click().catch(() => undefined);
+    await pressEachUntilNone(
+      admin,
+      admin.getByRole('button', { name: /^Add .* to this board$/ }),
+      'adding a member to the lanes board',
+    );
+    await admin.getByRole('button', { name: 'Back' }).first().click();
+    await admin.getByText('To Do').first().waitFor({ timeout: 25000 });
+
+    for (const [title, lane] of LANE_CARDS) await addTo(title, lane);
+
+    // Three lanes in three states, for the board's headings and the overview:
+    // Planning part finished, Marketing late, Supplies all finished.
+    const openCard = async (title, edit) => {
+      await admin.getByText(title).first().click();
+      await edit();
+      await admin.waitForTimeout(1500);
+      await admin.getByRole('button', { name: 'Back' }).first().click();
+      await admin.getByText('To Do').first().waitFor({ timeout: 25000 });
+    };
+    const toDone = () => admin.getByLabel('Column', { exact: true }).selectOption({ label: 'Done' });
+    await openCard('Confirm the dates', toDone);
+    await openCard('Order the books', toDone);
+    await openCard('Design the flyer', () => admin.getByLabel('Due date', { exact: true }).fill('2026-01-15'));
+  }
+} catch (e) {
+  console.warn('could not seed the lanes board — continuing:', String(e).slice(0, 160));
+}
+
+// A second program, cloned from the first as staff would make one, so the
+// overview has two boards under one heading of lane names. The clone has no
+// details, so it is given its own start date.
+const SECOND_PROGRAM = 'Autumn Program 2027';
+try {
+  await admin.getByRole('button', { name: 'Boards' }).first().click();
+  await admin.getByRole('button', { name: 'New board' }).waitFor({ timeout: 25000 });
+  await admin.waitForTimeout(1500);
+  if (!(await admin.getByText(SECOND_PROGRAM, { exact: true }).first().isVisible().catch(() => false))) {
+    await admin.getByText(LANES_BOARD, { exact: true }).first().click({ button: 'right' });
+    await admin.getByLabel('Name of the clone').fill(SECOND_PROGRAM);
+    await admin.getByRole('button', { name: 'Clone', exact: true }).click();
+    await admin.getByText('To Do').first().waitFor({ timeout: 30000 });
+    await admin.getByRole('button', { name: 'Board settings' }).click();
+    await settingsPage('Details');
+    await admin.getByLabel('Start date', { exact: true }).fill('2027-09-13');
+    await admin.getByText('13 Sept 2027').or(admin.getByText('13 Sep 2027')).first().waitFor({ timeout: 25000 }).catch(() => undefined);
+  }
+} catch (e) {
+  console.warn('could not seed the second program — continuing:', String(e).slice(0, 160));
+}
+
+// A third program with eight lanes, too many for a phone to write their names
+// straight: the overview slants them, the layout the phones must be seen to
+// draw (Maestro's overview screenshot), beside the two straight-named ones.
+const CAMP = 'Summer Camp 2027';
+const CAMP_LANES = ['Planning', 'Curriculum', 'Staffing', 'Supplies', 'Venue', 'Registration', 'Volunteers', 'Food'];
+try {
+  await admin.getByRole('button', { name: 'Boards' }).first().click();
+  await admin.getByRole('button', { name: 'New board' }).waitFor({ timeout: 25000 });
+  await admin.waitForTimeout(1500);
+  if (!(await admin.getByText(CAMP, { exact: true }).first().isVisible().catch(() => false))) {
+    await admin.getByRole('button', { name: 'New board' }).click();
+    await fillThen(admin, 'Board name', CAMP, (o) =>
+      admin.getByRole('button', { name: 'Create', exact: true }).click(o),
+    );
+    await admin.getByText('To Do').first().waitFor({ timeout: 30000 });
+    await admin.getByRole('button', { name: 'Board settings' }).click();
+    await settingsPage('Lanes');
+    await admin.getByRole('switch', { name: 'Lanes on this board' }).click();
+    await admin.getByPlaceholder('New lane name').waitFor({ timeout: 25000 });
+    for (const lane of CAMP_LANES) {
+      await fillThen(admin, 'New lane name', lane, (o) =>
+        admin.getByRole('button', { name: 'Add lane' }).click(o),
+      );
+      await admin.getByRole('button', { name: `Rename lane ${lane}` }).waitFor({ timeout: 25000 });
+    }
+    await admin.getByRole('button', { name: 'Back' }).first().click();
+    await admin.getByText('To Do').first().waitFor({ timeout: 25000 });
+    await admin.getByRole('button', { name: '+ Add card' }).first().click();
+    await admin.getByPlaceholder('Card title').fill('Book the campsite');
+    await admin.getByLabel('Lane', { exact: true }).selectOption({ label: 'Venue' });
+    await admin.getByRole('button', { name: 'Add card', exact: true }).click();
+    await admin.getByText('Book the campsite').first().waitFor({ timeout: 25000 });
+  }
+} catch (e) {
+  console.warn('could not seed the camp board — continuing:', String(e).slice(0, 160));
+}
+
+// A board marked as a template, so the Boards list has its Templates heading.
+const TEMPLATE_BOARD = 'Program template';
+try {
+  await admin.getByRole('button', { name: 'Boards' }).first().click();
+  await admin.getByRole('button', { name: 'New board' }).waitFor({ timeout: 25000 });
+  await admin.waitForTimeout(1500);
+  if (!(await admin.getByText(TEMPLATE_BOARD, { exact: true }).first().isVisible().catch(() => false))) {
+    await admin.getByRole('button', { name: 'New board' }).click();
+    await fillThen(admin, 'Board name', TEMPLATE_BOARD, (o) =>
+      admin.getByRole('button', { name: 'Create', exact: true }).click(o),
+    );
+    await admin.getByText('To Do').first().waitFor({ timeout: 30000 });
+    await admin.getByRole('button', { name: 'Board settings' }).click();
+    await admin.getByRole('switch', { name: 'This board is a template' }).click();
+    await admin.getByText(/^Listed under Templates/).waitFor({ timeout: 25000 });
+  }
+} catch (e) {
+  console.warn('could not seed the template board — continuing:', String(e).slice(0, 160));
+}
+
 await browser.close();
-console.log(`Seeded: 3 people, 1 board, ${COLUMNS.length + 3} columns, ${CARDS.length} cards.`);
+console.log(
+  `Seeded: 3 people, 5 boards (two with ${LANES.length} lanes, one with ${CAMP_LANES.length}, one a template), ${COLUMNS.length + 3} columns, ${
+    CARDS.length
+  } cards.`,
+);
 console.log(`Open ${BASE} and use the dev sign-in row.`);

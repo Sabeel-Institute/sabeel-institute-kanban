@@ -127,6 +127,147 @@ describe('diffBoard', () => {
   });
 });
 
+describe('diffBoard on lanes', () => {
+  const lanes = [
+    { id: 'p', name: 'Planning' },
+    { id: 'm', name: 'Marketing' },
+    { id: 's', name: 'Supplies' },
+  ];
+  const withLanes = (over: BoardSnapshot = {}) =>
+    board({ lanesOn: true, lanes, doneColumnId: 'c', ...over });
+
+  it('records lanes turned on, without a second line for the finished column set with it', () => {
+    expect(diffBoard(board(), board({ lanesOn: true, doneColumnId: 'c' }))).toEqual([
+      { type: 'lanesOn' },
+    ]);
+  });
+
+  it('records lanes turned off, and nothing for the lanes it keeps', () => {
+    expect(diffBoard(withLanes(), withLanes({ lanesOn: false }))).toEqual([{ type: 'lanesOff' }]);
+  });
+
+  it('records a lane added, removed or renamed, matched by id', () => {
+    expect(
+      diffBoard(withLanes(), withLanes({ lanes: [...lanes, { id: 'w', name: 'Wrap-up' }] })),
+    ).toEqual([{ type: 'laneAdded', to: 'Wrap-up' }]);
+    expect(diffBoard(withLanes(), withLanes({ lanes: lanes.filter((l) => l.id !== 'm') }))).toEqual([
+      { type: 'laneRemoved', from: 'Marketing' },
+    ]);
+    expect(
+      diffBoard(
+        withLanes(),
+        withLanes({ lanes: lanes.map((l) => (l.id === 'm' ? { ...l, name: 'Outreach' } : l)) }),
+      ),
+    ).toEqual([{ type: 'laneRenamed', from: 'Marketing', to: 'Outreach' }]);
+  });
+
+  it('records a reorder, but not for an add or a removal on its own', () => {
+    const [p, m, s] = lanes;
+    expect(diffBoard(withLanes(), withLanes({ lanes: [m, p, s] }))).toEqual([
+      { type: 'lanesReordered' },
+    ]);
+    expect(diffBoard(withLanes(), withLanes({ lanes: [p, s] }))).toEqual([
+      { type: 'laneRemoved', from: 'Marketing' },
+    ]);
+  });
+
+  it('records the first lane added to a board that never had any', () => {
+    expect(
+      diffBoard(board({ lanesOn: true }), board({ lanesOn: true, lanes: [lanes[0]] })),
+    ).toEqual([{ type: 'laneAdded', to: 'Planning' }]);
+  });
+
+  it('records the finished column by name when it is chosen', () => {
+    expect(diffBoard(withLanes(), withLanes({ doneColumnId: 'b' }))).toEqual([
+      { type: 'finishedColumn', to: 'Doing' },
+    ]);
+  });
+
+  it('records a finished column first set while lanes are on, not one set by turning them on', () => {
+    expect(
+      diffBoard(withLanes({ lanesOn: false, doneColumnId: undefined }), withLanes()),
+    ).toEqual([{ type: 'lanesOn' }]);
+    expect(diffBoard(withLanes({ doneColumnId: undefined }), withLanes())).toEqual([
+      { type: 'finishedColumn', to: 'Done' },
+    ]);
+  });
+
+  it('records only the change made on a board without lanes, nothing of lanes', () => {
+    // A real change, so a diff that reported lanes on any write would show.
+    expect(diffBoard(board(), board({ name: 'Fundraising 2027' }))).toEqual([
+      { type: 'renamed', from: 'Fundraising', to: 'Fundraising 2027' },
+    ]);
+  });
+});
+
+describe('diffBoard on details', () => {
+  const fields = [
+    { id: 'f1', name: 'Teachers', type: 'text' as const },
+    { id: 'f2', name: 'Start date', type: 'start' as const },
+    { id: 'f3', name: 'Zoom link', type: 'link' as const },
+  ];
+  const withFields = (over: BoardSnapshot = {}) =>
+    board({ fields, details: { f1: 'Sara', f2: '2027-06-01' }, ...over });
+
+  it('records a field added, removed or renamed, matched by id', () => {
+    expect(
+      diffBoard(withFields(), withFields({ fields: [...fields, { id: 'f4', name: 'Fee', type: 'number' }] })),
+    ).toEqual([{ type: 'fieldAdded', to: 'Fee' }]);
+    expect(
+      diffBoard(withFields(), withFields({ fields: fields.filter((f) => f.id !== 'f3') })),
+    ).toEqual([{ type: 'fieldRemoved', from: 'Zoom link' }]);
+    expect(
+      diffBoard(
+        withFields(),
+        withFields({ fields: fields.map((f) => (f.id === 'f1' ? { ...f, name: 'Teacher' } : f)) }),
+      ),
+    ).toEqual([{ type: 'fieldRenamed', from: 'Teachers', to: 'Teacher' }]);
+  });
+
+  it('records a reorder, but not for an add or a removal on its own', () => {
+    const [a, b, c] = fields;
+    expect(diffBoard(withFields(), withFields({ fields: [c, a, b] }))).toEqual([
+      { type: 'fieldsReordered' },
+    ]);
+  });
+
+  it('records each value set, changed or cleared, by the field’s name', () => {
+    expect(
+      diffBoard(withFields(), withFields({ details: { f1: 'Omar', f2: '2027-06-01', f3: 'https://z.example' } })),
+    ).toEqual([
+      { type: 'detailChanged', field: 'Teachers', to: 'Omar' },
+      { type: 'detailChanged', field: 'Zoom link', to: 'https://z.example' },
+    ]);
+    expect(diffBoard(withFields(), withFields({ details: { f2: '2027-06-01' } }))).toEqual([
+      { type: 'detailChanged', field: 'Teachers' },
+    ]);
+  });
+
+  it('records a field removed with its value as one line, not two', () => {
+    expect(
+      diffBoard(
+        withFields(),
+        withFields({ fields: fields.filter((f) => f.id !== 'f1'), details: { f2: '2027-06-01' } }),
+      ),
+    ).toEqual([{ type: 'fieldRemoved', from: 'Teachers' }]);
+  });
+
+  it('names a value by the field as renamed in the same write', () => {
+    expect(
+      diffBoard(
+        withFields(),
+        withFields({
+          fields: fields.map((f) => (f.id === 'f1' ? { ...f, name: 'Teacher' } : f)),
+          details: { f1: 'Omar', f2: '2027-06-01' },
+        }),
+      ),
+    ).toEqual([
+      { type: 'fieldRenamed', from: 'Teachers', to: 'Teacher' },
+      { type: 'detailChanged', field: 'Teacher', to: 'Omar' },
+    ]);
+  });
+});
+
 describe('boardChangeActor', () => {
   it('names the creator of a new board', () => {
     expect(boardChangeActor(null, board())).toBe('sara');
@@ -201,6 +342,68 @@ describe('describeBoardActivity', () => {
       'The column “Doing” was renamed to “Now”',
     );
     expect(describeBoardActivity({ type: 'columnsReordered' })).toBe('The columns were reordered');
+  });
+
+  it('words the lane entries', () => {
+    const by = { actorUid: 'sara', actorName: 'Sara' };
+    expect(describeBoardActivity({ type: 'lanesOn', ...by })).toBe('Sara turned lanes on');
+    expect(describeBoardActivity({ type: 'lanesOff' })).toBe('Lanes were turned off');
+    expect(describeBoardActivity({ type: 'laneAdded', to: 'Marketing', ...by })).toBe(
+      'Sara added the lane “Marketing”',
+    );
+    expect(describeBoardActivity({ type: 'laneRemoved', from: 'Marketing', ...by })).toBe(
+      'Sara removed the lane “Marketing”',
+    );
+    expect(
+      describeBoardActivity({ type: 'laneRenamed', from: 'Marketing', to: 'Outreach', ...by }),
+    ).toBe('Sara renamed the lane “Marketing” to “Outreach”');
+    expect(describeBoardActivity({ type: 'lanesReordered', ...by })).toBe('Sara reordered the lanes');
+    expect(describeBoardActivity({ type: 'finishedColumn', to: 'Done', ...by })).toBe(
+      'Sara set the finished column to “Done”',
+    );
+    for (const t of ['lanesOn', 'laneAdded', 'finishedColumn']) {
+      expect(isKnownBoardActivityType(t)).toBe(true);
+    }
+  });
+
+  it('records the template mark set and taken off', () => {
+    expect(diffBoard(board(), board({ template: true }))).toEqual([{ type: 'templateOn' }]);
+    expect(diffBoard(board({ template: true }), board({ template: false }))).toEqual([
+      { type: 'templateOff' },
+    ]);
+    expect(diffBoard(board(), board({ template: false }))).toEqual([]);
+  });
+
+  it('words the template entries and a clone’s first line', () => {
+    const by = { actorUid: 'sara', actorName: 'Sara' };
+    expect(describeBoardActivity({ type: 'templateOn', ...by })).toBe('Sara marked the board as a template');
+    expect(describeBoardActivity({ type: 'templateOff', ...by })).toBe(
+      'Sara took the template mark off the board',
+    );
+    expect(describeBoardActivity({ type: 'cloned', from: 'Program template', ...by })).toBe(
+      'Sara cloned this board from “Program template”',
+    );
+  });
+
+  it('words the detail entries, cutting a long value short', () => {
+    const by = { actorUid: 'sara', actorName: 'Sara' };
+    expect(describeBoardActivity({ type: 'fieldAdded', to: 'Fee', ...by })).toBe(
+      'Sara added the field “Fee”',
+    );
+    expect(describeBoardActivity({ type: 'fieldRemoved', from: 'Fee', ...by })).toBe(
+      'Sara removed the field “Fee”',
+    );
+    expect(describeBoardActivity({ type: 'fieldsReordered', ...by })).toBe('Sara reordered the details');
+    expect(describeBoardActivity({ type: 'detailChanged', field: 'Fee', to: '120', ...by })).toBe(
+      'Sara set “Fee” to “120”',
+    );
+    expect(describeBoardActivity({ type: 'detailChanged', field: 'Fee', ...by })).toBe(
+      'Sara cleared “Fee”',
+    );
+    const long = describeBoardActivity({ type: 'detailChanged', field: 'Notes', to: 'x'.repeat(300), ...by });
+    expect(long.length).toBeLessThan(120);
+    expect(long.endsWith('…”')).toBe(true);
+    expect(isKnownBoardActivityType('detailChanged')).toBe(true);
   });
 
   it('falls back to Someone for a recorded person with no name', () => {

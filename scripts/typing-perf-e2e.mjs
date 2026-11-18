@@ -130,6 +130,14 @@ await board('perf_light', 'Empty board', [{ id: 'lc0', name: 'To Do' }], 0);
   await Promise.all(writes);
 }
 
+// No arm for a board's detail values. One was tried: with the value's draft
+// hoisted into the Details page (every keystroke re-rendering all twenty
+// fields), two runs measured ratios of 3.00 and 0.92. Twenty rows of text cost
+// too little to re-render for a ratio to see it above the noise, so the arm
+// could not be relied on to fail. `DetailValue` owning its draft is held by
+// its structure instead (CLAUDE.md, "A text draft belongs to the component
+// that owns the field").
+
 // Both cards live on the EMPTY board: the card screen replaces the board, so
 // what is behind it cannot contribute to the measurement either way.
 await card('perf_card_heavy', 'perf_light', 'lc0', 'Busy card', 'V0');

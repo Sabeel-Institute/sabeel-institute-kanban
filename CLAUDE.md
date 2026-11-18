@@ -64,7 +64,11 @@ Do not silently change any of these.
 
 - **Restraint is the feature.** They left ClickUp because of interface bloat. No
   dashboards, integrations, automations, alternate board views, or time tracking.
-  Every addition must justify itself against "does the team actually use this?" —
+  Lanes (below) are part of the one board view, not another, and a board that
+  does not switch them on looks and behaves exactly as it would without them.
+  The overview (below) is the one cross-board summary, and it is a list of
+  boards, not a dashboard: no charts or figures, no settings, and nobody who
+  is on no board with lanes ever sees it. Every addition must justify itself against "does the team actually use this?" —
   when in doubt, leave it out and ask.
 - **No board limit**, anywhere in the model, UI, or rules — the 5-board cap was a
   reason they're leaving.
@@ -205,6 +209,94 @@ disabling the account is the block, by decision.
   the card triggers stay out of those, because a card moved onto its board's
   copy of a label shows exactly what it showed before.
 
+## Lanes and the finished column
+
+Added 2026-11-15 (Faisal, over a concept round; `docs/PRODUCT_BRIEF.md`
+§ Lanes is the full statement), so a program board can replace a tracking
+spreadsheet. A board may switch on lanes as well as columns; a card records
+its `laneId`. What is load-bearing:
+
+- **Every lane question goes through `packages/shared/src/lanes.ts`**:
+  `lanesLive`, `finishedColumnId`, `isFinished`, `laneOf`, `groupByLane`,
+  `laneInfo`. The app and the functions hold no copy of a rule.
+- **A lane id is unchecked, and a stale one is No lane.** No `laneIds` mirror,
+  rules check `laneId`'s shape only and NEVER require it: a card naming a lane
+  that is gone loses nothing, unlike one naming a gone column. That is what
+  makes every old app inert rather than refused. Do not add a lane lookup to
+  the rules or a `required` to the card.
+- **The finished column exists only with live lanes**, and is read only through
+  `finishedColumnId`, which falls back to the last column when the stored one
+  is gone. **Every column write keeps it pinned**: `columnsPatch` takes the
+  board, so the compiler names every column write, and gives a deleted finished
+  column's place to the new last column, written, with the delete's
+  confirmation saying which (`finishedColumnDeleteNote`). Unpinned, deleting
+  Done made every card in Review finished, never late, and a later column add
+  moved it again, silently. **A finished card is never late, anywhere**: the board, the card,
+  the archive, My Work (under Finished), Search's Overdue and the 08:00
+  reminder. A board without lanes is unchanged; never apply the rule there.
+- **A lane change is history and a notice**, like a column move, except on a
+  move to another board, which clears the lane and records none.
+- **12 lanes at most** (`LANES_MAX`), restated in `firestore.rules`, where
+  `functions/test/unit/ruleLimits.test.ts` holds the two to one number.
+- **A board without lanes draws nothing new.** Every surface asks `lanesLive`
+  before drawing a heading, asking for a lane, or calling a card finished.
+
+## A board's details
+
+Added 2026-11-15 with lanes (`docs/PRODUCT_BRIEF.md` § Details): typed fields
+on Board settings → Details, read by everyone on the board, changed by its
+owners and admins. `packages/shared/src/boardFields.ts` holds every rule.
+
+- **Contents are app-kept, not rule-kept.** Rules bound `fields` and `details`
+  at twenty (held to `BOARD_FIELDS_MAX` by `ruleLimits.test.ts`) and cannot look
+  inside either. Every value goes through `validateDetailValue`. **Every reader
+  takes the board through `boardExtras`** (`toBoard`, and `withCleanExtras` in
+  each function), which drops a lane, field or value in a shape the app never
+  writes: one would otherwise throw in every admin's overview and in the
+  history trigger on each write to its board.
+- **Every `fields` write deletes the values of fields not in it**
+  (`orphanDetailIds`, against the board as just read): two owners editing at
+  once could otherwise leave a value no field shows, counting against the
+  rules' twenty until saving a real one is refused.
+- **A link opens only through `safeLink`** (http or https), at save and again
+  at tap: a `javascript:` value from another client would otherwise run.
+- **A value is written by its path (`details.<id>`), and a field is removed
+  with its value in one write** (`removeBoardField`), so the two cannot drift.
+- **Start date and End date are the only details anything else reads**,
+  through `namedFieldValue`. Nothing reads a field by its name.
+
+## The overview
+
+Added 2026-11-15 with lanes (`docs/PRODUCT_BRIEF.md` § Overview): one row per
+board with lanes, one mark per lane, opened from an icon in the Boards header
+shown only to someone it has a board for. Read-only.
+
+- **Its rules are `packages/shared/src/overview.ts`** (which boards, the three
+  orders, the grouping by lane names, the hidden list) **and its geometry is
+  `app/src/overviewLayout.ts`** (`laneColumns`). The screen only draws; a
+  group's heading and its rows take one `laneColumns` answer, so a name sits
+  over its own mark.
+- **Lane names are written in full, every lane is on screen, nothing scrolls
+  sideways** (Faisal's decisions). Names are MEASURED, laid out once in the
+  real font on each platform (`useMeasuredWidths`); an estimate from the
+  letters was short for capitals and cut names. `laneColumns` writes them
+  straight when each fits on one line, otherwise narrows the columns until the
+  furthest-reaching slanted name ends inside the row and steepens the slant
+  until neighbours are a line apart. The sweep holds it at every width with a
+  twelve-lane board whose longest name is last (`overviewFaults` in
+  `screens-e2e.mjs`, cut either way); the seed's eight-lane program puts slanted
+  names in front of the phones. Do not cut names to make room.
+- **Each control writes its own field** (`setOverviewSort`,
+  `setOverviewReverse`): a write of both carried the other from the last
+  render, and a choice made before that render put the old value back.
+- **Each row listens to its own board's cards** and is not virtualised: a
+  member's card read is checked against its board, which a cross-board query
+  could do ten times, and a row that stops listening loses its place in "most
+  overdue".
+- **Per person, it stores the order and the hidden boards, nothing else**, on
+  the user document, self-written; the hidden list is bounded at 500 in the
+  rules (`OVERVIEW_HIDDEN_MAX`, held by `ruleLimits.test.ts`).
+
 ## Attachments
 
 Added 2026-07-26, reversing the original "no attachments" decision. Multiple
@@ -236,9 +328,9 @@ contact with untrusted users.
 ## A board's history
 
 Added 2026-10-29: `onBoardWritten` diffs every board write (`diffBoard`) into
-`boards/{id}/activity`, which everyone on the board reads at the foot of Board
-settings. **Who did it is the `updatedBy`/`updatedAt` stamp**, named only when
-the write moved it. Rules refuse a board update without a new stamp naming the
+`boards/{id}/activity`, which everyone on the board reads on the History page
+of Board settings. **Who did it is the `updatedBy`/`updatedAt` stamp**, named
+only when the write moved it. Rules refuse a board update without a new stamp naming the
 writer, so builds before 0.15.0, which do not know the stamp, cannot save a
 board (Faisal, 2026-11-03: "I want everyone to update"); changes they made
 before then name nobody. **Anything that writes a board stamps it** — client
@@ -441,9 +533,14 @@ itself is deliberately NOT darkened — that would collapse it into
 - **An editor closes only once its write LANDS.** Closing first and handing the
   write up afterwards means a failed save takes your text with it and leaves an
   error pointing at something you can no longer see. So `close()`/`setDraft(null)`
-  goes INSIDE the `run` callback, after the `await`. This is why editors take
-  `run` plus a raw write that may reject, rather than a pre-wrapped one: `run`
-  resolves even on failure, so anything sequenced after it runs regardless.
+  goes INSIDE the `run` callback, after the `await`, or is gated on what `run`
+  returns: true once the work landed. `run` resolves even on failure, so a
+  statement after a bare `await run(...)` runs regardless; `runSeam.test.ts`
+  fails on one. **Adding a card is the one exception**, because the card is on
+  the board before the server confirms it and an add made offline waits in the
+  queue: its form closes at once, and a refused add reopens it with what was
+  typed. A form held open until the server answered sat over its own card and
+  closed whatever form was open by then.
 - **Card ordering is fractional string ranks** in `@sabeel/shared`; a move is one
   document write. Never reintroduce an array-of-ids ordering.
 - **Stats are server-written, ADMIN-gated, and must never be able to break what
@@ -465,8 +562,12 @@ itself is deliberately NOT darkened — that would collapse it into
   (`onCardWritten`, `onCardBoardCount`; `cloneBoard`, 2026-11-13). Only those
   two read the stamp: `onCardNotify` still runs, so such a writer must not
   assign anyone, and each "created" line still joins a pending notice. The
-  emulator runs triggers one at a time and cannot show the burst; reason about
-  it, do not wait for a test to.
+  emulator runs triggers in parallel (up to fifty, one at a time only when
+  debugging functions), but without production's write rate per document, so
+  it cannot show the burst; reason about it, do not wait for a test to. Nor can
+  a test lean on trigger ORDER: one trigger's line appearing does not prove an
+  earlier event's trigger has finished. Hold the condition a while after the
+  signal instead (`stays`).
 
 ---
 
@@ -697,6 +798,42 @@ change of that size. A review round checks them; it does not replace them.
    only for a check seen to fail without the code, on the surface it names.
    Large fix batches brought bugs of their own.
 
+A review of lanes, details, templates and the overview (2026-11-16) found
+about thirty more, and their causes added four:
+
+7. **Decide one thing in one place.** A rule made in several handlers or
+   layouts drifts: a drop refused by the lane but accepted by the card under
+   the pointer, a lane-state memo copied into three layouts with the same
+   stale day, six exits from a mode of which two reset it. Put it in one
+   function or hook and test that (`boardDrop.ts`, `useLaneInfo`, `toIdle`).
+8. **An absence check needs a positive signal first.** "Not there" passes just
+   as well before the thing could appear: wait for proof the producer ran (the
+   list answered, a later history line), then count zero. The same holds the
+   other way: the screen moves on the local write, before the server has it,
+   so a stored read made on a screen change waits until the store holds what
+   is expected (`storedOnce`), or it flakes on a busy runner.
+9. **Drive an input as a person does.** `fill()` sets a whole value at once,
+   which hid a date field writing every keystroke; type key by key where the
+   input reacts per key.
+10. **Look at each failure on screen.** Make each new read and write fail once
+    and look: a failed read drawn as "none", a refused add that lost its
+    title, a failed preferences read that let one hide wipe the list. The
+    three-state rule says this; only looking finds where it was missed.
+
+A second round, aimed at the first round's causes, added two more:
+
+11. **A check's expected state must differ from what the code shows without
+    the feature.** An order that happened to draw as the default, a clone
+    whose finished column was the last one anyway, an "empty" label another
+    field also showed, a scan that followed helpers one level deep: each
+    passed with the feature removed. Break every new check once (practice 3),
+    a fix's own included, and say in the commit what was broken.
+12. **Review a fix batch as a change of its own, and run each test before
+    committing it.** The first round's fixes held about ten new faults (a
+    picked date lost on leaving the screen, a Back fixed for one of its three
+    ways in); a reviewer given only the fixes' diff found them. A test
+    committed without running its suite failed on its first run.
+
 ### The width sweep is the DEFAULT check for layout, on both surfaces
 
 ```sh
@@ -707,8 +844,10 @@ SWEEP_WIDTHS=320 npm run test:screens      # while iterating
 Every authenticated screen at five widths straddling the breakpoint — including a
 card with the description editor open and one with the comment composer in use,
 because an editor is its own layout — each screenshotted to `shots/screens/` AND
-asserted: no sideways scroll, no same-layer control overlap, a way out of every
-screen, the right board layout. The widths straddle the breakpoint rather than
+asserted: no sideways scroll, no same-layer control overlap, every text's
+contrast against what it is drawn on (4.5:1, 3:1 large; captions, dimmed
+controls and text on images exempt), a way out of every screen, the right board
+layout. The widths straddle the breakpoint rather than
 looking thorough: a layout bug on one side of it is invisible from the other.
 
 **Prove a change on the web app unless it touches a seam a browser cannot
@@ -854,12 +993,14 @@ factory rather than being silently dropped.
   release pull request and the GitHub release take their title and text from
   it) and the only record of why.
 - **The user manual is part of the app.** A change to any screen means
-  `docs/USER-MANUAL.md`, then `node scripts/manual-shots.mjs` for its images, then
-  `npx sabeel-ci render-manual` for the PDF (needs `uv` and `google-chrome`) —
-  all three, same batch. Add new
-  screens to the generator; an image with no generator goes stale unnoticed.
-  User-visible changes ship with their documentation in the same batch as the
-  code — never let the manual lag a release.
+  `docs/USER-MANUAL.md` in the same change, and a generator for any new picture
+  in `scripts/manual-shots.mjs`; an image with no generator goes stale
+  unnoticed. The pictures (`node scripts/manual-shots.mjs`) and the PDF (`npx
+  sabeel-ci render-manual`, needs `uv` and `google-chrome`) are taken ONCE per
+  release, at the end, right before it goes to the stores (Faisal,
+  2026-11-16): retaking them per change is wasted while later changes move
+  the same screens. `docs/PHASE_STATUS.md` § Before the next store release
+  lists what is owed. Never let the manual lag a release.
 - **So are the help films** (More → Help): one short narrated film per thing
   people do, in a phone cut and a computer cut, listed once in `HELP_VIDEOS`
   (`@sabeel/shared`) and scripted in `scripts/tutorials/tutorials.mjs`. A
@@ -867,10 +1008,12 @@ factory rather than being silently dropped.
   the set (`docs/DEV-TOOLING.md`, "The help films"). The films live on their
   own public Hosting site, never in git, and show the guide world only — no
   real board, card or person. Their narration is a colleague talking you
-  through the screen, never labels read out. A film shipped stale on purpose
-  is listed in `docs/PHASE_STATUS.md` § Help films that lag the app, with what
-  it lacks: re-record from that list, add to it when a release leaves another
-  behind, and take each film off once the set is published with it.
+  through the screen, never labels read out. Films are recorded ONCE per
+  release, at the end, right before it goes to the stores, never per change
+  (Faisal, 2026-11-16). Until then a change lists each film whose screen it
+  moves, and each film it needs, in `docs/PHASE_STATUS.md` § Before the next
+  store release; re-record from that list, and take each film off once the set
+  is published with it.
 - Before ANY significant install (global/system/major framework), ask first;
   routine project-local npm deps of the locked stack are fine.
 - All repo artifacts (docs, plans, protocols) live in this repo.

@@ -21,10 +21,20 @@ const card = (over: Partial<CloneSourceCard> & { id: string }): CloneSourceCard 
   ...over,
 });
 
-function clone(cards: CloneSourceCard[], subscribe = false) {
+function clone(
+  cards: CloneSourceCard[],
+  subscribe = false,
+  lanes: {
+    lanesOn?: boolean;
+    lanes?: { id: string; name: string }[];
+    doneColumnId?: string;
+    fields?: { id: string; name: string; type: 'text' | 'start' }[];
+    details?: Record<string, string>;
+  } = {},
+) {
   let n = 0;
   return boardClone({
-    source: { description: 'For every program', columns },
+    source: { description: 'For every program', columns, ...lanes },
     cards,
     labels,
     boardId: 'clone',
@@ -154,6 +164,84 @@ describe('boardClone: the cards', () => {
     expect(data.assigneeUids).toEqual([]);
     expect(data.priority).toBe('none');
     expect(data.commentCount).toBe(0);
+  });
+});
+
+describe('boardClone: lanes', () => {
+  const lanes = [
+    { id: 'ln_plan', name: 'Planning' },
+    { id: 'ln_mkt', name: 'Marketing' },
+  ];
+  const onLanes = { lanesOn: true, lanes, doneColumnId: 'c_done' };
+
+  it('carries lanes switched on, in order, under new ids, with the finished column mapped', () => {
+    // A finished column that is NOT the last, so a clone that dropped it and
+    // fell back to the last column would not pass.
+    const { board } = clone([], false, { ...onLanes, doneColumnId: 'c_todo' });
+    expect(board.lanesOn).toBe(true);
+    expect(board.lanes!.map((l) => l.name)).toEqual(['Planning', 'Marketing']);
+    expect(board.lanes!.map((l) => l.id)).not.toContain('ln_plan');
+    expect(board.doneColumnId).toBe(board.columns[0].id);
+  });
+
+  it('puts each card in its lane on the clone', () => {
+    const { board, cards } = clone([card({ id: 'a', laneId: 'ln_mkt' })], false, onLanes);
+    expect(cards[0].data.laneId).toBe(board.lanes![1].id);
+  });
+
+  it('clones a card whose lane is gone, or that has none, with no lane', () => {
+    const { cards } = clone(
+      [card({ id: 'a', laneId: 'ln_gone' }), card({ id: 'b' })],
+      false,
+      onLanes,
+    );
+    expect(cards.map((c) => 'laneId' in c.data)).toEqual([false, false]);
+  });
+
+  it('keeps lanes switched off as they were, lanes and all', () => {
+    const { board, cards } = clone([card({ id: 'a', laneId: 'ln_plan' })], false, {
+      ...onLanes,
+      lanesOn: false,
+    });
+    expect(board.lanesOn).toBeUndefined();
+    expect(board.lanes!.map((l) => l.name)).toEqual(['Planning', 'Marketing']);
+    expect(cards[0].data.laneId).toBe(board.lanes![0].id);
+  });
+
+  it('leaves a finished column that is gone on the source unset', () => {
+    expect(clone([], false, { ...onLanes, doneColumnId: 'c_gone' }).board.doneColumnId).toBeUndefined();
+  });
+
+  it('never marks a clone as a template, though the callable passes the marked source whole', () => {
+    // `cloneBoard` hands the source BoardDoc over as it is, mark and all.
+    expect('template' in clone([], false, { template: true } as never).board).toBe(false);
+  });
+
+  it('gives a board without lanes none of the lane fields', () => {
+    const { board, cards } = clone([card({ id: 'a' })]);
+    expect(['lanesOn', 'lanes', 'doneColumnId'].filter((k) => k in board)).toEqual([]);
+    expect('laneId' in cards[0].data).toBe(false);
+  });
+});
+
+describe('boardClone: details', () => {
+  it('carries the fields under new ids, and none of their values', () => {
+    const fields = [
+      { id: 'f1', name: 'Teachers', type: 'text' as const },
+      { id: 'f2', name: 'Start date', type: 'start' as const },
+    ];
+    // Values in the source, so leaving them behind is something the clone does.
+    const { board } = clone([], false, { fields, details: { f1: 'Sara', f2: '2027-06-01' } });
+    expect(board.fields!.map((f) => [f.name, f.type])).toEqual([
+      ['Teachers', 'text'],
+      ['Start date', 'start'],
+    ]);
+    expect(board.fields!.map((f) => f.id)).not.toContain('f1');
+    expect('details' in board).toBe(false);
+  });
+
+  it('gives a board without details none', () => {
+    expect('fields' in clone([]).board).toBe(false);
   });
 });
 

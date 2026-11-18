@@ -27,36 +27,46 @@ web. "The code looks right" is not verification.
 | 14 | ClickUp import + launch | **complete** (2026-07-26) — three boards imported from a CSV export in one pass; `scripts/import-clickup.mjs` and the `sourceId` field remain so a re-run would update, not duplicate. See `docs/MIGRATION.md`. |
 | — | Since launch | The app is **in production and in daily use**. Work now ships as numbered releases rather than phases; the **deploy log** below is the running record. |
 
-## Help films that lag the app
+## Before the next store release: films and manual pictures
 
-The films on More → Help are recorded from the guide world
-(`scripts/tutorials/`) and published as one set. A release that changes a
-screen re-records the films that show it; when one is shipped stale on
-purpose, it is listed here with what it lacks, and comes off the list when it
-is re-recorded and the set published. Re-record from this list.
+**Done once, at the end, right before the release goes to the stores, and not
+before** (Faisal, 2026-11-16: re-recording or re-photographing per step is
+wasted work while later steps change the same screens). Until then each change
+keeps the manual's TEXT current, which is cheap and mostly additive, and lists
+here what its screens need; nobody records a film, retakes a picture or renders
+the PDF.
 
-**As of v0.19.0** (Faisal, 2026-11-14: shipped with stale films, to start the
-next release sooner). The scripts already carry the new lines (the board film
-explains the subtask chips, the clone film the bell); only the recording and
-publishing are missing. The clone film's narration is rendered.
+The order, at the end, against a fresh `scripts/dev.sh web` seed:
 
-| Film | Stale? | What it lacks |
-|---|---|---|
-| `board` | stale | Subtask chips on card faces, and its two new lines about them; the board name in the app's font (computer) |
-| `clone-board` | stale | The Clone sheet's bell and its new line; the chips on the cloned board; the board name's font (computer) |
-| `card` | stale | The chips on the board it starts from; the description editor's new spacing (phone: blank lines between paragraphs; computer: the card's line height); the board name's font (computer) |
-| `getting-around` | stale | The chips on the Fundraising board it visits; the board name's font (computer) |
-| `moving` | stale | The chips on the board; the board name's font (computer) |
-| `archiving` | stale | The chips on the board; the board name's font (computer) |
-| `bulk` | stale | The chips on the board; the board name's font (computer) |
-| `board-archive` | stale | The chips on the board it starts from; the board name's font (computer) |
-| `labels` | stale | The chips on the board it passes through; the board name's font (computer) |
-| `search` | stale | "↳ Subtask" on Design the programme in the results |
-| `comments` | stale, computer only | The comment box's new line height |
-| `board-settings` | stale, computer only | The board name's font |
-| `board-people` | stale, computer only | The board name's font |
-| `new-board` | stale, computer only | The new board's name in the app's font |
-| `signing-in`, `attachments`, `subtasks`, `my-work`, `notifications`, `report`, `people`, `roles`, `stats` | current | Nothing: they show none of v0.19.0's changes |
+1. **Films.** Script what is missing, add each new film to `HELP_VIDEOS` in
+   `@sabeel/shared` in the same change as its recording, never before (the
+   Help screen lists what is there). Render narration for every line whose
+   words changed (`scripts/tutorials/tts.py`; `record.mjs` refuses a WAV of
+   other words), record every film listed below, both cuts, and publish the
+   set (`docs/DEV-TOOLING.md`, "The help films"). Take each film off the list
+   as the set is published.
+2. **Manual pictures.** `node scripts/manual-shots.mjs` with no arguments, so
+   every picture is retaken from the same seed. Look at each one, and keep
+   only those that show a real change: the rest move only by dates, times and
+   the build stamp.
+3. **The PDF.** `npx sabeel-ci render-manual`, last, after the pictures, and
+   read it: the PDF's Markdown renderer is python-markdown, which draws a list
+   item that follows a paragraph line with no blank line between them as text
+   run on from that paragraph. The release command renders it again with the
+   version line.
+
+When a release changes what an old build gets wrong, raise the version floor
+to it last, once the web, Play and TestFlight have it (`docs/DEPLOY.md`
+§ Retiring old builds).
+
+**Owed now: nothing.** v0.20.0 recorded every film (three of them new:
+`lanes`, `details` and `overview`, which carries the legend for the
+overview's marks), retook the manual's pictures and rendered its PDF at its
+release (2026-11-18). A change that moves a screen a film or a picture shows
+adds it here:
+
+| Film or picture | What it lacks |
+|---|---|
 
 ## What works today (2026-10-16)
 
@@ -94,8 +104,8 @@ testing, and on iPhones through TestFlight:
 - Comments with @mentions — the picker opens **at the caret**, like code
   completion, rather than above the field — per-card **comment subscriptions**,
   and a tamper-proof per-card activity history.
-- **A board's own history**, at the bottom of Board settings for everyone on
-  the board: who created, renamed, archived or restored it, who added or
+- **A board's own history**, on the History page of Board settings for
+  everyone on the board: who created, renamed, archived or restored it, who added or
   removed whom, who made someone an owner, and what happened to its columns.
   Server-written like a card's. History from before it existed was recovered
   from the daily backups and the member callables' logs; most of those lines

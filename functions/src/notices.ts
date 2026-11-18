@@ -4,6 +4,7 @@ import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions/v2';
 import { getFirestore } from 'firebase-admin/firestore';
 import {
+  cleanLanes,
   arrivalOf,
   arrivalText,
   changeNoticeText,
@@ -136,6 +137,8 @@ async function noticesFor(cardId: string, entries: NoticeEntry[]): Promise<Notic
   const memberUids = (board.memberUids as string[]) ?? [];
   const columns = (board.columns as BoardColumn[]) ?? [];
   const columnNameFor = (id: string) => columns.find((c) => c.id === id)?.name ?? 'another column';
+  const lanes = cleanLanes(board.lanes);
+  const laneNameFor = (id: string) => lanes.find((l) => l.id === id)?.name;
 
   const followers = noticeFollowers({
     entries,
@@ -201,6 +204,7 @@ async function noticesFor(cardId: string, entries: NoticeEntry[]): Promise<Notic
           nameFor,
           columnNameFor,
           cardTitleFor,
+          laneNameFor,
         }),
         actorUid,
         boardId,

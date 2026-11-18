@@ -31,7 +31,11 @@ export function addDays(dayKey: string, days: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
-export type DueBucket = 'overdue' | 'today' | 'soon' | 'later' | 'none';
+/**
+ * `finished` is never a date's bucket (`bucketFor` does not return it): it is
+ * where `groupByDue` puts a finished card, which is due nowhere.
+ */
+export type DueBucket = 'overdue' | 'today' | 'soon' | 'later' | 'none' | 'finished';
 
 export const DUE_BUCKET_LABELS: Record<DueBucket, string> = {
   overdue: 'Overdue',
@@ -39,6 +43,7 @@ export const DUE_BUCKET_LABELS: Record<DueBucket, string> = {
   soon: 'Next 7 days',
   later: 'Later',
   none: 'No due date',
+  finished: 'Finished',
 };
 
 /** Order the buckets appear in. Overdue first — it is the thing to act on. */
@@ -48,6 +53,7 @@ export const DUE_BUCKET_ORDER: DueBucket[] = [
   'soon',
   'later',
   'none',
+  'finished',
 ];
 
 export function bucketFor(dueDate: string | undefined, today: string): DueBucket {
@@ -65,10 +71,15 @@ export function bucketFor(dueDate: string | undefined, today: string): DueBucket
 export function groupByDue<T extends { dueDate?: string; title: string }>(
   cards: readonly T[],
   today: string,
+  /**
+   * Whether a card is finished (`isFinished` on its own board). A finished card
+   * is never Overdue or due: it goes under Finished, last, whatever its date.
+   */
+  isDone: (card: T) => boolean = () => false,
 ): { bucket: DueBucket; label: string; cards: T[] }[] {
   const groups = new Map<DueBucket, T[]>();
   for (const c of cards) {
-    const b = bucketFor(c.dueDate, today);
+    const b = isDone(c) ? 'finished' : bucketFor(c.dueDate, today);
     const list = groups.get(b) ?? [];
     list.push(c);
     groups.set(b, list);
@@ -84,9 +95,24 @@ export function groupByDue<T extends { dueDate?: string; title: string }>(
   }));
 }
 
-/** Friendly relative wording for a due date, e.g. "3 days late", "Tomorrow". */
-export function describeDue(dueDate: string | undefined, today: string): string {
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** A day key as "3 Nov", with the year when it is not this year's. */
+export function shortDay(dayKey: string, today: string): string {
+  const [y, m, d] = dayKey.split('-').map(Number);
+  const day = `${d} ${MONTHS[m - 1]}`;
+  return y === Number(today.slice(0, 4)) ? day : `${day} ${y}`;
+}
+
+/**
+ * Friendly relative wording for a due date, e.g. "3 days late", "Tomorrow".
+ *
+ * A FINISHED card (`isFinished`) is never late: past its date it shows the
+ * date itself, "3 Nov", where any other card would say how late it is.
+ */
+export function describeDue(dueDate: string | undefined, today: string, finished = false): string {
   if (!dueDate) return '';
+  if (finished && dueDate < today) return shortDay(dueDate, today);
   if (dueDate === today) return 'Today';
   if (dueDate === addDays(today, 1)) return 'Tomorrow';
   if (dueDate === addDays(today, -1)) return 'Yesterday';

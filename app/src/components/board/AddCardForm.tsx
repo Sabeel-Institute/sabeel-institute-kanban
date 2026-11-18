@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { CARD_TITLE_MAX } from '@sabeel/shared';
-import { Button, Row, TextField } from '../ui';
+import { CARD_TITLE_MAX, type BoardLane } from '@sabeel/shared';
+import { Select } from '../Select';
+import { Button, Hint, Row, TextField } from '../ui';
 import { NewCardBell } from './Bells';
 
 /**
@@ -29,20 +30,41 @@ import { NewCardBell } from './Bells';
  * non-scrolling screen; the wide board needs neither. That is each board's
  * layout, not the form's.
  */
+/** What an add-card form held: given back to a form reopened after a refusal. */
+export interface AddCardDraft {
+  title: string;
+  subscribe: boolean;
+  laneId?: string;
+}
+
 export function AddCardForm({
   onAdd,
   onCancel,
   canSubscribe,
+  lanes,
+  initial,
 }: {
-  /** Called with a trimmed, non-empty title, and whether to subscribe to it. */
-  onAdd: (title: string, subscribe: boolean) => void;
+  /** Called with a trimmed, non-empty title, whether to subscribe to it, and
+   *  its lane on a board with lanes. */
+  onAdd: (title: string, subscribe: boolean, laneId?: string) => void;
   onCancel: () => void;
   /** Whether the bell is offered: only a member of the board may subscribe. */
   canSubscribe: boolean;
+  /** The board's lanes when they are live; absent on a board without them. */
+  lanes?: readonly BoardLane[];
+  /** What a refused add held, to start from instead of an empty form. */
+  initial?: AddCardDraft;
 }) {
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(initial?.title ?? '');
   // Unmount-scoped like the draft, so every new composer starts subscribed.
-  const [subscribe, setSubscribe] = useState(true);
+  const [subscribe, setSubscribe] = useState(initial?.subscribe ?? true);
+  // None chosen to start, and nothing remembered between cards (Faisal,
+  // 2026-11-15): a lane picked for you is a card filed in the wrong place.
+  // A lane given back is kept only while the board still has it.
+  const [laneId, setLaneId] = useState(
+    initial?.laneId && lanes?.some((l) => l.id === initial.laneId) ? initial.laneId : '',
+  );
+  const [needsLane, setNeedsLane] = useState(false);
 
   // One path for both the Add button and the keyboard's submit, so they cannot
   // drift. An empty title is a no-op rather than a disabled button, which is
@@ -50,7 +72,11 @@ export function AddCardForm({
   function submit() {
     const trimmed = title.trim();
     if (!trimmed) return;
-    onAdd(trimmed, canSubscribe && subscribe);
+    if (lanes && !laneId) {
+      setNeedsLane(true);
+      return;
+    }
+    onAdd(trimmed, canSubscribe && subscribe, lanes ? laneId : undefined);
   }
 
   return (
@@ -63,6 +89,23 @@ export function AddCardForm({
         maxLength={CARD_TITLE_MAX}
         onSubmit={submit}
       />
+      {lanes ? (
+        <>
+          <Select
+            label="Lane"
+            value={laneId}
+            options={[
+              { value: '', label: 'Choose a lane' },
+              ...lanes.map((l) => ({ value: l.id, label: l.name })),
+            ]}
+            onChange={(id) => {
+              setLaneId(id);
+              if (id) setNeedsLane(false);
+            }}
+          />
+          {needsLane ? <Hint>Choose a lane for the card first.</Hint> : null}
+        </>
+      ) : null}
       <Row>
         <Button label="Add" onPress={submit} />
         <Button label="Cancel" variant="secondary" onPress={onCancel} />

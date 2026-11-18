@@ -11,6 +11,7 @@
   "calendar-view-month": 61415,
   "calendar-view-week": 61416,
   "check": 58826,
+  "checklist": 59057,
   "chevron-left": 58827,
   "chevron-right": 58828,
   "close": 58829,
@@ -60,6 +61,7 @@
   "star-border": 59450,
   "subdirectory-arrow-right": 58842,
   "swap-horiz": 59604,
+  "swap-vert": 59605,
   "table-chart": 57957,
   "unarchive": 57705
 }

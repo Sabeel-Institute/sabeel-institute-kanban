@@ -234,6 +234,66 @@ export const TUTORIALS = [
     ],
   },
   {
+    id: 'lanes',
+    as: 'omar',
+    start: (w) => w.board('summer-camp'),
+    steps: [
+      {
+        say: "Some boards are divided into lanes as well as columns. A program's board might have a lane for the planning, one for the programme, and one for the venue.",
+        do: (t) => t.highlight(t.label(/^Planning,/)),
+      },
+      {
+        say: "Every column lists the same lanes, in the same order, so a lane stays in one place as you move between columns. Beside each lane is how many of its cards are finished, out of all of them.",
+        do: (t) => t.highlight(t.label(/^Programme,/)),
+      },
+      {
+        say: "The count turns green once every card in the lane is finished, and red when a card that isn't finished is past its date. Here, something in the programme is running late.",
+        do: (t) => t.highlight(t.card('Plan week one')),
+      },
+      {
+        say: "One column holds the finished cards, usually the last. A finished card is never late, even after its date has passed.",
+        do: async (t) => {
+          if (!t.phone) await t.highlight(t.card('Book the campsite'));
+          else await t.wait(600);
+        },
+      },
+      {
+        say: "To add a card, tap Add card, type its title, and choose its lane. It won't go in until it has one.",
+        do: async (t) => {
+          await t.tap(t.btn('+ Add card'));
+          await t.type(t.placeholder('Card title'), 'Order the tents');
+          await t.select(t.label('Lane'), 'Venue');
+        },
+      },
+      {
+        say: 'Add it, and there it is, in its lane.',
+        do: async (t) => {
+          await t.tap(t.btn(t.phone ? 'Add' : 'Add card'));
+          await t.waitFor(t.card('Order the tents'));
+          await t.highlight(t.card('Order the tents'));
+        },
+      },
+      {
+        say: "To move a card to another lane, open it. Its lane is right beside its column.",
+        do: async (t) => {
+          await t.tap(t.card('Recruit volunteers'));
+          await t.highlight(t.label('Lane'));
+        },
+      },
+      {
+        say: "Choose another lane, and the card moves. Everyone following the card hears about it, just as when it changes column.",
+        do: (t) => t.select(t.label('Lane'), 'Programme'),
+      },
+      {
+        say: "The board's owners switch lanes on and name them in its settings, under Lanes.",
+        do: async (t) => {
+          await t.tap(t.btn('Back'));
+          await t.highlight(t.btn('About this board'));
+        },
+      },
+    ],
+  },
+  {
     id: 'card',
     as: 'omar',
     start: (w) => w.board('fundraising'),
@@ -630,6 +690,77 @@ export const TUTORIALS = [
     ],
   },
   {
+    id: 'overview',
+    as: 'sara',
+    start: '',
+    steps: [
+      {
+        say: "If you're on a board that's divided into lanes, the Boards screen has an overview: every program at a glance. Tap the list with ticks, at the top.",
+        do: async (t) => {
+          await t.tap(t.btn('Overview'));
+          await t.waitFor(t.id('overview-row:Winter Camp'));
+        },
+      },
+      {
+        say: "Each board is a row: its name, its dates, and a mark for each lane, under the lane's name. Boards with the same lanes sit together under one row of names.",
+        do: (t) => t.highlight(t.id('overview-row:Winter Camp')),
+      },
+      {
+        say: "Here's what the marks mean. A tick on green: every card in the lane is finished. An exclamation mark on red: a card in it is late.",
+        do: (t) =>
+          t.key([
+            ['complete', 'All finished'],
+            ['late', 'A card is late'],
+            ['soon', 'Due in the next few days'],
+            ['open', 'Under way, nothing late'],
+            ['undated', 'Cards, but no due dates'],
+            ['none', 'No cards'],
+          ]),
+      },
+      {
+        say: "A solid gold circle: a card is due in the next few days. An empty ring: the lane is under way, and nothing's late.",
+        do: (t) => t.wait(400),
+      },
+      {
+        say: "A dashed ring: the lane has cards, but none of them has a due date. And a dash means the lane has no cards at all.",
+        do: async (t) => {
+          await t.wait(2500);
+          await t.unkey();
+        },
+      },
+      {
+        say: "You can order the boards by start date, by when they were made, or by which is most overdue, and the arrows turn the order around. The overview remembers your choice.",
+        do: async (t) => {
+          await t.select(t.label('Order'), 'Most overdue');
+          await t.tap(t.btn('Reverse the order'));
+        },
+      },
+      {
+        say: "To keep a board out of your overview, press and hold its row, and choose Hide. It's hidden for you, and nobody else.",
+        do: async (t) => {
+          const row = t.id('overview-row:Spring Camp');
+          if (t.phone) await t.longPress(row);
+          else await t.rightClick(row);
+          await t.tap(t.text('Hide from my overview'));
+        },
+      },
+      {
+        say: "Hidden boards wait at the foot of the list. Open Hidden, and tap show beside one to bring it back.",
+        do: async (t) => {
+          await t.tap(t.btn(/^Hidden \(/));
+          await t.tap(t.btn('Show Spring Camp'));
+        },
+      },
+      {
+        say: 'To open a board, just tap its row.',
+        do: async (t) => {
+          await t.tap(t.id('overview-row:Winter Camp'));
+          await t.waitFor(t.btn('Board settings'));
+        },
+      },
+    ],
+  },
+  {
     id: 'search',
     as: 'omar',
     start: '',
@@ -867,22 +998,26 @@ export const TUTORIALS = [
     start: (w) => w.board('weekend-school'),
     steps: [
       {
-        say: 'If you own a board, you can change how it works. Tap the gear to open its settings.',
+        say: 'If you own a board, you can change how it works. Tap the gear to open its settings. Each part of it has a page of its own.',
         do: async (t) => {
           await t.tap(t.btn('Board settings'));
-          await t.waitFor(t.btn('Save name'));
+          await t.waitFor(t.btn('History'));
         },
       },
       {
-        say: 'You can rename the board here. Type the new name, and tap Save name.',
+        say: "General is where you rename the board. Type the new name, and tap Save name.",
         do: async (t) => {
+          // A computer opens on General, beside the list; a phone opens on the list.
+          if (t.phone) await t.tap(t.btn('General'));
           await t.replace(t.placeholder('Board name'), 'Weekend School 2026');
           await t.tap(t.btn('Save name'));
         },
       },
       {
-        say: 'Under Columns, tap the pencil next to a column to rename it.',
+        say: 'Then Columns. Tap the pencil next to a column to rename it.',
         do: async (t) => {
+          if (t.phone) await t.tap(t.btn('Back'));
+          await t.tap(t.btn('Columns'));
           await t.tap(t.btn('Rename column To Do'));
           await t.replace(t.label('Rename To Do'), 'Up next');
           await t.tap(t.btn('Save column name'));
@@ -900,22 +1035,70 @@ export const TUTORIALS = [
         do: (t) => t.highlight(t.label('Drag to reorder')),
       },
       {
-        say: "Right at the bottom there's the board's history. Everything you just did is already there, with your name on it.",
+        say: "History is the board's history. Everything you just did is already there, with your name on it.",
         do: async (t) => {
-          await t.scrollTo(t.text('History'));
+          if (t.phone) await t.tap(t.btn('Back'));
+          await t.tap(t.btn('History'));
           await t.highlight(t.text(/added the column “Waiting on parents”/, false));
         },
       },
       {
-        say: "People who don't own the board see this screen too. They can look after the board's own labels, and see the members and the history, so they know who to ask, and who changed what.",
+        say: "People who don't own the board see some of these pages too. They can look after the board's own labels, and see the members and the history, so they know who to ask, and who changed what.",
         do: (t) => t.wait(400),
       },
       {
         say: "A column can only be deleted once it's empty, so no cards go missing. You'll find delete on the board itself, right by the column's name.",
         do: async (t) => {
+          // Back to the list first on a phone; a computer's Back leaves settings.
+          if (t.phone) await t.tap(t.btn('Back'));
           await t.tap(t.btn('Back'));
           await t.highlight(t.btn(/^Delete column /));
         },
+      },
+    ],
+  },
+  {
+    id: 'details',
+    as: 'sara',
+    start: (w) => w.board('summer-camp'),
+    steps: [
+      {
+        say: "A board can carry details about the work it's for: when a program starts and ends, who's teaching, the link for its meetings. Open the board's settings, and then Details.",
+        do: async (t) => {
+          await t.tap(t.btn('Board settings'));
+          await t.tap(t.btn('Details'));
+          await t.waitFor(t.btn('Edit Teachers'));
+        },
+      },
+      {
+        say: "Everyone on the board can read them here, and tap a link to open it.",
+        do: (t) => t.highlight(t.link(/^Zoom link:/)),
+      },
+      {
+        say: "If you own the board, you can change them. Tap a pencil, make the change, and tap the tick.",
+        do: async (t) => {
+          await t.tap(t.btn('Edit Teachers'));
+          await t.replace(t.label('Teachers'), 'Sara, Omar and Bilal');
+          await t.tap(t.btn('Save Teachers'));
+        },
+      },
+      {
+        say: 'Dates are picked from a calendar.',
+        do: (t) => t.highlight(t.label('Start date')),
+      },
+      {
+        say: "To add another detail, tap the pencil at the top. Choose what kind it is, some text, a number, a date or a link, give it a name, and add it.",
+        do: async (t) => {
+          await t.tap(t.btn('Edit fields'));
+          await t.select(t.label('Type'), 'Number');
+          await t.type(t.placeholder('Field name, such as Teachers'), 'Fee');
+          await t.tap(t.btn('Add field'));
+          await t.tap(t.btn('Done'));
+        },
+      },
+      {
+        say: "Start date and End date are special: the overview shows them beside the board's name. And when the board's cloned for its next run, its details come too, empty, ready to fill in.",
+        do: (t) => t.highlight(t.label('End date')),
       },
     ],
   },
@@ -925,9 +1108,10 @@ export const TUTORIALS = [
     start: (w) => w.board('weekend-school'),
     steps: [
       {
-        say: "Only the people on a board can see it. To add someone, open the board's settings.",
+        say: "Only the people on a board can see it. To add someone, open the board's settings, and then People.",
         do: async (t) => {
           await t.tap(t.btn('Board settings'));
+          await t.tap(t.btn('People'));
           await t.scrollTo(t.btn(/^Add someone/));
         },
       },
@@ -990,10 +1174,10 @@ export const TUTORIALS = [
         do: (t) => t.tap(t.btn('Back')),
       },
       {
-        say: "Boards themselves are never deleted. When one's finished, open its settings, scroll down, and tap Archive board.",
+        say: "Boards themselves are never deleted. When one's finished, open its settings, then General, and tap Archive board.",
         do: async (t) => {
           await t.tap(t.btn('Board settings'));
-          await t.scrollTo(t.btn('Archive board'));
+          if (t.phone) await t.tap(t.btn('General'));
           await t.tap(t.btn('Archive board'));
           await t.waitFor(t.text('Boards'));
         },
@@ -1003,7 +1187,7 @@ export const TUTORIALS = [
         do: (t) => t.wait(600),
       },
       {
-        say: 'It waits under Archived, at the bottom of your boards. Open it from there, and use Restore board in its settings to bring it all back.',
+        say: 'It waits under Archived, at the bottom of your boards. Open it from there, and use Restore board in its settings, under General, to bring it all back.',
         do: async (t) => {
           await t.scrollTo(t.btn(/^Archived \(\d+\)$/));
           await t.tap(t.btn(/^Archived \(\d+\)$/));
@@ -1103,10 +1287,11 @@ export const TUTORIALS = [
         do: (t) => t.highlight(t.btn('New label')),
       },
       {
-        say: "In the board's settings, anyone on the board can rename, recolour or delete its own. The institute's have a lock, because they're changed in one place only.",
+        say: "In the board's settings, under Labels, anyone on the board can rename, recolour or delete its own. The institute's have a lock, because they're changed in one place only.",
         do: async (t) => {
           await t.tap(t.link(/^Open board Fundraising 2026/));
           await t.tap(t.btn('Board settings'));
+          await t.tap(t.btn('Labels'));
           await t.scrollTo(t.btn('Rename label Hall booking'));
         },
       },
@@ -1114,14 +1299,13 @@ export const TUTORIALS = [
         say: "That place is for admins: More, then Labels. Whatever you change here changes on every board.",
         do: async (t) => {
           // A phone shows its tab bar on the tab roots alone: back from the
-          // settings, the board and the card this film opened on.
-          if (t.phone) {
-            await t.tap(t.btn('Back'));
-            await t.tap(t.btn('Back'));
-            await t.tap(t.btn('Back'));
-          }
+          // Labels page, the settings, the board and the card this film
+          // opened on.
+          if (t.phone) await t.tap(t.btn('Back'), { times: 4 });
           await t.tap(t.btn('More'));
-          await t.tap(t.btn(/^Labels/));
+          // In the sheet: on a computer, Board settings behind it has a
+          // Labels page of its own.
+          await t.tap(t.page.getByRole('dialog').getByRole('button', { name: /^Labels/ }));
           await t.waitFor(t.btn('Rename label Events'));
         },
       },

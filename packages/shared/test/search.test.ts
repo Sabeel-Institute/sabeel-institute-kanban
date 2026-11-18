@@ -166,6 +166,10 @@ describe('filterCards', () => {
     expect(filterCards(cards, { priorities: [] }, TODAY)).toHaveLength(4);
   });
 
+  it('leaves a finished card out of Overdue', () => {
+    expect(filterCards(cards, { due: 'overdue' }, TODAY, (c) => c.id === 'b')).toEqual([]);
+  });
+
   it('filters overdue', () => {
     expect(filterCards(cards, { due: 'overdue' }, TODAY).map((c) => c.id)).toEqual(['b']);
   });

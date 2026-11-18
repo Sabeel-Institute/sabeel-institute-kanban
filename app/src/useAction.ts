@@ -24,19 +24,32 @@ import { timed, type Untimed } from './slowWrites';
  * second tap — while the stopwatch should not. So the callback is handed
  * `untimed` and wraps anything whose duration is not ours (see slowWrites.ts).
  * Only the callbacks that need it take the argument.
+ *
+ * `run` resolves whether or not the work succeeded, having shown the error, so
+ * it RETURNS whether it did: true once the work landed. Anything that should
+ * follow only a success (clearing a field, closing an editor, leaving a
+ * screen) goes inside the callback after the write, or is gated on that
+ * answer. Statements after a bare `await run(...)` run on failure too, which
+ * once cleared a typed name the rules had refused; `runSeam.test.ts` scans for
+ * them.
  */
+/** `run` as a component takes it from its parent: true once the work landed. */
+export type Run = (fn: () => Promise<unknown>) => Promise<boolean>;
+
 export function useAction(source: string) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const run = useCallback(
-    async (fn: (untimed: Untimed) => Promise<unknown>, label = source) => {
+    async (fn: (untimed: Untimed) => Promise<unknown>, label = source): Promise<boolean> => {
       setBusy(true);
       setError(null);
       try {
         await timed(label, fn);
+        return true;
       } catch (e) {
         setError(toUserMessage(e, label));
+        return false;
       } finally {
         setBusy(false);
       }

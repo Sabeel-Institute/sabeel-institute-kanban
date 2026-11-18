@@ -21,8 +21,10 @@ in the app.
 
 - **Restraint is the feature.** The reason to leave ClickUp was interface bloat.
   Every proposed addition must justify itself against "does the team actually use
-  this?" No dashboards, no integrations, no automations, no Gantt/calendar/list
-  view alternates, no time tracking (that lives in the sibling time-tracker app).
+  this?" No integrations, no automations, no Gantt/calendar/list view
+  alternates, no time tracking (that lives in the sibling time-tracker app).
+  There is one board view; a board's **lanes** are part of it, and a board that
+  does not switch them on looks and behaves exactly as it would without them.
   When in doubt, leave it out and ask.
 - **No board limit.** Nothing in the data model, UI, or rules may cap board count.
 - **Phone-first, not phone-compatible.** The mobile board is a distinct layout
@@ -55,7 +57,11 @@ in the app.
 | Offboarding | A disabled user **keeps their assignments**, rendered as inactive; a board's owners get a review list to reassign. Disabling **warns** if the person solely owns a board, and proceeds anyway. |
 | Theming | **Single light theme, no dark mode** (decided 2026-07-21). Semantic tokens throughout, so a re-theme stays a one-file change. |
 | Subtasks | A card may be a **subtask of one other card on the same board** (`parentId` on the child). The parent's detail view lists them and links straight through; the child shows "Subtask of". On a card's face (Faisal, 2026-11-14, the chips of three prototypes, because people were hand-labelling cards "Main Task" and "subtask" to see this on the board): the parent a grey chip with its count, the child one naming its parent (`parentTitles`), or "Subtask" where the parent is not among the cards loaded — archived, on another board after a move that left the child linked, or on a screen that loads no siblings (My Work, Search, the board's archive). A tile's accessible name says both (`cardTileName`). Deliberately NOT a checklist: a subtask is an ordinary card, with its own column, assignees and comments. Added 2026-07-25 — the ClickUp import had been faking it in description text. **`parentId` is an opaque string to the rules**: same-board is enforced by the picker, not by `firestore.rules`, which check only that it is a string under 200 chars. A child's read access comes from its OWN `boardId`, so a stale or cross-board link leaks nothing: it shows as a plain "Subtask" chip and a "Subtask of" line the child can unlink, never the other card's title. Do not add a rules lookup to "fix" this; it would cost a read on every card write to enforce something the UI already does and no one can exploit. |
-| Explicitly NOT in v1 | Checklists (as a separate item type — see Subtasks), custom fields, dependencies, recurring cards, alternate board views, automations, integrations, guest/external access. |
+| Template mark | **A board may be marked as a template** (2026-11-15), by its owners and admins on General. The mark does exactly two things: the board is listed under Templates with a badge, and it is left out of the overview. Cloning stays a long press on any board; a clone is never marked; its history opens with one line, "cloned from", and nothing else ties it to its source. |
+| Details | **A board may carry details** (2026-11-15): a short list of typed fields (Text, Number, Date, Link, and the fixed Start date and End date), filled in on Board settings → Details. Everyone on the board reads them; its owners and admins change them. See "Details". |
+| Lanes | **A board may be divided into lanes as well as columns** (2026-11-15), so a program board can stand in for a tracking spreadsheet. A switch on Board settings → Lanes, off by default; a card sits in one column and one lane. With lanes, one column holds **finished** cards: a lane's heading counts them, and a finished card is never late. See "Lanes". |
+| Overview | **One screen of every program** (2026-11-15): a row per board with lanes, a mark per lane showing its state, boards with the same lanes under one heading, three orders either way, and boards each person may hide from their own. Opened from an icon in the Boards header, shown only to someone it has a board for. See "Overview". |
+| Explicitly NOT in v1 | Checklists (as a separate item type — see Subtasks), dependencies, recurring cards, alternate board views, automations, integrations, guest/external access. |
 | Layout | **Chosen by available WIDTH, not platform** (breakpoint **700px**, `WIDE_BREAKPOINT` in `app/src/theme/layout.ts` — the one definition; never restate it). Wide → columns side by side. Narrow → one column at a time, swipe between them. So a tablet gets columns and a phone browser gets the swipe board. |
 | Drag and drop | A web **capability** layered on the wide layout. Native has no HTML5 drag API, so a wide native surface (a tablet) offers the same explicit "Move to…" the narrow layout uses. |
 | Card ordering | **Fractional string ranks** (LexoRank-style, base-62) in `@sabeel/shared`. A move is a single-document write. |
@@ -145,6 +151,9 @@ users/{uid}
                                                  # board membership checked when a notice is sent
   favoriteBoardIds: [boardId, …]
   recentBoardIds: [boardId, …]                   # client-maintained, capped at 10
+  overviewSort?: start|created|late              # the overview's order; absent is start
+  overviewReverse?: bool                         # that order the other way
+  overviewHiddenBoardIds?: [boardId, …]          # boards hidden from my overview, at most 500
   unreadNotifCount
   # Mirrors custom claims for UI display. Rules trust the TOKEN, never this doc.
 
@@ -159,10 +168,19 @@ boards/{boardId}
   memberUids: [uid, …]                           # for `array-contains` queries
   updatedAt?, updatedBy?                         # who changed it last, for its history: a change stamps
                                                  # both (rules hold updatedBy to the writer) or leaves both
+  lanesOn?: bool                                 # absent = off; off keeps `lanes` and every card's lane
+  lanes?: [ { id, name } ]                       # at most 12 (LANES_MAX); order is the board's
+  doneColumnId?                                  # the finished column, read only through `finishedColumnId`
+  fields?: [ { id, name, type } ]                # details' fields, at most 20; type text|number|date|link|start|end
+  details?: { fieldId: value }                   # every value a string; a date YYYY-MM-DD; no key = not set
+  template?: bool                                # listed under Templates; never copied to a clone
 
 boards/{boardId}/activity/{entryId}              # the board's own history
   type: created|renamed|archived|restored|memberAdded|memberRemoved|ownerAdded|ownerRemoved
         |columnAdded|columnRemoved|columnRenamed|columnsReordered
+        |lanesOn|lanesOff|laneAdded|laneRemoved|laneRenamed|lanesReordered|finishedColumn
+        |fieldAdded|fieldRemoved|fieldRenamed|fieldsReordered|detailChanged   # detailChanged carries `field`
+        |templateOn|templateOff|cloned                # cloned: a clone's first line, written by cloneBoard
   at, actorUid?, actorName?, subjectUid?, subjectName?, from?, to?, since?
   # Written ONLY by the onBoardWritten trigger. Names are stored, not looked up.
 
@@ -188,6 +206,8 @@ cards/{cardId}                                   # TOP-LEVEL collection; keyed t
   commentCount                                   # denormalized for the card face
   parentId?                                      # the card this is a SUBTASK of — lives on the child, so the parent's list is derived
                                                  # board-scoped by convention (a cross-board move clears it); rules validate shape only
+  laneId?                                        # the card's lane; absent = No lane. Shape-checked only, NEVER required:
+                                                 # an id that matches no lane is drawn under No lane. A cross-board move clears it
   createdAt/By, updatedAt/By
 
 cards/{cardId}/comments/{commentId}              # under the CARD, so they travel with a move
@@ -195,7 +215,7 @@ cards/{cardId}/comments/{commentId}              # under the CARD, so they trave
 
 cards/{cardId}/activity/{activityId}
   type: created|moved|assigned|unassigned|due|priority|labels|edited|archived
-        |subtaskOf|subtask|attached|detached
+        |subtaskOf|subtask|attached|detached|lane
   actorUid, at, from?, to?
   # Written ONLY by the server (the card trigger, and the attachment callables
   # for the two file types). Clients have no write access at all, so the log
@@ -565,6 +585,9 @@ curation overhead:
 2. **Recents** — last 10 opened (`recentBoardIds`, on the user doc so it syncs
    between phone and web).
 3. **Everything else** — alphabetical, with a filter box.
+4. **Templates** — boards marked as templates (2026-11-15), alphabetical, each
+   with a badge, taken out before the others so a marked board is listed once.
+   An archived template goes under Archived and keeps its badge.
 
 No folders or groups: they need curation, a permission story of their own, and a
 second tree to navigate on a phone. Revisit only if the team passes ~50 boards and
@@ -594,7 +617,10 @@ and opens when it lands.
 - **What comes along:** the columns, in order; every OPEN card's title and
   description, in the same column and order; subtask links, each pointing at
   its parent's clone; the institute's labels on those cards; the board's
-  description.
+  description; the board's lanes, switched on or off as they were, under new
+  ids, with each card's lane and the finished column; and its details' fields,
+  under new ids, without their values. A card whose lane is gone on the source
+  has none on the clone.
 - **What stays behind:** archived cards, due dates, assignees, priorities,
   comments, history and attachments, and the template's own labels (Faisal,
   2026-11-13: institute labels only). A subtask whose parent is archived is
@@ -641,6 +667,160 @@ and opens when it lands.
 
 `boardClone` in `@sabeel/shared` is the one statement of what a clone holds.
 
+## Lanes (2026-11-15)
+
+Decided by Faisal over a concept round on 2026-11-15, to let a program board
+replace a program-tracking spreadsheet without adding typing or anything to
+learn for boards that are not programs.
+
+- **A lane is a name in Board settings → Lanes**, as a column is: an id and a
+  name, renamed in place, dragged into order, removed only once it holds no
+  open cards (`laneDeleteBlocked`), at most **12** on a board (`LANES_MAX`,
+  restated in `firestore.rules` and held to it by `ruleLimits.test.ts`).
+  Names are unique on a board, case-insensitively, checked by the app.
+- **A switch, off by default.** Off, or on with no lane added, the board is
+  drawn exactly as before (`lanesLive`). Off keeps the lanes and every card's
+  lane, so on restores the board.
+- **A card records its lane** (`laneId`). No lane, or a lane since removed, is
+  drawn under **No lane**, last, in every column once any card on the board has
+  none. A cross-board move or copy leaves the lane behind.
+- **The finished column exists only on a board with live lanes.** It is chosen
+  on the Lanes page and starts as the last column. Every column write keeps it
+  pinned (`columnsPatch`): deleting it gives its place to the new last column,
+  written and recorded in the board's history, and the delete's confirmation
+  says which column that is. A stored column that is gone anyway, deleted by
+  an app too old to know about lanes, falls back to the last
+  (`finishedColumnId`). A card in it is **finished**
+  (`isFinished`), and **a finished card is never late anywhere**: its face shows
+  its date rather than how late it is, its card says nothing of Overdue, My
+  Work files it under **Finished** (last), Search's Overdue chip leaves it out,
+  and the 08:00 reminder skips it. A board without lanes has no finished column
+  and is unchanged.
+- **Each column lists every lane under one heading** (`LaneHeading`), on the
+  phone, the browser and a tablet alike: the name and one badge, finished of
+  total across every column, **green** when the lane is complete, **red** when
+  an unfinished card is past its date, the ordinary text colour otherwise, "No
+  cards" when empty. A lane keeps its heading in a column with none of its
+  cards, so it holds its place from column to column. The wide board is not a
+  swimlane grid: lanes do not line up across columns (decision A).
+- **Add card asks for a lane** on a board with lanes, none chosen, and adds
+  nothing until one is. A subtask starts in its parent's lane. A card's lane is
+  a second choice beside its column on the card; No lane is offered only while
+  the card has none. The selection bar's Move takes a column, a lane or both.
+  On the browser a card dropped on a lane lands in it; a card with a lane is
+  not dropped into No lane.
+- **A lane change is in the card's history and its followers' notices**, like
+  a column move ("moved it to the Marketing lane"). Sorting an existing board
+  into lanes therefore sends one notice per card (decision B).
+- **A lane's state** (`laneInfo`) counts every open card in it, dated or not;
+  due dates decide only late and soon, through `bucketFor`. Archived cards do
+  not count.
+- **Not checked by the rules, on purpose.** A card in a column that does not
+  exist vanishes from the board, which is why columns are checked against a
+  `columnIds` mirror; a card naming a lane that does not exist is drawn under
+  No lane and loses nothing, the same choice as `parentId`. So there is no
+  `laneIds` mirror, the rules check `laneId`'s shape only, and they never
+  require one: an app from before lanes keeps adding cards, which land under No
+  lane. Lane names and lengths are the app's to keep, like a board's own labels.
+- **A clone carries** whether lanes are on, the lanes (under new ids), each
+  card's lane and the finished column.
+
+## Details (2026-11-15)
+
+Facts about what a board is for: its start date, the teachers, a meeting
+link. Decided by Faisal with lanes, for program boards; a board that adds no
+field has an empty Details page and nothing else changes.
+
+- **A list of typed fields**, each a name, a type and a value: Text, Number,
+  Date, Link, plus **Start date** and **End date**, which are dates with fixed
+  names, one of each at most, and the only details anything else reads
+  (`namedFieldValue`); no field of another type may take either name. A
+  number takes commas only between groups of three (1,200), so "7,5" is
+  refused rather than saved as 75. None is required; none has a default. A field's type is
+  chosen once; to change it, remove the field and add another. At most twenty
+  (`BOARD_FIELDS_MAX`, restated in the rules). No file field, no per-field
+  switch for the overview: both were proposed and rejected.
+- **Everyone on the board reads them** on Board settings → Details, the first
+  page for someone who does not run the board (whose settings are "About this
+  board"). **The board's owners and admins change them**: each value with its
+  own pencil and editor, a date from a picker, and the fields behind "Edit
+  fields". Removing a field removes its value in the same write.
+- **A link opens only when it is http or https** (`safeLink`), checked when
+  saved and again when tapped, since another client could have stored
+  anything.
+- **Values are strings in one map**, keyed by field id, written by path, so two
+  owners saving different values both land.
+- **Shapes are the app's, not the rules'**: rules bound the list and the map at
+  twenty and cannot look inside either, so a name's length, a date being a date
+  and a link being http hold because the app keeps them and only owners and
+  admins write a board. The same accepted gap as a board's own labels.
+- **History** records fields added, removed, renamed and reordered, and each
+  value set or cleared, naming the field. **A clone** carries the fields under
+  new ids and none of the values.
+
+## Overview (2026-11-15)
+
+One screen that shows how every program is going, so the people running
+programs see what is late without opening each board. Decided by Faisal with
+lanes; read-only, and it stores two preferences per person and nothing else.
+
+- **Reached from an icon in the Boards header**, shown only to someone with at
+  least one board it lists (a hidden one counts), so people who never use
+  lanes never see it. Not a tab and not in More (decision D).
+- **It lists the boards you can see that have live lanes** (`lanesLive`), are
+  not marked as templates and are not archived (`overviewBoards`): the boards
+  you are on, and every such board for an admin, as in the Boards list.
+  Archiving a board is how a finished program leaves everyone's overview.
+- **One row per board**: its name, its Start date and End date if set, and one
+  mark per lane, the lane's state (`laneInfo`) as a shape and a colour, so it
+  reads without colour: a tick on green (all finished), an exclamation on red
+  (a card is late), filled (due soon), a ring (under way), a dashed ring
+  (cards, none dated) and a dash (no cards). A finished card is never late
+  here either. **No legend on the screen** (Faisal, 2026-11-17): a key would
+  cost rows a phone cannot spare, so the marks are explained in the manual and
+  in the overview's help film, which lays them over the picture. Nothing else
+  is read from Details. A row opens its board; to a
+  screen reader it is one button that says each lane and its state
+  (`describeMark`). A board whose cards could not be loaded says so on its
+  row rather than drawing marks that would read as "nothing here".
+- **Boards with the same lanes share a heading.** "The same" is the lanes'
+  names in the same order, ignoring capitals and spaces at the ends
+  (`laneSignature`); a board that renames, adds or reorders a lane moves under
+  a heading of its own. Boards are ordered inside their group, and the group
+  holding the first board in the order comes first (`groupOverview`).
+- **Three orders, each either way, remembered per person**: start date
+  (earliest first, where it opens), date created (oldest first) and most
+  overdue (the board whose latest card is most days late first, counting only
+  cards in its lanes, the ones its row shows). A board with no start date goes
+  last whichever way the start-date order runs, and so does one whose cards
+  are still loading or could not be read under most overdue. Ties go by name
+  (`sortOverview`). Nobody arranges the list by hand.
+- **Each person hides boards from their own overview**, by a long press on the
+  row (right-click on a computer), and shows them again from **Hidden (n)** at
+  the foot; a board shown again returns to its place (decision E). Hiding
+  changes nothing for anyone else, and a hidden board stays hidden through
+  being archived and restored. Hiding is offered only once the person's
+  hidden list has been read.
+- **The lane names are written in full.** Each is measured as drawn, in the
+  platform's own font (`useMeasuredWidths`). Straight over their marks where
+  each fits its column on one line; otherwise on a slant, every name starting
+  at its own mark (`laneColumns`). The columns narrow until the name that reaches
+  furthest right ends inside the row, and the slant is the gentlest at which
+  neighbouring names stay a line apart. So every lane is on screen, nothing
+  scrolls sideways, and on a small phone with twelve lanes the marks shrink
+  rather than touch (decision F). There is no setting for the layout.
+- **Stored per person, on the user document**: `overviewSort`,
+  `overviewReverse` and `overviewHiddenBoardIds`, written by the person alone,
+  each control writing its own field. The hidden list keeps boards not listed
+  at the moment, so one archived and restored stays hidden, and holds the
+  latest 500 (`OVERVIEW_HIDDEN_MAX`, restated in the rules). A display preference grants nothing, so hiding a board you
+  cannot see changes nothing.
+- **Each row listens to its own board's cards**, the board screen's query and
+  rule, rather than one query across boards: a member's read of a card is
+  checked against its board, and a query may make ten such lookups. Rows are
+  not virtualised, since a row that stops listening would lose its place in
+  "most overdue". Fine for the boards fewer than fifty people keep.
+
 ## Theming
 
 **The palette is the Sabeel Institute brand palette** — see `docs/BRAND.md`, the
@@ -673,15 +853,16 @@ comments, newest first.
 
 - Clients cannot write activity at all — the log is trustworthy by construction.
 - Field edits that carry no meaning for others (rank-only changes from a reorder)
-  are **not** logged; a column change is. Otherwise a busy board's history is
-  100% noise and nobody reads it.
+  are **not** logged; a column change is, and so is a lane change on the same
+  board. Otherwise a busy board's history is 100% noise and nobody reads it.
 - Retention matches cards: kept indefinitely.
 
 ### A board's own history
 
-At the bottom of Board settings, for everyone who can see the board: who
+On the History page of Board settings, for everyone who can see the board: who
 created it, renamed it, archived or restored it, added or removed whom, made
-or unmade an owner, and added, removed, renamed or reordered its columns.
+or unmade an owner, added, removed, renamed or reordered its columns or its
+lanes, turned lanes on or off, and set the finished column.
 
 - **One writer.** The `onBoardWritten` trigger diffs every board write
   (`diffBoard` in `@sabeel/shared`) into `boards/{id}/activity`. Client edits
@@ -737,10 +918,21 @@ Deny-by-default.
   members of the card's board, and an entry for a board you are not on yields
   nothing. `removeBoardMember` clears the removed person's entries for that
   board.
+- A user may write their own overview preferences: `overviewSort` one of the
+  three orders, `overviewReverse` a boolean, `overviewHiddenBoardIds` a list of
+  at most 500 (`OVERVIEW_HIDDEN_MAX`, held to it by `ruleLimits.test.ts`).
+  They grant nothing, so the ids are not checked.
 - Board create: `role in [organizer, admin]`. Settings, membership, ownership and
   archive: ownership of that board.
 - `columnId` on a card must match a column that exists on the board — clients
   cannot invent columns.
+- **A board's `fields` and `details` are bounded at twenty each and nothing
+  more**; their contents are the app's to keep (see "Details").
+- **`laneId` on a card is checked for shape only** (a string of at most 200),
+  and never required, by decision: see "Lanes". A board holds at most 12
+  `lanes`; their names, their uniqueness and the finished column naming a real
+  column are the app's to keep, an accepted gap like a board's own labels, held
+  because only a board's owners and admins write a board.
 - **Every uid in a card's `assigneeUids` must be in the parent board's
   `memberUids`.** Load-bearing for My Work — see above.
 - **The same is true of `subscriberUids`**, and for a sharper reason: the read
@@ -909,6 +1101,10 @@ edits made while offline.
 - **Card move** is a "Move to…" sheet from the card (long-press or detail screen),
   not a drag — dragging across a swipe-paged surface is ambiguous and error-prone.
 - **Reorder within a column** is a long-press drag on the vertical list only.
+- **On a board with lanes**, each column page lists the board's lanes in order,
+  each under a heading with its badge, then that lane's cards in this column;
+  a lane with none here keeps its heading, so lanes hold their place as you
+  swipe.
 - Card detail is a **full screen**, not a modal; comments live at the bottom of it.
 - Board switcher is a bottom sheet listing the user's boards.
 

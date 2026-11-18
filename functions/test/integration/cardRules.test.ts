@@ -423,6 +423,45 @@ describe('creating cards', () => {
   });
 });
 
+describe('a card’s lane', () => {
+  it('a member creates a card in a lane', async () => {
+    await assertSucceeds(
+      setDoc(doc(ctx('member1', 'member'), 'cards/lane1'), card({ laneId: 'ln_marketing' })),
+    );
+  });
+
+  it('a member moves a card to another lane, and to another column with it', async () => {
+    await assertSucceeds(
+      updateDoc(doc(ctx('member1', 'member'), 'cards/card1'), {
+        ...card({ laneId: 'ln_supplies' }),
+        columnId: 'c2',
+        rank: 'W',
+      }),
+    );
+  });
+
+  // Not checked against the board's lanes, on purpose: a lane that is gone is
+  // drawn under No lane and loses nothing (CardDoc.laneId).
+  it('accepts a lane the board does not have', async () => {
+    await assertSucceeds(
+      setDoc(doc(ctx('member1', 'member'), 'cards/lane2'), card({ laneId: 'ln_never_there' })),
+    );
+  });
+
+  it('never requires one, so an app from before lanes still adds cards', async () => {
+    await assertSucceeds(setDoc(doc(ctx('member1', 'member'), 'cards/lane3'), card()));
+  });
+
+  it('rejects a non-string or over-long lane', async () => {
+    await assertFails(
+      setDoc(doc(ctx('member1', 'member'), 'cards/lane4'), card({ laneId: 42 })),
+    );
+    await assertFails(
+      setDoc(doc(ctx('member1', 'member'), 'cards/lane5'), card({ laneId: 'x'.repeat(201) })),
+    );
+  });
+});
+
 describe('updating cards (in-board)', () => {
   it('a member can move a card between columns on their board', async () => {
     await assertSucceeds(

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { BackHandler } from 'react-native';
 import { goBackHistory, onPopState, pushHistory, replaceHistory } from './history';
+import type { BoardSettingsPage } from './boardSettingsPages';
 
 /**
  * A tiny navigation stack.
@@ -18,10 +19,12 @@ import { goBackHistory, onPopState, pushHistory, replaceHistory } from './histor
 export type Route =
   | { name: 'boards' }
   | { name: 'board'; boardId: string }
-  | { name: 'boardSettings'; boardId: string }
+  /** No page is the list of pages on a phone, and the first page on a wide screen. */
+  | { name: 'boardSettings'; boardId: string; page?: BoardSettingsPage }
   | { name: 'boardArchive'; boardId: string }
   | { name: 'newBoard' }
   | { name: 'card'; boardId: string; cardId: string }
+  | { name: 'overview' }
   | { name: 'myWork' }
   | { name: 'search' }
   | { name: 'users' }
@@ -58,12 +61,30 @@ function popInternal() {
 onPopState(popInternal);
 
 function pop() {
-  if (stack.length <= 1) return;
-  // On web let the BROWSER drive: history.back() fires popstate, which calls
-  // popInternal. Popping here as well would take two screens off one press.
-  // Returns false on native, where we pop directly.
-  if (goBackHistory()) return;
-  popInternal();
+  back(1);
+}
+
+/** Take `steps` screens off the stack at once, never the last. */
+function back(steps: number) {
+  const n = Math.min(steps, stack.length - 1);
+  if (n <= 0) return;
+  // On web let the BROWSER drive: history.go(-n) fires popstate, which calls
+  // popInternal once a step. Popping here as well would take screens off
+  // twice. Returns false on native, where we pop directly.
+  if (goBackHistory(n)) return;
+  for (let i = 0; i < n; i += 1) popInternal();
+}
+
+/**
+ * Swap the screen on top for another without a step back to it: a choice made
+ * WITHIN one screen, such as a page from the side list of Board settings on a
+ * wide screen. Back then leaves the screen rather than walking every page that
+ * was looked at. The browser's current entry still stands for the top of the
+ * stack, so history is left alone.
+ */
+function replace(route: Route) {
+  stack = [...stack.slice(0, -1), route];
+  emit();
 }
 
 /** Replace the whole stack — used when signing out, or jumping to a root tab. */
@@ -115,9 +136,13 @@ export function useNav() {
 
   return {
     route: s[s.length - 1],
+    /** The whole stack, top last, for a screen whose Back depends on it. */
+    stack: s,
     canGoBack: s.length > 1,
     push: useCallback(push, []),
     pop: useCallback(pop, []),
+    back: useCallback(back, []),
+    replace: useCallback(replace, []),
     reset: useCallback(reset, []),
   };
 }

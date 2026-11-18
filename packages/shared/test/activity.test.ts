@@ -237,6 +237,47 @@ describe('attachment history', () => {
   });
 });
 
+describe('lane history', () => {
+  const lanes = (id: string) => ({ plan: 'Planning', mkt: 'Marketing' })[id];
+  const say = (entry: { type: ActivityType; from?: string; to?: string }) =>
+    describeActivity(entry, () => 'Sara', () => 'Done', undefined, lanes);
+  const card = { boardId: 'b1', columnId: 'todo', laneId: 'plan' };
+
+  it('records a lane change on the board, as a column move is', () => {
+    expect(diffCard(card, { ...card, laneId: 'mkt' })).toEqual([
+      { type: 'lane', from: 'plan', to: 'mkt' },
+    ]);
+    expect(diffCard({ ...card, laneId: undefined }, card)).toEqual([
+      { type: 'lane', from: undefined, to: 'plan' },
+    ]);
+  });
+
+  it('records the column and the lane when both move in one write', () => {
+    expect(diffCard(card, { ...card, columnId: 'done', laneId: 'mkt' }).map((e) => e.type)).toEqual(
+      ['moved', 'lane'],
+    );
+  });
+
+  it('records nothing for the lane on a move to another board, which clears it', () => {
+    expect(
+      diffCard(card, { ...card, boardId: 'b2', columnId: 'c9', laneId: undefined }),
+    ).toEqual([{ type: 'moved', from: 'todo', to: 'c9' }]);
+  });
+
+  it('names the lane', () => {
+    expect(say({ type: 'lane', from: 'plan', to: 'mkt' })).toBe('moved it to the Marketing lane');
+  });
+
+  it('still reads for a lane since removed, or a lane cleared', () => {
+    expect(say({ type: 'lane', to: 'gone' })).toBe('moved it to another lane');
+    expect(say({ type: 'lane', from: 'plan' })).toBe('took it out of its lane');
+  });
+
+  it('is known to this build', () => {
+    expect(isKnownActivityType('lane')).toBe(true);
+  });
+});
+
 describe('isKnownActivityType', () => {
   it('accepts every type this build describes', () => {
     for (const t of ['created', 'moved', 'attached', 'detached'] as const) {
