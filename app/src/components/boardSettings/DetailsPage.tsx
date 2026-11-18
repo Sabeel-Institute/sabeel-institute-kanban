@@ -207,7 +207,11 @@ function DetailValue({
             accessibilityLabel={`${field.name}: ${link}`}
             onPress={() => void Linking.openURL(link).catch(() => undefined)}
           >
-            <Text style={[type.body, styles.link, { color: t.text.accent }]}>{link}</Text>
+            {/* Selectable, as a text value is: a meeting link is copied into
+                a message as often as it is opened. */}
+            <Text style={[type.body, styles.link, { color: t.text.accent }]} selectable>
+              {link}
+            </Text>
           </Pressable>
         ) : (
           <Text style={[type.body, { color: t.text.primary }]} selectable>

@@ -114,6 +114,15 @@ export function DateField({
           const next = e.target.value;
           setDraft(next);
           stopWaiting();
+          // Emptied by the browser's own clear (Chrome's picker, Android's
+          // dialog), not mid-typing: `badInput` is what tells the two apart,
+          // since a half-typed date also reads as ''. Saved at once, as the
+          // Clear button does; it once waited for the field to be left, and
+          // leaving the screen first lost it.
+          if (next === '' && !e.target.validity.badInput) {
+            settle('');
+            return;
+          }
           if (plausibleDay(next)) {
             waiting.current = next;
             timer.current = setTimeout(() => settle(next), SETTLE_MS);

@@ -1538,9 +1538,11 @@ async function tour(page, tag, width) {
           rows,
         };
       });
+      // Fundraising 2026 has no details, so a member is not shown the page:
+      // they could add none, and it would be the first they land on.
       const wantRows = wants.settings
         ? ['General', 'Columns', 'Lanes', 'Details', 'People', 'Labels', 'History']
-        : ['Details', 'People', 'Labels', 'History'];
+        : ['People', 'Labels', 'History'];
       check(
         `${tag} / settings as ${role === 'owner' ? 'an owner' : 'a member'} lists its pages`,
         list.title === (wants.settings ? 'settings' : 'members') &&

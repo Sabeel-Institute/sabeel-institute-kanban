@@ -137,7 +137,7 @@ Each card shows, at a glance: its **title**, a **priority badge**, its **labels*
 its **due date** (red if overdue), and the **people assigned** (as name chips) —
 so you can read a card without opening it. A card with no priority set shows no
 badge. Tap **+ Add card** at the bottom of a column, type a title, press Enter —
-that's a new card. The **bell** beside the title is on, so you're subscribed to the
+that's a new card (on a board with lanes, choose its lane first; see *Lanes*). The **bell** beside the title is on, so you're subscribed to the
 card you make and hear about everything on it (see **Subscribe**, below); tap it
 before adding if you'd rather not.
 
@@ -761,8 +761,8 @@ beside it; click another page to open it there, and **Back** returns to the
 board.
 
 If you don't own the board the icon is a **group of people** instead and says
-**About this board**: the same list with **Details**, **People**, **Labels**
-and **History**, and nothing else.
+**About this board**: the same list with **People**, **Labels** and
+**History**, and **Details** first when the board has any, and nothing else.
 
 <div class="pair">
   <figure class="ph"><img src="manual/img/roster-phone.png" alt="People as somebody who does not own the board, on a phone"><figcaption>The same on a phone</figcaption></figure>

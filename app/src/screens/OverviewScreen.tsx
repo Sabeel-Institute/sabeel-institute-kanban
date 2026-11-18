@@ -21,6 +21,8 @@ import {
   setOverviewHidden,
   setOverviewReverse,
   setOverviewSort,
+  noteBoardOpened,
+  useMyBoardPrefs,
   useMyBoards,
   useMyOverviewPrefs,
   type BoardListItem,
@@ -73,6 +75,7 @@ export function OverviewScreen({ user }: { user: SessionUser }) {
   const nav = useNav();
   const boards = useMyBoards(user);
   const prefs = useMyOverviewPrefs(user);
+  const boardPrefs = useMyBoardPrefs(user);
   const { run, error } = useAction('overview');
   const [hiding, setHiding] = useState<BoardListItem | null>(null);
   const [showHidden, setShowHidden] = useState(false);
@@ -175,7 +178,12 @@ export function OverviewScreen({ user }: { user: SessionUser }) {
           laneNames={g.laneNames}
           boards={g.rows.map((r) => r.board)}
           onReport={report}
-          onOpen={(b) => nav.push({ name: 'board', boardId: b.id })}
+          onOpen={(b) => {
+            // Recent, as a board opened from the Boards list is: a program
+            // reached through the overview was otherwise never among them.
+            void noteBoardOpened(user, b.id, boardPrefs.data?.recents ?? []).catch(() => undefined);
+            nav.push({ name: 'board', boardId: b.id });
+          }}
           onMenu={setHiding}
         />
       ))}

@@ -364,6 +364,9 @@ export function CardScreen({
           {/* The lane, beside the column, on a board with lanes. "No lane" is
               offered only while the card has none: a card is placed, not
               unplaced. */}
+          {/* Said on screen, as "in" says the column: a lane called Planning
+              read as another column or a stage. */}
+          {live ? <Hint>lane</Hint> : null}
           {live ? (
             <Select
               label="Lane"

@@ -95,7 +95,8 @@ not the rules': a build from before board labels ignores it until the version
 floor retires it, and a phone before 0.13.1 never reads the floor.
 
 Everyone else on a board opens Board settings as **About this board**, with
-the four pages they can use: **Details**, which everyone on the board reads;
+the pages they can use: **Details**, which everyone on the board reads, when
+the board has any;
 **People**, the member list, read-only, with owners marked; **Labels**, the
 board's own to change like anyone on the board; and **History**. The roster answers "who do I ask to add someone?" without a
 trip to an admin — which is what it used to take.

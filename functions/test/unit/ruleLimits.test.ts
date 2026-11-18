@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { BOARD_FIELDS_MAX, LANES_MAX, OVERVIEW_HIDDEN_MAX, OVERVIEW_SORTS } from '@sabeel/shared';
+import { BOARD_FIELDS_MAX, COMMENT_BODY_MAX, LANES_MAX, OVERVIEW_HIDDEN_MAX, OVERVIEW_SORTS } from '@sabeel/shared';
 
 /**
  * LIMITS THE RULES RESTATE. Rules cannot import TypeScript, so a cap the app
@@ -31,6 +31,11 @@ describe('limits restated in firestore.rules', () => {
 
   it('bounds the boards one person hides from the overview at OVERVIEW_HIDDEN_MAX', () => {
     expect(sizeBounds('overviewHiddenBoardIds')).toEqual([OVERVIEW_HIDDEN_MAX]);
+  });
+
+  it('bounds a comment at COMMENT_BODY_MAX, which the comment box counts against', () => {
+    const bounds = [...rules.matchAll(/comment\(\)\.body\.size\(\) <= (\d+)/g)].map((m) => Number(m[1]));
+    expect(bounds).toEqual([COMMENT_BODY_MAX, COMMENT_BODY_MAX]);
   });
 
   it('admits exactly the overview orders the app offers', () => {
