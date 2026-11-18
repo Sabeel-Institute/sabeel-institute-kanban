@@ -3,10 +3,10 @@ import {
   activeMentionQuery,
   completeMention,
   extractMentions,
-  handleFor,
   isMentionQuery,
   mentionSuggestions,
 } from '../src/mentions';
+import { handleFor } from '../src/people';
 
 const people = [
   { uid: 'u1', displayName: 'Sara Ahmed', email: 'sara@oursabeel.com' },

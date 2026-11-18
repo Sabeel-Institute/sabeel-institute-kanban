@@ -27,14 +27,22 @@
  */
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { PRIORITIES, priorityLabel, type Priority } from '@sabeel/shared';
+import {
+  NO_PEOPLE_MATCH,
+  PEOPLE_FILTER_LABEL,
+  PRIORITIES,
+  priorityLabel,
+  type Priority,
+} from '@sabeel/shared';
 import { Sheet } from './Sheet';
-import { NarrowList, type NarrowItem } from './NarrowList';
+import { NarrowList, narrowPeople, type NarrowItem } from './NarrowList';
 import { Button, FilterChip, Hint, Row } from './ui';
 import { space, useTheme } from '../theme';
 
 /** The "no board" / "anyone" row. A real id can never be empty. */
 const ANY = '';
+/** People narrow as every person picker does; "Anyone" stays first until something is typed. */
+const NARROW_PEOPLE = narrowPeople([ANY]);
 
 type Section = 'priority' | 'board' | 'labels' | 'assignee';
 
@@ -171,7 +179,9 @@ function Sections({
           items={people.length > 0 ? [{ id: ANY, name: 'Anyone' }, ...people] : []}
           selectedIds={[assigneeUid ?? ANY]}
           onPick={(uid) => onPickAssignee(uid === ANY ? undefined : uid)}
-          placeholder="Filter people"
+          placeholder={PEOPLE_FILTER_LABEL}
+          narrow={NARROW_PEOPLE}
+          noMatch={NO_PEOPLE_MATCH}
           actionVerb="Filter to"
           empty="Nobody is on a board with you."
           bounded={false}
