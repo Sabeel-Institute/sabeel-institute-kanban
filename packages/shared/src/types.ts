@@ -78,6 +78,21 @@ export interface BoardLane {
   name: string;
 }
 
+/**
+ * A detail's type. `start` and `end` are dates that always carry the names
+ * Start date and End date, at most one of each on a board, and are the only
+ * fields anything else in the app reads (the overview). The type is chosen
+ * once: to change it, the field is removed and another added.
+ */
+export type BoardFieldType = 'text' | 'number' | 'date' | 'link' | 'start' | 'end';
+
+/** One of a board's details: a named, typed field. Its value is in `BoardDoc.details`. */
+export interface BoardField {
+  id: string;
+  name: string;
+  type: BoardFieldType;
+}
+
 // ---- Labels ----------------------------------------------------------------
 
 /**
@@ -190,6 +205,25 @@ export interface BoardDoc {
    * this names one that is gone.
    */
   doneColumnId?: string;
+  /**
+   * The board's details: facts about what the board is for, such as a start
+   * date or a meeting link. In the order the Details page shows them; at most
+   * `BOARD_FIELDS_MAX`. Absent is none.
+   */
+  fields?: BoardField[];
+  /**
+   * Each field's value, by field id, always a string (a date as `YYYY-MM-DD`,
+   * a number as typed). A field with no value has no key. Removing a field
+   * removes its key in the same write. Shapes are the app's to keep
+   * (`validateDetailValue`): rules can bound the map, not look inside it.
+   */
+  details?: Record<string, string>;
+  /**
+   * Marked as a template: listed under Templates in the Boards list, with a
+   * badge, and left out of the overview. Nothing else; any board can be
+   * cloned, marked or not, and a clone is never marked. Absent is not.
+   */
+  template?: boolean;
 }
 
 // ---- Cards -----------------------------------------------------------------
@@ -399,7 +433,21 @@ export type BoardActivityType =
   | 'laneRenamed'
   | 'lanesReordered'
   /** `to` carries the name of the column finished cards are in. */
-  | 'finishedColumn';
+  | 'finishedColumn'
+  /** `to` carries the field's name. */
+  | 'fieldAdded'
+  /** `from` carries the field's name. */
+  | 'fieldRemoved'
+  /** `from`/`to` carry the old and new name. */
+  | 'fieldRenamed'
+  | 'fieldsReordered'
+  /** `field` carries the field's name, `to` its new value, absent when cleared. */
+  | 'detailChanged'
+  | 'templateOn'
+  | 'templateOff'
+  /** The board's first line when it was made by cloning: `from` carries the
+   *  source board's name. Written by `cloneBoard`, not by `diffBoard`. */
+  | 'cloned';
 
 /**
  * An entry in a board's history, at `boards/{boardId}/activity/{id}`.
@@ -426,6 +474,8 @@ export interface BoardActivityDoc {
   subjectName?: string;
   from?: string;
   to?: string;
+  /** The field a `detailChanged` entry is about, by name. */
+  field?: string;
   /**
    * Set only on a change recovered from backups: it happened after `since` and
    * by `at`, and nothing narrows it further.

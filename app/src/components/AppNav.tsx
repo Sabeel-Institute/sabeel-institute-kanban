@@ -43,7 +43,7 @@ const TABS: TabDef[] = [
     key: 'boards',
     label: 'Boards',
     icon: 'dashboard',
-    activeFor: ['boards', 'board', 'boardSettings', 'newBoard', 'card'],
+    activeFor: ['boards', 'board', 'boardSettings', 'newBoard', 'card', 'overview'],
   },
   { key: 'myWork', label: 'My Work', icon: 'assignment-ind', activeFor: ['myWork'] },
   { key: 'search', label: 'Search', icon: 'search', activeFor: ['search'] },

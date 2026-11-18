@@ -1,6 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { BackHandler, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { canEditBoardLabels, canManageBoard, finishedColumnChoice } from '@sabeel/shared';
+import {
+  canEditBoardLabels,
+  canManageBoard,
+  filledFields,
+  finishedColumnChoice,
+} from '@sabeel/shared';
 import { useBoard, type BoardListItem } from '../boards';
 import {
   PAGE_TITLES,
@@ -18,6 +23,7 @@ import { Card, Hint, IconAction, LoadError, Row, Screen, Spinner, Title } from '
 import { BoardHistory } from '../components/BoardHistory';
 import { BoardLabelsSection } from '../components/LabelManager';
 import { ColumnsPage } from '../components/boardSettings/ColumnsPage';
+import { DetailsPage } from '../components/boardSettings/DetailsPage';
 import { GeneralPage } from '../components/boardSettings/GeneralPage';
 import { LanesPage } from '../components/boardSettings/LanesPage';
 import { PeoplePage } from '../components/boardSettings/PeoplePage';
@@ -99,7 +105,7 @@ export function BoardSettingsScreen({
    * with fewer, and a page no longer offered falls back (`shownPage`).
    */
   const canManage = canManageBoard(user, b);
-  const pages = settingsPages(canManage);
+  const pages = settingsPages(canManage, b.fields.length > 0);
   const shown = shownPage(page, pages, isWide);
   const ownLabels =
     labels.status === 'ready'
@@ -114,6 +120,8 @@ export function BoardSettingsScreen({
     lanesOn: b.lanesOn,
     lanes: b.lanes.length,
     finishedColumn: b.columns.find((c) => c.id === finishedColumnChoice(b))?.name ?? null,
+    fields: b.fields.length,
+    filled: filledFields(b.fields, b.details),
   };
 
   function goBack() {
@@ -142,7 +150,7 @@ export function BoardSettingsScreen({
   ) : null;
   // What the screen is called with no page open. Someone who does not run the
   // board reaches it from a control named this, so the screen says the same.
-  const listTitle = canManage ? 'Board settings' : 'Members and labels';
+  const listTitle = canManage ? 'Board settings' : 'About this board';
 
   if (isWide) {
     return (
@@ -209,6 +217,8 @@ function PageBody({
       return <ColumnsPage board={board} />;
     case 'lanes':
       return <LanesPage board={board} />;
+    case 'details':
+      return <DetailsPage board={board} canEdit={canManage} />;
     case 'people':
       return <PeoplePage board={board} user={user} canManage={canManage} />;
     case 'labels':

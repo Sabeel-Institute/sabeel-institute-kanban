@@ -1,6 +1,6 @@
 import { SYSTEM_ACTOR } from './activity';
 import { localId, newBoard } from './boards';
-import type { BoardColumn, BoardDoc, BoardLane, CardDoc } from './types';
+import type { BoardColumn, BoardDoc, BoardField, BoardLane, CardDoc } from './types';
 
 /**
  * Cloning a board: a new board laid out like the source, holding a fresh copy
@@ -48,6 +48,13 @@ export const CLONE_BOARD_MAX_CARDS = 240;
  */
 export const CLONE_BOARD_MAX_BYTES = 8 * 1024 * 1024;
 
+/**
+ * The id of a clone's first history line, "cloned from", which `cloneBoard`
+ * writes with the board. Fixed, so `onBoardWritten` can tell a clone from a
+ * new board and not add a "created" line beside it.
+ */
+export const CLONED_ENTRY_ID = 'cloned';
+
 /** What a clone reads of each source card. */
 export interface CloneSourceCard {
   id: string;
@@ -82,6 +89,7 @@ export function boardClone(params: {
     lanesOn?: boolean;
     lanes?: readonly BoardLane[];
     doneColumnId?: string;
+    fields?: readonly BoardField[];
   };
   cards: readonly CloneSourceCard[];
   /** Every label, so only the institute's are kept: a board's own has no `boardId` match on the clone. */
@@ -175,6 +183,11 @@ export function boardClone(params: {
     // A finished column that is gone on the source is left unset: the clone
     // falls back to its last column, as the source did.
     ...(doneColumnId ? { doneColumnId } : {}),
+    // The details' fields under new ids, and none of their values: what was
+    // typed belongs to one run of the work, as a due date does.
+    ...((params.source.fields ?? []).length > 0
+      ? { fields: params.source.fields!.map((f) => ({ ...f, id: localId('fld') })) }
+      : {}),
   };
   return { board, cards };
 }

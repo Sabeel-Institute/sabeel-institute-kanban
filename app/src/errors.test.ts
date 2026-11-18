@@ -112,7 +112,7 @@ describe('errorText, on a write the rules refused', () => {
     const prod = new Refusal('permission-denied', 'Missing or insufficient permissions.');
     const emulator = new Refusal('permission-denied', "PERMISSION_DENIED: \nfalse for 'update' @ L3");
     for (const e of [prod, emulator]) {
-      expect(errorText(e)).toMatch(/^That change was not allowed\./);
+      expect(errorText(e)).toMatch(/^That was not allowed\./);
     }
   });
 

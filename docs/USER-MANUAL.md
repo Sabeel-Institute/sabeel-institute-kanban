@@ -114,6 +114,8 @@ rail stays put — it's narrow enough to keep out of the way.
 
 **Boards** lists everything you can open. Tap the **star** beside a board to keep
 it at the top; boards you've opened recently follow, then the rest alphabetically.
+Boards marked as **templates**, the ones people clone to start a program, come
+last under their own heading, each with a small *Template* badge.
 
 Every board shows as a card in a grid on wide screens, and as a single-column list
 on a phone. If your account can create boards, **New board** is at the top (see
@@ -135,7 +137,7 @@ Each card shows, at a glance: its **title**, a **priority badge**, its **labels*
 its **due date** (red if overdue), and the **people assigned** (as name chips) —
 so you can read a card without opening it. A card with no priority set shows no
 badge. Tap **+ Add card** at the bottom of a column, type a title, press Enter —
-that's a new card. The **bell** beside the title is on, so you're subscribed to the
+that's a new card (on a board with lanes, choose its lane first; see *Lanes*). The **bell** beside the title is on, so you're subscribed to the
 card you make and hear about everything on it (see **Subscribe**, below); tap it
 before adding if you'd rather not.
 
@@ -148,7 +150,7 @@ another column doesn't count.
 **On a phone the row along the bottom holds everything else**: beside **+ Add
 card** are icons to watch the column, delete it (owners of the board only), open the
 board's **archived cards**, and open the board's **settings** — or, if you do not
-own it, its **members and labels**, the pages of settings you can use. They sit
+own it, **About this board**, the pages of settings you can use. They sit
 there rather than in the header so the board's name has the top row to itself.
 
 ### Lanes
@@ -184,6 +186,44 @@ before **Add**. A subtask starts in the lane of the card it belongs to.
 
 A board without lanes looks exactly as described above. Lanes are switched on
 in the board's settings (Part 2).
+
+### The overview
+
+<div class="pair">
+  <figure class="ph"><img src="manual/img/overview-phone.png" alt="The overview on a phone: each program's name and dates, a row of marks under the lane names written on a slant"><figcaption>On a phone</figcaption></figure>
+  <figure class="wd"><img src="manual/img/overview-wide.png" alt="The overview in a browser: each program on one line, its marks under the lane names"><figcaption>In a browser</figcaption></figure>
+</div>
+
+If you're on a board with lanes, the **Boards** screen has an **Overview**
+button at the top (a list with ticks). It shows every board with lanes that
+you can open, one row each: the board's name, its start and end dates if it
+has them, and a mark for each lane, under the lane's name.
+
+- a **tick on green**: every card in the lane is finished
+- an **exclamation mark on red**: a card in the lane is late
+- **filled in**: a card is due in the next few days
+- a **ring**: under way, nothing late
+- a **dashed ring**: it has cards, but none has a due date
+- a **dash**: the lane has no cards
+
+The **overview** film in **More → Help** goes through the marks one by one.
+
+Boards with the same lanes sit together under one row of lane names. Tap a
+row to open its board.
+
+**Order** sorts the boards by **Start date** (where it starts), **Date
+created** or **Most overdue**, and the arrows beside it turn that order the
+other way. A board without a start date always comes last when sorting by
+start date. The app remembers your choice.
+
+**Hiding a board from your overview:** press and hold its row (right-click in
+a browser) and choose **Hide from my overview**. It's hidden for you only. To
+bring it back, open **Hidden** at the foot of the list and press the **show**
+icon beside it. A board you've hidden stays hidden, even if it's archived and
+later restored.
+
+Boards marked as templates and archived boards aren't in the overview, so
+archiving a program when it's over takes it out for everyone.
 
 ## 1.5 Working with a card
 
@@ -621,8 +661,9 @@ altogether in **Alerts → Settings**.
 </div>
 
 **More → Help** lists short narrated films of the app at work, one for each
-thing people do in it: signing in, a board, a card, comments, attachments,
-search, alerts and the rest, then running a board, then the admins' screens.
+thing people do in it: signing in, a board, lanes, a card, comments,
+attachments, the overview, search, alerts and the rest, then running a board
+and its details, then the admins' screens.
 Everyone sees every film, so a member can see what an owner or an admin does
 and knows whom to ask.
 
@@ -692,10 +733,17 @@ would otherwise tell you about every change to every card.
 
 The clone has the same columns and lanes, and each open card in the same place
 and lane, with its title, its description and its subtasks, and the institute's
-labels. It starts
-fresh on everything that belongs to one run of the work: no due dates, nobody
-assigned, no priorities, comments, history or files. Archived cards and the
+labels; a card that was finished on the old board is finished on the new one.
+It has the same details' fields, all empty. It starts fresh on everything that
+belongs to one run of the work: no due dates, nobody assigned, no priorities,
+comments, history or files, and no details filled in. Archived cards and the
 board's own labels are not cloned. The board you cloned from does not change.
+
+A board made to be cloned can be **marked as a template** in its settings, under
+**General**: it then sits under *Templates* in the Boards list, and it is left
+out of the overview. Any board can be
+cloned, marked or not, and a clone is never marked. The clone's history opens
+with one line saying which board it was cloned from; nothing else ties the two.
 
 For a member, pressing and holding a board does nothing more than a tap: a
 member who wants a clone asks an organizer. An archived board has to be
@@ -716,8 +764,8 @@ beside it; click another page to open it there, and **Back** returns to the
 board.
 
 If you don't own the board the icon is a **group of people** instead and says
-**Members and labels**: the same list with **People**, **Labels** and
-**History**, and nothing else.
+**About this board**: the same list with **People**, **Labels** and
+**History**, and **Details** first when the board has any, and nothing else.
 
 <div class="pair">
   <figure class="ph"><img src="manual/img/roster-phone.png" alt="People as somebody who does not own the board, on a phone"><figcaption>The same on a phone</figcaption></figure>
@@ -726,8 +774,8 @@ If you don't own the board the icon is a **group of people** instead and says
 
 The pages:
 
-- **General** — rename the board, and archive it (or restore it, once it is
-  archived). This page is the only place that renames a board, which is why a
+- **General** — rename the board, mark it as a **template** (see *Cloning a
+  board*), and archive it (or restore it, once it is archived). This page is the only place that renames a board, which is why a
   member who cannot open it cannot rename a board either.
 - **Columns** — add, rename, and reorder. Tap the **pencil** beside a column's
   name to rename it; drag the handle to reorder. A column can only be deleted
@@ -754,6 +802,28 @@ The pages:
     <figure class="ph"><img src="manual/img/lanesettings-phone.png" alt="The Lanes page on a phone: the switch, the lanes with their handles, and where finished cards are"><figcaption>On a phone</figcaption></figure>
     <figure class="wd"><img src="manual/img/lanesettings-wide.png" alt="The Lanes page in a browser"><figcaption>In a browser</figcaption></figure>
   </div>
+- **Details** — facts about what the board is for, such as its start date,
+  the teachers or a meeting link. **Everyone on the board reads them**; its
+  owners change them.
+
+  <div class="pair">
+    <figure class="ph"><img src="manual/img/details-phone.png" alt="The Details page on a phone: each field's name and value, with a pencil to change it"><figcaption>On a phone</figcaption></figure>
+    <figure class="wd"><img src="manual/img/details-wide.png" alt="The Details page in a browser"><figcaption>In a browser</figcaption></figure>
+  </div>
+
+  To change a value, tap the **pencil** beside it, type, and tap the **tick**
+  (an empty value clears it). A date is picked from a calendar, and a link
+  opens when tapped. To add, rename, reorder or remove the fields themselves,
+  tap the **pencil** at the top, **Edit fields**: rename one with its pencil,
+  drag its handle, or remove it with its **bin**, which asks first and takes
+  its value with it. **Add a field** asks for its type (Text, Number, Date or
+  Link) and a name. A field's type is chosen once: to change it, remove the
+  field and add another. A board can have up to twenty.
+
+  **Start date** and **End date** are dates with fixed names, one of each at
+  most, and the only details other screens read, so no other field can be
+  called either. A link must start with `http://` or `https://`, and a number
+  can have commas between thousands, as in 1,200.
 - **People** — who can see the board, and who owns it. Tap the **add-person**
   icon beside the *Members* heading to see who else can be added, and tap a name
   to add them. Removing someone (the **remove-person** icon on their row) also
@@ -839,8 +909,9 @@ since they can open any board's settings; a board they haven't joined shows a
 The **History** page lists what has happened to the board itself, newest
 first, and who did it: who created it, renamed it, archived or restored it;
 who added or removed whom; who made someone an owner or stopped being one;
-which columns or lanes were added, removed, renamed or reordered; and who
-turned lanes on or off, or chose the finished column. Everyone on the board
+which columns, lanes or details were added, removed, renamed or reordered; who
+turned lanes on or off, or chose the finished column; and each detail set or
+cleared, with its value. Everyone on the board
 sees it, owners or not. What happens to a card is in that card's own
 history, on the card.
 
@@ -1060,16 +1131,24 @@ Open the board → **settings** → **General**. That page is the only place tha
 **…rename or add columns?** *(the board's owners)*
 Open the board → **settings** → **Columns**.
 
+**…record a board's start date, its teachers or a meeting link?** *(the board's owners)*
+Open the board → **settings** → **Details** → **Add details**, add the fields,
+then fill them in.
+
 **…divide a board into lanes?** *(the board's owners)*
 Open the board → **settings** → **Lanes** → turn on **Lanes on this board**,
 then add the lanes.
+
+**…see how every program is going?**
+**Boards** → **Overview** at the top. It's there once you're on a board with
+lanes.
 
 **…add a label?** *(anyone on the board)*
 Open any card → **+** beside its labels. It belongs to that board. A label for
 every board is an institute label: an admin adds it in **More → Labels**.
 
 **…rename or delete a label?** *(anyone on the board, for its own labels)*
-Open the board → **settings** (**Members and labels** if you don't own it) →
+Open the board → **settings** (**About this board** if you don't own it) →
 **Labels**. Labels with a lock are the institute's: an admin changes those in
 **More → Labels**. Deleting removes the label from every card that carries it,
 and tells you how many first — counting live cards and archived ones separately,
@@ -1131,11 +1210,11 @@ Board **settings → People** → add them. (They must be an approved account fi
 Board **settings → People** → turn on the switch on their row → confirm.
 
 **…find out who runs a board I'm on?** *(anyone)*
-Open the board → **Members and labels** — or **Board settings**, if you are one of
+Open the board → **About this board** — or **Board settings**, if you are one of
 them → **People**. Owners are marked on it either way.
 
 **…find out who archived a board, or who added or removed someone?** *(anyone on the board)*
-Open the board's settings (**Members and labels** if you don't own it) → **History**.
+Open the board's settings (**About this board** if you don't own it) → **History**.
 
 **…hand a board on when I created it?** *(needs an admin)*
 Ask an admin. Only they can take ownership off whoever created a board — the

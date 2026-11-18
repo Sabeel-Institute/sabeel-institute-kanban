@@ -10,6 +10,7 @@ import {
   type WriteBatch,
 } from 'firebase-admin/firestore';
 import {
+  withCleanExtras,
   NOTIFICATION_RETENTION_DAYS,
   ORG_TIMEZONE,
   addDays,
@@ -526,7 +527,7 @@ export async function runDueSoonReminders(
   async function boardFor(boardId: string): Promise<LaneBoard | null> {
     if (!boards.has(boardId)) {
       const snap = await db().doc(`boards/${boardId}`).get();
-      boards.set(boardId, snap.exists ? (snap.data() as LaneBoard) : null);
+      boards.set(boardId, snap.exists ? (withCleanExtras(snap.data()!) as unknown as LaneBoard) : null);
     }
     return boards.get(boardId) ?? null;
   }

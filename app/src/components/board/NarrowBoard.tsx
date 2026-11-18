@@ -450,7 +450,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
           control that does not say what it does. */}
       <IconAction
         icon={canManage ? 'settings' : 'group'}
-        label={canManage ? 'Board settings' : 'Members and labels'}
+        label={canManage ? 'Board settings' : 'About this board'}
         onPress={() => nav.push({ name: 'boardSettings', boardId })}
       />
     </>
@@ -723,7 +723,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
                       initial={retry?.columnId === col.id ? retry : undefined}
                       onCancel={() => {
                         setAdding(false);
-                        setRetry(null);
+                        setRetry((r) => (r?.columnId === col.id ? null : r));
                       }}
                     />
                   </Panel>

@@ -29,9 +29,9 @@ const ORDER = [
   'rules', 'boards', 'boards-clone', 'mywork', 'search', 'alerts', 'stats', 'people', 'labels', 'more', 'report',
   'board', 'board-owner', 'board-member', 'roster-owner', 'roster-member',
   'board-longname', 'board-empty', 'bulk', 'card', 'card-editing', 'card-comment',
-  'settings', 'settings-general', 'settings-columns', 'settings-lanes', 'settings-people',
-  'settings-labels', 'settings-history', 'archive',
-  'lanes-board', 'lanes-add-card', 'lanes-move', 'lanes-settings',
+  'settings', 'settings-general', 'settings-columns', 'settings-lanes', 'settings-details',
+  'settings-people', 'settings-labels', 'settings-history', 'archive',
+  'lanes-board', 'lanes-add-card', 'lanes-move', 'lanes-settings', 'details-filled', 'details-fields',
 ];
 
 /**
@@ -69,7 +69,7 @@ const BLURB = {
   'card-editing': 'The description EDITOR open — toolbar row plus Save/Cancel.',
   'card-comment': 'The comment composer in use, with Bold active.',
   'board-owner': 'The same board as an OWNER of it — delete-column and Board settings present, like an admin. Ownership is per board and has nothing to do with the org role.',
-  'board-member': 'The same board as a MEMBER who does not own it — no delete-column, and the settings icon becomes Members and labels. The archive stays, because members archive and so must un-archive.',
+  'board-member': 'The same board as a MEMBER who does not own it — no delete-column, and the settings icon becomes About this board. The archive stays, because members archive and so must un-archive.',
   'roster-owner': 'Settings \u2192 People as an OWNER: a toggle per person, and the creator\u2019s row locked, because only an admin may take ownership off whoever made the board.',
   'roster-member': 'Settings \u2192 People as a MEMBER \u2014 read-only, owners marked. It answers \u201cwho do I ask to add someone?\u201d. Reachable by nobody in the admin tour, since an admin owns every board.',
   bulk: 'Selection mode, with the action bar floating over the board. Six 44px actions do not fit one row at 320px, so it wraps rather than pushing the page sideways.',
@@ -79,6 +79,7 @@ const BLURB = {
   'settings-general': 'Settings \u2192 General: the board\u2019s name, and Archive. Owners and admins only.',
   'settings-columns': 'Settings \u2192 Columns: rename in place, drag to reorder, add at the foot. Owners and admins only.',
   'settings-lanes': 'Settings \u2192 Lanes on a board without them: the switch, off, and nothing else.',
+  'settings-details': 'Settings \u2192 Details on a board with none: one line saying so, and Add details for an owner.',
   'settings-people': 'Settings \u2192 People: the members, an Owner switch on each row, and the add-person icon on the heading.',
   'settings-labels': 'Settings \u2192 Labels: the institute\u2019s locked, then the board\u2019s own with their controls. Everyone on the board.',
   'settings-history': 'Settings \u2192 History: what has happened to the board, newest first. Everyone on the board.',
@@ -87,6 +88,8 @@ const BLURB = {
   'lanes-board': 'A board WITH LANES: each column lists every lane under a heading and one badge, finished of total \u2014 green when complete, red when a card is late \u2014 and No lane last. A lane name at the 40-character limit must shrink, not push its badge off the row.',
   'lanes-add-card': 'Add card on a board with lanes: the title, a lane to choose with none chosen, and the bell.',
   'lanes-move': 'The selection bar\u2019s Move mode on a board with lanes: a column, a lane, or both, then Move.',
+  'details-filled': 'Settings \u2192 Details filled in, as an owner: dates as pickers, a long text value and a long link that must wrap, each with its pencil.',
+  'details-fields': 'The Details field editor: each field with its handle, pencil (not on Start date and End date) and bin, and the add-a-field card.',
   'lanes-settings': 'Settings \u2192 Lanes on: the switch, the lanes with their handles, pencils and bins, the add row, and where finished cards are.',
 };
 

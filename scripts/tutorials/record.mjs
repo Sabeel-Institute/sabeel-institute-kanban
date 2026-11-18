@@ -263,6 +263,49 @@ function helpers(page, variant, world) {
     /** The dev row's sign-in, pressed though it is hidden: what the Google button does, as far as the app can tell. */
     devSignIn: (name) => page.getByRole('button', { name, exact: true, includeHidden: true }).evaluate((e) => e.click()),
     highlight: outline,
+    /**
+     * A key drawn over the screen, held until `unkey`: what each of the
+     * overview's marks means, which the screen itself has no room to say
+     * (Faisal, 2026-11-17). Each row is [mark, words]; the marks are drawn in
+     * the app's own colours (app/src/theme/palette.ts).
+     */
+    key: async (rows) => {
+      await page.evaluate((rs) => {
+        document.getElementById('__tut-key')?.remove();
+        const panel = document.createElement('div');
+        panel.id = '__tut-key';
+        Object.assign(panel.style, {
+          position: 'fixed', left: '50%', bottom: '8%', transform: 'translateX(-50%)', zIndex: 2147483646,
+          background: '#FBF6F0', border: '1px solid #C9B7A7', borderRadius: '14px', padding: '14px 18px',
+          boxShadow: '0 10px 30px rgba(58,47,40,0.25)', font: '600 15px system-ui, sans-serif', color: '#3A2F28',
+          display: 'grid', gridTemplateColumns: '28px auto', gap: '10px 12px', alignItems: 'center',
+        });
+        const mark = (kind) => {
+          const m = document.createElement('div');
+          const base = { width: '22px', height: '22px', borderRadius: '50%', boxSizing: 'border-box',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#F9F2E9', font: '800 14px system-ui' };
+          if (kind === 'complete') Object.assign(m.style, base, { background: '#456B3B' }), (m.textContent = '✓');
+          if (kind === 'late') Object.assign(m.style, base, { background: '#A32218' }), (m.textContent = '!');
+          if (kind === 'soon') Object.assign(m.style, base, { background: '#977535' });
+          if (kind === 'open') Object.assign(m.style, base, { border: '2px solid #6A5748' });
+          if (kind === 'undated') Object.assign(m.style, base, { border: '2px dashed #6A5748' });
+          if (kind === 'none') Object.assign(m.style, { width: '13px', height: '2px', background: '#6A5748', margin: '0 auto' });
+          return m;
+        };
+        for (const [kind, words] of rs) {
+          panel.appendChild(mark(kind));
+          const w = document.createElement('div');
+          w.textContent = words;
+          panel.appendChild(w);
+        }
+        document.body.appendChild(panel);
+      }, rows);
+      await wait(500);
+    },
+    unkey: async () => {
+      await page.evaluate(() => document.getElementById('__tut-key')?.remove());
+      await wait(300);
+    },
     type: async (loc, text) => {
       await press(loc);
       await typeText(text);

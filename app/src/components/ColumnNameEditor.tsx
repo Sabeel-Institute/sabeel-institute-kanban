@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import {
+  BOARD_FIELD_NAME_MAX,
   COLUMN_NAME_MAX,
   LANE_NAME_MAX,
   renameColumn,
+  renameField,
   renameLane,
   type BoardColumn,
+  type BoardField,
   type BoardLane,
 } from '@sabeel/shared';
 import { IconAction, Row, TextField } from './ui';
@@ -117,6 +120,33 @@ export function LaneNameEditor({
   );
 }
 
+/** A detail's field name, renamed in place: the same editor, under the field's rules. */
+export function FieldNameEditor({
+  field,
+  fields,
+  onRename,
+  ...rest
+}: EditorProps & {
+  field: BoardField;
+  fields: readonly BoardField[];
+  /** The write; it must REJECT on failure, as `ColumnNameEditor`'s does. */
+  onRename: (fields: BoardField[]) => Promise<unknown>;
+}) {
+  return (
+    <ItemNameEditor
+      {...rest}
+      item={field}
+      noun="field"
+      maxLength={BOARD_FIELD_NAME_MAX}
+      rename={(name) => {
+        const r = renameField(fields, field.id, name);
+        return r.ok ? { ok: true, items: r.fields } : r;
+      }}
+      onRename={onRename}
+    />
+  );
+}
+
 function ItemNameEditor<T extends Named>({
   item,
   noun,
@@ -135,7 +165,7 @@ function ItemNameEditor<T extends Named>({
 }: EditorProps & {
   item: T;
   /** Says what is renamed, in every label: "Rename column To Do". */
-  noun: 'column' | 'lane';
+  noun: 'column' | 'lane' | 'field';
   maxLength: number;
   /** The shared rule: the renamed list, or why not. */
   rename: (name: string) => RenameResult<T>;

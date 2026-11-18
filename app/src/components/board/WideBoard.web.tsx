@@ -609,7 +609,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
               control that does not say what it does. */}
           <IconAction
             icon={canManage ? 'settings' : 'group'}
-            label={canManage ? 'Board settings' : 'Members and labels'}
+            label={canManage ? 'Board settings' : 'About this board'}
             onPress={() => nav.push({ name: 'boardSettings', boardId })}
           />
           <IconAction icon="arrow-back" label="Back" onPress={nav.pop} />

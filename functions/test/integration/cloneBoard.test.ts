@@ -218,10 +218,12 @@ describe('cloneBoard: the clone', () => {
     for (const c of cards) {
       expect(await createdLines(c.id)).toEqual([{ type: 'created', actorUid: ORG, at: c.createdAt }]);
     }
-    await waitFor('board history created entry', async () => {
-      const entries = (await adminDb().collection(`boards/${cloneId}/activity`).get()).docs.map((d) => d.data());
-      return entries.some((e) => e.type === 'created') ? true : undefined;
-    });
+    // The board's history opens with "cloned from", written with the board;
+    // the history trigger adds no "created" beside it (checked below, once
+    // the triggers have had time to run).
+    const boardLines = async () =>
+      (await adminDb().collection(`boards/${cloneId}/activity`).get()).docs.map((d) => d.data().type);
+    expect(await boardLines()).toEqual(['cloned']);
     // Each card's "created" queues a notice, as any new card's does: once
     // they are all queued, the card triggers have had the clone too. Had they
     // not stayed out, the count, Stats and history would now be doubling.
@@ -233,6 +235,7 @@ describe('cloneBoard: the clone', () => {
       if ((await adminDb().doc(`boards/${cloneId}`).get()).data()?.activeCardCount !== 4) return false;
       if ((await createdToday()) !== 4) return false;
       for (const c of cards) if ((await createdLines(c.id)).length !== 1) return false;
+      if ((await boardLines()).join() !== 'cloned') return false;
       return true;
     });
     // The sweep sends the queued notices to nobody: the cloner made the cards
@@ -270,8 +273,34 @@ describe('cloneBoard: the clone', () => {
   });
 });
 
-describe('cloneBoard: lanes', () => {
-  it('carries the lanes, the finished column and each card’s lane', async () => {
+describe('cloneBoard: a template', () => {
+  it('opens the clone’s history with one line, cloned from the source, and does not mark it', async () => {
+    await adminDb().doc('boards/cb_marked').set(board({ name: 'Camp template', template: true }));
+    const id = newId();
+    const res = await callFunction('cloneBoard', { boardId: 'cb_marked', name: 'Camp 2027', cloneId: id }, await idTokenFor(ORG));
+    expect(res.body.error).toBeUndefined();
+    const clone = (await adminDb().doc(`boards/${id}`).get()).data()!;
+    expect(clone.template).toBeUndefined();
+    // A later change's line is waited for, and then the history is held to
+    // its two lines for a while: the emulator runs triggers in parallel, so
+    // the creation's trigger is not sure to have finished before the rename's.
+    await adminDb().doc(`boards/${id}`).update({ name: 'Camp 2027 renamed', updatedBy: ORG, updatedAt: Date.now() });
+    const read = async () =>
+      (await adminDb().collection(`boards/${id}/activity`).orderBy('at').get()).docs.map((d) => d.data());
+    const lines = await waitFor('the rename in the clone’s history', async () => {
+      const all = await read();
+      return all.some((l) => l.type === 'renamed') ? all : undefined;
+    });
+    expect(lines).toEqual([
+      expect.objectContaining({ type: 'cloned', from: 'Camp template', actorUid: ORG, actorName: 'Olive Organizer' }),
+      expect.objectContaining({ type: 'renamed', to: 'Camp 2027 renamed' }),
+    ]);
+    await stays('no "created" line joins them', async () => !(await read()).some((l) => l.type === 'created'), 3000);
+  });
+});
+
+describe('cloneBoard: lanes and details', () => {
+  it('carries the lanes, the finished column, each card’s lane and the details’ fields', async () => {
     await adminDb().doc('boards/cb_lanes').set(
       board({
         lanesOn: true,
@@ -279,7 +308,13 @@ describe('cloneBoard: lanes', () => {
           { id: 'ln_plan', name: 'Planning' },
           { id: 'ln_mkt', name: 'Marketing' },
         ],
-        doneColumnId: 'c_run',
+        // Not the last column: a clone falling back to the last would differ.
+        doneColumnId: 'c_plan',
+        fields: [
+          { id: 'fld_s', name: 'Start date', type: 'start' },
+          { id: 'fld_t', name: 'Teachers', type: 'text' },
+        ],
+        details: { fld_s: '2027-06-01', fld_t: 'Sara' },
       }),
     );
     await adminDb().doc('cards/cb_lane_card').set(card('cb_lanes', { laneId: 'ln_mkt' }));
@@ -292,7 +327,13 @@ describe('cloneBoard: lanes', () => {
     const clone = (await adminDb().doc(`boards/${id}`).get()).data()!;
     expect(clone.lanesOn).toBe(true);
     expect(clone.lanes.map((l: { name: string }) => l.name)).toEqual(['Planning', 'Marketing']);
-    expect(clone.doneColumnId).toBe(clone.columns[1].id);
+    expect(clone.doneColumnId).toBe(clone.columns[0].id);
+    // The details' fields come, under new ids; what was typed in them does not.
+    expect(clone.fields.map((f: { name: string; type: string }) => [f.name, f.type])).toEqual([
+      ['Start date', 'start'],
+      ['Teachers', 'text'],
+    ]);
+    expect(clone.details).toBeUndefined();
     const cards = (await adminDb().collection('cards').where('boardId', '==', id).get()).docs.map((d) => d.data());
     expect(cards.find((c) => c.title === 'A task')?.laneId).toBe(clone.lanes[1].id);
     expect('laneId' in (cards.find((c) => c.title === 'No lane yet') ?? {})).toBe(false);

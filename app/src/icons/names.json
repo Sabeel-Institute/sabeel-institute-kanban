@@ -11,6 +11,7 @@
   "calendar-view-month",
   "calendar-view-week",
   "check",
+  "checklist",
   "chevron-left",
   "chevron-right",
   "close",
@@ -60,6 +61,7 @@
   "star-border",
   "subdirectory-arrow-right",
   "swap-horiz",
+  "swap-vert",
   "table-chart",
   "unarchive"
 ]

@@ -592,6 +592,78 @@ describe('lanes on a board', () => {
   });
 });
 
+describe('a board’s details', () => {
+  const fields = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ id: `fld_${i}`, name: `Field ${i}`, type: 'text' }));
+  const details = (n: number) =>
+    Object.fromEntries(Array.from({ length: n }, (_, i) => [`fld_${i}`, `value ${i}`]));
+
+  it('an owner writes fields and their values, and a value alone by its path', async () => {
+    const db = ctx('owner1', 'member');
+    await assertSucceeds(
+      updateDoc(doc(db, 'boards/b_member'), { ...stamp('owner1'), fields: fields(2), details: details(2) }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(db, 'boards/b_member'), { ...stamp('owner1'), 'details.fld_1': 'changed' }),
+    );
+  });
+
+  it('a member of the board who is not an owner cannot change them', async () => {
+    await assertFails(
+      updateDoc(doc(ctx('member1', 'member'), 'boards/b_member'), {
+        ...stamp('member1'),
+        'details.fld_0': 'mine now',
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(ctx('member1', 'member'), 'boards/b_member'), {
+        ...stamp('member1'),
+        fields: fields(1),
+      }),
+    );
+  });
+
+  it('a board holds at most twenty fields and twenty values', async () => {
+    const db = ctx('owner1', 'member');
+    await assertSucceeds(
+      updateDoc(doc(db, 'boards/b_member'), { ...stamp('owner1'), fields: fields(20), details: details(20) }),
+    );
+    await assertFails(
+      updateDoc(doc(db, 'boards/b_member'), { ...stamp('owner1'), fields: fields(21) }),
+    );
+    await assertFails(
+      updateDoc(doc(db, 'boards/b_member'), { ...stamp('owner1'), 'details.fld_20': 'one more' }),
+    );
+  });
+
+  it('refuses fields that are not a list, or values that are not a map', async () => {
+    const db = ctx('owner1', 'member');
+    await assertFails(
+      updateDoc(doc(db, 'boards/b_member'), { ...stamp('owner1'), fields: { a: 1 } }),
+    );
+    await assertFails(
+      updateDoc(doc(db, 'boards/b_member'), { ...stamp('owner1'), details: ['x'] }),
+    );
+  });
+});
+
+describe('the template mark', () => {
+  it('an owner sets and clears it; a member cannot; it is a boolean', async () => {
+    await assertSucceeds(
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), { ...stamp('owner1'), template: true }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), { ...stamp('owner1'), template: false }),
+    );
+    await assertFails(
+      updateDoc(doc(ctx('member1', 'member'), 'boards/b_member'), { ...stamp('member1'), template: true }),
+    );
+    await assertFails(
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), { ...stamp('owner1'), template: 'yes' }),
+    );
+  });
+});
+
 describe('granting and revoking ownership', () => {
   it('an owner promotes another member', async () => {
     await assertSucceeds(

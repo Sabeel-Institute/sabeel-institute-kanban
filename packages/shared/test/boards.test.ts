@@ -133,6 +133,18 @@ describe('sortBoardsForList', () => {
     expect(favourites.map((b) => b.name)).toEqual(['Apple', 'Zebra']);
   });
 
+  it('takes templates out first, so a marked board is listed once, under Templates', () => {
+    const marked = [...boards, { id: 'b5', name: 'Program template', template: true }, { id: 'b6', name: 'Camp template', template: true }];
+    const s = sortBoardsForList(marked, ['b5'], ['b6', 'b3']);
+    expect(s.templates.map((b) => b.name)).toEqual(['Camp template', 'Program template']);
+    expect([...s.favourites, ...s.recents, ...s.others].some((b) => b.template)).toBe(false);
+    expect(s.recents.map((b) => b.name)).toEqual(['Mango']);
+  });
+
+  it('has no templates when none is marked', () => {
+    expect(sortBoardsForList(boards, [], []).templates).toEqual([]);
+  });
+
   it('orders recents most-recent-first, not alphabetically', () => {
     const { recents } = sortBoardsForList(boards, [], ['b3', 'b4']);
     expect(recents.map((b) => b.name)).toEqual(['Mango', 'Banana']);

@@ -24,6 +24,7 @@ export type Route =
   | { name: 'boardArchive'; boardId: string }
   | { name: 'newBoard' }
   | { name: 'card'; boardId: string; cardId: string }
+  | { name: 'overview' }
   | { name: 'myWork' }
   | { name: 'search' }
   | { name: 'users' }
