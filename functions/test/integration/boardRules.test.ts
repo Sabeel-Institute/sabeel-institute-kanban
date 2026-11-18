@@ -647,6 +647,23 @@ describe('a board’s details', () => {
   });
 });
 
+describe('the template mark', () => {
+  it('an owner sets and clears it; a member cannot; it is a boolean', async () => {
+    await assertSucceeds(
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), { ...stamp('owner1'), template: true }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), { ...stamp('owner1'), template: false }),
+    );
+    await assertFails(
+      updateDoc(doc(ctx('member1', 'member'), 'boards/b_member'), { ...stamp('member1'), template: true }),
+    );
+    await assertFails(
+      updateDoc(doc(ctx('owner1', 'member'), 'boards/b_member'), { ...stamp('owner1'), template: 'yes' }),
+    );
+  });
+});
+
 describe('granting and revoking ownership', () => {
   it('an owner promotes another member', async () => {
     await assertSucceeds(

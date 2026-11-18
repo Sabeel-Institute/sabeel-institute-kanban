@@ -380,6 +380,14 @@ const SHOTS = {
     await p.getByRole('button', { name: 'Edit fields' }).waitFor({ timeout: 30000 });
     await p.waitForTimeout(900);
   },
+  // The overview, from its icon in the Boards header: the seed's two programs
+  // under one heading of lane names.
+  overview: async (p) => {
+    await nav(p, 'Boards');
+    await p.getByRole('button', { name: 'Overview', exact: true }).click();
+    await p.getByTestId('overview-row:Autumn Program 2027').waitFor({ timeout: 30000 });
+    await p.waitForTimeout(1200);
+  },
   // Settings → People, as an OWNER: the Owner switch beside each row.
   owners: async (p) => {
     await openBoard(p);

@@ -440,6 +440,10 @@ export function Button({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={expanded === undefined ? undefined : { expanded }}
+      // react-native-web maps `accessibilityState.expanded` to nothing, as
+      // with `selected` (IconAction): measured, the element carried no
+      // aria-expanded. Inert on native, where the state above is read.
+      aria-expanded={expanded}
       onPress={onPress}
       disabled={disabled || busy}
       style={({ pressed }) => [

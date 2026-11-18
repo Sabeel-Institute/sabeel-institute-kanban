@@ -130,6 +130,10 @@ export function diffBoard(
     out.push({ type: 'finishedColumn', to: now.get(after.doneColumnId) });
   }
 
+  if (Boolean(before.template) !== Boolean(after.template)) {
+    out.push({ type: after.template ? 'templateOn' : 'templateOff' });
+  }
+
   // Details: fields by id, as columns and lanes are, so a rename is a rename.
   const wasField = new Map((before.fields ?? []).map((f) => [f.id, f.name]));
   const nowField = new Map((after.fields ?? []).map((f) => [f.id, f.name]));
@@ -211,6 +215,9 @@ const KNOWN_BOARD_ACTIVITY_TYPES: Record<BoardActivityType, true> = {
   fieldRenamed: true,
   fieldsReordered: true,
   detailChanged: true,
+  templateOn: true,
+  templateOff: true,
+  cloned: true,
 };
 
 export function isKnownBoardActivityType(value: unknown): value is BoardActivityType {
@@ -325,5 +332,15 @@ export function describeBoardActivity(e: Describable): string {
       return known
         ? `${actor} set ${quoted(e.field)} to ${quoted(shortValue(e.to))}`
         : `${quoted(e.field)} was set to ${quoted(shortValue(e.to))}`;
+    case 'templateOn':
+      return known ? `${actor} marked the board as a template` : 'The board was marked as a template';
+    case 'templateOff':
+      return known
+        ? `${actor} took the template mark off the board`
+        : 'The board stopped being a template';
+    case 'cloned':
+      return known
+        ? `${actor} cloned this board from ${quoted(e.from)}`
+        : `This board was cloned from ${quoted(e.from)}`;
   }
 }

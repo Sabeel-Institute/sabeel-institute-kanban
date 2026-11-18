@@ -4,6 +4,7 @@ import { guardedEvent, sentryDsn } from './sentry';
 import { getFirestore } from 'firebase-admin/firestore';
 import {
   withCleanExtras,
+  CLONED_ENTRY_ID,
   boardChangeActor,
   diffBoard,
   type BoardActivityDoc,
@@ -39,6 +40,11 @@ export const onBoardWritten = onDocumentWritten(
     if (changes.length === 0) return;
 
     const db = getFirestore();
+    // A clone's history opens with "cloned from", which `cloneBoard` wrote
+    // with the board; a "created" line beside it would say the same twice.
+    if (!before && (await db.doc(`boards/${event.params.boardId}/activity/${CLONED_ENTRY_ID}`).get()).exists) {
+      return;
+    }
     const actorUid = boardChangeActor(before, after);
     // The name as it is NOW, stored: an admin who is not on the board has no
     // profile there, and nobody's profile survives their leaving it.

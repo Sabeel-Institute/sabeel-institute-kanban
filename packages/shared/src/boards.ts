@@ -315,12 +315,19 @@ export function labelIdsAfterBoardChange(
  * rest alphabetically. With no board cap the flat list is what degrades first,
  * and this is the cheapest structure that scales without asking anyone to
  * curate folders.
+ *
+ * Boards marked as templates are taken out first, alphabetically, so a marked
+ * board appears once, under Templates, starred or recent or not.
  */
-export function sortBoardsForList<T extends { id: string; name: string }>(
-  boards: T[],
+export function sortBoardsForList<T extends { id: string; name: string; template?: boolean }>(
+  all: T[],
   favouriteIds: readonly string[],
   recentIds: readonly string[],
-): { favourites: T[]; recents: T[]; others: T[] } {
+): { favourites: T[]; recents: T[]; others: T[]; templates: T[] } {
+  const templates = all
+    .filter((b) => b.template)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const boards = all.filter((b) => !b.template);
   const fav = new Set(favouriteIds);
   const favourites = boards.filter((b) => fav.has(b.id));
 
@@ -338,6 +345,7 @@ export function sortBoardsForList<T extends { id: string; name: string }>(
     favourites: favourites.sort((a, b) => a.name.localeCompare(b.name)),
     recents,
     others,
+    templates,
   };
 }
 
