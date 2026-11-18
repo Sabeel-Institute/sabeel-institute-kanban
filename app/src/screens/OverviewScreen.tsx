@@ -1,18 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import {
   OVERVIEW_SORTS,
   OVERVIEW_SORT_LABELS,
   boardOverdueDays,
   describeMark,
   groupOverview,
+  isDateType,
+  isNamedType,
   laneInfo,
   namedFieldValue,
   nextHidden,
   overviewBoards,
+  safeLink,
   shortDay,
   sortOverview,
   todayInOrgTz,
+  type BoardField,
   type LaneInfo,
   type OverviewRow,
   type OverviewSort,
@@ -31,6 +35,7 @@ import { useBoardCards } from '../cards';
 import { contextMenuProps } from '../contextMenu';
 import { Icon } from '../icons';
 import { useNav } from '../nav';
+import { createViewStore } from '../viewState';
 import type { SessionUser } from '../session';
 import { Sheet, SheetOption } from '../components/Sheet';
 import { Select } from '../components/Select';
@@ -235,6 +240,8 @@ export function OverviewScreen({ user }: { user: SessionUser }) {
 const ROW_PAD = space.md + StyleSheet.hairlineWidth;
 /** On a wide screen the board's name has a column of its own, left of the marks. */
 const NAME_WIDTH = 260;
+/** The details chevron's square: a 44-point target, as every control's. */
+const TOGGLE = 44;
 
 /**
  * Boards with the same lanes, under one heading of lane names. The group
@@ -450,7 +457,27 @@ function BoardRow({
         : 'loading';
   const label = `${board.name}${dates ? `, ${dates}` : ''}: ${spoken}`;
 
+  // The board's other details, behind a chevron (#118): what has a value,
+  // in the board's order, less the dates the row already shows.
+  const shown = board.fields.filter(
+    (f) => !isNamedType(f.type) && (board.details[f.id] ?? '') !== '',
+  );
+  const { open: openIds } = overviewDetailsView.use();
+  const expanded = shown.length > 0 && openIds.includes(board.id);
+  const toggle = () =>
+    overviewDetailsView.set((prev) => ({
+      open: prev.open.includes(board.id)
+        ? prev.open.filter((id) => id !== board.id)
+        : [...prev.open, board.id],
+    }));
+
+  // The card holds the row, which opens the board, and beside it (never
+  // inside: a control inside a button is invalid, and a press on it would
+  // open the board) the chevron and the details it shows. The row keeps the
+  // padding it always had, so the lane geometry measured for the group is
+  // unchanged.
   return (
+    <View style={[styles.card, { backgroundColor: t.bg.surface, borderColor: t.border.subtle }]}>
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -462,10 +489,16 @@ function BoardRow({
       style={({ pressed }) => [
         styles.row,
         isWide && styles.rowWide,
-        { backgroundColor: pressed ? t.bg.inset : t.bg.surface, borderColor: t.border.subtle },
+        { backgroundColor: pressed ? t.bg.inset : 'transparent' },
       ]}
     >
-      <View style={[styles.title, isWide && styles.titleWide]}>
+      <View
+        style={[
+          styles.title,
+          isWide && styles.titleWide,
+          shown.length > 0 && styles.titleBesideToggle,
+        ]}
+      >
         <Text style={[type.body, styles.boardName, { color: t.text.primary }]} numberOfLines={2}>
           {board.name}
         </Text>
@@ -479,6 +512,103 @@ function BoardRow({
         <Marks cols={cols} count={board.lanes.length} infos={loaded.status === 'ready' ? loaded.infos : null} />
       ) : null}
     </Pressable>
+      {shown.length > 0 ? (
+        <View
+          pointerEvents="box-none"
+          style={[styles.toggleSlot, isWide ? styles.toggleSlotWide : styles.toggleSlotNarrow]}
+        >
+          <DetailsToggle name={board.name} expanded={expanded} onToggle={toggle} />
+        </View>
+      ) : null}
+      {expanded ? (
+        <BoardDetails fields={shown} details={board.details} wide={isWide} />
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * Which rows have their details open: for this session, so opening a board
+ * and coming Back finds them as they were, and not stored on the account.
+ */
+const overviewDetailsView = createViewStore<{ open: string[] }>({ open: [] });
+
+/** The chevron that shows and hides a row's details. */
+function DetailsToggle({
+  name,
+  expanded,
+  onToggle,
+}: {
+  name: string;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const t = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Details of ${name}`}
+      accessibilityState={{ expanded }}
+      // react-native-web maps accessibilityState.expanded to nothing.
+      aria-expanded={expanded}
+      onPress={onToggle}
+      style={({ pressed }) => [
+        styles.toggle,
+        { backgroundColor: pressed ? t.bg.inset : 'transparent' },
+      ]}
+    >
+      <Icon name={expanded ? 'expand-less' : 'expand-more'} size={24} color={t.text.secondary} />
+    </Pressable>
+  );
+}
+
+/**
+ * A board's details as label and value: a wrapping grid on a wide screen, a
+ * list on a phone. Read-only, as the overview is. Dates read as the Details
+ * page writes them; a link opens only when it is http or https (`safeLink`),
+ * checked here again since another client could have stored anything.
+ */
+function BoardDetails({
+  fields,
+  details,
+  wide,
+}: {
+  fields: readonly BoardField[];
+  details: Readonly<Record<string, string>>;
+  wide: boolean;
+}) {
+  const t = useTheme();
+  const today = todayInOrgTz();
+  return (
+    <View
+      testID="overview-details"
+      style={[styles.details, wide && styles.detailsWide, { borderTopColor: t.border.subtle }]}
+    >
+      {fields.map((f) => {
+        const value = details[f.id] ?? '';
+        const link = f.type === 'link' ? safeLink(value) : null;
+        return (
+          <View key={f.id} style={[styles.detail, wide && styles.detailWide]}>
+            <Text style={[type.caption, styles.detailLabel, { color: t.text.secondary }]}>{f.name}</Text>
+            {link ? (
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel={`${f.name}: ${link}`}
+                onPress={() => void Linking.openURL(link).catch(() => undefined)}
+              >
+                <Text style={[type.body, styles.detailLink, { color: t.text.accent }]} numberOfLines={1}>
+                  {link}
+                </Text>
+              </Pressable>
+            ) : (
+              <Text style={[type.body, { color: t.text.primary }]} selectable>
+                {isDateType(f.type) ? shortDay(value, today) : value}
+              </Text>
+            )}
+          </View>
+        );
+      })}
+    </View>
   );
 }
 
@@ -562,12 +692,40 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     transformOrigin: 'left bottom',
   },
-  row: {
+  card: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: radius.md,
+    overflow: 'hidden',
+  },
+  row: {
     padding: space.md,
     gap: space.sm,
   },
+  /** Room on the title's right for the chevron, so a long name wraps before it. */
+  titleBesideToggle: { paddingRight: TOGGLE + space.xs },
+  toggleSlot: { position: 'absolute', top: space.md - (TOGGLE - 22) / 2 },
+  toggleSlotNarrow: { right: space.xs },
+  // At the right edge of the name column, which ends at ROW_PAD + NAME_WIDTH.
+  toggleSlotWide: { left: ROW_PAD + NAME_WIDTH - TOGGLE },
+  toggle: {
+    width: TOGGLE,
+    height: TOGGLE,
+    borderRadius: TOGGLE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  details: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+    gap: space.sm,
+  },
+  // Under the name column's edge, so the details read as the row's own.
+  detailsWide: { flexDirection: 'row', flexWrap: 'wrap', columnGap: space.lg, rowGap: space.sm },
+  detail: { gap: 2, minWidth: 0 },
+  detailWide: { flexBasis: 220, flexGrow: 1, maxWidth: 360 },
+  detailLabel: { textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600' },
+  detailLink: { textDecorationLine: 'underline' },
   rowWide: { flexDirection: 'row', alignItems: 'center' },
   title: { gap: 2 },
   titleWide: { width: NAME_WIDTH, marginRight: space.md },

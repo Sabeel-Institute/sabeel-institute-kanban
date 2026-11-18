@@ -180,7 +180,29 @@ try {
   //   created: Gamma, Alpha, Delta, Beta
   //   late:    Gamma (2020), Delta (2024), Alpha (2025), Beta (none late)
   // Alpha and Beta share their lanes, so they share a heading.
-  await board('ov_alpha', 'Alpha Camp', PS, { details: { f_start: '2027-07-01' }, createdAt: 2000 }, [F, O]);
+  // Alpha has details beyond its start date, one of them empty (#118).
+  await board(
+    'ov_alpha',
+    'Alpha Camp',
+    PS,
+    {
+      fields: [
+        { id: 'f_start', name: 'Start date', type: 'start' },
+        { id: 'f_teach', name: 'Teachers', type: 'text' },
+        { id: 'f_zoom', name: 'Zoom link', type: 'link' },
+        { id: 'f_fee', name: 'Fee', type: 'number' },
+        { id: 'f_notes', name: 'Notes', type: 'text' },
+      ],
+      details: {
+        f_start: '2027-07-01',
+        f_teach: 'Sara and Omar',
+        f_zoom: 'https://meet.example.org/alpha',
+        f_fee: '1,200',
+      },
+      createdAt: 2000,
+    },
+    [F, O],
+  );
   await board('ov_beta', 'Beta Course', PS, { details: { f_start: '2027-03-01' }, createdAt: 4000 }, [O]);
   await board('ov_gamma', 'Gamma Circle', ['Prep', 'Teach'], { createdAt: 1000 }, [F, O]);
   await board('ov_delta', 'Delta Retreat', [...PS, 'Wrap-up'], { details: { f_start: '2027-05-01' }, createdAt: 3000 }, [F]);
@@ -369,6 +391,42 @@ try {
   await page.getByRole('button', { name: 'Show Delta Retreat', exact: true }).click();
   await settled(page, [['Beta Course', 'Alpha Camp'], ['Delta Retreat']]);
 
+  // ---- A row's details (#118) ---------------------------------------------------------------
+  const alphaToggle = page.getByRole('button', { name: 'Details of Alpha Camp', exact: true });
+  const panel = page.getByTestId('overview-details');
+  {
+    await alphaToggle.waitFor({ timeout: 15000 });
+    const shut = (await alphaToggle.getAttribute('aria-expanded')) === 'false' && (await panel.count()) === 0;
+    const betaHas = await page.getByRole('button', { name: 'Details of Beta Course', exact: true }).count();
+    await alphaToggle.click();
+    await panel.waitFor({ timeout: 10000 });
+    const text = await panel.innerText();
+    const link = page.getByRole('link', { name: 'Zoom link: https://meet.example.org/alpha' });
+    check(
+      'a row with details beyond its dates opens them from its chevron, the filled ones only',
+      shut &&
+        betaHas === 0 &&
+        (await alphaToggle.getAttribute('aria-expanded')) === 'true' &&
+        /Sara and Omar/.test(text) &&
+        /1,200/.test(text) &&
+        (await link.count()) === 1 &&
+        !/Notes|Start date/i.test(text),
+      text.replace(/\n/g, ' | '),
+    );
+    check(
+      'and opening them does not open the board',
+      (await overviewButton(page).count()) === 0 &&
+        (await page.getByRole('button', { name: 'Board settings' }).count()) === 0 &&
+        (await page.getByTestId('overview-row:Alpha Camp').isVisible()),
+    );
+    await page.screenshot({ path: join(SHOTS, 'overview-details-wide.png'), fullPage: true });
+    await page.setViewportSize({ width: 380, height: 820 });
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: join(SHOTS, 'overview-details-phone.png'), fullPage: true });
+    await page.setViewportSize({ width: 1280, height: 950 });
+    await page.waitForTimeout(500);
+  }
+
   // ---- A row opens its board --------------------------------------------------------------
   await page.getByTestId('overview-row:Delta Retreat').click();
   check(
@@ -377,6 +435,15 @@ try {
       .getByRole('button', { name: 'Board settings' })
       .waitFor({ timeout: 20000 })
       .then(() => page.getByText('Delta Retreat').first().isVisible(), () => false),
+  );
+  // Back on the overview, the details opened above are still open: kept for
+  // the session (#118).
+  await page.getByRole('button', { name: 'Back' }).first().click();
+  check(
+    'and coming back from a board finds them still open',
+    await alphaToggle
+      .waitFor({ timeout: 15000 })
+      .then(async () => (await alphaToggle.getAttribute('aria-expanded')) === 'true' && (await panel.isVisible()), () => false),
   );
 
   // ---- Collapsing a section of the Boards list (#110) ---------------------------------------

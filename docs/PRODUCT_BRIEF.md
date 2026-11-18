@@ -782,6 +782,13 @@ lanes; read-only, and it stores two preferences per person and nothing else.
 - **Reached from an icon in the Boards header**, shown only to someone with at
   least one board it lists (a hidden one counts), so people who never use
   lanes never see it. Not a tab and not in More (decision D).
+- **A row shows its board's details on request** (#118, 2026-11-18): a
+  chevron at the top right of the name opens, under the row, the details that
+  have a value, less Start date and End date, which the row already shows;
+  links open through `safeLink`. No chevron on a board with nothing else to
+  show. The chevron sits beside the row's button, never inside it, and the
+  row's padding and the group's lane geometry do not change. Open rows are
+  view state, kept for the session and not stored.
 - **It lists the boards you can see that have live lanes** (`lanesLive`), are
   not marked as templates and are not archived (`overviewBoards`): the boards
   you are on, and every such board for an admin, as in the Boards list.
