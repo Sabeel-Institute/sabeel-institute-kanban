@@ -718,7 +718,7 @@ export const TUTORIALS = [
           ]),
       },
       {
-        say: "Filled in: a card is due in the next few days. A ring: the lane is under way, and nothing's late.",
+        say: "A solid gold circle: a card is due in the next few days. An empty ring: the lane is under way, and nothing's late.",
         do: (t) => t.wait(400),
       },
       {
@@ -752,7 +752,7 @@ export const TUTORIALS = [
         },
       },
       {
-        say: 'And tap a row to open its board.',
+        say: 'To open a board, just tap its row.',
         do: async (t) => {
           await t.tap(t.id('overview-row:Winter Camp'));
           await t.waitFor(t.btn('Board settings'));
