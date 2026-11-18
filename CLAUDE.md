@@ -808,7 +808,10 @@ about thirty more, and their causes added four:
    function or hook and test that (`boardDrop.ts`, `useLaneInfo`, `toIdle`).
 8. **An absence check needs a positive signal first.** "Not there" passes just
    as well before the thing could appear: wait for proof the producer ran (the
-   list answered, a later history line), then count zero.
+   list answered, a later history line), then count zero. The same holds the
+   other way: the screen moves on the local write, before the server has it,
+   so a stored read made on a screen change waits until the store holds what
+   is expected (`storedOnce`), or it flakes on a busy runner.
 9. **Drive an input as a person does.** `fill()` sets a whole value at once,
    which hid a date field writing every keystroke; type key by key where the
    input reacts per key.

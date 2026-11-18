@@ -263,7 +263,18 @@ try {
   check('most overdue, reversed', same(got, LATE_BACK), flat(got));
 
   const stored = async () => (await db.doc(`users/${F.uid}`).get()).data();
-  let prefs = await stored();
+  // The page moves on the local write, before the server has it: a stored
+  // read waits until it holds what is expected, or gives up and shows what it
+  // read.
+  const storedWhen = async (ok) => {
+    let data = await stored();
+    for (let i = 0; i < 60 && !ok(data); i += 1) {
+      await page.waitForTimeout(250);
+      data = await stored();
+    }
+    return data;
+  };
+  let prefs = await storedWhen((d) => d.overviewSort === 'late' && d.overviewReverse === true);
   check('the order is kept for the person', prefs.overviewSort === 'late' && prefs.overviewReverse === true);
   await page.reload({ waitUntil: 'load' });
   await overviewButton(page).waitFor({ timeout: 30000 }).catch(() => {});
@@ -308,7 +319,7 @@ try {
   const HIDDEN = [['Beta Course'], ['Delta Retreat'], ['Gamma Circle']];
   got = await settled(page, HIDDEN);
   check('hidden, a board leaves the overview', same(got, HIDDEN), flat(got));
-  prefs = await stored();
+  prefs = await storedWhen((d) => JSON.stringify(d.overviewHiddenBoardIds) === '["ov_alpha"]');
   check('and only the hidden list is written', JSON.stringify(prefs.overviewHiddenBoardIds) === '["ov_alpha"]');
   const disclosure = page.getByRole('button', { name: 'Hidden (1)' });
   check('Hidden (1) at the foot', await disclosure.isVisible());
@@ -344,7 +355,7 @@ try {
   // Restored: listed again, and hidden, so the foot counts two.
   await page.getByRole('button', { name: 'Hidden (2)' }).waitFor({ timeout: 20000 }).catch(() => {});
   got = await settled(page, [['Beta Course', 'Alpha Camp']]);
-  prefs = await stored();
+  prefs = await storedWhen((d) => [...(d.overviewHiddenBoardIds ?? [])].sort().join() === 'ov_delta,ov_gamma');
   check(
     'a hidden board archived and restored is still hidden, though another was hidden meanwhile',
     same(got, [['Beta Course', 'Alpha Camp']]) &&
