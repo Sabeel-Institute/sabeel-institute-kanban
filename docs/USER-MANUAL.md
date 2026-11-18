@@ -268,6 +268,7 @@ Tap any card to open the full view.
   web page and anything the card cannot show — headings, colours, tables,
   images — arrives as ordinary text with the bold, italics, lists and links
   kept. Nothing is silently mangled; it is just reduced to what a card holds.
+
 - **Attachments** — files on the card. See below. A card with files shows a
   small **paperclip and count** on the board, so you can see which cards carry
   something without opening them.
@@ -297,6 +298,7 @@ Tap any card to open the full view.
   drag the handles or tap **Select all** to take the whole thing. A list's
   bullets and numbers are drawn beside its words, so they are not always
   copied with them.
+
 - **Subscribe** — the **bell** in the card's header. Tap it to hear about
   everything on a card even when it isn't assigned to you: new comments, and any
   change its activity records — moved, renamed, a new due date, a file attached
@@ -314,6 +316,7 @@ Tap any card to open the full view.
   You can edit your own comment with the **pencil**, and the **@** works there
   too — mention someone in an edit and they're told, once. Correcting the wording
   afterwards doesn't notify anyone again.
+
 - **Activity** — who changed what, and when, including subtasks being linked and
   unlinked. Written by the system, so no one can edit it.
 
@@ -824,6 +827,7 @@ The pages:
   most, and the only details other screens read, so no other field can be
   called either. A link must start with `http://` or `https://`, and a number
   can have commas between thousands, as in 1,200.
+
 - **People** — who can see the board, and who owns it. Tap the **add-person**
   icon beside the *Members* heading to see who else can be added, and tap a name
   to add them. Removing someone (the **remove-person** icon on their row) also
@@ -840,6 +844,7 @@ The pages:
 
   Somebody removed while they have the board open is told they no longer have
   access to it, rather than being left looking at a screen that will not load.
+
 - **Labels** — everything this board's cards can carry, and the one page of
   settings **everyone on the board** gets to change, owner or not.
 
@@ -859,6 +864,7 @@ The pages:
   surfaces. Names are short by design, and two labels on one board can't share
   a name even in different capitals — a card face shows the name and nothing
   else, so "Urgent" and "urgent" would be impossible to tell apart.
+
 - **History** — what has happened to the board itself, newest first. See below.
 
 ### Letting somebody else run the board
