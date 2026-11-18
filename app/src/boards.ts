@@ -5,6 +5,7 @@ import {
   collection,
   deleteField,
   doc,
+  FieldPath,
   getDoc,
   query,
   updateDoc,
@@ -502,6 +503,39 @@ export async function setSectionCollapsed(
   await updateDoc(doc(db, 'users', user.uid), {
     collapsedBoardSections: collapsed ? arrayUnion(section) : arrayRemove(section),
   });
+}
+
+/**
+ * One lane of a board, one way (`laneKey` names the No lane group). The path
+ * is built from parts, so a board id is never read as a dotted path.
+ */
+export async function setLaneCollapsed(
+  user: SessionUser,
+  boardId: string,
+  key: string,
+  collapsed: boolean,
+): Promise<void> {
+  await updateDoc(
+    doc(db, 'users', user.uid),
+    new FieldPath('collapsedLanes', boardId),
+    collapsed ? arrayUnion(key) : arrayRemove(key),
+  );
+}
+
+/**
+ * Every lane of a board at once: `keys` collapses those, `null` expands them
+ * all, deleting the board's entry so a board's lanes leave nothing behind.
+ */
+export async function setAllLanesCollapsed(
+  user: SessionUser,
+  boardId: string,
+  keys: readonly string[] | null,
+): Promise<void> {
+  await updateDoc(
+    doc(db, 'users', user.uid),
+    new FieldPath('collapsedLanes', boardId),
+    keys ? [...keys] : deleteField(),
+  );
 }
 
 /** The signed-in user's own list preferences, live. */

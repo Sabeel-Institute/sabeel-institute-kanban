@@ -558,9 +558,25 @@ const layoutFaults = (page, width) =>
      * Only elements with visible area are considered, so the pager's
      * off-screen pages — laid out to the right by design — are not flagged.
      */
+    // Cut off by a scroller that can scroll to it, as the wide board's
+    // columns are, is by design: what is past the edge is a scroll away.
+    // Cut off by `overflow: hidden` or by the window, it cannot be reached.
+    const scrollsTo = (e, right) => {
+      for (let a = e.parentElement; a && a !== document.body; a = a.parentElement) {
+        const ox = getComputedStyle(a).overflowX;
+        if (
+          (ox === 'auto' || ox === 'scroll') &&
+          a.scrollWidth > a.clientWidth + 1 &&
+          right > a.getBoundingClientRect().right
+        ) {
+          return true;
+        }
+      }
+      return false;
+    };
     for (const e of els) {
       const raw = e.getBoundingClientRect();
-      if (raw.right > w + 1 && area(visibleRect(e)) > 4) {
+      if (raw.right > w + 1 && area(visibleRect(e)) > 4 && !scrollsTo(e, raw.right)) {
         faults.push(`"${name(e)}" is clipped by the right edge (${Math.round(raw.right - w)}px past)`);
       }
     }
@@ -1287,11 +1303,11 @@ async function tour(page, tag, width) {
   await visit('lanes-board', async () => {
     await nav('Boards');
     await page.getByText('Summer Program', { exact: true }).first().click();
-    await page.locator('[role="heading"][aria-label^="Planning,"]').first().waitFor({ timeout: 20000 });
+    await page.locator('[data-testid="lane-heading"][aria-label^="Planning,"]').first().waitFor({ timeout: 20000 });
   });
   {
     const headings = await page.evaluate(() =>
-      [...document.querySelectorAll('[role="heading"][aria-label]')]
+      [...document.querySelectorAll('[data-testid="lane-heading"][aria-label]')]
         .filter((h) => {
           const r = h.getBoundingClientRect();
           return r.width > 0 && r.left >= 0 && r.right <= window.innerWidth + 1;

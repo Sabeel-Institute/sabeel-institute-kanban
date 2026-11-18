@@ -251,11 +251,13 @@ export function DisclosureHeading({
   label,
   expanded,
   onToggle,
+  testID,
   children,
 }: {
   label: string;
   expanded: boolean;
   onToggle: () => void;
+  testID?: string;
   /** The heading's own drawing, beside the chevron. */
   children: ReactNode;
 }) {
@@ -267,6 +269,7 @@ export function DisclosureHeading({
       accessibilityState={{ expanded }}
       aria-expanded={expanded}
       onPress={onToggle}
+      testID={testID}
       style={({ pressed }) => [
         styles.disclosure,
         { backgroundColor: pressed ? t.bg.inset : 'transparent' },

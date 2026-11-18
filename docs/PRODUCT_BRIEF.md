@@ -711,6 +711,13 @@ learn for boards that are not programs.
   cards" when empty. A lane keeps its heading in a column with none of its
   cards, so it holds its place from column to column. The wide board is not a
   swimlane grid: lanes do not line up across columns (decision A).
+- **A lane folds, per person** (#115): its heading folds the lane's cards away
+  in every column at once, keeping its count and colour; two icons fold and
+  open every lane. Stored on the person's user document (`collapsedLanes`, by
+  board), across reloads and devices, and decided in one hook for every layout
+  (`useLaneCollapse`). A drop on a folded heading lands first in the lane; an
+  add into a folded lane opens it. Expanding every lane deletes the board's
+  entry, so stored folds do not outlive the boards they name.
 - **Add card asks for a lane** on a board with lanes, none chosen, and adds
   nothing until one is. A subtask starts in its parent's lane. A card's lane is
   a second choice beside its column on the card; No lane is offered only while
