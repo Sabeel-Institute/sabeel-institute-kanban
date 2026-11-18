@@ -216,6 +216,14 @@ The **overview** film in **More → Help** goes through the marks one by one.
 Boards with the same lanes sit together under one row of lane names. Tap a
 row to open its board.
 
+A board with **details** beyond its dates (teachers, a meeting link, a fee:
+whatever its owners added in Board settings → Details) has a small **arrow**
+at the top right of its row. Tap it to show those details under the row, and
+again to hide them; links open from there. Only details with a value are
+shown, and not the dates, which the row already gives. Tapping the arrow
+doesn't open the board; tapping the rest of the row still does. Rows you open
+stay open while you use the app.
+
 **Order** sorts the boards by **Start date** (where it starts), **Date
 created** or **Most overdue**, and the arrows beside it turn that order the
 other way. A board without a start date always comes last when sorting by

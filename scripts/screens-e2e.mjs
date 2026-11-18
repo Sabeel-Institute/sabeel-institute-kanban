@@ -666,7 +666,7 @@ async function rulesScreen(page, tag, width) {
 }
 
 // ---- The tour --------------------------------------------------------------
-const SCREENS = 38;
+const SCREENS = 39;
 
 /**
  * Text that does not reach the brand's contrast against what it is drawn on:
@@ -867,6 +867,20 @@ async function tour(page, tag, width) {
     ovFaults.length === 0,
     ovFaults.join('; ').slice(0, 200),
   );
+  // A row's details, open under it (#118): swept like any screen, and the
+  // lane names and marks must not move for it.
+  await visit('overview-details', async () => {
+    await page.getByRole('button', { name: 'Details of Summer Program', exact: true }).click();
+    await page.getByTestId('overview-details').waitFor({ timeout: 10000 });
+  });
+  const ovDetailFaults = await overviewFaults(page);
+  check(
+    `${tag} / overview with details open: every mark apart and on screen, every lane name in full`,
+    ovDetailFaults.length === 0,
+    ovDetailFaults.join('; ').slice(0, 200),
+  );
+  // Closed again, so the next width starts from the overview as it opens.
+  await page.getByRole('button', { name: 'Details of Summer Program', exact: true }).click();
   await page.getByLabel('Name of the clone').waitFor({ state: 'detached', timeout: 15000 });
 
   await visit('mywork', () => nav('My Work'));
