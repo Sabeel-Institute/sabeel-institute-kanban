@@ -117,6 +117,11 @@ it at the top; boards you've opened recently follow, then the rest alphabeticall
 Boards marked as **templates**, the ones people clone to start a program, come
 last under their own heading, each with a small *Template* badge.
 
+Tap a heading (*Starred*, *Recent*, *All boards*, *Templates*) to fold that
+section away; the heading stays, with the number of boards it holds, and tapping
+it again opens it. What you fold stays folded, on this device and your others,
+until you open it again.
+
 Every board shows as a card in a grid on wide screens, and as a single-column list
 on a phone. If your account can create boards, **New board** is at the top (see
  Part 2).

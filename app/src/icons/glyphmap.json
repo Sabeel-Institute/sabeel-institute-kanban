@@ -26,6 +26,8 @@
   "edit": 58313,
   "error-outline": 57345,
   "event": 59512,
+  "expand-less": 58830,
+  "expand-more": 58831,
   "filter-alt-off": 60210,
   "folder-zip": 60204,
   "format-bold": 57912,
@@ -63,5 +65,7 @@
   "swap-horiz": 59604,
   "swap-vert": 59605,
   "table-chart": 57957,
-  "unarchive": 57705
+  "unarchive": 57705,
+  "unfold-less": 58838,
+  "unfold-more": 58839
 }

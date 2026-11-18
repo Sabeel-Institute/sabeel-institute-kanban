@@ -1,16 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Icon } from '../icons';
-import { BOARD_NAME_MAX, overviewBoards, sortBoardsForList } from '@sabeel/shared';
+import {
+  BOARD_NAME_MAX,
+  overviewBoards,
+  sortBoardsForList,
+  type BoardSection,
+} from '@sabeel/shared';
 import {
   boardsView,
   cloneBoard,
   createBoard,
   newBoardId,
   noteBoardOpened,
+  setSectionCollapsed,
   toggleFavourite,
   updateBoard,
   useMyBoardPrefs,
+  useMyCollapsed,
   useMyBoards,
   type BoardListItem,
 } from '../boards';
@@ -26,7 +33,7 @@ import {
   Hint,
   Card,
   CardGrid,
-  Heading,
+  DisclosureHeading,
   IconAction,
   LoadError,
   Row,
@@ -53,6 +60,44 @@ const EMPTY: string[] = [];
  * drops `accessibilityActions`, and there the keyboard's context-menu key (or
  * Shift+F10) fires the same `contextmenu` a right-click does.
  */
+const NO_SECTIONS: readonly BoardSection[] = [];
+
+/**
+ * One section of the list, collapsible (#110): the heading toggles it, and
+ * while collapsed it says how many boards it holds, so collapsing hides the
+ * boards and never the fact that they are there.
+ */
+function BoardsSection({
+  title,
+  count,
+  collapsed,
+  onToggle,
+  children,
+}: {
+  title: string;
+  count: number;
+  collapsed: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  const t = useTheme();
+  const words = collapsed ? `${title} (${count})` : title;
+  // Named "<title> section", never the bare title: "Boards" and "All boards"
+  // already name the tab and the control that returns to this list, and two
+  // controls answering to one name confuse a screen reader and every test.
+  const label = collapsed ? `${title} section (${count})` : `${title} section`;
+  return (
+    <>
+      <View style={styles.sectionGap}>
+        <DisclosureHeading label={label} expanded={!collapsed} onToggle={onToggle}>
+          <Text style={[type.heading, { color: t.text.primary }]}>{words}</Text>
+        </DisclosureHeading>
+      </View>
+      {collapsed ? null : children}
+    </>
+  );
+}
+
 function BoardRow({
   board,
   isFavourite,
@@ -177,6 +222,18 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
   /** The board whose clone sheet is open, and the id its clone will have. */
   const [cloning, setCloning] = useState<{ board: BoardListItem; cloneId: string } | null>(null);
   const cloneAction = useAction('cloneBoard');
+  // Sections collapsed by this person, on their account (#110). Loading or
+  // unreadable reads as nothing collapsed: a display preference, so the list
+  // shows in full rather than hiding boards on a failed read, and the failure
+  // is on the global banner.
+  const collapsedPrefs = useMyCollapsed(user);
+  const collapsed = collapsedPrefs.data?.sections ?? NO_SECTIONS;
+  const collapseAction = useAction('collapseSection');
+  function toggleSection(section: BoardSection) {
+    return collapseAction.run(() =>
+      setSectionCollapsed(user, section, !collapsed.includes(section)),
+    );
+  }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const t = useTheme();
@@ -338,6 +395,12 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
         />
       ) : null}
 
+      {collapseAction.error ? (
+        <Card style={styles.form}>
+          <Body>{collapseAction.error}</Body>
+        </Card>
+      ) : null}
+
       {!hasAny ? (
         <Card style={styles.form}>
           <Body>
@@ -350,7 +413,12 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
 
       {sections.favourites.length > 0 ? (
         <>
-          <Heading>Starred</Heading>
+          <BoardsSection
+            title={'Starred'}
+            count={sections.favourites.length}
+            collapsed={collapsed.includes('starred')}
+            onToggle={() => toggleSection('starred')}
+          >
           <CardGrid>
             {sections.favourites.map((b) => (
               <BoardRow
@@ -363,12 +431,18 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
               />
             ))}
           </CardGrid>
+          </BoardsSection>
         </>
       ) : null}
 
       {sections.recents.length > 0 ? (
         <>
-          <Heading>Recent</Heading>
+          <BoardsSection
+            title={'Recent'}
+            count={sections.recents.length}
+            collapsed={collapsed.includes('recent')}
+            onToggle={() => toggleSection('recent')}
+          >
           <CardGrid>
             {sections.recents.map((b) => (
               <BoardRow
@@ -381,16 +455,18 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
               />
             ))}
           </CardGrid>
+          </BoardsSection>
         </>
       ) : null}
 
       {sections.others.length > 0 ? (
         <>
-          <Heading>
-            {sections.favourites.length + sections.recents.length > 0
-              ? 'All boards'
-              : 'Boards'}
-          </Heading>
+          <BoardsSection
+            title={sections.favourites.length + sections.recents.length > 0 ? 'All boards' : 'Boards'}
+            count={sections.others.length}
+            collapsed={collapsed.includes('all')}
+            onToggle={() => toggleSection('all')}
+          >
           <CardGrid>
             {sections.others.map((b) => (
               <BoardRow
@@ -403,6 +479,7 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
               />
             ))}
           </CardGrid>
+          </BoardsSection>
         </>
       ) : null}
 
@@ -410,7 +487,12 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
           in come first. Cloned by a long press, like any board. */}
       {sections.templates.length > 0 ? (
         <>
-          <Heading>Templates</Heading>
+          <BoardsSection
+            title={'Templates'}
+            count={sections.templates.length}
+            collapsed={collapsed.includes('templates')}
+            onToggle={() => toggleSection('templates')}
+          >
           <CardGrid>
             {sections.templates.map((b) => (
               <BoardRow
@@ -423,6 +505,7 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
               />
             ))}
           </CardGrid>
+          </BoardsSection>
         </>
       ) : null}
 
@@ -502,6 +585,7 @@ function ArchivedBoards({
 }
 
 const styles = StyleSheet.create({
+  sectionGap: { marginTop: space.lg },
   between: { justifyContent: 'space-between' },
   nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space.sm },
   shrink: { flexShrink: 1 },

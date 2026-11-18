@@ -198,7 +198,7 @@ try {
   await page.getByRole('button', { name: 'More' }).waitFor({ timeout: 30000 });
 
   const boards = async () => {
-    await page.getByRole('button', { name: 'Boards' }).first().click();
+    await page.getByRole('button', { name: 'Boards', exact: true }).first().click();
     await page.getByRole('button', { name: 'New board' }).waitFor({ timeout: 20000 });
   };
   const newBoard = async (name) => {

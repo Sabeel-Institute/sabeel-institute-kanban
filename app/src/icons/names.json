@@ -26,6 +26,8 @@
   "edit",
   "error-outline",
   "event",
+  "expand-less",
+  "expand-more",
   "filter-alt-off",
   "folder-zip",
   "format-bold",
@@ -63,5 +65,7 @@
   "swap-horiz",
   "swap-vert",
   "table-chart",
-  "unarchive"
+  "unarchive",
+  "unfold-less",
+  "unfold-more"
 ]
