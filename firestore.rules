@@ -112,7 +112,21 @@ service cloud.firestore {
       function selfWritableOnly() {
         return request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['favoriteBoardIds', 'recentBoardIds', 'mutedBoardIds',
-                    'notifyPrefs', 'unreadNotifCount', 'watchedColumns']);
+                    'notifyPrefs', 'unreadNotifCount', 'watchedColumns',
+                    'overviewSort', 'overviewReverse', 'overviewHiddenBoardIds']);
+      }
+      // The overview's order and the boards hidden from it: display
+      // preferences, granting nothing. Hiding a board you cannot see changes
+      // nothing either, since the overview lists only boards you can. 500 is
+      // OVERVIEW_HIDDEN_MAX, held to it by ruleLimits.test.ts.
+      function overviewPrefsWellFormed() {
+        return (!('overviewSort' in request.resource.data)
+                || request.resource.data.overviewSort in ['start', 'created', 'late'])
+          && (!('overviewReverse' in request.resource.data)
+              || request.resource.data.overviewReverse is bool)
+          && (!('overviewHiddenBoardIds' in request.resource.data)
+              || (request.resource.data.overviewHiddenBoardIds is list
+                  && request.resource.data.overviewHiddenBoardIds.size() <= 500));
       }
       // The columns whose arrivals notify you. Naming a column on a board you
       // are not on gains nothing: the notice sweep sends arrivals to that
@@ -137,7 +151,8 @@ service cloud.firestore {
       allow update: if isActive()
         && request.auth.uid == userId
         && selfWritableOnly()
-        && watchesBounded();
+        && watchesBounded()
+        && overviewPrefsWellFormed();
 
       // Accounts are created by the auth trigger and never deleted by clients.
       allow create, delete: if false;

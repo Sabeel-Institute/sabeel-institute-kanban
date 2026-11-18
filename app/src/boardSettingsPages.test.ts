@@ -9,7 +9,7 @@ import {
 
 describe('settingsPages', () => {
   it('gives someone who runs the board every page, General first', () => {
-    expect(settingsPages(true)).toEqual([
+    expect(settingsPages(true, false)).toEqual([
       'general',
       'columns',
       'lanes',
@@ -21,13 +21,15 @@ describe('settingsPages', () => {
   });
 
   it('gives anyone else the pages they can use, and no others', () => {
-    expect(settingsPages(false)).toEqual(['details', 'people', 'labels', 'history']);
+    expect(settingsPages(false, true)).toEqual(['details', 'people', 'labels', 'history']);
+    // No details: nothing for them on that page, and it would be the first.
+    expect(settingsPages(false, false)).toEqual(['people', 'labels', 'history']);
   });
 });
 
 describe('shownPage', () => {
-  const owner = settingsPages(true);
-  const member = settingsPages(false);
+  const owner = settingsPages(true, false);
+  const member = settingsPages(false, true);
 
   it('shows the list alone on a phone until a page is chosen', () => {
     expect(shownPage(undefined, owner, false)).toBeNull();

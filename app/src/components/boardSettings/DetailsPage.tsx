@@ -207,7 +207,11 @@ function DetailValue({
             accessibilityLabel={`${field.name}: ${link}`}
             onPress={() => void Linking.openURL(link).catch(() => undefined)}
           >
-            <Text style={[type.body, styles.link, { color: t.text.accent }]}>{link}</Text>
+            {/* Selectable, as a text value is: a meeting link is copied into
+                a message as often as it is opened. */}
+            <Text style={[type.body, styles.link, { color: t.text.accent }]} selectable>
+              {link}
+            </Text>
           </Pressable>
         ) : (
           <Text style={[type.body, { color: t.text.primary }]} selectable>
@@ -216,12 +220,10 @@ function DetailValue({
         )}
       </View>
       {canEdit ? (
-        <IconAction
-          icon="edit"
-          label={`Edit ${field.name}`}
-          disabled={busy}
-          onPress={() => setDraft(value ?? '')}
-        />
+        // Not held while another value saves: opening an editor writes
+        // nothing, and a pencil that ignored a click just after a date was
+        // set read as broken. Save waits instead.
+        <IconAction icon="edit" label={`Edit ${field.name}`} onPress={() => setDraft(value ?? '')} />
       ) : null}
     </Row>
   );

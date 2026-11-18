@@ -105,7 +105,7 @@ export function BoardSettingsScreen({
    * with fewer, and a page no longer offered falls back (`shownPage`).
    */
   const canManage = canManageBoard(user, b);
-  const pages = settingsPages(canManage);
+  const pages = settingsPages(canManage, b.fields.length > 0);
   const shown = shownPage(page, pages, isWide);
   const ownLabels =
     labels.status === 'ready'

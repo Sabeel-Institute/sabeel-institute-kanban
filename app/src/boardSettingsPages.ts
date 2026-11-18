@@ -33,11 +33,12 @@ export const PAGE_TITLES: Record<BoardSettingsPage, string> = {
  * details (everyone on the board reads them), the people (who to ask), the
  * labels (a board's own are anyone-on-the-board's to change) and the history.
  * Not General or Columns drawn disabled, which reads as something broken.
+ * Details only when the board has some: they cannot add any, and an empty
+ * page first is where they would otherwise land, on almost every board.
  */
-export function settingsPages(canManage: boolean): BoardSettingsPage[] {
-  return canManage
-    ? ['general', 'columns', 'lanes', 'details', 'people', 'labels', 'history']
-    : ['details', 'people', 'labels', 'history'];
+export function settingsPages(canManage: boolean, hasDetails: boolean): BoardSettingsPage[] {
+  if (canManage) return ['general', 'columns', 'lanes', 'details', 'people', 'labels', 'history'];
+  return hasDetails ? ['details', 'people', 'labels', 'history'] : ['people', 'labels', 'history'];
 }
 
 /**

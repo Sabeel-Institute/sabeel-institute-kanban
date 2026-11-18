@@ -351,6 +351,60 @@ for (const [id, columnId, laneId, title, dueDate] of [
   });
 }
 
+// Two more boards with lanes, for the overview: six lanes, and the most a
+// board may have, twelve, among them the longest name. On a 320px phone the
+// twelve must fit with every name in full on a slant, the marks shrunk rather
+// than touching or scrolling (docs/PRODUCT_BRIEF.md § Overview). The longest
+// name is last, where a slant reaches furthest right. One card in
+// each state a mark draws: complete, late, soon, under way, no due dates.
+const SOON = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
+const OVERVIEW_BOARDS = [
+  // Capitals, which an estimate from letter counts once drew too narrow.
+  ['sw_six', 'Tajweed Course', ['Planning', 'Curriculum', 'MARKETING & PR', 'Staffing', 'Supplies', 'Wrap-up']],
+  ['sw_twelve', 'Summer Camp 2027', [
+    'Planning', 'Curriculum', 'Staffing', 'Supplies', 'Venue', 'Registration',
+    'Volunteers', 'Food', 'Transport', 'Photography', 'Wrap-up', LONG_LANE,
+  ]],
+];
+for (const [id, name, laneNames] of OVERVIEW_BOARDS) {
+  await db.doc(`boards/${id}`).set({
+    name,
+    description: '',
+    archived: false,
+    columns: [
+      { id: 'o1', name: 'To Do' },
+      { id: 'o2', name: 'Done' },
+    ],
+    columnIds: ['o1', 'o2'],
+    lanesOn: true,
+    lanes: laneNames.map((n, i) => ({ id: `${id}_l${i}`, name: n })),
+    doneColumnId: 'o2',
+    fields: [{ id: 'of_s', name: 'Start date', type: 'start' }],
+    details: { of_s: '2027-07-05' },
+    memberUids: [uid],
+    boardOwnerUids: [uid],
+    memberProfiles: { [uid]: { displayName: 'Faisal', email: 'faisal@oursabeel.com' } },
+    activeCardCount: 0,
+    createdAt: now,
+    createdBy: uid,
+  });
+  for (const [n, lane, columnId, dueDate] of [
+    [0, 0, 'o2', null],
+    [1, 1, 'o1', '2020-01-01'],
+    [2, 2, 'o1', SOON],
+    [3, 3, 'o1', '2099-01-01'],
+    [4, 4, 'o1', null],
+  ]) {
+    await db.doc(`cards/${id}_c${n}`).set({
+      boardId: id, title: `Card ${n}`, columnId, laneId: `${id}_l${lane}`, priority: 'none',
+      description: '', ...(dueDate ? { dueDate } : {}),
+      rank: `V${n}`, assigneeUids: [], subscriberUids: [], labelIds: [],
+      archived: false, commentCount: 0,
+      createdAt: now, createdBy: uid, updatedAt: now, updatedBy: uid,
+    });
+  }
+}
+
 // A board MARKED AS A TEMPLATE, so the Boards list draws its Templates heading
 // and a badge on a row, at every width. A long name, beside which the badge
 // must wrap rather than push the star off the row.
@@ -612,7 +666,97 @@ async function rulesScreen(page, tag, width) {
 }
 
 // ---- The tour --------------------------------------------------------------
-const SCREENS = 37;
+const SCREENS = 38;
+
+/**
+ * Text that does not reach the brand's contrast against what it is drawn on:
+ * 4.5:1, or 3:1 for large text (24px, or 18.66px bold). Read from the page, so
+ * a token that passes on one background and fails on another is caught where
+ * it is drawn: the lane badge's green read on ivory and failed on a column.
+ *
+ * Exempt, as BRAND.md has it: `text.muted` (Caption, metadata you could delete
+ * without losing information), anything dimmed as disabled, and text on an
+ * image. The background is the nearest ancestor that paints one.
+ */
+const MUTED = 'rgb(165, 141, 122)';
+const contrastFaults = (page) =>
+  page.evaluate((muted) => {
+    const rgb = (s) => (s.match(/[\d.]+/g) || []).map(Number);
+    const lum = ([r, g, b]) => {
+      const f = (c) => ((c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+      return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+    };
+    const ratio = (a, b) => {
+      const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+      return (x + 0.05) / (y + 0.05);
+    };
+    const faults = new Set();
+    for (const el of document.querySelectorAll('body *')) {
+      const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+      if (!own) continue;
+      const style = getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0 || style.visibility === 'hidden' || style.color === muted) continue;
+      let bg = null;
+      let dimmed = false;
+      for (let n = el; n && n !== document.documentElement; n = n.parentElement) {
+        const s = getComputedStyle(n);
+        if (Number(s.opacity) < 1) dimmed = true;
+        if (s.backgroundImage !== 'none') { bg = 'image'; break; }
+        const c = rgb(s.backgroundColor);
+        if (c.length >= 3 && (c.length < 4 || c[3] > 0.5)) { bg = c; break; }
+      }
+      if (dimmed || bg === 'image' || !bg) continue;
+      const size = parseFloat(style.fontSize);
+      const large = size >= 24 || (size >= 18.66 && Number(style.fontWeight) >= 700);
+      const got = ratio(rgb(style.color), bg);
+      if (got < (large ? 3 : 4.5)) {
+        faults.add(`"${el.textContent.trim().slice(0, 24)}" ${got.toFixed(2)}:1 (${style.color} on rgb(${bg.slice(0, 3).join(', ')}))`);
+      }
+    }
+    return [...faults];
+  }, MUTED);
+
+/**
+ * What the overview must hold at every width, read from the page: within a
+ * row no two marks touch and each is on screen; every lane name is on screen,
+ * drawn in full (no ellipsis across, no clamp downwards), and ends above its
+ * group's first row.
+ */
+const overviewFaults = (page) =>
+  page.evaluate(() => {
+    const faults = [];
+    const w = window.innerWidth;
+    for (const group of document.querySelectorAll('[data-testid="overview-group"]')) {
+      const firstRow = group.querySelector('[data-testid^="overview-row:"]');
+      const rowTop = firstRow ? firstRow.getBoundingClientRect().top : Infinity;
+      for (const name of group.querySelectorAll('[data-testid="overview-names"] > div > div')) {
+        const r = name.getBoundingClientRect();
+        const text = name.textContent;
+        if (r.left < -0.5 || r.right > w + 0.5) faults.push(`"${text}" off screen (${Math.round(r.left)}–${Math.round(r.right)})`);
+        // Cut either way: an ellipsis across, or a clamp downwards.
+        if (name.scrollWidth > name.clientWidth + 1 || name.scrollHeight > name.clientHeight + 1) {
+          faults.push(`"${text}" cut short`);
+        }
+        if (r.bottom > rowTop + 0.5) faults.push(`"${text}" runs into the row below`);
+      }
+      for (const row of group.querySelectorAll('[data-testid^="overview-row:"]')) {
+        const marks = [...row.querySelectorAll('[data-testid="overview-mark"]')].map((c) => c.firstElementChild);
+        let lastRight = -Infinity;
+        for (const m of marks) {
+          if (!m) {
+            faults.push(`${row.dataset.testid}: a lane has no mark`);
+            continue;
+          }
+          const r = m.getBoundingClientRect();
+          if (r.left < -0.5 || r.right > w + 0.5) faults.push(`${row.dataset.testid}: a mark off screen`);
+          if (r.left < lastRight + 1) faults.push(`${row.dataset.testid}: two marks touch`);
+          lastRight = r.right;
+        }
+      }
+    }
+    return faults;
+  });
 
 async function tour(page, tag, width) {
   /**
@@ -651,6 +795,8 @@ async function tour(page, tag, width) {
     await page.waitForTimeout(500);
     const faults = await layoutFaults(page, width);
     check(`${tag} / ${name}`, faults.length === 0, faults.join('; ').slice(0, 160));
+    const dim = await contrastFaults(page);
+    check(`${tag} / ${name} text has its contrast`, dim.length === 0, dim.join('; ').slice(0, 300));
     const out = await escapes(page);
     check(`${tag} / ${name} has a way out`, out.back || out.tabs, 'no Back and no tab bar');
     const small = await smallTargets(page);
@@ -698,6 +844,29 @@ async function tour(page, tag, width) {
     await page.getByLabel('Name of the clone').waitFor({ timeout: 15000 });
   });
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+
+  // The overview, from its icon in the Boards header: three boards with lanes,
+  // the twelve-lane one being the case the layout is for.
+  await visit('overview', async () => {
+    await nav('Boards');
+    await page.getByRole('button', { name: 'Overview', exact: true }).click();
+    await page.getByTestId('overview-row:Summer Camp 2027').waitFor({ timeout: 20000 });
+    await page.waitForFunction(
+      () =>
+        document.querySelectorAll('[data-testid="overview-mark"] > *').length >= 21 &&
+        ![...document.querySelectorAll('[data-testid^="overview-row:"]')].some((r) =>
+          /: loading$/.test(r.getAttribute('aria-label') || ''),
+        ),
+      null,
+      { timeout: 20000 },
+    );
+  });
+  const ovFaults = await overviewFaults(page);
+  check(
+    `${tag} / overview: every mark apart and on screen, every lane name in full`,
+    ovFaults.length === 0,
+    ovFaults.join('; ').slice(0, 200),
+  );
   await page.getByLabel('Name of the clone').waitFor({ state: 'detached', timeout: 15000 });
 
   await visit('mywork', () => nav('My Work'));
@@ -1078,7 +1247,22 @@ async function tour(page, tag, width) {
   for (const name of SETTINGS_PAGES) {
     await visit(`settings-${name.toLowerCase()}`, async () => {
       await pageRow(name).click();
-      await page.waitForTimeout(600);
+      // Proof the page opened, or the checks would run on the page before
+      // it: on a wide screen its row is marked current, on a phone the list
+      // gives way to the page.
+      if (wide) {
+        await page.waitForFunction(
+          (n) =>
+            [...document.querySelectorAll('[aria-current="page"]')].some(
+              (el) => el.getAttribute('aria-label') === n,
+            ),
+          name,
+          { timeout: 15000 },
+        );
+      } else {
+        await pageRow(SETTINGS_PAGES[0]).waitFor({ state: 'hidden', timeout: 15000 });
+      }
+      await page.waitForTimeout(300);
     });
     if (!wide) {
       await page.getByRole('button', { name: 'Back' }).first().click();
@@ -1354,9 +1538,11 @@ async function tour(page, tag, width) {
           rows,
         };
       });
+      // Fundraising 2026 has no details, so a member is not shown the page:
+      // they could add none, and it would be the first they land on.
       const wantRows = wants.settings
         ? ['General', 'Columns', 'Lanes', 'Details', 'People', 'Labels', 'History']
-        : ['Details', 'People', 'Labels', 'History'];
+        : ['People', 'Labels', 'History'];
       check(
         `${tag} / settings as ${role === 'owner' ? 'an owner' : 'a member'} lists its pages`,
         list.title === (wants.settings ? 'settings' : 'members') &&

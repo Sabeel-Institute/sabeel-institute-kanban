@@ -23,6 +23,7 @@ import {
   type BoardField,
   type BoardLane,
   type BoardDoc,
+  type OverviewSort,
 } from '@sabeel/shared';
 import { auth, db, functions } from './firebase';
 import { useLiveDoc, useLiveQuery } from './liveQuery';
@@ -70,6 +71,8 @@ export interface BoardListItem {
   details: Record<string, string>;
   /** Marked as a template: listed under Templates, with a badge. */
   template: boolean;
+  /** When it was made, for the overview's "date created" order. */
+  createdAt: number;
 }
 
 function toBoard(id: string, data: Record<string, unknown>): BoardListItem {
@@ -103,6 +106,7 @@ function toBoard(id: string, data: Record<string, unknown>): BoardListItem {
     // otherwise throw in every reader (`boardExtras`).
     ...boardExtras(data),
     template: data.template === true,
+    createdAt: (data.createdAt as number) ?? 0,
   };
 }
 
@@ -430,6 +434,45 @@ export async function noteBoardOpened(
   const next = pushRecent(recents, boardId, MAX_RECENT_BOARDS);
   if (next[0] === recents[0] && next.length === recents.length) return;
   await updateDoc(doc(db, 'users', user.uid), { recentBoardIds: next });
+}
+
+/**
+ * The overview's two remembered preferences, the only things it stores per
+ * person: the order chosen, either way, and the boards hidden. On the
+ * person's own user document, as their favourites are.
+ */
+export function useMyOverviewPrefs(user: SessionUser) {
+  return useLiveDoc<{ sort: OverviewSort; reverse: boolean; hidden: string[] }>(
+    () => doc(db, 'users', user.uid),
+    [user.uid],
+    'overview-prefs',
+    (d) => {
+      const sort = d?.data.overviewSort;
+      return {
+        sort: sort === 'created' || sort === 'late' ? sort : 'start',
+        reverse: d?.data.overviewReverse === true,
+        hidden: (d?.data.overviewHiddenBoardIds as string[]) ?? [],
+      };
+    },
+  );
+}
+
+/**
+ * The order and its direction are written apart, each by its own control: a
+ * write of both would carry the other's value from the last render, and a
+ * choice made before that render caught up would put the old value back.
+ */
+export async function setOverviewSort(user: SessionUser, sort: OverviewSort): Promise<void> {
+  await updateDoc(doc(db, 'users', user.uid), { overviewSort: sort });
+}
+
+export async function setOverviewReverse(user: SessionUser, reverse: boolean): Promise<void> {
+  await updateDoc(doc(db, 'users', user.uid), { overviewReverse: reverse });
+}
+
+/** Build `hidden` with `nextHidden`, which keeps boards not listed at the moment. */
+export async function setOverviewHidden(user: SessionUser, hidden: string[]): Promise<void> {
+  await updateDoc(doc(db, 'users', user.uid), { overviewHiddenBoardIds: hidden });
 }
 
 /** The signed-in user's own list preferences, live. */

@@ -36,6 +36,7 @@ import { BoardSettingsScreen } from './src/screens/BoardSettingsScreen';
 import { BoardArchiveScreen } from './src/screens/BoardArchiveScreen';
 import { CardScreen } from './src/screens/CardScreen';
 import { MyWorkScreen } from './src/screens/MyWorkScreen';
+import { OverviewScreen } from './src/screens/OverviewScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { SearchScreen } from './src/screens/SearchScreen';
 import { UsersScreen } from './src/screens/UsersScreen';
@@ -98,6 +99,8 @@ function renderScreen(route: Route, user: SessionUser) {
       );
     case 'myWork':
       return <MyWorkScreen user={user} />;
+    case 'overview':
+      return <OverviewScreen user={user} />;
     case 'notifications':
       return <NotificationsScreen user={user} />;
     case 'search':
