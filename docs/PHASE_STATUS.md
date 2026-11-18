@@ -67,6 +67,7 @@ adds it here:
 
 | Film or picture | What it lacks |
 |---|---|
+| `board-people` film | The add-someone list's **Filter people** field (#112) |
 | `boards-phone`, `boards-wide`, `clone-*`, `overview-*` pictures; every film that shows the Boards list (`getting-around`, `new-board`, `clone-board`, `overview`, `signing-in`) | The Boards list's section headings are collapsible, with a chevron (#110) |
 
 ## What works today (2026-10-16)

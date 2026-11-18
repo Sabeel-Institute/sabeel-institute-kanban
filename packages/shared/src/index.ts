@@ -13,6 +13,7 @@ export * from './due';
 export * from './help';
 export * from './lanes';
 export * from './mentions';
+export * from './people';
 export * from './migration';
 export * from './notices';
 export * from './notify';

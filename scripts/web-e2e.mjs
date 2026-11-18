@@ -587,6 +587,22 @@ try {
   await settingsPage(admin, 'People');
   await admin.getByRole('button', { name: /^Add someone/ }).click();
   await admin.getByText('Add someone').waitFor({ timeout: 15000 });
+  // The list narrows by typing, as every person picker does: "sar" leaves Sara
+  // alone, and a name nobody has says so.
+  {
+    const rows = admin.getByRole('button', { name: /^Add .* to this board$/ });
+    await rows.first().waitFor({ timeout: 15000 });
+    const before = await rows.count();
+    await admin.getByPlaceholder('Filter people').fill('zzz-nobody');
+    const none = await admin.getByText('No one matches.').isVisible().catch(() => false);
+    await admin.getByPlaceholder('Filter people').fill('sar');
+    const names = await rows.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+    check(
+      'the add-someone list narrows by typing, and says when no one matches',
+      none && names.length === 1 && /^Add Sara/.test(names[0] ?? ''),
+      `${before} rows before; after "sar": ${JSON.stringify(names)}`,
+    );
+  }
   // Each candidate is one pressable row named "Add <person> to this board" —
   // not a bare "Add" button beside a name.
   await admin.getByRole('button', { name: /^Add .* to this board$/ }).first().click();
@@ -1123,6 +1139,14 @@ try {
   const openPicker = admin.getByRole('button', { name: /^Assign someone/ });
   await openPicker.waitFor({ timeout: 25000 });
   await openPicker.click();
+  // Every address shares the institute's domain, so matching it matched
+  // everyone; the person pickers match the name and the handle only.
+  await admin.getByPlaceholder('Filter people').fill('oursabeel');
+  check(
+    "the assignee picker does not match the shared email domain",
+    await admin.getByText('No one matches.').isVisible().catch(() => false),
+  );
+  await admin.getByPlaceholder('Filter people').fill('');
 
   for (let i = 0; i < 5; i++) {
     const option = admin.getByRole('button', { name: /^Assign \w/ });
@@ -2258,10 +2282,15 @@ try {
     // Narrowing the list by typing is what makes it usable on a big board.
     await admin.getByPlaceholder('Filter people').fill('zzz-nobody');
     const noMatch = await admin
-      .getByText('Nothing matches.')
+      .getByText('No one matches.')
       .isVisible()
       .catch(() => false);
-    check('typing narrows the people list, and says when nothing matches', noMatch);
+    check('typing narrows the people list, and says when no one matches', noMatch);
+    await admin.getByPlaceholder('Filter people').fill('oursabeel');
+    check(
+      "Search's people list does not match the shared email domain",
+      await admin.getByText('No one matches.').isVisible().catch(() => false),
+    );
     await admin.getByRole('button', { name: 'Done', exact: true }).click();
     await admin.waitForTimeout(400);
   }

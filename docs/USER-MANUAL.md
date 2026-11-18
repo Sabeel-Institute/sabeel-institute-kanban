@@ -283,7 +283,10 @@ Tap any card to open the full view.
 - **Due date** — a whole day, not a time. Pick it from a calendar; **Clear**
   removes it. An overdue card shows in red and says *Overdue*.
 - **Assignees** — anyone on the board. Tap the **add-person** icon beside the
-  *Assignees* heading, then pick a name; the **remove-person** icon on a row
+  *Assignees* heading, then pick a name. Typing in **Filter people** above the
+  list narrows it by any part of a name, or by the part of an address before
+  the @; every list of people in the app narrows the same way, the @mention
+  list included. The **remove-person** icon on a row
   unassigns them. They show as **name chips** on the card face, the card lands in
   each person's **My Work**, and they're notified.
 - **Labels** — coloured **badges** on the card face. The institute's labels are
@@ -834,8 +837,8 @@ The pages:
   can have commas between thousands, as in 1,200.
 
 - **People** — who can see the board, and who owns it. Tap the **add-person**
-  icon beside the *Members* heading to see who else can be added, and tap a name
-  to add them. Removing someone (the **remove-person** icon on their row) also
+  icon beside the *Members* heading to see who else can be added, type in
+  **Filter people** to narrow the list, and tap a name to add them. Removing someone (the **remove-person** icon on their row) also
   **unassigns them from that board's cards** — you're told how many before it
   happens — and takes away their ownership of it if they had any. **Adding them
   back later does not give the ownership back**; turn the switch on again if you
