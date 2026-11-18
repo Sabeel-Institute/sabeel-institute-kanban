@@ -4,6 +4,7 @@ import { Icon } from '../icons';
 import {
   PRIORITIES,
   canManageBoard,
+  finishRefusal,
   isFinished,
   labelsForBoard,
   laneOf,
@@ -345,8 +346,20 @@ export function CardScreen({
             value={c.columnId}
             disabled={busy || !cardsReady}
             options={b.columns.map((col) => ({ value: col.id, label: col.name }))}
-            onChange={(toColumnId) =>
-              run(async () => {
+            onChange={(toColumnId) => {
+              // A parent stays out of the finished column while a subtask is
+              // open (#111); said here, and nothing written.
+              const refused = finishRefusal({
+                board: b,
+                toColumnId,
+                moving: [c],
+                cards: boardCards.data ?? NO_CARDS,
+              });
+              if (refused) {
+                setError(refused);
+                return;
+              }
+              return run(async () => {
                 // Give it a fresh rank at the END of the destination. Carrying
                 // the old rank across would drop the card at an arbitrary
                 // position — ranks are only meaningful within a column.
@@ -358,8 +371,8 @@ export function CardScreen({
                   after: null,
                   user,
                 });
-              })
-            }
+              });
+            }}
           />
           {/* The lane, beside the column, on a board with lanes. "No lane" is
               offered only while the card has none: a card is placed, not

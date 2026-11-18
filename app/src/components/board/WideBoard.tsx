@@ -6,6 +6,7 @@ import {
   columnDeleteBlocked,
   columnsPatch,
   finishedColumnDeleteNote,
+  finishRefusal,
   groupByLane,
   isFinished,
   type Label,
@@ -149,6 +150,14 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   async function moveTo(card: Card, column: BoardColumn) {
     const target = (byColumn.get(column.id) ?? []).filter((c) => c.id !== card.id);
     setMoving(null);
+    // A parent stays out of the finished column while a subtask is open (#111).
+    const refused = laneBoard
+      ? finishRefusal({ board: laneBoard, toColumnId: column.id, moving: [card], cards: cards.data ?? [] })
+      : null;
+    if (refused) {
+      setError(refused);
+      return;
+    }
     await run(() =>
       moveCard({
         card,
@@ -283,6 +292,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         currentBoardId={boardId}
         columns={columns}
         lanes={live && laneBoard ? laneBoard.lanes : undefined}
+        doneColumnId={laneBoard?.doneColumnId}
         allCards={cards.data ?? []}
         selection={selection}
         members={members}

@@ -40,6 +40,7 @@ import {
   columnDeleteBlocked,
   columnsPatch,
   finishedColumnDeleteNote,
+  finishRefusal,
   groupByLane,
   isFinished,
   laneOf,
@@ -409,6 +410,20 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
 
       const moving = (cards.data ?? []).find((c) => c.id === cardId);
       if (!moving) return;
+      // A parent stays out of the finished column while a subtask is open
+      // (#111): the card stays where it was, and the board says why.
+      if (laneBoard) {
+        const refused = finishRefusal({
+          board: laneBoard,
+          toColumnId: columnId,
+          moving: [moving],
+          cards: cards.data ?? [],
+        });
+        if (refused) {
+          setError(refused);
+          return;
+        }
+      }
 
       const drawnColumn = byColumn.get(columnId) ?? [];
       const column = drawnColumn.filter((c) => c.id !== moving.id);
@@ -622,6 +637,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
           currentBoardId={boardId}
           columns={b.columns}
           lanes={live && laneBoard ? laneBoard.lanes : undefined}
+          doneColumnId={laneBoard?.doneColumnId}
           allCards={cards.data ?? []}
           selection={selection}
           members={members}

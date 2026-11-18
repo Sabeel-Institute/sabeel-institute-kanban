@@ -178,6 +178,13 @@ says *No cards*.
 how late it is, and it isn't *Overdue* anywhere: not on the card, in My Work
 or in Search, and nobody is reminded about it.
 
+**A card waits for its subtasks.** A card with a subtask that isn't finished
+can't go into the finished column, however you move it: dragging, choosing
+the column on the card, or **Move** on a selection. The app says which
+subtasks are still open; finish them (or archive any that are no longer
+needed), and the card can go. Moving a card together with all its open
+subtasks is fine, since they finish with it.
+
 Cards without a lane, such as those added before the board had lanes, sit
 under **No lane**, at the foot of each column.
 

@@ -703,6 +703,13 @@ learn for boards that are not programs.
   cards" when empty. A lane keeps its heading in a column with none of its
   cards, so it holds its place from column to column. The wide board is not a
   swimlane grid: lanes do not line up across columns (decision A).
+- **A parent waits for its subtasks** (#111, 2026-11-18): on a board with
+  lanes, a card with an open subtask (same board, not finished, not archived)
+  cannot be moved into the finished column, by any path; the move is refused
+  in words naming the open subtasks, and nothing is written. Subtasks moved
+  with it into the finished column count as finished. Always on, no setting;
+  a board without lanes has no finished column and is unchanged. Reopening a
+  subtask, or adding one, under a finished parent is allowed.
 - **Add card asks for a lane** on a board with lanes, none chosen, and adds
   nothing until one is. A subtask starts in its parent's lane. A card's lane is
   a second choice beside its column on the card; No lane is offered only while

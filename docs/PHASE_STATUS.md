@@ -67,6 +67,7 @@ adds it here:
 
 | Film or picture | What it lacks |
 |---|---|
+| `lanes` film | A line on a parent waiting for its subtasks before it can go to the finished column (#111); no screen changes |
 
 ## What works today (2026-10-16)
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import type { BoardColumn, BoardLane } from '@sabeel/shared';
+import { finishRefusal, type BoardColumn, type BoardLane } from '@sabeel/shared';
 import {
   bulkArchive,
   bulkAssign,
@@ -32,6 +32,7 @@ export function BulkBar({
   currentBoardId,
   columns,
   lanes,
+  doneColumnId,
   allCards,
   selection,
   members,
@@ -47,6 +48,8 @@ export function BulkBar({
    * on is sorted in a few taps. No new icon: five is what fits a 320px phone.
    */
   lanes?: readonly BoardLane[];
+  /** The board's stored finished column, read with `lanes` (#111). */
+  doneColumnId?: string;
   allCards: readonly Card[];
   selection: Selection;
   members: readonly BoardMemberProfile[];
@@ -215,8 +218,22 @@ export function BulkBar({
               label="Move"
               busy={busy}
               disabled={!moveColumnId && !moveLaneId}
-              onPress={() =>
-                run(() =>
+              onPress={() => {
+                // A parent stays out of the finished column while a subtask
+                // is open (#111); the whole move is refused, and says which.
+                const refused = moveColumnId
+                  ? finishRefusal({
+                      board: { columns, lanesOn: true, lanes, doneColumnId },
+                      toColumnId: moveColumnId,
+                      moving: chosen,
+                      cards: allCards,
+                    })
+                  : null;
+                if (refused) {
+                  onError(refused);
+                  return;
+                }
+                return run(() =>
                   bulkMove({
                     cards: chosen,
                     toColumnId: moveColumnId || undefined,
@@ -224,8 +241,8 @@ export function BulkBar({
                     destinationCards: moveColumnId ? cardsInColumn(allCards, moveColumnId) : [],
                     user,
                   }),
-                )
-              }
+                );
+              }}
             />
             <Button
               label="Cancel"

@@ -397,6 +397,87 @@ try {
   await page.getByRole('button', { name: /^Overdue filter/ }).click();
   await openBoard(BOARD);
 
+  // ---- A parent waits for its subtasks (#111) ------------------------------------
+  // A parent and one open subtask, written straight in, in To Do, Marketing.
+  // Every way of moving the parent to Done is refused, saying why, and the
+  // parent stays where it was; once the subtask is finished, the move goes.
+  {
+    const boardDoc = (await db.collection('boards').where('name', '==', BOARD).get()).docs[0];
+    const bd = boardDoc.data();
+    const col = (name) => bd.columns.find((c) => c.name === name).id;
+    const marketing = bd.lanes.find((l) => l.name === 'Marketing').id;
+    const by = bd.createdBy;
+    const put = (title, extra) =>
+      db.collection('cards').add({
+        boardId: boardDoc.id, title, description: '', columnId: col('To Do'), rank: `y${title.length}`,
+        laneId: marketing, priority: 'none', assigneeUids: [], subscriberUids: [], labelIds: [],
+        archived: false, commentCount: 0,
+        createdAt: Date.now(), createdBy: by, updatedAt: Date.now(), updatedBy: by, ...extra,
+      });
+    const parentRef = await put('Run the fair');
+    const childRef = await put('Book the stalls', { parentId: parentRef.id });
+    await page.locator('[data-testid="card-Run the fair"]').waitFor({ timeout: 20000 });
+    const where = async () => (await parentRef.get()).data().columnId;
+    const said = () =>
+      page.getByText(/“Run the fair” can’t go to Done while its subtask is still open: “Book the stalls”/).first();
+    const dismiss = async () => {
+      await page.getByRole('button', { name: 'Dismiss' }).first().click().catch(() => {});
+    };
+
+    await htmlDrag(
+      page,
+      '[data-testid="card-Run the fair"]',
+      '[data-testid="column-cards-Done"] [role="heading"][aria-label^="Marketing,"]',
+    );
+    const dragSaid = await said().waitFor({ timeout: 10000 }).then(() => true, () => false);
+    check(
+      'a parent dragged to Done with a subtask open stays put, and the board says why',
+      dragSaid && (await where()) === col('To Do'),
+    );
+    await dismiss();
+
+    await openCard('Run the fair');
+    await page.getByLabel('Column', { exact: true }).selectOption({ label: 'Done' });
+    const pickSaid = await said().waitFor({ timeout: 10000 }).then(() => true, () => false);
+    await page.waitForTimeout(800);
+    check(
+      'and so does choosing Done on the card',
+      pickSaid && (await where()) === col('To Do') &&
+        (await page.getByLabel('Column', { exact: true }).inputValue()) === col('To Do'),
+    );
+    await back();
+
+    await page.getByRole('checkbox', { name: 'Select Run the fair' }).click();
+    await page.getByRole('button', { name: 'Move selected cards' }).click();
+    await page.getByLabel('Destination column', { exact: true }).selectOption({ label: 'Done' });
+    await page.getByRole('button', { name: 'Move', exact: true }).click();
+    const bulkSaid = await said().waitFor({ timeout: 10000 }).then(() => true, () => false);
+    await page.waitForTimeout(800);
+    check('and so does Move on the selection bar', bulkSaid && (await where()) === col('To Do'));
+    // Out of Move (Cancel), then out of the selection (Clear selection), or a
+    // tap on a card below would select it rather than open it.
+    await page.getByRole('button', { name: 'Cancel', exact: true }).first().click();
+    await page.getByRole('button', { name: 'Clear selection', exact: true }).click();
+    await dismiss();
+
+    // Its subtask finished, the parent goes.
+    await childRef.update({ columnId: col('Done'), updatedAt: Date.now() });
+    await page.waitForTimeout(1500);
+    await openCard('Run the fair');
+    await page.getByLabel('Column', { exact: true }).selectOption({ label: 'Done' });
+    let moved = false;
+    for (let i = 0; i < 40 && !moved; i += 1) {
+      moved = (await where()) === col('Done');
+      if (!moved) await page.waitForTimeout(250);
+    }
+    check('once its subtask is finished, the parent goes to Done', moved);
+    await back();
+    // Out of the way of the checks below, which count this board's cards.
+    await parentRef.update({ archived: true, archivedAt: Date.now() });
+    await childRef.update({ archived: true, archivedAt: Date.now() });
+    await openBoard(BOARD);
+  }
+
   // ---- In bulk ----------------------------------------------------------------
   await page.getByRole('checkbox', { name: 'Select Order the books' }).click();
   await page.getByRole('checkbox', { name: 'Select Book the hall' }).click();

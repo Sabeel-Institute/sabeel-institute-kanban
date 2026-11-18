@@ -545,6 +545,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
         currentBoardId={boardId}
         columns={columns}
         lanes={live && laneBoard ? laneBoard.lanes : undefined}
+        doneColumnId={laneBoard?.doneColumnId}
         allCards={cards.data ?? []}
         selection={selection}
         members={members}
