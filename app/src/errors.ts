@@ -34,12 +34,23 @@ export function toUserMessage(e: unknown, source: string): string {
  * sign-in screen showed exactly that word on 2026-10-22, when no function could
  * start. A function that ran and failed sends its own status, `INTERNAL`.
  *
+ * A write the RULES refused (Firestore's `permission-denied`) is said in
+ * words for the person: Firestore's own are "Missing or insufficient
+ * permissions." in production and a rule trace on the emulator, and every
+ * refused write on a settings page once showed one or the other. The screens
+ * offer only what a person may do, so a refusal almost always means their
+ * access changed while the screen was open. A callable's refusal keeps its
+ * own sentence, which this codebase wrote.
+ *
  * The Functions SDK (since `@firebase/functions` 0.14, firebase 13) ends every
  * message with the HTTP status it got, `Only a board's owners can do that.
  * [403]`, and `internal [0]` when no answer came. That tail is for a developer,
  * so it goes first; the tests take their errors from the real SDK, so a change
  * in its format fails them rather than reaching the screen.
  */
+const REFUSED =
+  'That change was not allowed. Your access to this board may have changed: go back and open it again.';
+
 export function errorText(e: unknown): string {
   const err = e as { code?: string; message?: string } | null;
   const said = (err?.message ?? (typeof e === 'string' ? e : '')).trim();
@@ -53,6 +64,7 @@ export function errorText(e: unknown): string {
   ) {
     return 'Cannot reach the server. Check your connection and try again.';
   }
+  if (err?.code === 'permission-denied') return REFUSED;
   if (raw && /\s/.test(raw) && !/^(Firebase(\s\w+)?:|Call to function ')/.test(raw)) return raw;
   return 'Something went wrong. Try again in a moment.';
 }

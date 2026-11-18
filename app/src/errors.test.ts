@@ -103,6 +103,22 @@ describe('errorText, on what the Functions SDK really throws', () => {
   });
 });
 
+describe('errorText, on a write the rules refused', () => {
+  it('says it in words, whatever Firestore says', async () => {
+    const { FirestoreError } = await import('firebase/firestore');
+    const prod = new FirestoreError('permission-denied', 'Missing or insufficient permissions.');
+    const emulator = new FirestoreError('permission-denied', "PERMISSION_DENIED: \nfalse for 'update' @ L3");
+    for (const e of [prod, emulator]) {
+      expect(errorText(e)).toMatch(/^That change was not allowed\./);
+    }
+  });
+
+  it("leaves a callable's own refusal its own sentence", () => {
+    const e = Object.assign(new Error('You can only clone a board you are on.'), { code: 'functions/permission-denied' });
+    expect(errorText(e)).toBe('You can only clone a board you are on.');
+  });
+});
+
 describe('toUserMessage', () => {
   it('shows what errorText says, never the bare code', () => {
     expect(toUserMessage(Object.assign(new Error('internal'), { code: 'functions/internal' }), 'signIn')).toBe(UNREACHABLE);
