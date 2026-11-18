@@ -459,6 +459,42 @@ the team.
 
 ## Deploy log
 
+### 2026-11-18 — Lanes, board details, templates and the overview — v0.20.0
+
+- **A board can be divided into lanes as well as columns**, so a program's
+  board can stand in for a tracking spreadsheet. Its owners switch lanes on in
+  Board settings → Lanes and name up to twelve. Every column lists the same
+  lanes under headings counting the lane's finished cards, green when all are
+  finished and red when one is late. Adding a card asks for its lane; a card's
+  lane sits beside its column on the card, and the selection bar's Move takes
+  a lane too. One column holds the finished cards, and **a finished card is
+  never late**: not on the board, the card, My Work, Search's Overdue or the
+  morning reminder. A board that does not switch lanes on is unchanged.
+- **Board settings is a list of pages**: General, Columns, Lanes, Details,
+  People, Labels and History. Someone who does not run the board sees it as
+  **About this board**, with the pages they can use.
+- **A board can carry details**: a start date, an end date, and text,
+  numbers, dates or links such as the teachers or a meeting link. Everyone on
+  the board reads them; its owners add and change them.
+- **A board can be marked as a template.** It is listed under Templates in the
+  Boards list and left out of the overview. A clone carries the lanes and the
+  details' fields, empty, and is never marked.
+- **The overview**, from the icon at the top of Boards for anyone on a board
+  with lanes: a row per program, a mark per lane, three orders either way,
+  and boards each person may hide from their own. The new Overview film in
+  Help explains the marks.
+- Also: a refused add keeps what was typed; a date typed in a browser is
+  saved once, not every keystroke; a refused change says so in words; the
+  High and Medium priority pills and a finished lane's green reach 4.5:1
+  contrast; a card dragged down its column lands where the bar shows.
+- Help has three new films (Lanes, A board's details, The overview) and every
+  film is recorded again. The manual covers all of it.
+
+Deploy the rules and functions before the clients: 0.20.0 writes lanes,
+details, the template mark and overview preferences, which the 0.19.0 rules
+refuse. Raise the version floor to 0.20.0 last, once the web, Play and
+TestFlight have it (Faisal, 2026-11-17).
+
 ### 2026-11-14 — Subtasks at a glance, and editing that looks like the card — v0.19.0
 
 - **Subtasks show on the board.** A card broken into subtasks carries a grey
