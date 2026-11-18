@@ -284,8 +284,14 @@ function helpers(page, variant, world) {
           const m = document.createElement('div');
           const base = { width: '22px', height: '22px', borderRadius: '50%', boxSizing: 'border-box',
             display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#F9F2E9', font: '800 14px system-ui' };
-          if (kind === 'complete') Object.assign(m.style, base, { background: '#456B3B' }), (m.textContent = '✓');
-          if (kind === 'late') Object.assign(m.style, base, { background: '#A32218' }), (m.textContent = '!');
+          if (kind === 'complete') {
+            Object.assign(m.style, base, { background: '#456B3B' });
+            m.textContent = '✓';
+          }
+          if (kind === 'late') {
+            Object.assign(m.style, base, { background: '#A32218' });
+            m.textContent = '!';
+          }
           if (kind === 'soon') Object.assign(m.style, base, { background: '#977535' });
           if (kind === 'open') Object.assign(m.style, base, { border: '2px solid #6A5748' });
           if (kind === 'undated') Object.assign(m.style, base, { border: '2px dashed #6A5748' });
