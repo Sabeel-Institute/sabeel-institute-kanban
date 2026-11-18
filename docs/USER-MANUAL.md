@@ -206,6 +206,8 @@ has them, and a mark for each lane, under the lane's name.
 - a **dashed ring**: it has cards, but none has a due date
 - a **dash**: the lane has no cards
 
+The **overview** film in **More → Help** goes through the marks one by one.
+
 Boards with the same lanes sit together under one row of lane names. Tap a
 row to open its board.
 
@@ -659,8 +661,9 @@ altogether in **Alerts → Settings**.
 </div>
 
 **More → Help** lists short narrated films of the app at work, one for each
-thing people do in it: signing in, a board, a card, comments, attachments,
-search, alerts and the rest, then running a board, then the admins' screens.
+thing people do in it: signing in, a board, lanes, a card, comments,
+attachments, the overview, search, alerts and the rest, then running a board
+and its details, then the admins' screens.
 Everyone sees every film, so a member can see what an owner or an admin does
 and knows whom to ask.
 

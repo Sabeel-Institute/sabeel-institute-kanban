@@ -1,6 +1,7 @@
 /**
  * THE GUIDE WORLD the help films are recorded in: three boards of ordinary
- * institute work, four people, labels, comments and a year of Stats —
+ * institute work and two programs divided into lanes, four people, labels,
+ * comments and a year of Stats —
  * written straight to the emulators with the Admin SDK, so it is the same to
  * the byte every time and takes seconds, not the minutes the UI seed takes.
  *
@@ -46,7 +47,10 @@ const email = (who) => `${who}@oursabeel.com`;
 
 /**
  * The boards, by fixed id so a film can open one by link (`/b/<id>`). Each
- * column is [id, name, cards]; each card is [id, title, extra fields].
+ * column is [id, name, cards]; each card is [id, title, extra fields]. A
+ * program board also has `lanes` ([id, name]), `done` (its finished column)
+ * and `details` ([id, name, type, value, with a date's value in days from
+ * today]); a card on it names its `lane`.
  */
 const BOARDS = [
   {
@@ -121,6 +125,58 @@ const BOARDS = [
       ]],
       ['doing', 'In Progress', [
         ['theme', 'Choose a new theme', { assignees: ['faisal'], priority: 'low' }],
+      ]],
+      ['done', 'Done', []],
+    ],
+  },
+  // Two programs with the same lanes (named for when, relative to the day a
+  // film is recorded, they run), so the overview shows them under one
+  // heading, and between them every state a lane's mark can be in: Winter's
+  // Planning due soon, Programme late, Venue finished; Spring's Planning with
+  // no dates, Programme with no cards, Venue under way.
+  {
+    id: 'summer-camp',
+    name: 'Winter Camp',
+    createdBy: 'sara',
+    owners: ['sara'],
+    members: ['sara', 'omar'],
+    lanes: [['planning', 'Planning'], ['programme', 'Programme'], ['venue', 'Venue']],
+    done: 'done',
+    details: [
+      ['start', 'Start date', 'start', 30],
+      ['end', 'End date', 'end', 44],
+      ['teachers', 'Teachers', 'text', 'Sara and Omar'],
+      ['zoom', 'Zoom link', 'link', 'https://meet.example.org/summer-camp'],
+    ],
+    columns: [
+      ['todo', 'To Do', [
+        ['volunteers', 'Recruit volunteers', { lane: 'planning', assignees: ['omar'], due: 2 }],
+        ['week-one', 'Plan week one', { lane: 'programme', assignees: ['sara'], due: -3 }],
+      ]],
+      ['doing', 'In Progress', [
+        ['week-two', 'Plan week two', { lane: 'programme', assignees: ['sara'], due: 9 }],
+      ]],
+      ['done', 'Done', [
+        ['dates', 'Set the dates', { lane: 'planning' }],
+        ['campsite', 'Book the campsite', { lane: 'venue' }],
+      ]],
+    ],
+  },
+  {
+    id: 'autumn-camp',
+    name: 'Spring Camp',
+    createdBy: 'sara',
+    owners: ['sara'],
+    members: ['sara', 'omar'],
+    lanes: [['planning', 'Planning'], ['programme', 'Programme'], ['venue', 'Venue']],
+    done: 'done',
+    details: [['start', 'Start date', 'start', 90]],
+    columns: [
+      ['todo', 'To Do', [
+        ['dates', 'Set the dates', { lane: 'planning' }],
+      ]],
+      ['doing', 'In Progress', [
+        ['hall', 'Book the hall', { lane: 'venue', due: 20 }],
       ]],
       ['done', 'Done', []],
     ],
@@ -270,6 +326,24 @@ export async function buildWorld() {
       activeCardCount: 0,
       createdAt: t0,
       createdBy: uids[b.createdBy],
+      ...(b.lanes
+        ? {
+            lanesOn: true,
+            lanes: b.lanes.map(([id, name]) => ({ id, name })),
+            doneColumnId: b.done,
+          }
+        : {}),
+      ...(b.details
+        ? {
+            fields: b.details.map(([id, name, type]) => ({ id, name, type })),
+            details: Object.fromEntries(
+              b.details.map(([id, , type, value]) => [
+                id,
+                type === 'start' || type === 'end' || type === 'date' ? addDays(today, value) : value,
+              ]),
+            ),
+          }
+        : {}),
     });
     for (const [columnId, , cards] of b.columns) {
       const ranks = initialRanks(cards.length);
@@ -290,6 +364,7 @@ export async function buildWorld() {
           ...(x.archived ? { archivedAt: at } : {}),
           commentCount: 0,
           ...(x.parent ? { parentId: cardId(b.id, x.parent) } : {}),
+          ...(x.lane ? { laneId: x.lane } : {}),
           createdAt: at,
           createdBy: by,
           updatedAt: at,
