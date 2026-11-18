@@ -7,21 +7,14 @@
  * and would have to agree exactly with the client's parser anyway.
  */
 
+import { handleFor, matchPeople } from './people';
+
 export interface MentionCandidate {
   uid: string;
   displayName: string;
   email: string;
 }
 
-/**
- * The handle shown in text. Derived from the email local part rather than the
- * display name, because names collide and contain spaces, and because everyone
- * already knows their own address.
- */
-export function handleFor(email: string): string {
-  const at = email.indexOf('@');
-  return (at === -1 ? email : email.slice(0, at)).toLowerCase();
-}
 
 /** Everyone whose handle appears as `@handle` in the text. */
 export function extractMentions(
@@ -51,54 +44,26 @@ export function extractMentions(
 /**
  * Candidates for the autocomplete, given what has been typed after the "@".
  *
- * Matches on the HANDLE and the display name — deliberately not the whole email.
- * Every account is on one domain, so matching the full address meant every
- * letter of "oursabeel.com" matched everybody: typing `@o`, `@s`, `@e`, `@a`,
- * `@u`, `@r`, `@b`, `@l`, `@c` or `@m` narrowed nothing at all. The handle IS
- * the local part, so nothing is lost.
+ * The matching is every person picker's (`matchPeople` in people.ts): the
+ * handle and the display name, never the shared email domain, best match first.
  *
  * EVERY match is returned. This used to stop at five, which on a board with the
  * whole organisation on it meant eight people were unreachable unless you
  * guessed enough of a prefix — a silent cap the reader has no way to notice.
  * The list scrolls now, so there is nothing to cap.
  *
- * `prioritise` floats people already on the card to the top, each group sorted
- * by display name. With a small organisation that is usually the whole fix: the
- * person you want is the first row rather than somewhere in a scroll. It only
- * REORDERS — someone who does not match the query is not resurrected by being
- * on the card.
+ * `prioritise` floats people already on the card to the top. With a small
+ * organisation that is usually the whole fix: the person you want is the first
+ * row rather than somewhere in a scroll. It only REORDERS — someone who does
+ * not match the query is not resurrected by being on the card.
  */
 export function mentionSuggestions(
   partial: string,
   candidates: readonly MentionCandidate[],
   opts: { prioritise?: readonly string[] } = {},
 ): MentionCandidate[] {
-  const q = partial.toLowerCase().trim();
-  const matches =
-    q.length === 0
-      ? [...candidates]
-      : candidates.filter(
-          (c) =>
-            handleFor(c.email).includes(q) || c.displayName.toLowerCase().includes(q),
-        );
-
-  // A match ANYWHERE counts — people search by surname — but a match at the
-  // START is almost always the one meant. Without this, typing "@s" put Faisal
-  // above Sara, because "fai-s-al" matches and F sorts first.
-  const startsWith = (c: MentionCandidate) =>
-    q.length > 0 &&
-    (handleFor(c.email).startsWith(q) || c.displayName.toLowerCase().startsWith(q));
-
   const top = new Set(opts.prioritise ?? []);
-  return matches.sort((a, b) => {
-    const aTop = top.has(a.uid);
-    const bTop = top.has(b.uid);
-    if (aTop !== bTop) return aTop ? -1 : 1;
-    const aPre = startsWith(a);
-    const bPre = startsWith(b);
-    if (aPre !== bPre) return aPre ? -1 : 1;
-    return a.displayName.localeCompare(b.displayName);
-  });
+  return matchPeople(partial, candidates, { first: (c) => top.has(c.uid) });
 }
 
 /** The trigger character. One definition; both editors and the parser derive. */

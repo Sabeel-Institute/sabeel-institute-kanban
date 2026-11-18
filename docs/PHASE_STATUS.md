@@ -67,6 +67,7 @@ adds it here:
 
 | Film or picture | What it lacks |
 |---|---|
+| `board-people` film | The add-someone list's **Filter people** field (#112) |
 
 ## What works today (2026-10-16)
 

@@ -17,6 +17,7 @@
  * below for when it should not scroll at all.
  */
 import { Fragment, useMemo, useState } from 'react';
+import { matchPeople } from '@sabeel/shared';
 import { Pressable, StyleSheet } from 'react-native';
 import { Body, Hint, PickerList, TextField } from './ui';
 import { radius, space, useTheme } from '../theme';
@@ -28,6 +29,29 @@ export interface NarrowItem {
   detail?: string;
 }
 
+function byNameOrDetail(query: string, items: readonly NarrowItem[]): readonly NarrowItem[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return items;
+  return items.filter(
+    (i) => i.name.toLowerCase().includes(q) || (i.detail ?? '').toLowerCase().includes(q),
+  );
+}
+
+/**
+ * For a list of people whose `detail` is their address: the person picker's
+ * matching (`matchPeople`). `keep` names items that stay first whatever is
+ * typed and are left out once anything is (an "Anyone" row).
+ */
+export function narrowPeople(keep: readonly string[] = []) {
+  return (query: string, items: readonly NarrowItem[]): readonly NarrowItem[] => {
+    const pinned = query.trim() ? [] : items.filter((i) => keep.includes(i.id));
+    const people = items
+      .filter((i) => !keep.includes(i.id))
+      .map((i) => ({ item: i, displayName: i.name, email: i.detail }));
+    return [...pinned, ...matchPeople(query, people).map((p) => p.item)];
+  };
+}
+
 export function NarrowList({
   items,
   onPick,
@@ -36,6 +60,8 @@ export function NarrowList({
   actionVerb,
   empty,
   bounded = true,
+  narrow = byNameOrDetail,
+  noMatch = 'Nothing matches.',
 }: {
   items: readonly NarrowItem[];
   onPick: (id: string) => void;
@@ -76,21 +102,22 @@ export function NarrowList({
    * cap is what stops a long list pushing the page down.
    */
   bounded?: boolean;
+  /**
+   * How the typed words narrow the items. By default, the name or the detail
+   * containing them; a list of PEOPLE passes `narrowPeople`, so it matches as
+   * every other person picker does (PeopleFilter) and not on the shared email
+   * domain, which a detail holding an address would otherwise match for all.
+   */
+  narrow?: (query: string, items: readonly NarrowItem[]) => readonly NarrowItem[];
+  /** Said when the field leaves nothing. */
+  noMatch?: string;
 }) {
   const t = useTheme();
   // The draft belongs HERE, not to the screen: it changes on every keystroke,
   // and a screen holding it re-renders every list it draws per character.
   const [filter, setFilter] = useState('');
 
-  const matches = useMemo(() => {
-    const q = filter.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
-      (i) =>
-        i.name.toLowerCase().includes(q) ||
-        (i.detail ?? '').toLowerCase().includes(q),
-    );
-  }, [items, filter]);
+  const matches = useMemo(() => narrow(filter, items), [narrow, items, filter]);
 
   if (items.length === 0) return <Hint>{empty}</Hint>;
 
@@ -104,7 +131,7 @@ export function NarrowList({
         placeholder={placeholder}
         label={placeholder}
       />
-      {matches.length === 0 ? <Hint>Nothing matches.</Hint> : null}
+      {matches.length === 0 ? <Hint>{noMatch}</Hint> : null}
       <Rows>
         {matches.map((i) => {
           const selected = selectedIds?.includes(i.id) ?? false;

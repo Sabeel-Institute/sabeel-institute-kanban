@@ -14,6 +14,7 @@ import { useNav } from '../../nav';
 import type { SessionUser } from '../../session';
 import { radius, space, useTheme } from '../../theme';
 import { useAction } from '../../useAction';
+import { NoPeopleMatch, PeopleFilterField, usePeopleFilter } from '../PeopleFilter';
 import {
   Body,
   Button,
@@ -44,7 +45,6 @@ export function PeoplePage({
   canManage: boolean;
 }) {
   const nav = useNav();
-  const t = useTheme();
   const boardId = b.id;
   // …and so is taking the board's CREATOR off it, which is the client mirror of
   // `keepsCreator()` in firestore.rules and of the check `removeBoardMember`
@@ -294,43 +294,12 @@ export function PeoplePage({
         ) : null}
 
         {adding ? (
-          <View
-            style={[
-              styles.picker,
-              { borderColor: t.border.subtle, backgroundColor: t.bg.inset },
-            ]}
-          >
-            <Hint>Add someone</Hint>
-            <PickerList>
-              {nonMembers.map((u) => (
-                <Pressable
-                  key={u.uid}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Add ${u.displayName} to this board`}
-                  disabled={busy}
-                  onPress={() =>
-                    run(() =>
-                      addBoardMember(boardId, u.uid),
-                    )
-                  }
-                  style={({ pressed }) => [
-                    styles.option,
-                    {
-                      backgroundColor: pressed ? t.bg.accentSoft : t.bg.surface,
-                      borderColor: t.border.subtle,
-                    },
-                  ]}
-                >
-                  <Body>{u.displayName}</Body>
-                </Pressable>
-              ))}
-            </PickerList>
-            <Button
-              label="Done"
-              variant="secondary"
-              onPress={() => setAdding(false)}
-            />
-          </View>
+          <AddPeoplePanel
+            people={nonMembers}
+            busy={busy}
+            onAdd={(uid) => run(() => addBoardMember(boardId, uid))}
+            onDone={() => setAdding(false)}
+          />
         ) : null}
       </Card>
 
@@ -381,6 +350,56 @@ export function PeoplePage({
         </Card>
       ) : null}
     </>
+  );
+}
+
+/**
+ * The add-someone list, narrowed by typing like every person picker
+ * (PeopleFilter). Its own component because the filter's draft changes on
+ * every keystroke and must not re-render the roster above it.
+ */
+function AddPeoplePanel({
+  people,
+  busy,
+  onAdd,
+  onDone,
+}: {
+  people: readonly { uid: string; displayName: string }[];
+  busy: boolean;
+  onAdd: (uid: string) => void;
+  onDone: () => void;
+}) {
+  const t = useTheme();
+  const { filter, setFilter, matches } = usePeopleFilter(people);
+  return (
+    <View
+      style={[styles.picker, { borderColor: t.border.subtle, backgroundColor: t.bg.inset }]}
+    >
+      <Hint>Add someone</Hint>
+      <PeopleFilterField value={filter} onChange={setFilter} />
+      {matches.length === 0 ? <NoPeopleMatch /> : null}
+      <PickerList>
+        {matches.map((u) => (
+          <Pressable
+            key={u.uid}
+            accessibilityRole="button"
+            accessibilityLabel={`Add ${u.displayName} to this board`}
+            disabled={busy}
+            onPress={() => onAdd(u.uid)}
+            style={({ pressed }) => [
+              styles.option,
+              {
+                backgroundColor: pressed ? t.bg.accentSoft : t.bg.surface,
+                borderColor: t.border.subtle,
+              },
+            ]}
+          >
+            <Body>{u.displayName}</Body>
+          </Pressable>
+        ))}
+      </PickerList>
+      <Button label="Done" variant="secondary" onPress={onDone} />
+    </View>
   );
 }
 

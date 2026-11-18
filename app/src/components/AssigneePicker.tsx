@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { BoardMemberProfile } from '../boards';
-import { Body, Button, Hint, IconAction, PickerList, Row, TextField } from './ui';
+import { NoPeopleMatch, PeopleFilterField, usePeopleFilter } from './PeopleFilter';
+import { Body, Button, Hint, IconAction, PickerList, Row } from './ui';
 import { radius, space, useTheme } from '../theme';
 
 /**
@@ -79,20 +80,8 @@ export function AssigneePicker({
   // An assignee who is no longer a board member (removed while assigned) would
   // otherwise vanish from the UI while remaining on the card. Surface them so
   // they can be removed.
-  /**
-   * Narrow the list by typing, the same way the subtask picker does
-   * (`components/Subtasks.tsx`) rather than a second idiom for the same job.
-   * With the whole organisation on a board this is a type instead of a scroll.
-   */
-  const [filter, setFilter] = useState('');
-  const matches = useMemo(() => {
-    const q = filter.trim().toLowerCase();
-    if (!q) return available;
-    return available.filter(
-      (m) =>
-        m.displayName.toLowerCase().includes(q) || m.email.toLowerCase().includes(q),
-    );
-  }, [available, filter]);
+  // Narrow the list by typing, as every person picker does (PeopleFilter).
+  const { filter, setFilter, matches } = usePeopleFilter(available);
 
   const orphaned = assignedUids.filter((uid) => !members.some((m) => m.uid === uid));
 
@@ -145,13 +134,8 @@ export function AssigneePicker({
           ]}
         >
           <Hint>Assign someone</Hint>
-          <TextField
-            value={filter}
-            onChangeText={setFilter}
-            placeholder="Filter people"
-            label="Filter people"
-          />
-          {matches.length === 0 ? <Hint>No one matches.</Hint> : null}
+          <PeopleFilterField value={filter} onChange={setFilter} />
+          {matches.length === 0 ? <NoPeopleMatch /> : null}
           <PickerList>
             {matches.map((m) => (
               <Pressable
