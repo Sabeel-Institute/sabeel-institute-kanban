@@ -85,7 +85,12 @@ export function DateField({
 
   /** Write `next`, showing it until the write settles, then the value. */
   function hand(next: string | undefined) {
-    void Promise.resolve(onChange(next)).finally(() => setDraft(null));
+    // Only the draft handed is dropped: one typed while this write was out is
+    // the person's next date, not something to put the old value back over.
+    const handed = next ?? '';
+    void Promise.resolve(onChange(next)).finally(() =>
+      setDraft((d) => (d === handed ? null : d)),
+    );
   }
 
   function settle(next: string) {
@@ -136,7 +141,8 @@ export function DateField({
           variant="secondary"
           onPress={() => {
             stopWaiting();
-            hand(undefined);
+            setDraft(null);
+            void Promise.resolve(onChange(undefined));
           }}
         />
       ) : (

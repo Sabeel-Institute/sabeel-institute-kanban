@@ -723,7 +723,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
                       initial={retry?.columnId === col.id ? retry : undefined}
                       onCancel={() => {
                         setAdding(false);
-                        setRetry(null);
+                        setRetry((r) => (r?.columnId === col.id ? null : r));
                       }}
                     />
                   </Panel>

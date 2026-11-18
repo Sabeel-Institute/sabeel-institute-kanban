@@ -51,8 +51,8 @@ export function GeneralPage({ board }: { board: BoardListItem }) {
         {/* Everything the mark does, said where it is set. */}
         <Hint>
           {board.template
-            ? 'Listed under Templates in the Boards list, for people to clone. It can be cloned like any board, and a clone is not a template.'
-            : 'A board people clone to start their own. Marked, it is listed under Templates in the Boards list.'}
+            ? 'Listed under Templates in the Boards list, for people to clone, and left out of the overview. It can be cloned like any board, and a clone is not a template.'
+            : 'A board people clone to start their own. Marked, it is listed under Templates in the Boards list and left out of the overview.'}
         </Hint>
       </Card>
 

@@ -141,6 +141,9 @@ export function OverviewScreen({ user }: { user: SessionUser }) {
       ) : null}
 
       <Row style={styles.controls}>
+        {/* Said on screen, as the manual says it: a menu reading only
+            "Start date" looked like a date to fill in. */}
+        <Body>Order</Body>
         <Select
           label="Order"
           value={sort}

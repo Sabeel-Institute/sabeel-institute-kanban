@@ -216,12 +216,10 @@ function DetailValue({
         )}
       </View>
       {canEdit ? (
-        <IconAction
-          icon="edit"
-          label={`Edit ${field.name}`}
-          disabled={busy}
-          onPress={() => setDraft(value ?? '')}
-        />
+        // Not held while another value saves: opening an editor writes
+        // nothing, and a pencil that ignored a click just after a date was
+        // set read as broken. Save waits instead.
+        <IconAction icon="edit" label={`Edit ${field.name}`} onPress={() => setDraft(value ?? '')} />
       ) : null}
     </Row>
   );

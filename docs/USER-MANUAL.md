@@ -730,13 +730,15 @@ would otherwise tell you about every change to every card.
 
 The clone has the same columns and lanes, and each open card in the same place
 and lane, with its title, its description and its subtasks, and the institute's
-labels. It starts
-fresh on everything that belongs to one run of the work: no due dates, nobody
-assigned, no priorities, comments, history or files. Archived cards and the
+labels; a card that was finished on the old board is finished on the new one.
+It has the same details' fields, all empty. It starts fresh on everything that
+belongs to one run of the work: no due dates, nobody assigned, no priorities,
+comments, history or files, and no details filled in. Archived cards and the
 board's own labels are not cloned. The board you cloned from does not change.
 
 A board made to be cloned can be **marked as a template** in its settings, under
-**General**: it then sits under *Templates* in the Boards list. Any board can be
+**General**: it then sits under *Templates* in the Boards list, and it is left
+out of the overview. Any board can be
 cloned, marked or not, and a clone is never marked. The clone's history opens
 with one line saying which board it was cloned from; nothing else ties the two.
 
