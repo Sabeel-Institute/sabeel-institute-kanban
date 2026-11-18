@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { finishBlockedMessage, finishBlockers, finishRefusal, type FinishCard } from '../src/subtaskFinish';
+import {
+  finishBlockedMessage,
+  finishBlockers,
+  finishRefusal,
+  reopenBlockedMessage,
+  reopenBlockers,
+  type FinishCard,
+  type ParentState,
+} from '../src/subtaskFinish';
 
 const columns = [{ id: 'todo' }, { id: 'doing' }, { id: 'done' }];
 const lanes = [{ id: 'ln-a', name: 'Planning' }];
@@ -79,5 +87,49 @@ describe('finishRefusal', () => {
       '“parent” can’t go to Wrapped while its subtask is still open: “a”. Finish it first.',
     );
     expect(finishRefusal({ board: named, toColumnId: 'doing', moving: [parent], cards: [parent, openA] })).toBeNull();
+  });
+});
+
+describe('reopenBlockers', () => {
+  const doneParent: ParentState = { id: 'parent', title: 'parent', columnId: 'done' };
+  const openParent: ParentState = { id: 'parent', title: 'parent', columnId: 'doing' };
+  const shelved: ParentState = { id: 'parent', title: 'parent', columnId: 'doing', archived: true };
+  const sub = card('s', { parentId: 'parent', columnId: 'done' });
+  const reopen = (moving: FinishCard[], parent: ParentState | undefined, to = 'doing', b = board) =>
+    reopenBlockers({ board: b, toColumnId: to, moving, parentOf: () => parent }).map((r) => [r.card.id, r.why]);
+
+  it('keeps a finished subtask finished while its parent is finished or archived', () => {
+    expect(reopen([sub], doneParent)).toEqual([['s', 'finished']]);
+    expect(reopen([sub], shelved)).toEqual([['s', 'archived']]);
+  });
+
+  it('counts restoring an archived subtask to an open column as reopening', () => {
+    const archivedSub = card('s', { parentId: 'parent', columnId: 'todo', archived: true });
+    expect(reopen([archivedSub], doneParent, 'todo')).toEqual([['s', 'finished']]);
+    expect(reopen([archivedSub], doneParent, 'done')).toEqual([]);
+  });
+
+  it('lets it reopen under an open parent, a gone one, or a parent moving with it', () => {
+    expect(reopen([sub], openParent)).toEqual([]);
+    expect(reopen([sub], undefined)).toEqual([]);
+    expect(reopen([sub, card('parent', { columnId: 'done' })], doneParent)).toEqual([]);
+  });
+
+  it('is not reopening to move an open subtask, or to stay in the finished column', () => {
+    expect(reopen([card('s', { parentId: 'parent', columnId: 'todo' })], doneParent)).toEqual([]);
+    expect(reopen([sub], doneParent, 'done')).toEqual([]);
+  });
+
+  it('holds nothing on a board without lanes', () => {
+    expect(reopen([sub], doneParent, 'doing', { ...board, lanesOn: false })).toEqual([]);
+  });
+
+  it('says what to do instead', () => {
+    const msg = reopenBlockedMessage(
+      reopenBlockers({ board, toColumnId: 'doing', moving: [sub], parentOf: () => doneParent }),
+    );
+    expect(msg).toBe(
+      '“s” is a subtask of “parent”, which is finished. To reopen it, first unlink it from its parent: open “s” and tap “Unlink from parent card”.',
+    );
   });
 });

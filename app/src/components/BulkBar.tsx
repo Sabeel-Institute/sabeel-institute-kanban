@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { finishRefusal, type BoardColumn, type BoardLane } from '@sabeel/shared';
+import type { BoardColumn, BoardLane } from '@sabeel/shared';
+import { allowMove } from '../moveGuard';
 import {
   bulkArchive,
   bulkAssign,
@@ -218,19 +219,20 @@ export function BulkBar({
               label="Move"
               busy={busy}
               disabled={!moveColumnId && !moveLaneId}
-              onPress={() => {
-                // A parent stays out of the finished column while a subtask
-                // is open (#111); the whole move is refused, and says which.
-                const refused = moveColumnId
-                  ? finishRefusal({
-                      board: { columns, lanesOn: true, lanes, doneColumnId },
-                      toColumnId: moveColumnId,
-                      moving: chosen,
-                      cards: allCards,
-                    })
-                  : null;
-                if (refused) {
-                  onError(refused);
+              onPress={async () => {
+                // A parent waits for its subtasks, and a subtask is not
+                // reopened under a finished parent (#111): the whole move is
+                // refused, and a notice says which.
+                if (
+                  moveColumnId &&
+                  !(await allowMove({
+                    board: { columns, lanesOn: true, lanes, doneColumnId },
+                    boardId: currentBoardId,
+                    toColumnId: moveColumnId,
+                    moving: chosen,
+                    cards: allCards,
+                  }))
+                ) {
                   return;
                 }
                 return run(() =>

@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '../icons';
+import { allowMove } from '../moveGuard';
 import {
   PRIORITIES,
   canManageBoard,
-  finishRefusal,
   isFinished,
   labelsForBoard,
   laneOf,
@@ -20,6 +20,7 @@ import {
   deleteCard,
   moveCard,
   restoreCard,
+  restoreColumnId,
   updateCard,
   useCard,
   subscribeToCard,
@@ -346,19 +347,18 @@ export function CardScreen({
             value={c.columnId}
             disabled={busy || !cardsReady}
             options={b.columns.map((col) => ({ value: col.id, label: col.name }))}
-            onChange={(toColumnId) => {
-              // A parent stays out of the finished column while a subtask is
-              // open (#111); said here, and nothing written.
-              const refused = finishRefusal({
+            onChange={async (toColumnId) => {
+              // A parent waits for its subtasks, and a subtask is not reopened
+              // under a finished parent (#111): refused in a notice, nothing
+              // written.
+              const allowed = await allowMove({
                 board: b,
+                boardId,
                 toColumnId,
                 moving: [c],
                 cards: boardCards.data ?? NO_CARDS,
               });
-              if (refused) {
-                setError(refused);
-                return;
-              }
+              if (!allowed) return;
               return run(async () => {
                 // Give it a fresh rank at the END of the destination. Carrying
                 // the old rank across would drop the card at an arbitrary
@@ -677,8 +677,16 @@ export function CardScreen({
           <Button
             busy={busy}
             label="Restore to the board"
-            onPress={() =>
-              run(async () => {
+            onPress={async () => {
+              const to = restoreColumnId(c, b.columns);
+              const allowed =
+                to === null ||
+                (await allowMove(
+                  { board: b, boardId, toColumnId: to, moving: [c], cards: boardCards.data ?? NO_CARDS },
+                  'Not restored',
+                ));
+              if (!allowed) return;
+              return run(async () => {
                 // May land in a different column if its own was deleted while it
                 // was archived — see restoreCard.
                 const { movedTo } = await restoreCard(c, user, b.columns);
@@ -686,8 +694,8 @@ export function CardScreen({
                   setNote(`Restored to ${movedTo}`);
                   setTimeout(() => setNote(null), 3200);
                 }
-              })
-            }
+              });
+            }}
           />
         ) : (
           <Button

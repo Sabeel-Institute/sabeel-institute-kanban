@@ -25,6 +25,10 @@ import {
   type Priority,
   labelIdsAfterBoardChange,
   type Label,
+  finishRefusal,
+  reopenBlockedMessage,
+  reopenBlockers,
+  type ParentState,
 } from '@sabeel/shared';
 import { db } from './firebase';
 import { useLiveDoc, useLiveQuery } from './liveQuery';
@@ -287,6 +291,52 @@ export async function moveCard(params: {
   );
 }
 
+/**
+ * Whether a move or a restore may go ahead on a board with lanes, and if not,
+ * why, in words: a parent card stays out of the finished column while a
+ * subtask is open (#111), and a subtask is not reopened while its parent is
+ * finished or archived. EVERY move and restore path asks this before writing
+ * (the card's column picker, a drop or move on either wide board, the
+ * selection bar's Move, Restore), so none lets through what another refuses.
+ *
+ * `cards` is the board's cards as drawn, which leaves out archived ones; a
+ * parent not among them is read from its document, and one that is gone or
+ * on another board holds nothing back.
+ */
+export async function moveRefusal(params: {
+  board: Parameters<typeof finishRefusal>[0]['board'];
+  boardId: string;
+  toColumnId: string;
+  moving: readonly Card[];
+  cards: readonly Card[];
+}): Promise<string | null> {
+  const { board, boardId, toColumnId, moving, cards } = params;
+  const finish = finishRefusal({ board, toColumnId, moving, cards });
+  if (finish) return finish;
+
+  const parents = new Map<string, ParentState>();
+  for (const c of cards) parents.set(c.id, c);
+  const missing = [
+    ...new Set(moving.map((c) => c.parentId).filter((id): id is string => !!id && !parents.has(id))),
+  ];
+  await Promise.all(
+    missing.map(async (id) => {
+      const snap = await getDoc(cardRef(id));
+      const data = snap.data();
+      if (snap.exists() && data?.boardId === boardId) {
+        parents.set(id, {
+          id,
+          title: (data.title as string) ?? '',
+          columnId: data.columnId as string,
+          archived: data.archived === true,
+        });
+      }
+    }),
+  );
+  const blocked = reopenBlockers({ board, toColumnId, moving, parentOf: (id) => parents.get(id) });
+  return blocked.length > 0 ? reopenBlockedMessage(blocked) : null;
+}
+
 /** Members archive; only this board's owners and admins destroy. Rules enforce both. */
 export async function archiveCard(cardId: string, user: SessionUser): Promise<void> {
   // `archivedAt` on EVERY archive path, not just the bulk one. It was written by
@@ -312,6 +362,14 @@ export async function archiveCard(cardId: string, user: SessionUser): Promise<vo
  * and reports where it went — the caller tells the user, because a card
  * quietly reappearing somewhere else is its own kind of lost.
  */
+/**
+ * Where a restored card lands: its own column while the board still has it,
+ * else the first. One answer for `restoreCard` and for the check before it.
+ */
+export function restoreColumnId(card: Card, columns: readonly BoardColumn[]): string | null {
+  return columns.some((col) => col.id === card.columnId) ? card.columnId : (columns[0]?.id ?? null);
+}
+
 export async function restoreCard(
   card: Card,
   user: SessionUser,
@@ -320,7 +378,7 @@ export async function restoreCard(
   // `archivedAt: undefined` clears the field (updateCard maps undefined to
   // deleteField). A live card carrying a stale archive time would sort wrongly
   // the next time it is archived.
-  if (columns.some((col) => col.id === card.columnId)) {
+  if (restoreColumnId(card, columns) === card.columnId) {
     await updateCard(card.id, { archived: false, archivedAt: undefined }, user);
     return {};
   }

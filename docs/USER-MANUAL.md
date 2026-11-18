@@ -185,6 +185,11 @@ subtasks are still open; finish them (or archive any that are no longer
 needed), and the card can go. Moving a card together with all its open
 subtasks is fine, since they finish with it.
 
+The other way round, a **finished subtask stays finished while the card it
+belongs to is finished or archived**: moving it out of the finished column,
+or restoring it from the archive into another column, is refused. To reopen
+it, open it and tap **Unlink from parent card** first.
+
 Cards without a lane, such as those added before the board had lanes, sit
 under **No lane**, at the foot of each column.
 

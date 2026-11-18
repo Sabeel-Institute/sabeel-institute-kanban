@@ -98,3 +98,63 @@ export function finishRefusal<T extends FinishCard>(params: {
   const name = params.board.columns.find((c) => c.id === params.toColumnId)?.name ?? 'the finished column';
   return finishBlockedMessage(blockers, name);
 }
+
+/**
+ * A subtask is not reopened while the card it belongs to is finished or
+ * archived (Faisal, 2026-11-18): it would be open work under a card that
+ * reads as done. To reopen it, it is unlinked from its parent first.
+ *
+ * Reopening is taking a subtask out of the finished column, or restoring an
+ * archived one, to anywhere but the finished column. `parentOf` answers for a
+ * parent id: the parent as it is (looked up off the board when it is not on
+ * it), or undefined for one that is gone or on another board, which holds
+ * nothing back. A parent moving in the same move ends where its subtask
+ * does, so it is not finished by it.
+ */
+export interface ParentState {
+  id: string;
+  title: string;
+  columnId: string;
+  archived?: boolean;
+}
+
+export interface ReopenBlocker<T extends FinishCard> {
+  card: T;
+  parent: ParentState;
+  why: 'finished' | 'archived';
+}
+
+export function reopenBlockers<T extends FinishCard>(params: {
+  board: LaneBoard;
+  toColumnId: string;
+  moving: readonly T[];
+  parentOf: (id: string) => ParentState | undefined;
+}): ReopenBlocker<T>[] {
+  const { board, toColumnId, moving, parentOf } = params;
+  const done = finishedColumnId(board);
+  if (done === null || toColumnId === done) return [];
+  const movingIds = new Set(moving.map((c) => c.id));
+  const out: ReopenBlocker<T>[] = [];
+  for (const card of moving) {
+    if (!card.parentId) continue;
+    const reopening = card.archived === true || isFinished(card, board);
+    if (!reopening) continue;
+    const parent = parentOf(card.parentId);
+    if (!parent) continue;
+    if (parent.archived) out.push({ card, parent, why: 'archived' });
+    else if (!movingIds.has(parent.id) && isFinished(parent, board)) out.push({ card, parent, why: 'finished' });
+  }
+  return out;
+}
+
+/** The refusal in words, and what to do instead. */
+export function reopenBlockedMessage<T extends FinishCard>(blockers: readonly ReopenBlocker<T>[]): string {
+  const quote = (s: string) => `“${s}”`;
+  if (blockers.length === 1) {
+    const { card, parent, why } = blockers[0];
+    return `${quote(card.title)} is a subtask of ${quote(parent.title)}, which is ${why}. To reopen it, first unlink it from its parent: open ${quote(card.title)} and tap “Unlink from parent card”.`;
+  }
+  return `${blockers.length} of these cards are subtasks of cards that are finished or archived: ${blockers
+    .map((b) => quote(b.card.title))
+    .join(', ')}. To reopen them, first unlink each from its parent card.`;
+}

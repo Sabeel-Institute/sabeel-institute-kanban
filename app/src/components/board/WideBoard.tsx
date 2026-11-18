@@ -6,7 +6,6 @@ import {
   columnDeleteBlocked,
   columnsPatch,
   finishedColumnDeleteNote,
-  finishRefusal,
   groupByLane,
   isFinished,
   type Label,
@@ -46,6 +45,7 @@ import {
 import { AddCardForm, type AddCardDraft } from './AddCardForm';
 import { WatchColumnBell } from './Bells';
 import { LaneHeading } from './LaneHeading';
+import { allowMove } from '../../moveGuard';
 import { useLaneInfo } from './useLaneInfo';
 import { setColumnWatched, useWatchedColumns } from '../../notifications';
 import { useLabels } from '../../labels';
@@ -150,12 +150,12 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   async function moveTo(card: Card, column: BoardColumn) {
     const target = (byColumn.get(column.id) ?? []).filter((c) => c.id !== card.id);
     setMoving(null);
-    // A parent stays out of the finished column while a subtask is open (#111).
-    const refused = laneBoard
-      ? finishRefusal({ board: laneBoard, toColumnId: column.id, moving: [card], cards: cards.data ?? [] })
-      : null;
-    if (refused) {
-      setError(refused);
+    // A parent waits for its subtasks, and a subtask is not reopened under a
+    // finished parent (#111).
+    if (
+      laneBoard &&
+      !(await allowMove({ board: laneBoard, boardId, toColumnId: column.id, moving: [card], cards: cards.data ?? [] }))
+    ) {
       return;
     }
     await run(() =>

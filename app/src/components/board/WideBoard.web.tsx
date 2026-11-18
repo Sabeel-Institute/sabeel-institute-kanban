@@ -32,6 +32,7 @@ import { BulkBar } from '../BulkBar';
 import { IconAction, LoadError } from '../ui';
 import { NewCardBell, WatchColumnBell } from './Bells';
 import { LaneHeading } from './LaneHeading';
+import { allowMove } from '../../moveGuard';
 import { useLaneInfo } from './useLaneInfo';
 import { setColumnWatched, useWatchedColumns } from '../../notifications';
 import {
@@ -40,7 +41,6 @@ import {
   columnDeleteBlocked,
   columnsPatch,
   finishedColumnDeleteNote,
-  finishRefusal,
   groupByLane,
   isFinished,
   laneOf,
@@ -410,19 +410,20 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
 
       const moving = (cards.data ?? []).find((c) => c.id === cardId);
       if (!moving) return;
-      // A parent stays out of the finished column while a subtask is open
-      // (#111): the card stays where it was, and the board says why.
-      if (laneBoard) {
-        const refused = finishRefusal({
+      // A parent waits for its subtasks, and a subtask is not reopened under
+      // a finished parent (#111): the card stays where it was, and a notice
+      // says why.
+      if (
+        laneBoard &&
+        !(await allowMove({
           board: laneBoard,
+          boardId,
           toColumnId: columnId,
           moving: [moving],
           cards: cards.data ?? [],
-        });
-        if (refused) {
-          setError(refused);
-          return;
-        }
+        }))
+      ) {
+        return;
       }
 
       const drawnColumn = byColumn.get(columnId) ?? [];
@@ -454,7 +455,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         setError(toUserMessage(e, 'moveCard'));
       }
     },
-    [drag, cards.data, byColumn, laneBoard, user, autoScroll],
+    [drag, cards.data, byColumn, laneBoard, boardId, user, autoScroll],
   );
 
   // The title comes from `WebAddCardForm`, already trimmed and non-empty — the
