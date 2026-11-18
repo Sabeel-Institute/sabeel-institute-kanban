@@ -718,6 +718,17 @@ learn for boards that are not programs.
   (`useLaneCollapse`). A drop on a folded heading lands first in the lane; an
   add into a folded lane opens it. Expanding every lane deletes the board's
   entry, so stored folds do not outlive the boards they name.
+- **A parent waits for its subtasks** (#111, 2026-11-18): on a board with
+  lanes, a card with an open subtask (same board, not finished, not archived)
+  cannot be moved into the finished column, by any path; the move is refused
+  in words naming the open subtasks, and nothing is written. Subtasks moved
+  with it into the finished column count as finished. Always on, no setting;
+  a board without lanes has no finished column and is unchanged. Nor is a
+  subtask reopened (moved out of the finished column, or restored from the
+  archive to an open column) while its parent is finished or archived: the
+  notice says to unlink it from its parent first. Both refusals are a notice
+  dialog. Adding or linking an open subtask under a finished parent is
+  allowed.
 - **Add card asks for a lane** on a board with lanes, none chosen, and adds
   nothing until one is. A subtask starts in its parent's lane. A card's lane is
   a second choice beside its column on the card; No lane is offered only while

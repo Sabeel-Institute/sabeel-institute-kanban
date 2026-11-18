@@ -234,6 +234,20 @@ its `laneId`. What is load-bearing:
   moved it again, silently. **A finished card is never late, anywhere**: the board, the card,
   the archive, My Work (under Finished), Search's Overdue and the 08:00
   reminder. A board without lanes is unchanged; never apply the rule there.
+- **A parent card stays out of the finished column while it has an open
+  subtask** (#111; Faisal, 2026-11-18: always, on every lane board, no
+  setting). Open is same board, neither finished nor archived. **Nor is a
+  subtask reopened while its parent is finished or archived** — taken out of
+  the finished column, or restored from the archive anywhere else — until it
+  is unlinked from the parent (Faisal, 2026-11-18). Both rules are
+  `packages/shared/src/subtaskFinish.ts`; every move and restore path asks
+  them through `allowMove` (`app/src/moveGuard.ts`), which refuses in a
+  notice dialog and writes nothing: the card's column picker, a drag on
+  either wide board, the selection bar's Move, Restore on the card and in the
+  archive. A parent off the board (archived) is read from its document.
+  Rules cannot see subtasks, so this is the app's, and a build without it
+  could still do it until the version floor passes it. Adding or linking an
+  open subtask under a finished parent is not refused.
 - **A lane change is history and a notice**, like a column move, except on a
   move to another board, which clears the lane and records none.
 - **12 lanes at most** (`LANES_MAX`), restated in `firestore.rules`, where

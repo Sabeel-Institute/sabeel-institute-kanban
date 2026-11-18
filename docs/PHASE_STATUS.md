@@ -71,6 +71,7 @@ adds it here:
 | `lanes` film; `lanes-*`, `overview-*` pictures | Lane headings fold, with a chevron, and the collapse/expand-all icons (#115) |
 | `overview` film; `overview-*` pictures | A row's details chevron, and the details it opens (#118) |
 | `boards-phone`, `boards-wide`, `clone-*`, `overview-*` pictures; every film that shows the Boards list (`getting-around`, `new-board`, `clone-board`, `overview`, `signing-in`) | The Boards list's section headings are collapsible, with a chevron (#110) |
+| `lanes` film | A line on a parent waiting for its subtasks before it can go to the finished column, and on a subtask not reopened under a finished parent (#111); no screen changes |
 
 ## What works today (2026-10-16)
 

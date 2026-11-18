@@ -9,3 +9,9 @@
 export function confirmAction(title: string, message: string): Promise<boolean> {
   return Promise.resolve(window.confirm(`${title}\n\n${message}`));
 }
+
+/** A notice with one button — WEB side (native sibling: confirm.ts). */
+export function noticeAction(title: string, message: string): Promise<void> {
+  window.alert(`${title}\n\n${message}`);
+  return Promise.resolve();
+}

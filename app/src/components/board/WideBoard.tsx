@@ -45,6 +45,7 @@ import {
 import { AddCardForm, type AddCardDraft } from './AddCardForm';
 import { WatchColumnBell } from './Bells';
 import { LaneHeading } from './LaneHeading';
+import { allowMove } from '../../moveGuard';
 import { useLaneInfo } from './useLaneInfo';
 import { LaneCollapseActions } from './LaneCollapseActions';
 import { useLaneCollapse } from './useLaneCollapse';
@@ -154,6 +155,14 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   async function moveTo(card: Card, column: BoardColumn) {
     const target = (byColumn.get(column.id) ?? []).filter((c) => c.id !== card.id);
     setMoving(null);
+    // A parent waits for its subtasks, and a subtask is not reopened under a
+    // finished parent (#111).
+    if (
+      laneBoard &&
+      !(await allowMove({ board: laneBoard, boardId, toColumnId: column.id, moving: [card], cards: cards.data ?? [] }))
+    ) {
+      return;
+    }
     await run(() =>
       moveCard({
         card,
@@ -295,6 +304,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         currentBoardId={boardId}
         columns={columns}
         lanes={live && laneBoard ? laneBoard.lanes : undefined}
+        doneColumnId={laneBoard?.doneColumnId}
         allCards={cards.data ?? []}
         selection={selection}
         members={members}

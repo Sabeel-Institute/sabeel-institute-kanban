@@ -34,6 +34,7 @@ import { NewCardBell, WatchColumnBell } from './Bells';
 import { LaneHeading } from './LaneHeading';
 import { LaneCollapseActions } from './LaneCollapseActions';
 import { useLaneCollapse } from './useLaneCollapse';
+import { allowMove } from '../../moveGuard';
 import { useLaneInfo } from './useLaneInfo';
 import { setColumnWatched, useWatchedColumns } from '../../notifications';
 import {
@@ -412,6 +413,21 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
 
       const moving = (cards.data ?? []).find((c) => c.id === cardId);
       if (!moving) return;
+      // A parent waits for its subtasks, and a subtask is not reopened under
+      // a finished parent (#111): the card stays where it was, and a notice
+      // says why.
+      if (
+        laneBoard &&
+        !(await allowMove({
+          board: laneBoard,
+          boardId,
+          toColumnId: columnId,
+          moving: [moving],
+          cards: cards.data ?? [],
+        }))
+      ) {
+        return;
+      }
 
       const drawnColumn = byColumn.get(columnId) ?? [];
       const column = drawnColumn.filter((c) => c.id !== moving.id);
@@ -442,7 +458,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         setError(toUserMessage(e, 'moveCard'));
       }
     },
-    [drag, cards.data, byColumn, laneBoard, user, autoScroll],
+    [drag, cards.data, byColumn, laneBoard, boardId, user, autoScroll],
   );
 
   // The title comes from `WebAddCardForm`, already trimmed and non-empty — the
@@ -628,6 +644,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
           currentBoardId={boardId}
           columns={b.columns}
           lanes={live && laneBoard ? laneBoard.lanes : undefined}
+          doneColumnId={laneBoard?.doneColumnId}
           allCards={cards.data ?? []}
           selection={selection}
           members={members}

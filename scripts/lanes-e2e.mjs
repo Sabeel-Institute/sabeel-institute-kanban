@@ -397,6 +397,167 @@ try {
   await page.getByRole('button', { name: /^Overdue filter/ }).click();
   await openBoard(BOARD);
 
+  // ---- A parent waits for its subtasks (#111) ------------------------------------
+  // A parent and one open subtask, written straight in, in To Do, Marketing.
+  // Every way of moving the parent to Done is refused in a notice (a dialog,
+  // recorded here), and the parent stays where it was; once the subtask is
+  // finished, the move goes. Then the subtask cannot be reopened while its
+  // parent is finished or archived, by any path, until it is unlinked.
+  {
+    const boardDoc = (await db.collection('boards').where('name', '==', BOARD).get()).docs[0];
+    const bd = boardDoc.data();
+    const col = (name) => bd.columns.find((c) => c.name === name).id;
+    const marketing = bd.lanes.find((l) => l.name === 'Marketing').id;
+    const by = bd.createdBy;
+    const put = (title, extra) =>
+      db.collection('cards').add({
+        boardId: boardDoc.id, title, description: '', columnId: col('To Do'), rank: `y${title.length}`,
+        laneId: marketing, priority: 'none', assigneeUids: [], subscriberUids: [], labelIds: [],
+        archived: false, commentCount: 0,
+        createdAt: Date.now(), createdBy: by, updatedAt: Date.now(), updatedBy: by, ...extra,
+      });
+    const parentRef = await put('Run the fair');
+    const childRef = await put('Book the stalls', { parentId: parentRef.id });
+    await page.locator('[data-testid="card-Run the fair"]').waitFor({ timeout: 20000 });
+    const at = async (ref) => (await ref.get()).data();
+    // Every notice the page raises, recorded; the page's own dialog handler
+    // (set up with the page) accepts it, as a person would.
+    const notices = [];
+    const onDialog = (d) => {
+      notices.push(d.message());
+    };
+    page.on('dialog', onDialog);
+    const noticed = async (re, ms = 10000) => {
+      const until = Date.now() + ms;
+      while (Date.now() < until) {
+        if (notices.some((m) => re.test(m))) return true;
+        await page.waitForTimeout(200);
+      }
+      return false;
+    };
+    const HELD = /“Run the fair” can’t go to Done while its subtask is still open: “Book the stalls”/;
+
+    await htmlDrag(
+      page,
+      '[data-testid="card-Run the fair"]',
+      '[data-testid="column-cards-Done"] [data-testid="lane-heading"][aria-label^="Marketing,"]',
+    );
+    check(
+      'a parent dragged to Done with a subtask open stays put, and a notice says why',
+      (await noticed(HELD)) && (await at(parentRef)).columnId === col('To Do'),
+    );
+
+    notices.length = 0;
+    await openCard('Run the fair');
+    await page.getByLabel('Column', { exact: true }).selectOption({ label: 'Done' });
+    const pickSaid = await noticed(HELD);
+    await page.waitForTimeout(800);
+    check(
+      'and so does choosing Done on the card',
+      pickSaid && (await at(parentRef)).columnId === col('To Do') &&
+        (await page.getByLabel('Column', { exact: true }).inputValue()) === col('To Do'),
+    );
+    await back();
+
+    notices.length = 0;
+    await page.getByRole('checkbox', { name: 'Select Run the fair' }).click();
+    await page.getByRole('button', { name: 'Move selected cards' }).click();
+    await page.getByLabel('Destination column', { exact: true }).selectOption({ label: 'Done' });
+    await page.getByRole('button', { name: 'Move', exact: true }).click();
+    const bulkSaid = await noticed(HELD);
+    await page.waitForTimeout(800);
+    check('and so does Move on the selection bar', bulkSaid && (await at(parentRef)).columnId === col('To Do'));
+    // Out of Move (Cancel), then out of the selection (Clear selection), or a
+    // tap on a card below would select it rather than open it.
+    await page.getByRole('button', { name: 'Cancel', exact: true }).first().click();
+    await page.getByRole('button', { name: 'Clear selection', exact: true }).click();
+
+    // Its subtask finished, the parent goes.
+    await childRef.update({ columnId: col('Done'), updatedAt: Date.now() });
+    await page.waitForTimeout(1500);
+    await openCard('Run the fair');
+    await page.getByLabel('Column', { exact: true }).selectOption({ label: 'Done' });
+    let moved = false;
+    for (let i = 0; i < 40 && !moved; i += 1) {
+      moved = (await at(parentRef)).columnId === col('Done');
+      if (!moved) await page.waitForTimeout(250);
+    }
+    check('once its subtask is finished, the parent goes to Done', moved);
+    await back();
+
+    // Reopening the subtask under its finished parent: refused on the card.
+    const REOPEN = (why) =>
+      new RegExp(`“Book the stalls” is a subtask of “Run the fair”, which is ${why}\\. To reopen it, first unlink it`);
+    notices.length = 0;
+    await openCard('Book the stalls');
+    await page.getByLabel('Column', { exact: true }).selectOption({ label: 'To Do' });
+    const reopenSaid = await noticed(REOPEN('finished'));
+    await page.waitForTimeout(800);
+    check(
+      'a finished subtask is not reopened while its parent is finished, and the notice says to unlink it',
+      reopenSaid && (await at(childRef)).columnId === col('Done'),
+      notices.join(' | '),
+    );
+    await back();
+
+    // Under an archived parent, refused on a drag too. The parent is read
+    // from its document, since an archived card is not on the board.
+    await parentRef.update({ archived: true, archivedAt: Date.now(), updatedAt: Date.now() });
+    await page.locator('[data-testid="card-Run the fair"]').waitFor({ state: 'detached', timeout: 20000 });
+    notices.length = 0;
+    await htmlDrag(
+      page,
+      '[data-testid="card-Book the stalls"]',
+      '[data-testid="column-cards-To Do"] [data-testid="lane-heading"][aria-label^="Marketing,"]',
+    );
+    check(
+      'and not while its parent is archived, dragged or otherwise',
+      (await noticed(REOPEN('archived'))) && (await at(childRef)).columnId === col('Done'),
+      notices.join(' | '),
+    );
+
+    // Restoring it open from the archive under its finished parent: refused.
+    await parentRef.update({ archived: false, columnId: col('Done'), updatedAt: Date.now() });
+    await childRef.update({ archived: true, archivedAt: Date.now(), columnId: col('To Do'), updatedAt: Date.now() });
+    await page.locator('[data-testid="card-Book the stalls"]').waitFor({ state: 'detached', timeout: 20000 });
+    notices.length = 0;
+    await page.getByRole('button', { name: 'Archived cards' }).click();
+    await page.getByRole('button', { name: 'Restore Book the stalls to the board' }).click();
+    const restoreSaid = await noticed(REOPEN('finished'));
+    await page.waitForTimeout(800);
+    check(
+      'and restoring it from the archive into an open column is refused the same way',
+      restoreSaid && (await at(childRef)).archived === true,
+      notices.join(' | '),
+    );
+    await back();
+
+    // Unlinked from its parent, it reopens.
+    await childRef.update({ archived: false, columnId: col('Done'), updatedAt: Date.now() });
+    await page.locator('[data-testid="card-Book the stalls"]').waitFor({ timeout: 20000 });
+    await openCard('Book the stalls');
+    await page.getByRole('button', { name: 'Unlink from parent card' }).click();
+    let unlinked = false;
+    for (let i = 0; i < 40 && !unlinked; i += 1) {
+      unlinked = !(await at(childRef)).parentId;
+      if (!unlinked) await page.waitForTimeout(250);
+    }
+    await page.getByLabel('Column', { exact: true }).selectOption({ label: 'To Do' });
+    let reopened = false;
+    for (let i = 0; i < 40 && !reopened; i += 1) {
+      reopened = (await at(childRef)).columnId === col('To Do');
+      if (!reopened) await page.waitForTimeout(250);
+    }
+    check('unlinked from its parent, it reopens', unlinked && reopened);
+    await back();
+    page.off('dialog', onDialog);
+
+    // Out of the way of the checks below, which count this board's cards.
+    await parentRef.update({ archived: true, archivedAt: Date.now() });
+    await childRef.update({ archived: true, archivedAt: Date.now() });
+    await openBoard(BOARD);
+  }
+
   // ---- In bulk ----------------------------------------------------------------
   await page.getByRole('checkbox', { name: 'Select Order the books' }).click();
   await page.getByRole('checkbox', { name: 'Select Book the hall' }).click();
