@@ -776,7 +776,10 @@ lanes; read-only, and it stores two preferences per person and nothing else.
   reads without colour: a tick on green (all finished), an exclamation on red
   (a card is late), filled (due soon), a ring (under way), a dashed ring
   (cards, none dated) and a dash (no cards). A finished card is never late
-  here either. Nothing else is read from Details. A row opens its board; to a
+  here either. **No legend on the screen** (Faisal, 2026-11-17): a key would
+  cost rows a phone cannot spare, so the marks are explained in the manual and
+  in the overview's help film, which lays them over the picture. Nothing else
+  is read from Details. A row opens its board; to a
   screen reader it is one button that says each lane and its state
   (`describeMark`). A board whose cards could not be loaded says so on its
   row rather than drawing marks that would read as "nothing here".

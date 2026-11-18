@@ -55,6 +55,14 @@ The order, at the end, against a fresh `scripts/dev.sh web` seed:
 3. **The PDF.** `npx sabeel-ci render-manual`, last, after the pictures. The
    release command renders it again with the version line.
 
+After the release is out on the web, Play and TestFlight, **raise the version
+floor to that release** (Faisal, 2026-11-17: "Yes, update the version floor"),
+last, as `docs/DEPLOY.md` § Retiring old builds says: `node
+scripts/set-min-version.mjs <X.Y.Z>`. A build from before lanes shows no lane,
+calls a finished card late on its own screens, and can delete a finished column
+without moving the finish; every phone from 0.13.1 and every web tab from
+0.17.0 reads the floor and asks for the update.
+
 Manual pictures that will change before then, so are retaken at the end:
 `settings-phone`/`-wide` (the list gains Details), `roster-*` (a non-owner's
 settings are now "About this board", opening on Details), `lanesettings-*`,
@@ -85,7 +93,7 @@ The films:
 | `lanes` | missing | A film for dividing a board into lanes: switching them on, adding a card to a lane, the counts, the finished column. Not yet scripted; the guide world (`world.mjs`) needs a board with lanes |
 | `board-people` | stale | The People page of Board settings (script and narration updated, not recorded); the board name's font (computer) |
 | `details` | missing | A film for a board's details: adding fields, filling them in, a member reading them. Not yet scripted |
-| `overview` | missing | A film for the overview: opening it from Boards, reading a row's marks, changing the order, hiding a board and showing it again. Not yet scripted; needs the guide world to have two or more boards with lanes |
+| `overview` | missing | A film for the overview: opening it from Boards, reading a row's marks, changing the order, hiding a board and showing it again. **It carries the legend** (Faisal, 2026-11-17): the screen has none, so the film lays the six marks over the picture as an overlay and spends time on each (all finished, late, due soon, under way, no due dates, no cards). Not yet scripted; needs the guide world to have two or more boards with lanes, in each state |
 | `new-board` | stale, computer only | The new board's name in the app's font |
 | `attachments`, `subtasks`, `my-work`, `notifications` | stale | The High and Medium priority pills' new colours, on the card faces they show |
 | `signing-in`, `report`, `people`, `roles`, `stats` | current | Nothing: they show none of v0.19.0's changes |
