@@ -46,6 +46,8 @@ import { AddCardForm, type AddCardDraft } from './AddCardForm';
 import { WatchColumnBell } from './Bells';
 import { LaneHeading } from './LaneHeading';
 import { useLaneInfo } from './useLaneInfo';
+import { LaneCollapseActions } from './LaneCollapseActions';
+import { useLaneCollapse } from './useLaneCollapse';
 import { setColumnWatched, useWatchedColumns } from '../../notifications';
 import { useLabels } from '../../labels';
 import { radius, space, useTheme } from '../../theme';
@@ -119,6 +121,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   const laneBoard = board.data;
   const live = laneBoard ? lanesLive(laneBoard) : false;
   const infoByLane = useLaneInfo(laneBoard ?? null, live, cards.data ?? EMPTY_CARDS);
+  const collapse = useLaneCollapse(user, boardId, laneBoard ?? null, live);
 
   // The title comes from `AddCardForm`, already trimmed and non-empty — the
   // draft lives there so typing one does not re-render the board.
@@ -132,6 +135,8 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
     setAdding(null);
     // Only this column's: a refused add waiting elsewhere is kept.
     setRetry((r) => (r?.columnId === columnId ? null : r));
+    // The card is drawn at once; a folded lane would swallow it from view.
+    if (laneId) void collapse.reveal(laneId);
     const added = await run(() =>
       createCard({
         boardId,
@@ -223,6 +228,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
           {b.name}
         </Title>
         <Row style={styles.headerActions}>
+          {live ? <LaneCollapseActions collapse={collapse} /> : null}
           {/* Everyone gets this, not just owners: members can archive, so
               members must be able to un-archive. */}
           <IconAction
@@ -248,6 +254,12 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         <Panel>
           <Body>{error}</Body>
           <Button label="Dismiss" variant="secondary" onPress={() => setError(null)} />
+        </Panel>
+      ) : null}
+      {collapse.error ? (
+        <Panel>
+          <Body>{collapse.error}</Body>
+          <Button label="Dismiss" variant="secondary" onPress={collapse.clearError} />
         </Panel>
       ) : null}
 
@@ -348,7 +360,10 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
                 {(live && laneBoard
                   ? groupByLane(colCards, laneBoard, cards.data ?? EMPTY_CARDS).flatMap((g) => [
                       { lane: g.lane, card: null },
-                      ...g.cards.map((card) => ({ lane: g.lane, card })),
+                      // A collapsed lane keeps its heading, in every column.
+                      ...(collapse.isCollapsed(g.lane?.id ?? null)
+                        ? []
+                        : g.cards.map((card) => ({ lane: g.lane, card }))),
                     ])
                   : colCards.map((card) => ({ lane: null, card }))
                 ).map(({ lane, card }) => {
@@ -358,6 +373,8 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
                         key={`lane:${lane?.id ?? 'none'}`}
                         name={lane?.name ?? 'No lane'}
                         info={lane ? (infoByLane.get(lane.id) ?? null) : null}
+                        collapsed={collapse.isCollapsed(lane?.id ?? null)}
+                        onToggle={() => void collapse.toggle(lane?.id ?? null)}
                       />
                     );
                   }

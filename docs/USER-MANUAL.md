@@ -189,6 +189,16 @@ under **No lane**, at the foot of each column.
 **Adding a card** on a board with lanes asks which lane it goes in: choose one
 before **Add**. A subtask starts in the lane of the card it belongs to.
 
+**Folding a lane.** Tap a lane's heading to fold its cards away, in every
+column at once; the heading stays, with its count and its colour, so a folded
+lane still shows when something in it is late. Tap it again to open it. Two
+icons fold every lane at once and open them all again: in a browser they're
+at the top of the board, beside **Archived cards**; on a phone they're just
+above the first lane. A card dropped on a folded lane's heading goes to the
+top of that lane, and adding a card to a folded lane opens it so you see the
+card arrive. What you fold stays folded, on this device and your others,
+until you open it.
+
 A board without lanes looks exactly as described above. Lanes are switched on
 in the board's settings (Part 2).
 

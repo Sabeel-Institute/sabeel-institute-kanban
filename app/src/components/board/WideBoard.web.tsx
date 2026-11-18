@@ -32,6 +32,8 @@ import { BulkBar } from '../BulkBar';
 import { IconAction, LoadError } from '../ui';
 import { NewCardBell, WatchColumnBell } from './Bells';
 import { LaneHeading } from './LaneHeading';
+import { LaneCollapseActions } from './LaneCollapseActions';
+import { useLaneCollapse } from './useLaneCollapse';
 import { useLaneInfo } from './useLaneInfo';
 import { setColumnWatched, useWatchedColumns } from '../../notifications';
 import {
@@ -391,6 +393,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   const laneBoard = board.data;
   const live = laneBoard ? lanesLive(laneBoard) : false;
   const infoByLane = useLaneInfo(laneBoard ?? null, live, cards.data ?? EMPTY_CARDS);
+  const collapse = useLaneCollapse(user, boardId, laneBoard ?? null, live);
 
   const drop = useCallback(
     async (target: DropTarget, cardIdFromEvent: string | null) => {
@@ -454,6 +457,8 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
     setAdding(null);
     // Only this column's: a refused add waiting elsewhere is kept.
     setRetry((r) => (r?.columnId === columnId ? null : r));
+    // The card is drawn at once; a folded lane would swallow it from view.
+    if (laneId) void collapse.reveal(laneId);
     try {
       await createCard({
         boardId,
@@ -597,6 +602,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         <div style={{ display: 'flex', gap: space.xs, flexShrink: 0 }}>
           {/* Everyone, not just owners: members can archive, so members must
               be able to un-archive. */}
+          {live ? <LaneCollapseActions collapse={collapse} /> : null}
           <IconAction
             icon="inventory-2"
             label="Archived cards"
@@ -659,6 +665,14 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         <div style={banner(t)}>
           {error}{' '}
           <button onClick={() => setError(null)} style={{ ...btn(t), marginLeft: 8 }}>
+            Dismiss
+          </button>
+        </div>
+      ) : null}
+      {collapse.error ? (
+        <div style={banner(t)}>
+          {collapse.error}{' '}
+          <button onClick={collapse.clearError} style={{ ...btn(t), marginLeft: 8 }}>
             Dismiss
           </button>
         </div>
@@ -874,18 +888,31 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
                       if (drag) setDropTarget({ columnId: col.id, laneId, index });
                       driveAutoScroll(e.clientX, e.clientY, col.id);
                     };
+                    // Collapsed, the lane keeps its heading and takes a drop
+                    // at its top: the bar shows under the heading, and the
+                    // card lands first in the lane, as a drop on any heading
+                    // does.
+                    const folded = collapse.isCollapsed(laneId);
                     return (
-                      <div key={laneId ?? 'none'} onDragOver={into(g.cards.length)}>
+                      <div key={laneId ?? 'none'} onDragOver={into(folded ? 0 : g.cards.length)}>
                         {/* Over the heading: the top of the lane. */}
                         <div onDragOver={into(0)}>
                           <LaneHeading
                             name={g.lane?.name ?? 'No lane'}
                             info={g.lane ? (infoByLane.get(g.lane.id) ?? null) : null}
+                            collapsed={folded}
+                            onToggle={() => void collapse.toggle(laneId)}
                           />
                         </div>
                         <div style={{ height: space.xs }} />
-                        {g.cards.map((card, i) => renderCard(card, i, laneId))}
-                        {marks(laneId, g.cards.length) ? dropBar : null}
+                        {folded ? (
+                          marks(laneId, 0) ? dropBar : null
+                        ) : (
+                          <>
+                            {g.cards.map((card, i) => renderCard(card, i, laneId))}
+                            {marks(laneId, g.cards.length) ? dropBar : null}
+                          </>
+                        )}
                       </div>
                     );
                   })

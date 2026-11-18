@@ -359,7 +359,7 @@ const SHOTS = {
   lanes: async (p) => {
     await nav(p, 'Boards');
     await p.getByText('Summer Program 2027', { exact: true }).first().click();
-    await p.locator('[role="heading"][aria-label^="Planning,"]').first().waitFor({ timeout: 30000 });
+    await p.locator('[data-testid="lane-heading"][aria-label^="Planning,"]').first().waitFor({ timeout: 30000 });
     await p.waitForTimeout(900);
   },
   // Settings → Lanes on that board: the switch, the lanes, the finished column.
