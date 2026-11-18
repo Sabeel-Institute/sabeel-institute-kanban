@@ -105,9 +105,12 @@ describe('errorText, on what the Functions SDK really throws', () => {
 
 describe('errorText, on a write the rules refused', () => {
   it('says it in words, whatever Firestore says', async () => {
+    // The SDK's own class, as a refused write rejects with; its constructor is
+    // private in the typings, not at runtime.
     const { FirestoreError } = await import('firebase/firestore');
-    const prod = new FirestoreError('permission-denied', 'Missing or insufficient permissions.');
-    const emulator = new FirestoreError('permission-denied', "PERMISSION_DENIED: \nfalse for 'update' @ L3");
+    const Refusal = FirestoreError as unknown as new (code: string, message: string) => Error;
+    const prod = new Refusal('permission-denied', 'Missing or insufficient permissions.');
+    const emulator = new Refusal('permission-denied', "PERMISSION_DENIED: \nfalse for 'update' @ L3");
     for (const e of [prod, emulator]) {
       expect(errorText(e)).toMatch(/^That change was not allowed\./);
     }
