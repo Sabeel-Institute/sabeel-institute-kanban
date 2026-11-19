@@ -28,6 +28,7 @@ export function LaneHeading({
   onToggle,
   here,
   bell,
+  stacked,
 }: {
   name: string;
   info: LaneInfo | null;
@@ -45,6 +46,11 @@ export function LaneHeading({
   here?: number;
   /** The lane's bell, beside its count and outside the fold button. */
   bell?: ReactNode;
+  /**
+   * The count on its own line under the name: the lane grid's narrow name
+   * column, where name, count, + and bell do not fit on one row.
+   */
+  stacked?: boolean;
 }) {
   const t = useTheme();
   const colour =
@@ -78,7 +84,7 @@ export function LaneHeading({
           onToggle={onToggle}
           testID={LANE_HEADING_TEST_ID}
         >
-            <View style={[styles.row, styles.inToggle]}>{words}</View>
+            <View style={[styles.row, styles.inToggle, stacked && styles.stacked]}>{words}</View>
           </DisclosureHeading>
         </View>
         {bell}
@@ -119,6 +125,7 @@ const styles = StyleSheet.create({
   toggleGap: { paddingTop: space.xs },
   inToggle: { paddingTop: 0, paddingHorizontal: 0 },
   withBell: { flexDirection: 'row', alignItems: 'center' },
+  stacked: { flexDirection: 'column', alignItems: 'flex-start', gap: 2, flexShrink: 1, minWidth: 0 },
   grow: { flex: 1, minWidth: 0 },
   // Ordinary case and weight beside the capitals: a count, not a name.
   here: { textTransform: 'none', letterSpacing: 0, fontWeight: '400' },

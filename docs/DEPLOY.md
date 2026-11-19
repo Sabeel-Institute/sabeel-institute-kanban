@@ -742,8 +742,10 @@ Reload, which fetches the current bundle; so raise the floor only once the web
 is deployed, or a reload would fetch the same old bundle and show the screen
 again. A tab opened on an older bundle never reads it. The update screen
 replaces whatever an open tab or phone was showing, a draft not yet saved
-included, so raise the floor when nobody is working: at the end of a
-maintenance window.
+included. At this app's activity that is an accepted cost: raise the floor
+right after the release's builds are published (the web deployed, Play
+internal testing and the TestFlight upload), without waiting for a quiet hour
+or for Apple to finish processing (Faisal, 2026-11-19).
 
 ## Maintenance window
 

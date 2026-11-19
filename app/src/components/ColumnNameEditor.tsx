@@ -20,35 +20,26 @@ type RenameResult<T> = { ok: true; items: T[] } | { ok: false; error: string };
 /** What every caller passes, whichever kind of name it is. */
 type EditorProps = {
   canEdit: boolean;
-  /** Trailing metadata shown after the name, e.g. a card count. Not editable. */
-  suffix?: string;
-  center?: boolean;
-  /**
-   * How many lines the name may occupy before it truncates. One everywhere it
-   * shares a row with other content; two on the phone pager, where the name is
-   * the row and there is empty space above and below it.
-   */
-  lines?: number;
-  bold?: boolean;
   busy?: boolean;
   /** The caller's `useAction` runner, so a failed rename reports in the same
    *  banner as every other failure on that screen. */
   run: (fn: () => Promise<unknown>) => void;
   onError: (message: string) => void;
   /**
-   * Lets a cramped surface make room while editing — the phone pager hides its
-   * Prev/Next arrows so the field gets the whole row instead of the ~190px left
-   * between them.
+   * Lets a row make room while editing: Board settings → Columns hides the
+   * column's delete, so the field keeps the row and the bin never sits beside
+   * the rename's cancel.
    */
   onEditingChange?: (editing: boolean) => void;
 };
 
 /**
- * A column's name, renamed in place.
+ * A column's name, renamed in place, in Board settings → Columns.
  *
- * Every surface that shows a column name offers the rename — board settings, the
- * phone pager, and both wide boards — so this is ONE component rather than four
- * copies of the same edit state. That matters more than it looks: the validation
+ * The board's own column headings are read-only (`ColumnHeading`); a column is
+ * renamed and deleted on the settings page. Lanes and fields share the editor,
+ * so this is ONE component rather than copies of the same edit state. That
+ * matters more than it looks: the validation
  * has a trap in it (a column must be excluded from its own duplicate check, or
  * re-saving its name — or just fixing its capitalisation — is rejected), which is
  * why the rule itself lives in `renameColumn` in @sabeel/shared and is
@@ -154,10 +145,6 @@ function ItemNameEditor<T extends Named>({
   rename,
   onRename,
   canEdit,
-  suffix,
-  center,
-  lines = 1,
-  bold,
   busy,
   run,
   onError,
@@ -240,38 +227,16 @@ function ItemNameEditor<T extends Named>({
   }
 
   return (
-    <Row style={[styles.nameRow, center && styles.center]}>
-      {/*
-        THE BALANCE SPACER — what actually centres the NAME.
-        Without it the row is `text + gap + 44px icon` and the parent centres
-        that whole unit, so the text lands ~24px LEFT of true centre. Mirroring
-        the icon on the left makes the two sides symmetric, so the name itself
-        sits on the centre line.
-
-        It collapses rather than truncating the name: its shrink weight
-        (999 x 44) dwarfs the text's, so Yoga takes the space out of the spacer
-        first. A long name therefore slides the name+pencil pair LEFT into the
-        room that exists there, and only starts truncating once the spacer is
-        gone.
-      */}
-      {center && canEdit ? <View style={styles.balance} /> : null}
+    <Row style={styles.nameRow}>
       {/* `shrink` is not optional. Without it Yoga measures the name against the
-          whole label cell and then lays it out NEXT TO the edit icon, so the row
-          is wider than its parent. A View clips on web but not on Android, where
-          a long name was filmed painting straight over the pager's Prev
-          arrow. It shrinks, then truncates at `lines`. */}
+          whole row and then lays it out NEXT TO the edit icon, so the row is
+          wider than its parent. A View clips on web but not on Android, where a
+          long name paints over its neighbour. It shrinks, then truncates. */}
       <Text
-        numberOfLines={lines}
-        style={[
-          type.body,
-          bold && styles.bold,
-          { color: t.text.secondary },
-          styles.shrink,
-          center && styles.centerText,
-        ]}
+        numberOfLines={1}
+        style={[type.body, { color: t.text.secondary }, styles.shrink]}
       >
         {item.name}
-        {suffix ? <Text style={{ color: t.text.muted }}>{suffix}</Text> : null}
       </Text>
       {canEdit ? (
         <IconAction
@@ -295,21 +260,7 @@ const styles = StyleSheet.create({
    * while the row around it refuses to give.
    */
   nameRow: { alignItems: 'center', gap: space.xs, flexShrink: 1, minWidth: 0 },
-  /**
-   * `alignSelf`, NOT `flex: 1`. The phone pager's label cell is a COLUMN flex
-   * container, so `flex: 1` here would stretch this row vertically and leave it
-   * still sized to its content horizontally — the centring would not change.
-   * Stretching on the cross axis is what gives the row the full width, which is
-   * what `justifyContent` and the balance spacer then work against.
-   */
-  center: { justifyContent: 'center', alignSelf: 'stretch' },
-  /** Mirrors IconAction's 44x44 box; see the spacer comment above. */
-  balance: { width: 44, flexShrink: 999 },
-  // Centred so a name that wraps reads as one centred block, not a centred
-  // first line with a ragged second.
-  centerText: { textAlign: 'center' },
   editRow: { alignItems: 'center', gap: space.xs, flex: 1 },
   grow: { flex: 1 },
   shrink: { flexShrink: 1 },
-  bold: { fontWeight: '600' },
 });
