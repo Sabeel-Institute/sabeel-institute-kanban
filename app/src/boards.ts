@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import {
+  collapsedPrefs,
   cleanFields,
   orphanDetailIds,
   boardExtras,
@@ -23,6 +24,8 @@ import {
   type BoardField,
   type BoardLane,
   type BoardDoc,
+  type BoardSection,
+  type CollapsedPrefs,
   type OverviewSort,
 } from '@sabeel/shared';
 import { auth, db, functions } from './firebase';
@@ -473,6 +476,32 @@ export async function setOverviewReverse(user: SessionUser, reverse: boolean): P
 /** Build `hidden` with `nextHidden`, which keeps boards not listed at the moment. */
 export async function setOverviewHidden(user: SessionUser, hidden: string[]): Promise<void> {
   await updateDoc(doc(db, 'users', user.uid), { overviewHiddenBoardIds: hidden });
+}
+
+/**
+ * What this person has collapsed (sections of the Boards list, lanes on a
+ * board), live from their own user document, so a change on one device shows
+ * on the others. Read through `collapsedPrefs`, which drops shapes the app
+ * never writes.
+ */
+export function useMyCollapsed(user: SessionUser) {
+  return useLiveDoc<CollapsedPrefs>(
+    () => doc(db, 'users', user.uid),
+    [user.uid],
+    'collapsed-prefs',
+    (d) => collapsedPrefs(d?.data),
+  );
+}
+
+/** One section, one way. Server-applied, so quick taps on two sections both land. */
+export async function setSectionCollapsed(
+  user: SessionUser,
+  section: BoardSection,
+  collapsed: boolean,
+): Promise<void> {
+  await updateDoc(doc(db, 'users', user.uid), {
+    collapsedBoardSections: collapsed ? arrayUnion(section) : arrayRemove(section),
+  });
 }
 
 /** The signed-in user's own list preferences, live. */

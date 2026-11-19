@@ -154,6 +154,8 @@ users/{uid}
   overviewSort?: start|created|late              # the overview's order; absent is start
   overviewReverse?: bool                         # that order the other way
   overviewHiddenBoardIds?: [boardId, …]          # boards hidden from my overview, at most 500
+  collapsedBoardSections?: [section, …]          # Boards-list sections I folded: starred, recent, all, templates
+  collapsedLanes?: { boardId: [laneKey, …] }      # lanes I folded on each board; at most 500 boards
   unreadNotifCount
   # Mirrors custom claims for UI display. Rules trust the TOKEN, never this doc.
 
@@ -588,6 +590,12 @@ curation overhead:
 4. **Templates** — boards marked as templates (2026-11-15), alphabetical, each
    with a badge, taken out before the others so a marked board is listed once.
    An archived template goes under Archived and keeps its badge.
+
+Each section's heading folds it away and opens it again (#110). Folded, the
+heading says how many boards the section holds, so folding hides boards and
+never the fact that they are there. What a person folds is stored on their
+user document (`collapsedBoardSections`), across reloads and devices, like
+their stars; it hides nothing from anyone else.
 
 No folders or groups: they need curation, a permission story of their own, and a
 second tree to navigate on a phone. Revisit only if the team passes ~50 boards and

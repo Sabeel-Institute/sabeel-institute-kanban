@@ -16,13 +16,17 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
   query,
   serverTimestamp,
   where,
 } from 'firebase/firestore';
 import {
+  COLLAPSED_LANE_BOARDS_MAX,
+  COLLAPSED_SECTIONS_MAX,
   EMULATOR_PROJECT_ID,
   MAX_WATCHED_COLUMNS,
+  NO_LANE_KEY,
   OVERVIEW_HIDDEN_MAX,
   PASSWORD_SIGN_IN_EMAIL,
   RULES_VERSION,
@@ -338,6 +342,38 @@ describe('preference self-writes', () => {
     await assertFails(updateDoc(doc(db, 'users/member1'), { overviewHiddenBoardIds: 'b1' }));
     // Someone else's, never.
     await assertFails(updateDoc(doc(db, 'users/org1'), { overviewSort: 'late' }));
+  });
+
+  it('an active user keeps what they have collapsed, within bounds, as the app writes it', async () => {
+    const db = ctx('member1', 'member', 'active');
+    // One entry at a time, server-applied, as the Boards list and a board do.
+    await assertSucceeds(
+      updateDoc(doc(db, 'users/member1'), { collapsedBoardSections: arrayUnion('starred') }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(db, 'users/member1'), {
+        [`collapsedLanes.b1`]: arrayUnion('ln-1', NO_LANE_KEY),
+      }),
+    );
+    await assertSucceeds(updateDoc(doc(db, 'users/member1'), { [`collapsedLanes.b1`]: deleteField() }));
+    const sections = Array.from({ length: COLLAPSED_SECTIONS_MAX }, (_, i) => `s${i}`);
+    await assertSucceeds(updateDoc(doc(db, 'users/member1'), { collapsedBoardSections: sections }));
+    await assertFails(
+      updateDoc(doc(db, 'users/member1'), { collapsedBoardSections: arrayUnion('one-more') }),
+    );
+    const boards = Object.fromEntries(
+      Array.from({ length: COLLAPSED_LANE_BOARDS_MAX }, (_, i) => [`b${i}`, ['ln-1']]),
+    );
+    await assertSucceeds(updateDoc(doc(db, 'users/member1'), { collapsedLanes: boards }));
+    await assertFails(
+      updateDoc(doc(db, 'users/member1'), { [`collapsedLanes.one-more`]: ['ln-1'] }),
+    );
+    await assertFails(updateDoc(doc(db, 'users/member1'), { collapsedBoardSections: 'starred' }));
+    await assertFails(updateDoc(doc(db, 'users/member1'), { collapsedLanes: ['ln-1'] }));
+    // Someone else's, never.
+    await assertFails(
+      updateDoc(doc(db, 'users/org1'), { collapsedBoardSections: arrayUnion('starred') }),
+    );
   });
 
   it('nobody may watch columns on someone else’s behalf', async () => {

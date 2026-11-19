@@ -18,7 +18,8 @@
  */
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
+import { mkdirSync } from 'node:fs';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
@@ -35,6 +36,8 @@ process.env.FIREBASE_AUTH_EMULATOR_HOST ??= `127.0.0.1:${PORTS.auth}`;
 process.env.GCLOUD_PROJECT = PROJECT;
 initializeApp({ projectId: PROJECT });
 const db = getFirestore();
+const SHOTS = resolve(import.meta.dirname, '..', 'shots');
+mkdirSync(SHOTS, { recursive: true });
 
 const results = [];
 function check(name, ok, detail = '') {
@@ -375,6 +378,58 @@ try {
       .waitFor({ timeout: 20000 })
       .then(() => page.getByText('Delta Retreat').first().isVisible(), () => false),
   );
+
+  // ---- Collapsing a section of the Boards list (#110) ---------------------------------------
+  // Templates holds one board here. Collapsed, the heading says how many it
+  // holds and the board goes; the choice is stored on the account, so it holds
+  // across a reload while the other sections stay open.
+  {
+    const stored = async (want, ms = 15000) => {
+      const until = Date.now() + ms;
+      for (;;) {
+        const got = (await faisal.ref.get()).data()?.collapsedBoardSections ?? [];
+        if (want(got) || Date.now() > until) return got;
+        await page.waitForTimeout(250);
+      }
+    };
+    await page.getByRole('button', { name: 'Boards', exact: true }).first().click();
+    const open = page.getByRole('button', { name: 'Templates section', exact: true });
+    const shut = page.getByRole('button', { name: 'Templates section (1)', exact: true });
+    await open.waitFor({ timeout: 20000 });
+    const before =
+      (await open.getAttribute('aria-expanded')) === 'true' &&
+      (await page.getByText('Template Program', { exact: true }).isVisible());
+    await open.click();
+    await shut.waitFor({ timeout: 10000 });
+    await page.screenshot({ path: join(SHOTS, 'boards-section-collapsed.png'), fullPage: true });
+    const hidden = (await page.getByText('Template Program', { exact: true }).count()) === 0;
+    const savedShut = await stored((g) => g.includes('templates'));
+    check(
+      'a Boards section collapses, saying how many boards it holds',
+      before && hidden && (await shut.getAttribute('aria-expanded')) === 'false',
+    );
+    await page.reload();
+    // The collapsed heading coming back is the list answering with the stored
+    // choice; only then is the board's absence evidence.
+    const back = await shut.waitFor({ timeout: 30000 }).then(() => true, () => false);
+    const others = page.getByRole('button', { name: 'All boards section', exact: true });
+    check(
+      'and stays collapsed after a reload, stored on the account, the other sections still open',
+      back &&
+        savedShut.includes('templates') &&
+        (await page.getByText('Template Program', { exact: true }).count()) === 0 &&
+        (await others.getAttribute('aria-expanded').catch(() => null)) === 'true',
+      `stored ${JSON.stringify(savedShut)}`,
+    );
+    await shut.click();
+    await open.waitFor({ timeout: 10000 });
+    const savedOpen = await stored((g) => !g.includes('templates'));
+    check(
+      'and opens again',
+      (await page.getByText('Template Program', { exact: true }).isVisible()) &&
+        !savedOpen.includes('templates'),
+    );
+  }
 
   // ---- A member, on two of the boards -------------------------------------------------------
   await omar.ref.update({

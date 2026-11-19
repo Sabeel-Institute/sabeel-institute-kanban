@@ -113,7 +113,22 @@ service cloud.firestore {
         return request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['favoriteBoardIds', 'recentBoardIds', 'mutedBoardIds',
                     'notifyPrefs', 'unreadNotifCount', 'watchedColumns',
-                    'overviewSort', 'overviewReverse', 'overviewHiddenBoardIds']);
+                    'overviewSort', 'overviewReverse', 'overviewHiddenBoardIds',
+                    'collapsedBoardSections', 'collapsedLanes']);
+      }
+      // Boards-list sections and lanes collapsed, by this person, for this
+      // person: display preferences that hide nothing from anyone else.
+      // Bounded and nothing more: what a key names is the app's to read
+      // (collapsedPrefs in @sabeel/shared drops what it does not know). 10 is
+      // COLLAPSED_SECTIONS_MAX and 500 COLLAPSED_LANE_BOARDS_MAX, held to them
+      // by ruleLimits.test.ts.
+      function collapsePrefsWellFormed() {
+        return (!('collapsedBoardSections' in request.resource.data)
+                || (request.resource.data.collapsedBoardSections is list
+                    && request.resource.data.collapsedBoardSections.size() <= 10))
+          && (!('collapsedLanes' in request.resource.data)
+              || (request.resource.data.collapsedLanes is map
+                  && request.resource.data.collapsedLanes.size() <= 500));
       }
       // The overview's order and the boards hidden from it: display
       // preferences, granting nothing. Hiding a board you cannot see changes
@@ -152,7 +167,8 @@ service cloud.firestore {
         && request.auth.uid == userId
         && selfWritableOnly()
         && watchesBounded()
-        && overviewPrefsWellFormed();
+        && overviewPrefsWellFormed()
+        && collapsePrefsWellFormed();
 
       // Accounts are created by the auth trigger and never deleted by clients.
       allow create, delete: if false;

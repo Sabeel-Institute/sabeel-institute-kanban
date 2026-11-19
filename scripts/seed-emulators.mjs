@@ -383,7 +383,7 @@ const LANE_CARDS = [
   ['Order the books', 'Supplies'],
 ];
 try {
-  await admin.getByRole('button', { name: 'Boards' }).first().click();
+  await admin.getByRole('button', { name: 'Boards', exact: true }).first().click();
   await admin.getByRole('button', { name: 'New board' }).waitFor({ timeout: 25000 });
   if (!(await admin.getByText(LANES_BOARD).first().isVisible().catch(() => false))) {
     await admin.getByRole('button', { name: 'New board' }).click();
@@ -476,7 +476,7 @@ try {
 // details, so it is given its own start date.
 const SECOND_PROGRAM = 'Autumn Program 2027';
 try {
-  await admin.getByRole('button', { name: 'Boards' }).first().click();
+  await admin.getByRole('button', { name: 'Boards', exact: true }).first().click();
   await admin.getByRole('button', { name: 'New board' }).waitFor({ timeout: 25000 });
   await admin.waitForTimeout(1500);
   if (!(await admin.getByText(SECOND_PROGRAM, { exact: true }).first().isVisible().catch(() => false))) {
@@ -499,7 +499,7 @@ try {
 const CAMP = 'Summer Camp 2027';
 const CAMP_LANES = ['Planning', 'Curriculum', 'Staffing', 'Supplies', 'Venue', 'Registration', 'Volunteers', 'Food'];
 try {
-  await admin.getByRole('button', { name: 'Boards' }).first().click();
+  await admin.getByRole('button', { name: 'Boards', exact: true }).first().click();
   await admin.getByRole('button', { name: 'New board' }).waitFor({ timeout: 25000 });
   await admin.waitForTimeout(1500);
   if (!(await admin.getByText(CAMP, { exact: true }).first().isVisible().catch(() => false))) {
@@ -533,7 +533,7 @@ try {
 // A board marked as a template, so the Boards list has its Templates heading.
 const TEMPLATE_BOARD = 'Program template';
 try {
-  await admin.getByRole('button', { name: 'Boards' }).first().click();
+  await admin.getByRole('button', { name: 'Boards', exact: true }).first().click();
   await admin.getByRole('button', { name: 'New board' }).waitFor({ timeout: 25000 });
   await admin.waitForTimeout(1500);
   if (!(await admin.getByText(TEMPLATE_BOARD, { exact: true }).first().isVisible().catch(() => false))) {

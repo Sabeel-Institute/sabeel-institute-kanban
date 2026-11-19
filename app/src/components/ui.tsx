@@ -237,6 +237,52 @@ export function Heading({
 }
 
 /**
+ * A heading that collapses and expands what follows it: the Boards list's
+ * sections and a board's lanes (#110, #115). One component, so both draw the
+ * same chevron, take the same 44-point row and say their state the same way.
+ *
+ * The WHOLE row is the button, not the chevron alone: on a phone the heading is
+ * the target a thumb aims for. Its name is `label` — the heading's words with
+ * any count — and its state goes out twice: `accessibilityState.expanded` for
+ * the phones, and `aria-expanded` because react-native-web maps the former to
+ * nothing (see `Button`). The caller draws what follows only while expanded.
+ */
+export function DisclosureHeading({
+  label,
+  expanded,
+  onToggle,
+  children,
+}: {
+  label: string;
+  expanded: boolean;
+  onToggle: () => void;
+  /** The heading's own drawing, beside the chevron. */
+  children: ReactNode;
+}) {
+  const t = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ expanded }}
+      aria-expanded={expanded}
+      onPress={onToggle}
+      style={({ pressed }) => [
+        styles.disclosure,
+        { backgroundColor: pressed ? t.bg.inset : 'transparent' },
+      ]}
+    >
+      <Icon
+        name={expanded ? 'expand-more' : 'chevron-right'}
+        size={ICON_INK}
+        color={t.text.secondary}
+      />
+      <View style={styles.disclosureBody}>{children}</View>
+    </Pressable>
+  );
+}
+
+/**
  * Body copy. There is no `muted` variant, deliberately.
  *
  * There was one, and every caller used it for something that carried meaning —
@@ -998,6 +1044,16 @@ export function LoadError({ what, code }: { what: string; code?: string }) {
 }
 
 const styles = StyleSheet.create({
+  disclosure: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
+    minHeight: 44,
+    borderRadius: radius.sm,
+  },
+  // Shrinks, so a long heading wraps beside the chevron rather than pushing
+  // the row wider than the screen: Yoga's flexShrink defaults to 0.
+  disclosureBody: { flex: 1, minWidth: 0 },
   toggleTrack: {
     width: 52,
     height: 32,
