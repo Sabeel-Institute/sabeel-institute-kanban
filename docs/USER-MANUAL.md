@@ -119,8 +119,9 @@ last under their own heading, each with a small *Template* badge.
 
 Tap a heading (*Starred*, *Recent*, *All boards*, *Templates*) to fold that
 section away; the heading stays, with the number of boards it holds, and tapping
-it again opens it. What you fold stays folded, on this device and your others,
-until you open it again.
+it again opens it. While you type in **Filter boards**, every section opens
+so nothing you're looking for is hidden. What you fold stays folded, on this
+device and your others, until you open it again.
 
 Every board shows as a card in a grid on wide screens, and as a single-column list
 on a phone. If your account can create boards, **New board** is at the top (see
@@ -206,9 +207,11 @@ column at once; the heading stays, with its count and its colour, so a folded
 lane still shows when something in it is late. Tap it again to open it. Two
 icons fold every lane at once and open them all again: in a browser they're
 at the top of the board, beside **Archived cards**; on a phone they're just
-above the first lane. A card dropped on a folded lane's heading goes to the
-top of that lane, and adding a card to a folded lane opens it so you see the
-card arrive. What you fold stays folded, on this device and your others,
+above the first lane. A folded lane's heading also says how many of its
+cards are in the column you're looking at. A card dropped on a folded lane's
+heading goes to the top of that lane, and the lane opens; adding a card to a
+folded lane opens it too, so you see the card arrive. Cards you had selected
+in a lane are unselected when it folds. What you fold stays folded, on this device and your others,
 until you open it.
 
 A board without lanes looks exactly as described above. Lanes are switched on

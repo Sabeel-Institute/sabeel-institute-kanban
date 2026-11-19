@@ -8,6 +8,7 @@ import {
   groupOverview,
   isDateType,
   isNamedType,
+  isRealDate,
   laneInfo,
   namedFieldValue,
   nextHidden,
@@ -497,6 +498,7 @@ function BoardRow({
           styles.title,
           isWide && styles.titleWide,
           shown.length > 0 && styles.titleBesideToggle,
+          shown.length > 0 && !isWide && styles.titleBesideToggleNarrow,
         ]}
       >
         <Text style={[type.body, styles.boardName, { color: t.text.primary }]} numberOfLines={2}>
@@ -602,7 +604,8 @@ function BoardDetails({
               </Pressable>
             ) : (
               <Text style={[type.body, { color: t.text.primary }]} selectable>
-                {isDateType(f.type) ? shortDay(value, today) : value}
+                {/* A date in a shape the app never writes reads as written. */}
+                {isDateType(f.type) && isRealDate(value) ? shortDay(value, today) : value}
               </Text>
             )}
           </View>
@@ -692,17 +695,25 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     transformOrigin: 'left bottom',
   },
+  // Not clipped: the row's keyboard focus ring is drawn outside its box, and
+  // a clipping card would hide it. The row rounds its own pressed shade.
   card: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: radius.md,
-    overflow: 'hidden',
   },
   row: {
     padding: space.md,
     gap: space.sm,
+    borderRadius: radius.md,
   },
-  /** Room on the title's right for the chevron, so a long name wraps before it. */
+  /**
+   * Room on the title's right for the chevron, so a long name wraps before it,
+   * and on a phone a title at least as tall as the chevron's 44-point box
+   * reaches below the row's padding, so the marks under it start clear of the
+   * chevron's touch area even with no dates line.
+   */
   titleBesideToggle: { paddingRight: TOGGLE + space.xs },
+  titleBesideToggleNarrow: { minHeight: TOGGLE - space.md + StyleSheet.hairlineWidth },
   toggleSlot: { position: 'absolute', top: space.md - (TOGGLE - 22) / 2 },
   toggleSlotNarrow: { right: space.xs },
   // At the right edge of the name column, which ends at ROW_PAD + NAME_WIDTH.
@@ -720,7 +731,6 @@ const styles = StyleSheet.create({
     paddingVertical: space.sm,
     gap: space.sm,
   },
-  // Under the name column's edge, so the details read as the row's own.
   detailsWide: { flexDirection: 'row', flexWrap: 'wrap', columnGap: space.lg, rowGap: space.sm },
   detail: { gap: 2, minWidth: 0 },
   detailWide: { flexBasis: 220, flexGrow: 1, maxWidth: 360 },

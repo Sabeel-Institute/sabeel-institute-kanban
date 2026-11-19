@@ -1,5 +1,6 @@
 import { moveRefusal } from './cards';
 import { noticeAction } from './confirm';
+import { captureError } from './sentry';
 
 /**
  * Ask before a move or a restore on a board with lanes (`moveRefusal`), and
@@ -12,7 +13,16 @@ export async function allowMove(
   params: Parameters<typeof moveRefusal>[0],
   title = 'Not moved',
 ): Promise<boolean> {
-  const refused = await moveRefusal(params);
+  let refused: string | null;
+  try {
+    refused = await moveRefusal(params);
+  } catch (e) {
+    // The check must never strand a move: a failure is reported and the
+    // move goes ahead, as it did before the rule (Rules cannot see subtasks
+    // either way).
+    captureError(e, { source: 'moveRefusal' });
+    return true;
+  }
   if (!refused) return true;
   await noticeAction(title, refused);
   return false;

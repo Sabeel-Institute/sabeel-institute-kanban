@@ -558,21 +558,17 @@ const layoutFaults = (page, width) =>
      * Only elements with visible area are considered, so the pager's
      * off-screen pages — laid out to the right by design — are not flagged.
      */
-    // Cut off by a scroller that can scroll to it, as the wide board's
-    // columns are, is by design: what is past the edge is a scroll away.
-    // Cut off by `overflow: hidden` or by the window, it cannot be reached.
+    // Cut off by the wide board's column scroller, which can scroll to it, is
+    // by design: what is past the edge is a scroll away. Only that scroller:
+    // a control cut off anywhere else (a chip row, `overflow: hidden`, the
+    // window) cannot be reached and is a fault.
     const scrollsTo = (e, right) => {
-      for (let a = e.parentElement; a && a !== document.body; a = a.parentElement) {
-        const ox = getComputedStyle(a).overflowX;
-        if (
-          (ox === 'auto' || ox === 'scroll') &&
-          a.scrollWidth > a.clientWidth + 1 &&
-          right > a.getBoundingClientRect().right
-        ) {
-          return true;
-        }
-      }
-      return false;
+      const a = e.closest('[data-testid="board-columns"]');
+      return (
+        !!a &&
+        a.scrollWidth > a.clientWidth + 1 &&
+        right > a.getBoundingClientRect().right
+      );
     };
     for (const e of els) {
       const raw = e.getBoundingClientRect();

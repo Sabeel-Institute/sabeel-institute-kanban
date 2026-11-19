@@ -28,6 +28,7 @@ import {
   finishRefusal,
   reopenBlockedMessage,
   reopenBlockers,
+  reopenCandidates,
   type ParentState,
 } from '@sabeel/shared';
 import { db } from './firebase';
@@ -314,26 +315,38 @@ export async function moveRefusal(params: {
   const finish = finishRefusal({ board, toColumnId, moving, cards });
   if (finish) return finish;
 
+  // Only a subtask being reopened can be refused for its parent, so only its
+  // parent is looked up, and only when it is not on the board: an ordinary
+  // move never waits on a read.
+  const candidates = reopenCandidates({ board, toColumnId, moving });
+  if (candidates.length === 0) return null;
   const parents = new Map<string, ParentState>();
   for (const c of cards) parents.set(c.id, c);
   const missing = [
-    ...new Set(moving.map((c) => c.parentId).filter((id): id is string => !!id && !parents.has(id))),
+    ...new Set(candidates.map((c) => c.parentId).filter((id): id is string => !!id && !parents.has(id))),
   ];
   await Promise.all(
     missing.map(async (id) => {
-      const snap = await getDoc(cardRef(id));
-      const data = snap.data();
-      if (snap.exists() && data?.boardId === boardId) {
-        parents.set(id, {
-          id,
-          title: (data.title as string) ?? '',
-          columnId: data.columnId as string,
-          archived: data.archived === true,
-        });
+      // A parent that cannot be read (on a board this person is not on,
+      // deleted, or out of reach offline) holds nothing back: the rule is a
+      // guard for this board's own cards, and must never strand a move.
+      try {
+        const snap = await getDoc(cardRef(id));
+        const data = snap.data();
+        if (snap.exists() && data?.boardId === boardId) {
+          parents.set(id, {
+            id,
+            title: (data.title as string) ?? '',
+            columnId: data.columnId as string,
+            archived: data.archived === true,
+          });
+        }
+      } catch {
+        // Unreadable: nothing held back.
       }
     }),
   );
-  const blocked = reopenBlockers({ board, toColumnId, moving, parentOf: (id) => parents.get(id) });
+  const blocked = reopenBlockers({ board, toColumnId, moving: candidates, parentOf: (id) => parents.get(id) });
   return blocked.length > 0 ? reopenBlockedMessage(blocked) : null;
 }
 

@@ -150,17 +150,19 @@ export function BoardArchiveScreen({
             <IconAction
               icon="unarchive"
               label={`Restore ${card.title} to the board`}
-              disabled={busy}
-              onPress={async () => {
+              // Held until the board's open cards are in: a restore is checked
+              // against them (#111).
+              disabled={busy || openCards.status !== 'ready'}
+              onPress={() => {
                 const to = restoreColumnId(card, b.columns);
-                const allowed =
-                  to === null ||
-                  (await allowMove(
-                    { board: b, boardId, toColumnId: to, moving: [card], cards: openCards.data ?? [] },
-                    'Not restored',
-                  ));
-                if (!allowed) return;
                 return run(async () => {
+                  const allowed =
+                    to === null ||
+                    (await allowMove(
+                      { board: b, boardId, toColumnId: to, moving: [card], cards: openCards.data ?? [] },
+                      'Not restored',
+                    ));
+                  if (!allowed) return;
                   const { movedTo } = await restoreCard(card, user, b.columns);
                   // Its own column may have been deleted while it sat here. Say
                   // where it actually went rather than letting it reappear

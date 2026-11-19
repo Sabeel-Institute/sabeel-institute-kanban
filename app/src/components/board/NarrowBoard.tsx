@@ -90,7 +90,8 @@ const NO_LANES: BoardLane[] = [];
 /** One row of a column's list: a card, or on a board with lanes a lane's heading. */
 type ColumnRow =
   | { kind: 'card'; card: Card }
-  | { kind: 'lane'; lane: BoardLane | null };
+  /** `count`: the lane's cards in this column, said when it is folded. */
+  | { kind: 'lane'; lane: BoardLane | null; count: number };
 
 function CardTile({
   card,
@@ -243,7 +244,14 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
   const live = laneBoard ? lanesLive(laneBoard) : false;
   const lanes = laneBoard?.lanes ?? NO_LANES;
   const infoByLane = useLaneInfo(laneBoard ?? null, live, cards.data ?? EMPTY_CARDS);
-  const collapse = useLaneCollapse(user, boardId, laneBoard ?? null, live);
+  const collapse = useLaneCollapse(
+    user,
+    boardId,
+    laneBoard ?? null,
+    live,
+    cards.data ?? EMPTY_CARDS,
+    selection.deselect,
+  );
   const rowsByColumn = useMemo(() => {
     const map = new Map<string, ColumnRow[]>();
     for (const [columnId, colCards] of byColumn) {
@@ -251,7 +259,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
         columnId,
         live && laneBoard
           ? groupByLane(colCards, laneBoard, cards.data ?? EMPTY_CARDS).flatMap((g) => [
-              { kind: 'lane' as const, lane: g.lane },
+              { kind: 'lane' as const, lane: g.lane, count: g.cards.length },
               // A collapsed lane keeps its heading, in every column.
               ...(collapse.isCollapsed(g.lane?.id ?? null)
                 ? []
@@ -685,6 +693,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
                       info={row.lane ? (infoByLane.get(row.lane.id) ?? null) : null}
                       collapsed={collapse.isCollapsed(row.lane?.id ?? null)}
                       onToggle={() => void collapse.toggle(row.lane?.id ?? null)}
+                      here={row.count}
                     />
                   ) : (
                     <CardTile

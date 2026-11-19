@@ -25,6 +25,7 @@ export function LaneHeading({
   info,
   collapsed,
   onToggle,
+  here,
 }: {
   name: string;
   info: LaneInfo | null;
@@ -35,6 +36,11 @@ export function LaneHeading({
    */
   collapsed?: boolean;
   onToggle?: () => void;
+  /**
+   * How many of the lane's cards are in THIS column. Said only while folded,
+   * when the cards are not there to count: the badge is the whole board's.
+   */
+  here?: number;
 }) {
   const t = useTheme();
   const colour =
@@ -43,12 +49,16 @@ export function LaneHeading({
       : info?.status === 'late'
         ? t.feedback.danger
         : t.text.secondary;
-  const label = info ? describeLane(name, info) : name;
+  const folded = !!onToggle && !!collapsed && here !== undefined;
+  const label = `${info ? describeLane(name, info) : name}${folded ? `, ${here} in this column` : ''}`;
   const words = (
     <>
       {/* Shrinks and wraps, so a long name cannot push the badge off the row:
           Yoga's flexShrink defaults to 0, unlike CSS. */}
-      <Text style={[type.label, styles.name, { color: t.text.secondary }]}>{name}</Text>
+      <Text style={[type.label, styles.name, { color: t.text.secondary }]}>
+        {name}
+        {folded ? <Text style={styles.here}>{`  · ${here} here`}</Text> : null}
+      </Text>
       {info ? (
         <Text style={[type.label, styles.badge, { color: colour }]}>{laneBadge(info)}</Text>
       ) : null}
@@ -101,4 +111,6 @@ const styles = StyleSheet.create({
   // without the plain heading's own top padding.
   toggleGap: { paddingTop: space.xs },
   inToggle: { paddingTop: 0, paddingHorizontal: 0 },
+  // Ordinary case and weight beside the capitals: a count, not a name.
+  here: { textTransform: 'none', letterSpacing: 0, fontWeight: '400' },
 });

@@ -122,7 +122,14 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   const laneBoard = board.data;
   const live = laneBoard ? lanesLive(laneBoard) : false;
   const infoByLane = useLaneInfo(laneBoard ?? null, live, cards.data ?? EMPTY_CARDS);
-  const collapse = useLaneCollapse(user, boardId, laneBoard ?? null, live);
+  const collapse = useLaneCollapse(
+    user,
+    boardId,
+    laneBoard ?? null,
+    live,
+    cards.data ?? EMPTY_CARDS,
+    selection.deselect,
+  );
 
   // The title comes from `AddCardForm`, already trimmed and non-empty — the
   // draft lives there so typing one does not re-render the board.
@@ -369,14 +376,14 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
               <ScrollView style={styles.fill} keyboardShouldPersistTaps="handled">
                 {(live && laneBoard
                   ? groupByLane(colCards, laneBoard, cards.data ?? EMPTY_CARDS).flatMap((g) => [
-                      { lane: g.lane, card: null },
+                      { lane: g.lane, card: null, count: g.cards.length },
                       // A collapsed lane keeps its heading, in every column.
                       ...(collapse.isCollapsed(g.lane?.id ?? null)
                         ? []
-                        : g.cards.map((card) => ({ lane: g.lane, card }))),
+                        : g.cards.map((card) => ({ lane: g.lane, card, count: 0 }))),
                     ])
-                  : colCards.map((card) => ({ lane: null, card }))
-                ).map(({ lane, card }) => {
+                  : colCards.map((card) => ({ lane: null, card, count: 0 }))
+                ).map(({ lane, card, count }) => {
                   if (!card) {
                     return (
                       <LaneHeading
@@ -385,6 +392,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
                         info={lane ? (infoByLane.get(lane.id) ?? null) : null}
                         collapsed={collapse.isCollapsed(lane?.id ?? null)}
                         onToggle={() => void collapse.toggle(lane?.id ?? null)}
+                        here={count}
                       />
                     );
                   }

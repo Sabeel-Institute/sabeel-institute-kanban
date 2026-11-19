@@ -394,7 +394,14 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   const laneBoard = board.data;
   const live = laneBoard ? lanesLive(laneBoard) : false;
   const infoByLane = useLaneInfo(laneBoard ?? null, live, cards.data ?? EMPTY_CARDS);
-  const collapse = useLaneCollapse(user, boardId, laneBoard ?? null, live);
+  const collapse = useLaneCollapse(
+    user,
+    boardId,
+    laneBoard ?? null,
+    live,
+    cards.data ?? EMPTY_CARDS,
+    selection.deselect,
+  );
 
   const drop = useCallback(
     async (target: DropTarget, cardIdFromEvent: string | null) => {
@@ -454,11 +461,14 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         });
         // Background tidy-up; never blocks the user.
         void rerankColumnIfNeeded(column).catch(() => {});
+        // Dropped on a folded lane's heading: open it, so the card is seen
+        // landing rather than vanishing.
+        if (inLane && target.laneId) void collapse.reveal(target.laneId);
       } catch (e) {
         setError(toUserMessage(e, 'moveCard'));
       }
     },
-    [drag, cards.data, byColumn, laneBoard, boardId, user, autoScroll],
+    [drag, cards.data, byColumn, laneBoard, boardId, user, autoScroll, collapse],
   );
 
   // The title comes from `WebAddCardForm`, already trimmed and non-empty — the
@@ -719,7 +729,8 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
           const colCards = byColumn.get(col.id) ?? [];
           const groups = live && laneBoard ? groupByLane(colCards, laneBoard, cards.data ?? EMPTY_CARDS) : null;
           // The order the column DRAWS its cards in, which shift-click follows.
-          const drawn = groups ? groups.flatMap((g) => g.cards) : colCards;
+          // Folded lanes' cards are not drawn, so a range never takes them.
+          const drawn = groups ? collapse.visible(groups.flatMap((g) => g.cards)) : colCards;
           // Dropped anywhere in the column but a lane: the end of the dragged
           // card's own lane, or of the column on a board without lanes. The
           // index counts the group as drawn, the dragged card included, so the
@@ -919,6 +930,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
                             info={g.lane ? (infoByLane.get(g.lane.id) ?? null) : null}
                             collapsed={folded}
                             onToggle={() => void collapse.toggle(laneId)}
+                            here={g.cards.length}
                           />
                         </div>
                         <div style={{ height: space.xs }} />

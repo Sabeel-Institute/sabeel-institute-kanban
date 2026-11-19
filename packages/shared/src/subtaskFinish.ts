@@ -48,6 +48,10 @@ export function finishBlockers<T extends FinishCard>(params: {
   const movingIds = new Set(moving.map((c) => c.id));
   const out: FinishBlocker<T>[] = [];
   for (const parent of moving) {
+    // Already finished, it is not going INTO the finished column: a reorder
+    // or a lane change within it is not refused (a board that switches lanes
+    // on, or moves its finish, can hold finished parents with open subtasks).
+    if (isFinished(parent, board)) continue;
     const open = cards.filter(
       (c) =>
         c.parentId === parent.id &&
@@ -124,6 +128,22 @@ export interface ReopenBlocker<T extends FinishCard> {
   why: 'finished' | 'archived';
 }
 
+/**
+ * The moving cards whose parent's state could refuse this move: subtasks
+ * being reopened on a board with lanes. Only these need a parent looked up,
+ * so an ordinary move never waits on a read.
+ */
+export function reopenCandidates<T extends FinishCard>(params: {
+  board: LaneBoard;
+  toColumnId: string;
+  moving: readonly T[];
+}): T[] {
+  const { board, toColumnId, moving } = params;
+  const done = finishedColumnId(board);
+  if (done === null || toColumnId === done) return [];
+  return moving.filter((c) => !!c.parentId && (c.archived === true || isFinished(c, board)));
+}
+
 export function reopenBlockers<T extends FinishCard>(params: {
   board: LaneBoard;
   toColumnId: string;
@@ -152,7 +172,10 @@ export function reopenBlockedMessage<T extends FinishCard>(blockers: readonly Re
   const quote = (s: string) => `“${s}”`;
   if (blockers.length === 1) {
     const { card, parent, why } = blockers[0];
-    return `${quote(card.title)} is a subtask of ${quote(parent.title)}, which is ${why}. To reopen it, first unlink it from its parent: open ${quote(card.title)} and tap “Unlink from parent card”.`;
+    const unlink = `open ${quote(card.title)} and tap “Unlink from parent card”`;
+    return why === 'archived'
+      ? `${quote(card.title)} is a subtask of ${quote(parent.title)}, which is archived. Restore ${quote(parent.title)} first, or to reopen ${quote(card.title)} on its own, unlink it from its parent: ${unlink}.`
+      : `${quote(card.title)} is a subtask of ${quote(parent.title)}, which is finished. To reopen it, first unlink it from its parent: ${unlink}.`;
   }
   return `${blockers.length} of these cards are subtasks of cards that are finished or archived: ${blockers
     .map((b) => quote(b.card.title))

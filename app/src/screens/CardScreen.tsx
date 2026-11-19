@@ -351,15 +351,16 @@ export function CardScreen({
               // A parent waits for its subtasks, and a subtask is not reopened
               // under a finished parent (#111): refused in a notice, nothing
               // written.
-              const allowed = await allowMove({
-                board: b,
-                boardId,
-                toColumnId,
-                moving: [c],
-                cards: boardCards.data ?? NO_CARDS,
-              });
-              if (!allowed) return;
+              // Inside `run`, so `busy` holds the picker while it asks.
               return run(async () => {
+                const allowed = await allowMove({
+                  board: b,
+                  boardId,
+                  toColumnId,
+                  moving: [c],
+                  cards: boardCards.data ?? NO_CARDS,
+                });
+                if (!allowed) return;
                 // Give it a fresh rank at the END of the destination. Carrying
                 // the old rank across would drop the card at an arbitrary
                 // position — ranks are only meaningful within a column.
@@ -676,17 +677,20 @@ export function CardScreen({
         {c.archived ? (
           <Button
             busy={busy}
+            // Held until the board's cards are in: the rules for a parent and
+            // its subtasks are checked against them (#111).
+            disabled={!cardsReady}
             label="Restore to the board"
             onPress={async () => {
               const to = restoreColumnId(c, b.columns);
-              const allowed =
-                to === null ||
-                (await allowMove(
-                  { board: b, boardId, toColumnId: to, moving: [c], cards: boardCards.data ?? NO_CARDS },
-                  'Not restored',
-                ));
-              if (!allowed) return;
               return run(async () => {
+                const allowed =
+                  to === null ||
+                  (await allowMove(
+                    { board: b, boardId, toColumnId: to, moving: [c], cards: boardCards.data ?? NO_CARDS },
+                    'Not restored',
+                  ));
+                if (!allowed) return;
                 // May land in a different column if its own was deleted while it
                 // was archived — see restoreCard.
                 const { movedTo } = await restoreCard(c, user, b.columns);

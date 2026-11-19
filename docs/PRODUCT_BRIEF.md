@@ -595,7 +595,8 @@ Each section's heading folds it away and opens it again (#110). Folded, the
 heading says how many boards the section holds, so folding hides boards and
 never the fact that they are there. What a person folds is stored on their
 user document (`collapsedBoardSections`), across reloads and devices, like
-their stars; it hides nothing from anyone else.
+their stars; it hides nothing from anyone else. While **Filter boards** holds
+text every section is open, so a match is never behind a fold.
 
 No folders or groups: they need curation, a permission story of their own, and a
 second tree to navigate on a phone. Revisit only if the team passes ~50 boards and
@@ -715,9 +716,13 @@ learn for boards that are not programs.
   in every column at once, keeping its count and colour; two icons fold and
   open every lane. Stored on the person's user document (`collapsedLanes`, by
   board), across reloads and devices, and decided in one hook for every layout
-  (`useLaneCollapse`). A drop on a folded heading lands first in the lane; an
-  add into a folded lane opens it. Expanding every lane deletes the board's
-  entry, so stored folds do not outlive the boards they name.
+  (`useLaneCollapse`). Folded, a heading also says how many of the lane's
+  cards are in that column. A drop on a folded heading lands first in the
+  lane and opens it, as an add into a folded lane does. A folded lane's
+  cards leave the selection as it folds, and a range or select-all takes
+  only cards on view: a bulk action never reaches a card nobody can see.
+  Opening the last folded lane, or Expand all, deletes the board's entry;
+  folds on a board nobody opens again stay, bounded at 500 boards.
 - **A parent waits for its subtasks** (#111, 2026-11-18): on a board with
   lanes, a card with an open subtask (same board, not finished, not archived)
   cannot be moved into the finished column, by any path; the move is refused

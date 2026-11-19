@@ -132,7 +132,8 @@ export function renameField(
 
 export type DetailResult = { ok: true; value: string | null } | { ok: false; error: string };
 
-function isRealDate(value: string): boolean {
+/** A YYYY-MM-DD that names a real day. Exported so a reader can show anything else as written. */
+export function isRealDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const [y, m, d] = value.split('-').map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));

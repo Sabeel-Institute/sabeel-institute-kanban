@@ -487,7 +487,11 @@ try {
 
     // Reopening the subtask under its finished parent: refused on the card.
     const REOPEN = (why) =>
-      new RegExp(`“Book the stalls” is a subtask of “Run the fair”, which is ${why}\\. To reopen it, first unlink it`);
+      new RegExp(
+        why === 'archived'
+          ? '“Book the stalls” is a subtask of “Run the fair”, which is archived\\. Restore “Run the fair” first, or to reopen'
+          : '“Book the stalls” is a subtask of “Run the fair”, which is finished\\. To reopen it, first unlink it',
+      );
     notices.length = 0;
     await openCard('Book the stalls');
     await page.getByLabel('Column', { exact: true }).selectOption({ label: 'To Do' });
@@ -722,6 +726,10 @@ try {
     const SUPPLIES_CARDS = ['Drag A', 'Drag B', 'Drag C', 'Before lanes'];
 
     const shownBefore = await visibleCards(SUPPLIES_CARDS);
+    // A card selected in the lane: folding hides it, so it leaves the
+    // selection rather than riding along, unseen, in a bulk action.
+    await page.getByRole('checkbox', { name: 'Select Drag A' }).click();
+    const selectedFirst = await page.getByRole('button', { name: 'Clear selection', exact: true }).isVisible();
     await suppliesHeads.first().click();
     await page.waitForFunction(
       () => [...document.querySelectorAll('[data-testid="lane-heading"][aria-label^="Supplies,"]')].every((e) => e.getAttribute('aria-expanded') === 'false'),
@@ -730,6 +738,17 @@ try {
     );
     const headsShut = await states(suppliesHeads);
     const counted = /finished|no cards/.test((await suppliesHeads.first().getAttribute('aria-label')) ?? '');
+    const hereLabel =
+      (await page
+        .locator('[data-testid="column-cards-To Do"] [data-testid="lane-heading"][aria-label^="Supplies,"]')
+        .getAttribute('aria-label')) ?? '';
+    check(
+      'a folded lane gives its count in this column, and its selected cards leave the selection',
+      selectedFirst &&
+        /, 3 in this column$/.test(hereLabel) &&
+        (await page.getByRole('button', { name: 'Clear selection', exact: true }).count()) === 0,
+      hereLabel,
+    );
     check(
       'a lane folds in every column at once, keeping its count, and only its cards go',
       shownBefore === 4 &&
@@ -782,13 +801,27 @@ try {
       order = await ranked();
       if (order[0] !== 'Drag N') await page.waitForTimeout(250);
     }
+    const dropOpened = await page
+      .waitForFunction(
+        () => [...document.querySelectorAll('[data-testid="lane-heading"][aria-label^="Supplies,"]')].every((e) => e.getAttribute('aria-expanded') === 'true'),
+        null,
+        { timeout: 10000 },
+      )
+      .then(() => true, () => false);
     check(
-      'a card dropped on a folded lane lands first in it, the lane still folded',
-      order[0] === 'Drag N' && (await states(suppliesHeads)).every((x) => x === 'false'),
+      'a card dropped on a folded lane lands first in it, and the lane opens to show it',
+      order[0] === 'Drag N' && dropOpened && (await page.locator('[data-testid="card-Drag N"]').isVisible()),
       order.join(),
     );
 
     // Adding a card to a folded lane opens it, so the card is seen landing.
+    await suppliesHeads.first().click();
+    await page.waitForFunction(
+      () => [...document.querySelectorAll('[data-testid="lane-heading"][aria-label^="Supplies,"]')].every((e) => e.getAttribute('aria-expanded') === 'false'),
+      null,
+      { timeout: 10000 },
+    );
+    await storedLanes((g) => Array.isArray(g) && g.includes(supplies));
     await addCard('Into the fold', 'Supplies');
     const opened = await storedLanes((g) => !(g ?? []).includes(supplies));
     check(

@@ -5,6 +5,7 @@ import {
   finishRefusal,
   reopenBlockedMessage,
   reopenBlockers,
+  reopenCandidates,
   type FinishCard,
   type ParentState,
 } from '../src/subtaskFinish';
@@ -45,6 +46,11 @@ describe('finishBlockers', () => {
     expect(blockers([parent, openA, openB], [parent, openA, openB, other])).toEqual([]);
     const got = blockers([parent, openA], [parent, openA, openB]);
     expect(got[0].open.map((c) => c.id)).toEqual(['b']);
+  });
+
+  it('does not refuse a parent already finished: a reorder or a lane change within the column', () => {
+    const doneParent = card('parent', { columnId: 'done' });
+    expect(blockers([doneParent], [doneParent, openA])).toEqual([]);
   });
 
   it('refuses nothing on the way to any other column', () => {
@@ -130,6 +136,37 @@ describe('reopenBlockers', () => {
     );
     expect(msg).toBe(
       '“s” is a subtask of “parent”, which is finished. To reopen it, first unlink it from its parent: open “s” and tap “Unlink from parent card”.',
+    );
+  });
+});
+
+describe('reopenCandidates', () => {
+  it('names only subtasks being reopened on a board with lanes, so ordinary moves look nothing up', () => {
+    const finishedSub = card('s', { parentId: 'parent', columnId: 'done' });
+    const openSub = card('o', { parentId: 'parent' });
+    const archivedSub = card('x', { parentId: 'parent', archived: true });
+    const lone = card('l', { columnId: 'done' });
+    const ids = (to: string, b = board) =>
+      reopenCandidates({ board: b, toColumnId: to, moving: [finishedSub, openSub, archivedSub, lone] }).map((c) => c.id);
+    expect(ids('doing')).toEqual(['s', 'x']);
+    expect(ids('done')).toEqual([]);
+    expect(ids('doing', { ...board, lanesOn: false })).toEqual([]);
+  });
+});
+
+describe('reopenBlockedMessage under an archived parent', () => {
+  it('offers restoring the parent first', () => {
+    const sub = card('s', { parentId: 'parent', columnId: 'done' });
+    const msg = reopenBlockedMessage(
+      reopenBlockers({
+        board,
+        toColumnId: 'doing',
+        moving: [sub],
+        parentOf: () => ({ id: 'parent', title: 'parent', columnId: 'done', archived: true }),
+      }),
+    );
+    expect(msg).toBe(
+      '“s” is a subtask of “parent”, which is archived. Restore “parent” first, or to reopen “s” on its own, unlink it from its parent: open “s” and tap “Unlink from parent card”.',
     );
   });
 });

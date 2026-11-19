@@ -197,17 +197,34 @@ try {
         f_start: '2027-07-01',
         f_teach: 'Sara and Omar',
         f_zoom: 'https://meet.example.org/alpha',
-        f_fee: '1,200',
+        f_fee: '1200',
       },
       createdAt: 2000,
     },
     [F, O],
   );
   await board('ov_beta', 'Beta Course', PS, { details: { f_start: '2027-03-01' }, createdAt: 4000 }, [O]);
-  await board('ov_gamma', 'Gamma Circle', ['Prep', 'Teach'], { createdAt: 1000 }, [F, O]);
+  // Gamma has a detail and no dates: its name is the title's one line (#118).
+  await board(
+    'ov_gamma',
+    'Gamma Circle',
+    ['Prep', 'Teach'],
+    {
+      createdAt: 1000,
+      fields: [
+        { id: 'f_start', name: 'Start date', type: 'start' },
+        { id: 'f_host', name: 'Host', type: 'text' },
+      ],
+      details: { f_host: 'Omar' },
+    },
+    [F, O],
+  );
   await board('ov_delta', 'Delta Retreat', [...PS, 'Wrap-up'], { details: { f_start: '2027-05-01' }, createdAt: 3000 }, [F]);
   await board('ov_tmpl', 'Template Program', PS, { template: true, createdAt: 5000 }, [F, O]);
   await board('ov_old', 'Old Program', PS, { archived: true, createdAt: 6000 }, [F, O]);
+  // Without lanes, so never on the overview; a seventh active board for the
+  // admin, so the Boards list draws Filter boards (#110's check below).
+  await board('ov_extra', 'Extra Board', PS, { lanesOn: false, createdAt: 8000 }, [F]);
   // Alpha: a finished card long past its date (not late), and a late one.
   await card('ov_alpha', 0, 0, 'c_done', '2020-01-01', F.uid);
   await card('ov_alpha', 1, 1, 'c_todo', '2025-06-01', F.uid);
@@ -338,6 +355,33 @@ try {
   got = await settled(page, START);
   check('and back with them, whatever the capitals', same(got, START), flat(got));
 
+  // ---- A row with details and no dates, on a phone (#118) ---------------------------------
+  // Before Hide and show, which hides Gamma.
+  {
+    await page.setViewportSize({ width: 380, height: 820 });
+    await page.getByRole('button', { name: 'Details of Gamma Circle', exact: true }).waitFor({ timeout: 15000 });
+    await page.waitForTimeout(500);
+    // On a phone, a row with no dates line keeps its marks below the chevron's
+    // 44-point box, so a tap on a mark opens the board, not the details.
+    const gap = await page.evaluate(() => {
+      const chevron = [...document.querySelectorAll('[aria-label="Details of Gamma Circle"]')].find(
+        (e) => e.getBoundingClientRect().width > 0,
+      );
+      const row = document.querySelector('[data-testid="overview-row:Gamma Circle"]');
+      const marks = row ? [...row.querySelectorAll('[data-testid="overview-mark"]')] : [];
+      if (!chevron || marks.length === 0) return null;
+      const bottom = chevron.getBoundingClientRect().bottom;
+      return Math.min(...marks.map((m) => m.getBoundingClientRect().top)) - bottom;
+    });
+    check(
+      'on a phone, a row with details and no dates keeps its marks clear of the chevron',
+      gap !== null && gap >= 0,
+      `marks start ${gap}px below the chevron`,
+    );
+    await page.setViewportSize({ width: 1280, height: 950 });
+    await page.waitForTimeout(500);
+  }
+
   // ---- Hide and show ------------------------------------------------------------------------
   await page.getByTestId('overview-row:Alpha Camp').click({ button: 'right' });
   await page.getByText('Hide from my overview').click();
@@ -408,7 +452,7 @@ try {
         betaHas === 0 &&
         (await alphaToggle.getAttribute('aria-expanded')) === 'true' &&
         /Sara and Omar/.test(text) &&
-        /1,200/.test(text) &&
+        /1200/.test(text) &&
         (await link.count()) === 1 &&
         !/Notes|Start date/i.test(text),
       text.replace(/\n/g, ' | '),
@@ -488,6 +532,15 @@ try {
         (await others.getAttribute('aria-expanded').catch(() => null)) === 'true',
       `stored ${JSON.stringify(savedShut)}`,
     );
+    // While a filter is typed, a folded section opens, so a match in it shows.
+    await page.getByPlaceholder('Filter boards').fill('Template Prog');
+    const matchShows = await page
+      .getByText('Template Program', { exact: true })
+      .waitFor({ timeout: 10000 })
+      .then(() => true, () => false);
+    await page.getByPlaceholder('Filter boards').fill('');
+    await shut.waitFor({ timeout: 10000 });
+    check('filtering shows a match inside a folded section, which folds again once cleared', matchShows);
     await shut.click();
     await open.waitFor({ timeout: 10000 });
     const savedOpen = await stored((g) => !g.includes('templates'));
