@@ -40,7 +40,14 @@ export const MENTION_ALL: MentionCandidate = {
  */
 function handlesIn(body: string): Set<string> {
   const tokens = body.match(new RegExp(`@${HANDLE_CHARS}+`, 'g')) ?? [];
-  return new Set(tokens.map((t) => t.slice(1).toLowerCase().replace(/\.+$/, '')));
+  return new Set(tokens.map((t) => withoutTrailingDots(t.slice(1).toLowerCase())));
+}
+
+/** A loop, not /\.+$/: that pattern is polynomial on a run of dots (CodeQL js/polynomial-redos). */
+function withoutTrailingDots(s: string): string {
+  let end = s.length;
+  while (end > 0 && s[end - 1] === '.') end -= 1;
+  return s.slice(0, end);
 }
 
 /** Whether the text mentions everyone on the board. */
