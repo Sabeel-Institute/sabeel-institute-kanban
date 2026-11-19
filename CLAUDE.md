@@ -356,7 +356,11 @@ before then name nobody. **Anything that writes a board stamps it** — client
 writes through `updateBoard`/`setBoardOwner`, the member callables with the
 caller — or its change is recorded as nobody's. Names are stored on entries,
 not resolved: the people a board's history is about are often no longer on
-it.
+it. **The same holds for every record of what someone did** (2026-11-19): a
+comment's `authorName` and a card history line's `actorName` are stored by
+the server when it happens (`functions/src/names.ts`), because a reader's
+lookup among the board's members calls an admin off the board, or anyone
+who has left it, "Someone". Readers show the stored name first.
 
 ## Descriptions and comments are rich text
 

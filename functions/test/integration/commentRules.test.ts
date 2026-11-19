@@ -247,6 +247,28 @@ describe('editing comments', () => {
     );
   });
 
+  // The server stamps `authorName` once the comment exists (onCommentNotify).
+  it('the author still edits a comment the server has named, without touching the name', async () => {
+    await env.withSecurityRulesDisabled((c) =>
+      updateDoc(doc(c.firestore(), `${CARD}/comments/existing`), { authorName: 'Member One' }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(ctx('member1', 'member'), `${CARD}/comments/existing`), { body: 'revised', editedAt: 2 }),
+    );
+  });
+
+  it('nobody renames the author: not by an edit, not on a new comment', async () => {
+    await env.withSecurityRulesDisabled((c) =>
+      updateDoc(doc(c.firestore(), `${CARD}/comments/existing`), { authorName: 'Member One' }),
+    );
+    await assertFails(
+      updateDoc(doc(ctx('member1', 'member'), `${CARD}/comments/existing`), { authorName: 'The Director' }),
+    );
+    await assertFails(
+      setDoc(doc(ctx('member1', 'member'), `${CARD}/comments/named`), comment({ authorName: 'The Director' })),
+    );
+  });
+
   it('authorship cannot be reassigned by an edit', async () => {
     await assertFails(
       updateDoc(doc(ctx('member1', 'member'), `${CARD}/comments/existing`), {
