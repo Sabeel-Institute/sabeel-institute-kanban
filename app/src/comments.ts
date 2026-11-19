@@ -15,6 +15,8 @@ import type { SessionUser } from './session';
 export interface Comment {
   id: string;
   authorUid: string;
+  /** The author's name as the server stored it; absent until it has, and on comments older than it. */
+  authorName?: string;
   body: string;
   mentionUids: string[];
   createdAt: number;
@@ -36,6 +38,7 @@ export function useComments(cardId: string) {
       docs.map((d) => ({
         id: d.id,
         authorUid: (d.data.authorUid as string) ?? '',
+        authorName: typeof d.data.authorName === 'string' ? d.data.authorName : undefined,
         body: (d.data.body as string) ?? '',
         mentionUids: (d.data.mentionUids as string[]) ?? [],
         createdAt: (d.data.createdAt as number) ?? 0,

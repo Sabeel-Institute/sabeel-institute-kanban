@@ -349,3 +349,33 @@ describe('marking an entry read or unread reaches no server code', () => {
     expect(after).toBe(before + 1);
   });
 });
+
+describe('a name is stored with what someone did (an admin off the board)', () => {
+  const ADMIN = 'nt_admin';
+
+  it('stamps a comment with its author, and the stamp tells nobody twice', async () => {
+    await makeUser({ uid: ADMIN, email: `${ADMIN}@oursabeel.com`, role: 'admin', status: 'active', displayName: 'Zed' });
+    await clearInbox(SUBSCRIBER);
+    const ref = await adminDb()
+      .collection('cards/nt_card/comments')
+      .add({ authorUid: ADMIN, body: 'checking in from outside', mentionUids: [], createdAt: Date.now() });
+    const named = await waitFor('the author name on the comment', async () => {
+      const d = (await ref.get()).data();
+      return d?.authorName ? d : undefined;
+    });
+    expect(named.authorName).toBe('Zed');
+    // The stamp is a write to the comment; the subscriber still hears of it once.
+    await waitFor('the subscriber told', async () => ((await inbox(SUBSCRIBER, 'comment')).length ? true : undefined));
+    await new Promise((r) => setTimeout(r, 3000));
+    expect(await inbox(SUBSCRIBER, 'comment')).toHaveLength(1);
+  });
+
+  it('names them on a line of the card’s history', async () => {
+    await adminDb().doc('cards/nt_card').update({ title: 'Ship it today', updatedBy: ADMIN, updatedAt: Date.now() });
+    const line = await waitFor('a history line by the admin', async () => {
+      const snap = await adminDb().collection('cards/nt_card/activity').where('actorUid', '==', ADMIN).get();
+      return snap.docs.map((d) => d.data()).find((d) => d.type === 'renamed' || d.to === 'Ship it today');
+    });
+    expect(line.actorName).toBe('Zed');
+  });
+});

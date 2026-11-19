@@ -307,7 +307,7 @@ export function Comments({
                 target stays finger-sized while the visual footprint is a word. */}
             <Row style={styles.between}>
               <Hint>
-                {nameFor.get(c.authorUid) ?? 'Someone'} · {when(c.createdAt)}
+                {c.authorName ?? nameFor.get(c.authorUid) ?? 'Someone'} · {when(c.createdAt)}
                 {c.editedAt ? ' · edited' : ''}
               </Hint>
               {editing !== c.id ? (

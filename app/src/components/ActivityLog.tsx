@@ -25,6 +25,8 @@ interface Entry {
    */
   type: ActivityType | null;
   actorUid: string;
+  /** Stored by the server when it happened; absent on lines older than that. */
+  actorName?: string;
   at: number;
   from?: string;
   to?: string;
@@ -70,6 +72,7 @@ export function ActivityLog({
         id: d.id,
         type: isKnownActivityType(d.data.type) ? d.data.type : null,
         actorUid: (d.data.actorUid as string) ?? '',
+        actorName: typeof d.data.actorName === 'string' ? d.data.actorName : undefined,
         at: (d.data.at as number) ?? 0,
         from: d.data.from as string | undefined,
         to: d.data.to as string | undefined,
@@ -102,7 +105,7 @@ export function ActivityLog({
         <Row key={e.id} style={styles.row}>
           <View style={[styles.tick, { backgroundColor: t.border.strong }]} />
           <Hint>
-            {nameFor(e.actorUid)}{' '}
+            {e.actorName ?? nameFor(e.actorUid)}{' '}
             {e.type === null
               ? 'made a change'
               : describeActivity(

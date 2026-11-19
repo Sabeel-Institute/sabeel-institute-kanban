@@ -23,6 +23,7 @@ import {
   type PushTokenDoc,
 } from '@sabeel/shared';
 import { PUSH_SECRETS, send, type Delivery } from './messaging';
+import { storedName } from './names';
 
 /**
  * Notifications: an in-app inbox entry plus a push, for a deliberately small set
@@ -78,8 +79,7 @@ async function boardIsArchived(boardId: string): Promise<boolean> {
 }
 
 async function nameOf(uid: string): Promise<string> {
-  const snap = await db().doc(`users/${uid}`).get();
-  return (snap.data()?.displayName as string) ?? 'Someone';
+  return (await storedName(uid)) ?? 'Someone';
 }
 
 /**
@@ -297,6 +297,21 @@ export const onCommentNotify = onDocumentWritten(
     // Deleted: nothing to announce.
     if (!after) return;
     const created = !before;
+
+    // The author's name, stored with the comment as board history stores its
+    // actor's (names.ts): a reader looks names up among the board's members,
+    // and an admin who is not on it, or anyone who has left it, is otherwise
+    // "Someone". Never worth failing the notices over: a retried trigger would
+    // write every inbox entry twice. The write is an edit, which this trigger
+    // and the count's both pass over.
+    if (created) {
+      try {
+        const authorName = await storedName(after.authorUid as string);
+        if (authorName) await event.data!.after!.ref.update({ authorName });
+      } catch (e) {
+        logger.warn('comment author name not stored', { error: String(e) });
+      }
+    }
 
     const { cardId } = event.params;
     const authorUid = after.authorUid as string;

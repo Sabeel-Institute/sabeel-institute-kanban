@@ -216,12 +216,14 @@ cards/{cardId}                                   # TOP-LEVEL collection; keyed t
   createdAt/By, updatedAt/By
 
 cards/{cardId}/comments/{commentId}              # under the CARD, so they travel with a move
-  authorUid, body, mentionUids: [uid, …], createdAt, editedAt?
+  authorUid, authorName?, body, mentionUids: [uid, …], createdAt, editedAt?
+  # authorName is stamped by the server once the comment exists; no client
+  # writes it, and an edit keeps it (functions/src/names.ts).
 
 cards/{cardId}/activity/{activityId}
   type: created|moved|assigned|unassigned|due|priority|labels|edited|archived
         |subtaskOf|subtask|attached|detached|lane
-  actorUid, at, from?, to?
+  actorUid, actorName?, at, from?, to?
   # Written ONLY by the server (the card trigger, and the attachment callables
   # for the two file types). Clients have no write access at all, so the log
   # cannot be forged or edited.

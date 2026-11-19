@@ -516,6 +516,9 @@ export const cloneBoard = onCall({ secrets: [sentryDsn] }, guarded(async (reques
     }
 
     tx.create(cloneRef, clone.board);
+    // Every line the clone writes names who cloned it (names.ts).
+    const clonerName = me.data()?.displayName;
+    const cloner = typeof clonerName === 'string' && clonerName ? { actorName: clonerName } : {};
     // The clone's history opens with where it came from, and that is the only
     // record of it (Faisal, 2026-11-15: a clone is only a clone). Under a fixed
     // id, so `onBoardWritten` knows not to add a "created" line of its own.
@@ -524,13 +527,13 @@ export const cloneBoard = onCall({ secrets: [sentryDsn] }, guarded(async (reques
       from: board.name,
       at: now,
       actorUid: actor.uid,
-      ...(typeof me.data()?.displayName === 'string' ? { actorName: me.data()!.displayName as string } : {}),
+      ...cloner,
     };
     tx.create(cloneRef.collection('activity').doc(CLONED_ENTRY_ID), cloned);
     for (const card of clone.cards) {
       const cardRef = db.doc(`cards/${card.id}`);
       tx.create(cardRef, card.data);
-      tx.create(cardRef.collection('activity').doc(), card.created);
+      tx.create(cardRef.collection('activity').doc(), { ...card.created, ...cloner });
     }
     return { made: clone.cards.length, name: clone.board.name };
   });

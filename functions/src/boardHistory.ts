@@ -2,6 +2,7 @@ import './setup';
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { guardedEvent, sentryDsn } from './sentry';
 import { getFirestore } from 'firebase-admin/firestore';
+import { storedName } from './names';
 import {
   withCleanExtras,
   CLONED_ENTRY_ID,
@@ -48,9 +49,7 @@ export const onBoardWritten = onDocumentWritten(
     const actorUid = boardChangeActor(before, after);
     // The name as it is NOW, stored: an admin who is not on the board has no
     // profile there, and nobody's profile survives their leaving it.
-    const actorName = actorUid
-      ? ((await db.doc(`users/${actorUid}`).get()).data()?.displayName as string | undefined)
-      : undefined;
+    const actorName = await storedName(actorUid);
     // When the board was written, to the millisecond: the history is ordered
     // by it. Not `event.time`, which the emulator gives in whole seconds, so
     // two changes in one second tied and fell back on the entries' random ids.
