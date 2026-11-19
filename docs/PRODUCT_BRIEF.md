@@ -1360,4 +1360,9 @@ Reversible, low-stakes, and not worth a round trip — flag any you dislike:
   a bad import needs purging.)
 - **Comments are editable by their author, deletable by the author, an owner of
   the board, or an admin**, with an "edited" marker.
-- **No @channel / @board-wide mention.** Mentions target individuals only.
+- **`@all` mentions everyone on the board** (Faisal, 2026-11-19, reversing the
+  earlier "individuals only"). It is parsed in the app like any handle and
+  stored as each member's uid (the author left out), so the rules, the
+  `mention` notice, its preference and the board mute apply unchanged; the
+  handle `all` is reserved for it. The comment says "mentioned everyone on the
+  board" rather than listing names.

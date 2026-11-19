@@ -95,6 +95,27 @@ name: Board, card, rich text and gestures
     timeout: 15000
 - assertVisible: "[\\s\\S]*@sara[\\s\\S]*"
 - takeScreenshot: 04-card-mention
+
+# @all, through the same native insertion: the comment must store "@all" and
+# say it mentioned everyone on the board.
+- scrollUntilVisible:
+    element: "Add a comment[\\s\\S]*"
+- tapOn: "Add a comment[\\s\\S]*"
+- inputText: "All hands @al"
+- tapOn: "Mention Everyone on this board"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- scrollUntilVisible:
+    element: "Comment"
+- tapOn: "Comment"
+- extendedWaitUntil:
+    visible: "mentioned everyone on the board"
+    timeout: 15000
+- assertVisible: "[\\s\\S]*@all[\\s\\S]*"
+- takeScreenshot: 04b-card-mention-all
 - scrollUntilVisible:
     element: "Back"
     direction: UP

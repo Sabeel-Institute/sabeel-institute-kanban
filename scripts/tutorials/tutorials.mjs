@@ -387,7 +387,7 @@ export const TUTORIALS = [
         do: (t) => t.type(t.id('comment-editor'), "Sure, I'll add them this afternoon. "),
       },
       {
-        say: 'To bring someone else in, type the at sign. A list of everyone on the board pops up.',
+        say: 'To bring someone else in, type the at sign. A list of everyone on the board pops up, and the first row, Everyone, tells the whole board at once.',
         do: async (t) => {
           await t.typeFocused('@');
           await t.waitFor(t.id('mention-popover'));

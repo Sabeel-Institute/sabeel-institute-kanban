@@ -360,6 +360,11 @@ Tap any card to open the full view.
   it scrolls if the board is large. Keep typing to narrow it, or tap a name. On a computer you can stay on the keyboard:
   **↑/↓** to move, **Enter** or **Tab** to pick, **Esc** to dismiss.
 
+  To tell the whole board, write **@all**: the list offers **Everyone on this
+  board** first. Everyone on the board but you is mentioned, and the comment
+  says *mentioned everyone on the board*. Each person still gets it only if
+  their mention notifications are on and the board isn't muted.
+
   The list closes when you click away, and picking a name never loses your place
   in the box.
 

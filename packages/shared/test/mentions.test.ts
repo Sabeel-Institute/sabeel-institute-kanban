@@ -5,6 +5,9 @@ import {
   extractMentions,
   isMentionQuery,
   mentionSuggestions,
+  mentionInsertion,
+  mentionsAll,
+  MENTION_ALL,
 } from '../src/mentions';
 import { handleFor } from '../src/people';
 
@@ -63,8 +66,10 @@ describe('extractMentions', () => {
 });
 
 describe('mentionSuggestions', () => {
-  it('offers everyone for an empty query', () => {
-    expect(mentionSuggestions('', people)).toHaveLength(4);
+  it('offers everyone for an empty query, Everyone on this board first', () => {
+    const all = mentionSuggestions('', people);
+    expect(all).toHaveLength(5);
+    expect(all[0]).toBe(MENTION_ALL);
   });
 
   it('matches on handle', () => {
@@ -121,12 +126,14 @@ describe('mentionSuggestions', () => {
       displayName: `Person ${String(i).padStart(2, '0')}`,
       email: `person${i}@oursabeel.com`,
     }));
-    expect(mentionSuggestions('', many)).toHaveLength(12);
+    // Twelve people, and Everyone on this board above them.
+    expect(mentionSuggestions('', many)).toHaveLength(13);
     expect(mentionSuggestions('person', many)).toHaveLength(12);
   });
 
   it('sorts by display name', () => {
     expect(mentionSuggestions('', people).map((p) => p.displayName)).toEqual([
+      'Everyone on this board',
       'Faisal Shah',
       'Omar Ali',
       'Sara Ahmed',
@@ -137,6 +144,7 @@ describe('mentionSuggestions', () => {
   it('floats prioritised people to the top, each group alphabetical', () => {
     const out = mentionSuggestions('', people, { prioritise: ['u3', 'u4'] });
     expect(out.map((p) => p.uid)).toEqual([
+      '*all', // Everyone on this board, always first
       'u4', // Omar Ali     — on the card
       'u3', // Sarah Khan   — on the card
       'u2', // Faisal Shah
@@ -153,7 +161,7 @@ describe('mentionSuggestions', () => {
 
   it('prioritising someone absent from the candidates changes nothing', () => {
     const out = mentionSuggestions('', people, { prioritise: ['nobody'] });
-    expect(out.map((p) => p.uid)).toEqual(['u2', 'u4', 'u1', 'u3']);
+    expect(out.map((p) => p.uid)).toEqual(['*all', 'u2', 'u4', 'u1', 'u3']);
   });
 });
 
@@ -257,7 +265,43 @@ describe('isMentionQuery', () => {
       { uid: 'u1', email: 'a@x.com', displayName: 'A' },
       { uid: 'u2', email: 'b@x.com', displayName: 'B' },
     ];
-    expect(mentionSuggestions('\n', roster)).toHaveLength(2);
+    expect(mentionSuggestions('\n', roster)).toHaveLength(3);
     expect(isMentionQuery('\n')).toBe(false);
+  });
+});
+
+describe('@all: everyone on the board', () => {
+  const uids = people.map((p) => p.uid).sort();
+
+  it('mentions every candidate, however the sentence goes on', () => {
+    for (const body of ['@all please read', 'Thanks @all.', 'Thanks, @ALL!', 'cc @all, and Sara']) {
+      expect(extractMentions(body, people).sort(), body).toEqual(uids);
+    }
+  });
+
+  it('is only the whole handle, and never part of an address', () => {
+    for (const body of ['@allison', 'mail bob@all.com', '@all_hands', '@alla']) {
+      expect(extractMentions(body, people), body).toEqual([]);
+      expect(mentionsAll(body), body).toBe(false);
+    }
+    expect(mentionsAll('Thanks @all.')).toBe(true);
+    expect(mentionsAll('@all')).toBe(true);
+  });
+
+  it('is offered first for "all" or "everyone" typed, and not otherwise', () => {
+    for (const q of ['a', 'al', 'all', 'e', 'ev', 'every', 'everyone', 'ALL']) {
+      expect(mentionSuggestions(q, people)[0], q).toBe(MENTION_ALL);
+    }
+    for (const q of ['sar', 'omar', 'allx', 'everyones']) {
+      expect(mentionSuggestions(q, people), q).not.toContain(MENTION_ALL);
+    }
+  });
+
+  it('is not offered with only one person to mean', () => {
+    expect(mentionSuggestions('', people.slice(0, 1))).not.toContain(MENTION_ALL);
+  });
+
+  it('is inserted as @all, by both editors', () => {
+    expect(mentionInsertion(MENTION_ALL)).toEqual({ indicator: '@', text: 'all', literal: '@all' });
   });
 });

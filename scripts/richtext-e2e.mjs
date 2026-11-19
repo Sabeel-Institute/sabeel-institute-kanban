@@ -476,6 +476,33 @@ const comment = (await db.collection('cards/rt_c/comments').get()).docs
 check('the mention resolved to a uid', !!comment && comment.mentionUids.includes(sara));
 check('the handle is literal text in the stored markdown', !!comment && comment.body.includes('@'));
 
+// ---- @all: everyone on the board ------------------------------------------
+// The board is this author and Sara, so @all mentions Sara alone: the author
+// is never told of their own words. Without @all the same text mentions
+// nobody, so this cannot pass by default.
+await box.click();
+await page.keyboard.type('All hands, @al');
+await page.waitForTimeout(900);
+const allRow = page.getByRole('button', { name: 'Mention Everyone on this board', exact: true });
+check('"@al" offers Everyone on this board, first', (await rows.first().getAttribute('aria-label')) === 'Mention Everyone on this board');
+await allRow.click();
+await page.waitForTimeout(500);
+await page.getByRole('button', { name: 'Comment', exact: true }).click();
+let everyone;
+for (let i = 0; i < 40 && !everyone; i += 1) {
+  everyone = (await db.collection('cards/rt_c/comments').get()).docs.map((d) => d.data()).find((d) => d.body.includes('All hands'));
+  if (!everyone) await page.waitForTimeout(250);
+}
+check(
+  '@all is stored as written and mentions every member but the author',
+  !!everyone && /@all\b/.test(everyone.body) && everyone.mentionUids.join() === sara,
+  JSON.stringify(everyone ?? null),
+);
+check(
+  'and the comment says it mentioned everyone',
+  await page.getByText('mentioned everyone on the board').first().waitFor({ timeout: 10000 }).then(() => true, () => false),
+);
+
 /**
  * A LINE BREAK ENDS THE MENTION.
  *

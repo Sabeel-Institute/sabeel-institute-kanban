@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { StyleSheet } from 'react-native';
-import { COMMENT_BODY_MAX, storedLength, type MentionCandidate } from '@sabeel/shared';
+import { COMMENT_BODY_MAX, mentionsAll, storedLength, type MentionCandidate } from '@sabeel/shared';
 import { addComment, deleteComment, editComment, useComments } from '../comments';
 import type { SessionUser } from '../session';
 import type { BoardMemberProfile } from '../boards';
@@ -341,7 +341,7 @@ export function Comments({
                 busy={busy}
                 onSave={(body) =>
                   run(async () => {
-                    await editComment({ cardId, commentId: c.id, body, candidates });
+                    await editComment({ cardId, commentId: c.id, body, candidates, authorUid: c.authorUid });
                     setEditing(null);
                   })
                 }
@@ -350,7 +350,9 @@ export function Comments({
             ) : (
               <>
                 <RichText markdown={c.body} />
-                {c.mentionUids.length > 0 ? (
+                {mentionsAll(c.body) ? (
+                  <Hint>mentioned everyone on the board</Hint>
+                ) : c.mentionUids.length > 0 ? (
                   <Hint>
                     mentioned{' '}
                     {c.mentionUids.map((u) => nameFor.get(u) ?? 'someone').join(', ')}
