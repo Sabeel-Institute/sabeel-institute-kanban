@@ -24,6 +24,7 @@ import {
   DisabledScreen,
   PendingScreen,
   ProvisioningScreen,
+  UnreachableScreen,
   RejectedScreen,
   RulesScreen,
   UpdateScreen,
@@ -226,6 +227,11 @@ function Routes() {
     // non-org address), which Auth confirms (`lookUpAccount`). Say so.
     case 'not-provisioned':
       return <WrongDomainScreen />;
+
+    // The account's role could not be read, and none was known: never
+    // shown as Waiting for approval (#116).
+    case 'unreachable':
+      return <UnreachableScreen />;
 
     case 'signed-in': {
       const { user } = session;

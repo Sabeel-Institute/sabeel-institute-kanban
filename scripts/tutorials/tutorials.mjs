@@ -258,11 +258,19 @@ export const TUTORIALS = [
         },
       },
       {
-        say: "To add a card, tap Add card, type its title, and choose its lane. It won't go in until it has one.",
+        say: "To add a card, tap a plus, type its title, and say where it goes. It won't go in until it has a lane and a column.",
         do: async (t) => {
-          await t.tap(t.btn('+ Add card'));
-          await t.type(t.placeholder('Card title'), 'Order the tents');
-          await t.select(t.label('Lane'), 'Venue');
+          // The phone adds from its column and asks for the lane; the
+          // computer's grid adds from the lane's + and asks for the column.
+          if (t.phone) {
+            await t.tap(t.btn('+ Add card'));
+            await t.type(t.placeholder('Card title'), 'Order the tents');
+            await t.select(t.label('Lane'), 'Venue');
+          } else {
+            await t.tap(t.btn('Add a card to the Venue lane'));
+            await t.type(t.placeholder('Card title'), 'Order the tents');
+            await t.select(t.label('Column'), 'To Do');
+          }
         },
       },
       {
@@ -1039,6 +1047,13 @@ export const TUTORIALS = [
         do: (t) => t.highlight(t.label('Drag to reorder')),
       },
       {
+        say: "Changed your mind about one? Tap the bin beside it. A column can only be deleted once it's empty, so no cards go missing, and you'll be asked before it goes.",
+        do: async (t) => {
+          await t.tap(t.btn('Delete column Waiting on parents'));
+          await t.waitGone(t.btn('Delete column Waiting on parents'));
+        },
+      },
+      {
         say: "History is the board's history. Everything you just did is already there, with your name on it.",
         do: async (t) => {
           if (t.phone) await t.tap(t.btn('Back'));
@@ -1049,15 +1064,6 @@ export const TUTORIALS = [
       {
         say: "People who don't own the board see some of these pages too. They can look after the board's own labels, and see the members and the history, so they know who to ask, and who changed what.",
         do: (t) => t.wait(400),
-      },
-      {
-        say: "A column can only be deleted once it's empty, so no cards go missing. You'll find delete on the board itself, right by the column's name.",
-        do: async (t) => {
-          // Back to the list first on a phone; a computer's Back leaves settings.
-          if (t.phone) await t.tap(t.btn('Back'));
-          await t.tap(t.btn('Back'));
-          await t.highlight(t.btn(/^Delete column /));
-        },
       },
     ],
   },

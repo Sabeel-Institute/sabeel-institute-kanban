@@ -391,8 +391,11 @@ try {
       admin.getByRole('button', { name: 'Create', exact: true }).click(o),
     );
     await admin.getByText('To Do').first().waitFor({ timeout: 30000 });
+    // With lanes on, the board is a grid and To Do's heading + asks for the
+    // lane; before, the column's own + Add card.
     const addTo = async (title, lane) => {
-      await admin.getByRole('button', { name: '+ Add card' }).first().click();
+      if (lane) await admin.getByRole('button', { name: 'Add a card to To Do', exact: true }).click();
+      else await admin.getByRole('button', { name: '+ Add card' }).first().click();
       await admin.getByPlaceholder('Card title').fill(title);
       if (lane) await admin.getByLabel('Lane', { exact: true }).selectOption({ label: lane });
       await admin.getByRole('button', { name: 'Add card', exact: true }).click();
@@ -520,7 +523,7 @@ try {
     }
     await admin.getByRole('button', { name: 'Back' }).first().click();
     await admin.getByText('To Do').first().waitFor({ timeout: 25000 });
-    await admin.getByRole('button', { name: '+ Add card' }).first().click();
+    await admin.getByRole('button', { name: 'Add a card to To Do', exact: true }).click();
     await admin.getByPlaceholder('Card title').fill('Book the campsite');
     await admin.getByLabel('Lane', { exact: true }).selectOption({ label: 'Venue' });
     await admin.getByRole('button', { name: 'Add card', exact: true }).click();

@@ -37,6 +37,7 @@ import {
 import type { Role, UserStatus } from '@sabeel/shared';
 import { auth, db } from './firebase';
 import { IS_DEV } from './env';
+import { captureError } from './sentry';
 
 export interface SessionUser {
   uid: string;
@@ -73,9 +74,19 @@ export type Session =
    * `provisioning` with `slow`.
    */
   | { state: 'not-provisioned'; uid: string }
+  /**
+   * The account's role and status could not be read: the token service did
+   * not answer, and this session has never read them. Never shown as
+   * Waiting for approval (#116): "could not find out" is not "not approved".
+   * Asked again on a timer and by Try again (`retryClaims`).
+   */
+  | { state: 'unreachable'; uid: string }
   | { state: 'signed-in'; user: SessionUser };
 
 type Listener = (s: Session) => void;
+
+const CLAIMS_RETRY_FIRST_MS = 5000;
+const CLAIMS_RETRY_MAX_MS = 60000;
 
 let current: Session = { state: 'loading' };
 const listeners = new Set<Listener>();
@@ -87,6 +98,14 @@ function emit(next: Session) {
 
 let unsubUserDoc: (() => void) | null = null;
 let lastClaimsStamp: number | null = null;
+/**
+ * The role and status this session last read from a token, for whom: what a
+ * failed read falls back to, rather than to any guess (#116).
+ */
+let lastClaims: { uid: string; role: Role; status: UserStatus } | null = null;
+/** A failed read is asked again on this timer, the delay doubling to a minute. */
+let claimsRetry: { timer: ReturnType<typeof setTimeout>; again: () => void } | null = null;
+let claimsRetryDelay = CLAIMS_RETRY_FIRST_MS;
 let provisioningTimer: ReturnType<typeof setTimeout> | null = null;
 /** Which uid this device has already registered a push token for. */
 let pushRegisteredFor: string | null = null;
@@ -122,10 +141,16 @@ const FIRST_LOOK_MS = 3_000;
 const LOOK_EVERY_MS = 5_000;
 export const PROVISIONING_PATIENCE_MS = 15_000;
 
+function stopClaimsRetry() {
+  if (claimsRetry) clearTimeout(claimsRetry.timer);
+  claimsRetry = null;
+}
+
 function stopWatchingUserDoc() {
   unsubUserDoc?.();
   unsubUserDoc = null;
   lastClaimsStamp = null;
+  stopClaimsRetry();
   if (provisioningTimer) {
     clearTimeout(provisioningTimer);
     provisioningTimer = null;
@@ -216,7 +241,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
 async function readClaims(
   fbUser: User,
   forceRefresh: boolean,
-): Promise<{ role: Role; status: UserStatus }> {
+): Promise<{ role: Role; status: UserStatus } | null> {
   let token;
   try {
     // A forced refresh is a network round trip, and a network call with no
@@ -234,8 +259,12 @@ async function readClaims(
     console.warn('token refresh failed, falling back to cached claims', e);
     try {
       token = await withTimeout(fbUser.getIdTokenResult(false), 4000, 'cached token');
-    } catch {
-      return { role: 'member', status: 'pending' };
+    } catch (cached) {
+      // Neither answered: the cached token had expired too (an idle tab, an
+      // hour on), so both needed the network. NOT "pending": that told an
+      // approved colleague an administrator had to approve them (#116).
+      captureError(cached, { where: 'readClaims', forceRefresh }, 'warning');
+      return null;
     }
   }
   // As the SESSION allows, the rule the rules and the callables apply
@@ -285,7 +314,23 @@ async function handleUserSnapshot(fbUser: User, snap: DocumentSnapshot): Promise
   const claimsChanged = lastClaimsStamp === null || stamp !== lastClaimsStamp;
   lastClaimsStamp = stamp;
 
-  const claims = await readClaims(fbUser, claimsChanged);
+  stopClaimsRetry();
+  const read = await readClaims(fbUser, claimsChanged);
+  if (read) {
+    lastClaims = { uid: fbUser.uid, ...read };
+    claimsRetryDelay = CLAIMS_RETRY_FIRST_MS;
+  } else {
+    // The next attempt refreshes the token, whatever the stamp says.
+    lastClaimsStamp = null;
+    armClaimsRetry(fbUser, snap);
+  }
+  // What this session last read, when this read failed; with nothing read
+  // yet, say the server could not be reached rather than guess.
+  const claims = read ?? (lastClaims?.uid === fbUser.uid ? lastClaims : null);
+  if (!claims) {
+    emit({ state: 'unreachable', uid: fbUser.uid });
+    return;
+  }
 
   emit({
     state: 'signed-in',
@@ -319,6 +364,27 @@ async function handleUserSnapshot(fbUser: User, snap: DocumentSnapshot): Promise
     pushRegisteredFor = fbUser.uid;
     void registerPush(fbUser.uid);
   }
+}
+
+/** Ask again for the claims a failed read could not get, sooner each time it fails less. */
+function armClaimsRetry(fbUser: User, snap: DocumentSnapshot) {
+  const again = () => {
+    claimsRetry = null;
+    if (auth.currentUser !== fbUser || !unsubUserDoc) return;
+    void handleUserSnapshot(fbUser, snap).catch((e) => {
+      console.warn('claims retry failed', e);
+    });
+  };
+  claimsRetry = { timer: setTimeout(again, claimsRetryDelay), again };
+  claimsRetryDelay = Math.min(claimsRetryDelay * 2, CLAIMS_RETRY_MAX_MS);
+}
+
+/** Try again, now, the read that left the app unable to reach the server. */
+export async function retryClaims(): Promise<void> {
+  const pending = claimsRetry;
+  if (!pending) return;
+  clearTimeout(pending.timer);
+  pending.again();
 }
 
 function watchUserDoc(fbUser: User) {
@@ -368,6 +434,8 @@ onAuthStateChanged(auth, (fbUser) => {
     resetAllViewStores();
     clearStatsCache();
     cachedFor = null;
+    lastClaims = null;
+    claimsRetryDelay = CLAIMS_RETRY_FIRST_MS;
     emit({ state: 'signed-out' });
     return;
   }

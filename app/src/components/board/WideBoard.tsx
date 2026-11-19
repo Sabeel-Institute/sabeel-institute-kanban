@@ -3,9 +3,6 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   type BoardColumn,
   canManageBoard,
-  columnDeleteBlocked,
-  columnsPatch,
-  finishedColumnDeleteNote,
   groupByLane,
   isFinished,
   type Label,
@@ -22,10 +19,9 @@ import {
   useBoardCards,
   type Card,
 } from '../../cards';
-import { updateBoard, useBoard, type BoardMemberProfile } from '../../boards';
+import { useBoard, type BoardMemberProfile } from '../../boards';
 import { CardFace } from '../CardFace';
 import { cardTileName } from '../../cardTileName';
-import { ColumnNameEditor } from '../ColumnNameEditor';
 import { useSelection } from '../../useSelection';
 import { BulkBar } from '../BulkBar';
 import type { SessionUser } from '../../session';
@@ -43,6 +39,7 @@ import {
   Title,
 } from '../ui';
 import { AddCardForm, type AddCardDraft } from './AddCardForm';
+import { ColumnHeading } from './ColumnHeading';
 import { WatchColumnBell, WatchLaneBell } from './Bells';
 import { LaneHeading } from './LaneHeading';
 import { allowMove } from '../../moveGuard';
@@ -86,10 +83,6 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   const [adding, setAdding] = useState<string | null>(null);
   const [retry, setRetry] = useState<(AddCardDraft & { columnId: string }) | null>(null);
   const [moving, setMoving] = useState<Card | null>(null);
-  // Which column is mid-rename — its delete icon steps aside while editing, so
-  // the cancel ✕ and the delete ✕ are never adjacent.
-  const [renamingCol, setRenamingCol] = useState<string | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<BoardColumn | null>(null);
   const { run, busy, error, setError } = useAction('wideBoard');
   const selection = useSelection(cards.data ?? EMPTY_CARDS);
 
@@ -183,27 +176,6 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
     );
   }
 
-  /**
-   * Deleting a column is irreversible and sits one tap away, so it ASKS.
-   * Emptiness is not consent — an empty column can still be one someone just
-   * cleared and is about to refill.
-   */
-  function askRemoveColumn(col: BoardColumn) {
-    const blocked = columnDeleteBlocked(col.name, (byColumn.get(col.id) ?? []).length);
-    if (blocked) {
-      setError(blocked);
-      return;
-    }
-    setPendingDelete(col);
-  }
-
-  async function confirmRemoveColumn(col: BoardColumn) {
-    setPendingDelete(null);
-    await run(() =>
-      updateBoard(boardId, columnsPatch(board.data ?? { columns }, columns.filter((c) => c.id !== col.id))),
-    );
-  }
-
   if (board.status === 'loading' || cards.status === 'loading') {
     return <Spinner label="Loading board…" />;
   }
@@ -287,33 +259,6 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         </Panel>
       ) : null}
 
-      {/* Destructive and irreversible, so it gets a labelled button and a
-          sentence — not an icon you can brush past. Gated with the icon that
-          opens it: another owner revoking yours while this is on screen would
-          otherwise leave a confirmation whose button the server now refuses. */}
-      {canManage && pendingDelete ? (
-        <Panel>
-          <Body>
-            Delete the column “{pendingDelete.name}”? It is empty, but this cannot
-            be undone.
-            {board.data ? ` ${finishedColumnDeleteNote(board.data, pendingDelete.id) ?? ''}` : ''}
-          </Body>
-          <Row>
-            <Button
-              busy={busy}
-              label="Delete column"
-              variant="danger"
-              onPress={() => confirmRemoveColumn(pendingDelete)}
-            />
-            <Button
-              label="Cancel"
-              variant="secondary"
-              onPress={() => setPendingDelete(null)}
-            />
-          </Row>
-        </Panel>
-      ) : null}
-
       <BulkBar
         canManage={canManage}
         currentBoardId={boardId}
@@ -344,41 +289,20 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
               key={col.id}
               style={[styles.column, { backgroundColor: t.bg.inset }]}
             >
+              {/* The name, its count and the bell. Renaming and deleting a
+                  column are Board settings → Columns. */}
               <Row style={styles.between}>
-                <ColumnNameEditor
-                  column={col}
-                  columns={columns}
-                  canEdit={canManage}
-                  suffix={` (${colCards.length})`}
-                  bold
-                  busy={busy}
-                  onError={setError}
-                  onRename={(next) => updateBoard(boardId, columnsPatch(b, next))}
-                  run={run}
-                  onEditingChange={(on) => setRenamingCol(on ? col.id : null)}
-                />
-                {/* Together at the right: the row spaces its children apart,
-                    and a third one would sit in the middle. */}
-                <Row>
-                  {isMember && renamingCol !== col.id ? (
-                    <WatchColumnBell
-                      columnName={col.name}
-                      watching={watching(col.id)}
-                      busy={busy || watched.status !== 'ready'}
-                      onPress={() =>
-                        run(() => setColumnWatched(user, boardId, col.id, !watching(col.id)))
-                      }
-                    />
-                  ) : null}
-                  {canManage && renamingCol !== col.id ? (
-                    <IconAction
-                      icon="delete-outline"
-                      label={`Delete column ${col.name}`}
-                      danger
-                      onPress={() => askRemoveColumn(col)}
-                    />
-                  ) : null}
-                </Row>
+                <ColumnHeading name={col.name} count={colCards.length} bold />
+                {isMember ? (
+                  <WatchColumnBell
+                    columnName={col.name}
+                    watching={watching(col.id)}
+                    busy={busy || watched.status !== 'ready'}
+                    onPress={() =>
+                      run(() => setColumnWatched(user, boardId, col.id, !watching(col.id)))
+                    }
+                  />
+                ) : null}
               </Row>
 
               <ScrollView style={styles.fill} keyboardShouldPersistTaps="handled">

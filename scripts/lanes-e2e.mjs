@@ -53,58 +53,53 @@ const BOARD = 'Lanes Program';
 const OTHER = 'Plain Board';
 const PAST = '2020-01-01';
 
-/** Every card on the wide board: its column, and the lane heading it sits under (null: none). */
+/**
+ * Every card on the wide board: its column, and its lane: the lane's name,
+ * 'No lane', or null on a board without lanes. Without lanes the board draws
+ * columns (`column-cards-<name>`); with them, a grid of cells, each saying its
+ * lane and column (`lane-cell`, `data-lane` '' for No lane).
+ */
 function placement(page) {
   return page.evaluate(() => {
     const out = {};
-    for (const list of document.querySelectorAll('[data-testid^="column-cards-"]')) {
-      const column = list.getAttribute('data-testid').slice('column-cards-'.length);
-      let lane = null;
-      for (const el of list.querySelectorAll('[data-testid="lane-heading"], [data-testid^="card-"]')) {
-        if (el.getAttribute('data-testid') === 'lane-heading') {
-          lane = (el.getAttribute('aria-label') || '').split(',')[0];
-        } else {
-          out[el.getAttribute('data-testid').slice('card-'.length)] = { column, lane };
-        }
+    const take = (root, column, lane) => {
+      for (const el of root.querySelectorAll('[data-testid^="card-"]')) {
+        out[el.getAttribute('data-testid').slice('card-'.length)] = { column, lane };
       }
+    };
+    for (const list of document.querySelectorAll('[data-testid^="column-cards-"]')) {
+      take(list, list.getAttribute('data-testid').slice('column-cards-'.length), null);
+    }
+    for (const cell of document.querySelectorAll('[data-testid="lane-cell"]')) {
+      take(cell, cell.dataset.column, cell.dataset.lane || 'No lane');
     }
     return out;
   });
 }
 
-/** The cards of one lane in one column, in the order drawn (lane null: No lane). */
-async function laneOrder(page, column, lane) {
-  return page.evaluate(
-    ([col, want]) => {
-      const list = document.querySelector(`[data-testid="column-cards-${col}"]`);
-      const out = [];
-      let current = null;
-      for (const el of list.querySelectorAll('[data-testid="lane-heading"], [data-testid^="card-"]')) {
-        if (el.getAttribute('data-testid') === 'lane-heading') current = (el.getAttribute('aria-label') || '').split(',')[0];
-        else if ((current === 'No lane' ? null : current) === want) out.push(el.getAttribute('data-testid').slice(5));
-      }
-      return out;
-    },
-    [column, lane],
-  );
+/** One lane's cell in one column (lane null or 'No lane': No lane). Throws when the grid has none. */
+function cellSelector(column, lane) {
+  const name = lane === null || lane === 'No lane' ? '' : lane;
+  return `[data-testid="lane-cell"][data-column="${column}"][data-lane="${name}"]`;
 }
 
-/** Whether a drop bar is drawn inside one lane's group of a column right now. */
+/** The cards of one lane in one column, in the order drawn (lane null: No lane). */
+async function laneOrder(page, column, lane) {
+  return page.evaluate((sel) => {
+    const cell = document.querySelector(sel);
+    if (!cell) throw new Error(`no cell ${sel}`);
+    return [...cell.querySelectorAll('[data-testid^="card-"]')].map((el) => el.getAttribute('data-testid').slice(5));
+  }, cellSelector(column, lane));
+}
+
+/** Whether a drop bar is drawn inside one lane's cell of a column right now. */
 function barIn(page, column, lane) {
-  return page.evaluate(
-    ([col, name]) => {
-      const h = [...document.querySelectorAll(`[data-testid="column-cards-${col}"] [data-testid="lane-heading"]`)].find((el) => {
-        const label = el.getAttribute('aria-label') || '';
-        return label === name || label.startsWith(`${name},`);
-      });
-      // No heading is a broken page, not a pass.
-      if (!h) throw new Error(`no ${name} heading in ${col}`);
-      let group = h;
-      while (group.parentElement && !group.parentElement.matches(`[data-testid="column-cards-${col}"]`)) group = group.parentElement;
-      return [...group.querySelectorAll('div')].some((d) => getComputedStyle(d).height === '3px');
-    },
-    [column, lane],
-  );
+  return page.evaluate((sel) => {
+    const cell = document.querySelector(sel);
+    // No cell is a broken page, not a pass.
+    if (!cell) throw new Error(`no cell ${sel}`);
+    return !!cell.querySelector('[data-testid="drop-bar"]');
+  }, cellSelector(column, lane));
 }
 
 /** A lane heading's words, as a screen reader hears it: name, finished of total, late. */
@@ -214,9 +209,15 @@ try {
     await page.getByText(name, { exact: true }).first().click();
     await page.getByText('To Do').first().waitFor({ timeout: 30000 });
   };
+  // With a lane: the + on To Do's heading, which asks for the lane. Without
+  // (a board with no lanes): the column's own + Add card.
   const addCard = async (title, lane) => {
-    await page.getByRole('button', { name: '+ Add card' }).first().click();
-    if (lane) await page.getByLabel('Lane', { exact: true }).selectOption({ label: lane });
+    if (lane) {
+      await page.getByRole('button', { name: 'Add a card to To Do', exact: true }).click();
+      await page.getByLabel('Lane', { exact: true }).selectOption({ label: lane });
+    } else {
+      await page.getByRole('button', { name: '+ Add card' }).first().click();
+    }
     await fillThen(page, 'Card title', title, async (o) => {
       await page.getByRole('button', { name: 'Add card', exact: true }).click(o);
       if (lane) await page.locator(`[data-testid="card-${title}"]`).waitFor(o);
@@ -301,19 +302,27 @@ try {
 
   // ---- The board, with lanes --------------------------------------------------
   check('a card from before lanes is under No lane', await placed(page, 'Before lanes', 'To Do', 'No lane'));
-  const toDoHeadings = await page.evaluate(() =>
-    [...document.querySelectorAll('[data-testid="column-cards-In Progress"] [data-testid="lane-heading"]')].map(
-      (h) => h.getAttribute('aria-label').split(',')[0],
-    ),
+  const grid = await page.evaluate(() => ({
+    lanes: [...document.querySelectorAll('[data-testid="lane-heading"]')].map((h) => h.getAttribute('aria-label').split(',')[0]),
+    cells: [...document.querySelectorAll('[data-testid="lane-cell"][data-column="In Progress"]')].map((c) => c.dataset.lane || 'No lane'),
+    perColumnAdds: document.querySelectorAll('button, [role="button"]').length &&
+      [...document.querySelectorAll('[role="button"], button')].filter((b) => (b.textContent || '').trim() === '+ Add card').length,
+  }));
+  check(
+    'the board is a grid: each lane once, as a row, with a cell in every column, and No lane last',
+    grid.lanes.join(',') === 'Supplies,Planning,Marketing,No lane' &&
+      grid.cells.join(',') === 'Supplies,Planning,Marketing,No lane',
+    JSON.stringify(grid),
   );
   check(
-    'every column lists every lane, holding cards or not, and No lane last',
-    toDoHeadings.join(',') === 'Supplies,Planning,Marketing,No lane',
-    toDoHeadings.join(','),
+    'a lane board has no + Add card at the foot of its columns: a + on each heading instead',
+    grid.perColumnAdds === 0 &&
+      (await page.getByRole('button', { name: /^Add a card to / }).count()) === 3 + 3,
+    `${grid.perColumnAdds} foot buttons`,
   );
 
   // Without a lane: the form stays, says why, and adds nothing.
-  await page.getByRole('button', { name: '+ Add card' }).first().click();
+  await page.getByRole('button', { name: 'Add a card to To Do', exact: true }).click();
   await fillThen(page, 'Card title', 'Book the hall', (o) =>
     page.getByRole('button', { name: 'Add card', exact: true }).click(o),
   );
@@ -440,7 +449,7 @@ try {
     await htmlDrag(
       page,
       '[data-testid="card-Run the fair"]',
-      '[data-testid="column-cards-Done"] [data-testid="lane-heading"][aria-label^="Marketing,"]',
+      '[data-testid="lane-cell"][data-column="Done"][data-lane="Marketing"]',
     );
     check(
       'a parent dragged to Done with a subtask open stays put, and a notice says why',
@@ -544,7 +553,7 @@ try {
     await htmlDrag(
       page,
       '[data-testid="card-Book the stalls"]',
-      '[data-testid="column-cards-To Do"] [data-testid="lane-heading"][aria-label^="Marketing,"]',
+      '[data-testid="lane-cell"][data-column="To Do"][data-lane="Marketing"]',
     );
     check(
       'and not while its parent is archived, dragged or otherwise',
@@ -658,10 +667,10 @@ try {
   await htmlDrag(
     page,
     '[data-testid="card-Before lanes"]',
-    '[data-testid="column-cards-In Progress"] [data-testid="lane-heading"][aria-label^="Supplies,"]',
+    '[data-testid="lane-cell"][data-column="In Progress"][data-lane="Supplies"]',
   );
   check(
-    'a card dragged onto a lane heading in another column lands in that lane and column',
+    'a card dragged into a lane’s cell in another column lands in that lane and column',
     await placed(page, 'Before lanes', 'In Progress', 'Supplies'),
   );
 
@@ -770,21 +779,21 @@ try {
     );
     const headsShut = await states(suppliesHeads);
     const counted = /finished|no cards/.test((await suppliesHeads.first().getAttribute('aria-label')) ?? '');
-    const hereLabel =
-      (await page
-        .locator('[data-testid="column-cards-To Do"] [data-testid="lane-heading"][aria-label^="Supplies,"]')
-        .getAttribute('aria-label')) ?? '';
+    // Folded, each cell says how many of the lane's cards it holds.
+    const hereTo = (await page.locator(cellSelector('To Do', 'Supplies')).innerText()).trim();
+    const hereIn = (await page.locator(cellSelector('In Progress', 'Supplies')).innerText()).trim();
     check(
-      'a folded lane gives its count in this column, and its selected cards leave the selection',
+      'a folded lane gives its count in each cell, and its selected cards leave the selection',
       selectedFirst &&
-        /, 3 in this column$/.test(hereLabel) &&
+        hereTo === '3 cards' &&
+        hereIn === '1 card' &&
         (await page.getByRole('button', { name: 'Clear selection', exact: true }).count()) === 0,
-      hereLabel,
+      `${hereTo} | ${hereIn}`,
     );
     check(
-      'a lane folds in every column at once, keeping its count, and only its cards go',
+      'a lane folds across the board at once (one heading), keeping its count, and only its cards go',
       shownBefore === 4 &&
-        headsShut.length >= 2 &&
+        headsShut.length === 1 &&
         headsShut.every((x) => x === 'false') &&
         counted &&
         (await visibleCards(SUPPLIES_CARDS)) === 0 &&
@@ -818,7 +827,7 @@ try {
     await htmlDrag(
       page,
       '[data-testid="card-Drag N"]',
-      '[data-testid="column-cards-To Do"] [data-testid="lane-heading"][aria-label^="Supplies,"]',
+      '[data-testid="lane-cell"][data-column="To Do"][data-lane="Supplies"]',
     );
     const ranked = async () => {
       const snap = await db.collection('cards').where('boardId', '==', boardDoc.id).get();
@@ -916,8 +925,8 @@ try {
   }
 
   // ---- Watching a lane ------------------------------------------------------------
-  // The bell beside a lane's count watches it, on every column's heading at
-  // once (one watch per lane), stored on the account as board/lane.
+  // The bell beside a lane's name watches it: one bell per lane, the grid's
+  // reason for being (2026-11-19), stored on the account as board/lane.
   {
     const boardDoc = (await db.collection('boards').where('name', '==', BOARD).get()).docs[0];
     const bd = boardDoc.data();
@@ -943,8 +952,8 @@ try {
     await watch.first().waitFor({ timeout: 10000 });
     const off = await storedWatch((g) => !g.includes(key));
     check(
-      'a lane is watched from the bell beside its count, on every column at once, and unwatched',
-      before >= 2 && stops === before && (await watch.count()) === before && on.includes(key) && !off.includes(key),
+      'a lane is watched from its one bell, beside its name, and unwatched',
+      before === 1 && stops === before && (await watch.count()) === before && on.includes(key) && !off.includes(key),
       `${before} bells; stored ${JSON.stringify(on)} then ${JSON.stringify(off)}`,
     );
   }
@@ -958,17 +967,23 @@ try {
     const bd = boardDoc.data();
     const todo = bd.columns.find((c) => c.name === 'To Do').id;
     await boardDoc.ref.update({ columnIds: bd.columnIds.filter((id) => id !== todo) });
-    await page.getByRole('button', { name: '+ Add card' }).first().click();
+    // From the lane's +, which asks for the column, with none chosen.
+    await page.getByRole('button', { name: 'Add a card to the Planning lane', exact: true }).click();
+    const unchosen = await page.getByLabel('Column', { exact: true }).inputValue();
     await page.getByPlaceholder('Card title').fill('Refused card');
-    await page.getByLabel('Lane', { exact: true }).selectOption({ label: 'Planning' });
+    await page.getByLabel('Column', { exact: true }).selectOption({ label: 'To Do' });
     await page.getByRole('button', { name: 'Add card', exact: true }).click();
     await page.waitForTimeout(3000);
     const kept = await page.getByPlaceholder('Card title').inputValue().catch(() => null);
-    const lane = await page.getByLabel('Lane', { exact: true }).inputValue().catch(() => null);
+    const column = await page.getByLabel('Column', { exact: true }).inputValue().catch(() => null);
     check(
-      'a card the rules refuse leaves the form open, its title and lane still in it',
-      kept === 'Refused card' && Boolean(lane) && (await page.locator('[data-testid="card-Refused card"]').count()) === 0,
-      `title ${kept}, lane ${lane}`,
+      'a lane\'s + asks for a column, none chosen; a refused card reopens that form with its title and column',
+      unchosen === '' &&
+        kept === 'Refused card' &&
+        column === todo &&
+        (await page.getByRole('dialog', { name: 'New card in the Planning lane' }).count()) === 1 &&
+        (await page.locator('[data-testid="card-Refused card"]').count()) === 0,
+      `column first ${JSON.stringify(unchosen)}; title ${kept}, column ${column}`,
     );
     await boardDoc.ref.update({ columnIds: bd.columnIds });
     // The browser's form closes on Escape; it has no Cancel button.
@@ -1037,9 +1052,9 @@ try {
   await page.screenshot({ path: join(SHOTS, 'lanes-board-end.png'), fullPage: true });
 
   // ---- Deleting the finished column --------------------------------------------
-  // A new last column, made the finished one, then deleted from the board: the
-  // confirmation says which column becomes finished, and that one is written,
-  // so adding a column afterwards does not move it again.
+  // A new last column, made the finished one, then deleted in Board settings
+  // → Columns: the confirmation says which column becomes finished, and that
+  // one is written, so adding a column afterwards does not move it again.
   {
     await settingsPage('Columns');
     await fillThen(page, 'New column name', 'Wrap-up', (o) =>
@@ -1049,17 +1064,18 @@ try {
     await page.getByRole('button', { name: 'Lanes', exact: true }).click();
     await page.getByLabel('Finished cards are in', { exact: true }).selectOption({ label: 'Wrap-up' });
     await page.waitForTimeout(1200);
-    await back();
+    await page.getByRole('button', { name: 'Columns', exact: true }).click();
+    // The confirmation is a dialog, accepted and recorded by the page's handler.
+    dialogs.length = 0;
     await page.getByRole('button', { name: 'Delete column Wrap-up' }).click();
-    const note = page.getByText(/count as finished instead/);
+    for (let i = 0; i < 50 && !dialogs.some((d) => /Delete “Wrap-up”\?/.test(d)); i += 1) {
+      await page.waitForTimeout(200);
+    }
     check(
       'deleting the finished column says which column becomes finished',
-      await note.waitFor({ timeout: 10000 }).then(
-        async () => /“Wrap-up”.*“Done” count as finished/.test(await note.innerText()),
-        () => false,
-      ),
+      dialogs.some((d) => /Delete “Wrap-up”\?[\s\S]*“Wrap-up”.*“Done” count as finished/.test(d)),
+      dialogs.join(' | '),
     );
-    await page.getByRole('button', { name: 'Delete column', exact: true }).click();
     const boardDoc = async () => (await db.collection('boards').where('name', '==', BOARD).get()).docs[0].data();
     let stored = null;
     for (let i = 0; i < 40; i += 1) {

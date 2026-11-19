@@ -52,6 +52,7 @@ in the app.
 | Lane watching | **Arrivals only, as columns** (2026-11-18). On a board with lanes, a board member may watch a lane (the bell beside its count) and is told when a card arrives in it: its lane changed to it, created in it, or restored into it. Someone who watches the column and the lane a card lands in hears once, of the column. It shares the column arrivals' preference ("A card arrives in a column or lane you watch"), so the settings stay at seven. Cleared from someone removed from the board. |
 | WIP limits | **None.** Dropped from the model. |
 | Column deletion | **Blocked until the column is empty**, made painless by multi-select bulk actions. |
+| Column rename and delete | **Board settings → Columns only** (2026-11-19), on every board. A column heading on the board carries its name, its count and its bell, nothing that edits. |
 | Bulk actions | **Multi-select cards** → move, archive, delete, assign. |
 | Board list | **Favorites + recents**, then everything else alphabetically. No folders. |
 | Card deletion | Members **archive** only. Permanent **delete is the board's owners and admins**. |
@@ -708,13 +709,24 @@ learn for boards that are not programs.
   Work files it under **Finished** (last), Search's Overdue chip leaves it out,
   and the 08:00 reminder skips it. A board without lanes has no finished column
   and is unchanged.
-- **Each column lists every lane under one heading** (`LaneHeading`), on the
-  phone, the browser and a tablet alike: the name and one badge, finished of
+- **A lane's heading** (`LaneHeading`) is its name and one badge, finished of
   total across every column, **green** when the lane is complete, **red** when
   an unfinished card is past its date, the ordinary text colour otherwise, "No
-  cards" when empty. A lane keeps its heading in a column with none of its
-  cards, so it holds its place from column to column. The wide board is not a
-  swimlane grid: lanes do not line up across columns (decision A).
+  cards" when empty.
+- **In a browser the wide board is a grid** (Faisal, 2026-11-19, replacing
+  decision A's headings inside each column there): columns across, lanes down,
+  a row as tall as its fullest cell, the column headings frozen at the top and
+  the lane names at the left. One bell per column and one per lane. A row
+  never scrolls inside itself: a lane too tall to work with is folded. A **+**
+  on a column's heading adds a card asking for its lane; a **+** beside a
+  lane's name asks for its column; neither is chosen for you, and there is no
+  **+ Add card** at a column's foot on a lane board. A drop into a cell sets
+  column and lane at once. A folded lane is a thin row saying, in each cell,
+  how many of its cards are there and how many are late.
+- **On the phone, and on a tablet's wide layout, each column lists every lane
+  under its heading**, keeping a heading in a column with none of its cards so
+  it holds its place from column to column. A tablet keeps that layout until
+  someone needs the grid there; a browser on the tablet has it.
 - **A lane folds, per person** (#115): its heading folds the lane's cards away
   in every column at once, keeping its count and colour; two icons fold and
   open every lane. Stored on the person's user document (`collapsedLanes`, by

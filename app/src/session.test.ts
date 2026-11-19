@@ -51,6 +51,10 @@ let deleted = false;
 let offline = false;
 let lookups = 0;
 let freshConnections = 0;
+/** The token service: down, it answers neither a refresh nor a cached read (#116). */
+let tokenDown = false;
+let tokenClaims: Profile = { role: 'member', status: 'pending' };
+const warnings: unknown[][] = [];
 const listeners: { next: (s: Snap) => void; active: boolean }[] = [];
 const authCallbacks: ((u: FakeUser | null) => void)[] = [];
 const fakeAuth: { currentUser: FakeUser | null } = { currentUser: null };
@@ -89,6 +93,11 @@ vi.mock('./auth/google', () => ({ googleSignOut: async () => undefined }));
 vi.mock('./notify', () => ({ registerPush: async () => undefined, unregisterPush: async () => undefined }));
 vi.mock('./liveQuery', () => ({ clearLiveResultCache: () => undefined }));
 vi.mock('./stats', () => ({ clearStatsCache: () => undefined }));
+vi.mock('./sentry', () => ({
+  captureError: (...args: unknown[]) => {
+    warnings.push(args);
+  },
+}));
 vi.mock('./auth/accountLookup', () => ({
   lookUpAccount: async () => {
     lookups += 1;
@@ -114,10 +123,10 @@ function user(uid = 'u1'): FakeUser {
     email: 'faisal@oursabeel.com',
     displayName: 'Faisal',
     getIdToken: async () => 'token',
-    getIdTokenResult: async () => ({
-      claims: { role: 'member', status: 'pending' },
-      signInProvider: 'google.com',
-    }),
+    getIdTokenResult: async () => {
+      if (tokenDown) throw new Error('auth/network-request-failed');
+      return { claims: { ...tokenClaims }, signInProvider: 'google.com' };
+    },
   };
 }
 
@@ -128,7 +137,7 @@ function user(uid = 'u1'): FakeUser {
  */
 let session: Pick<
   typeof import('./session'),
-  'sessionNow' | 'retryProvisioning' | 'signOut' | 'PROVISIONING_PATIENCE_MS'
+  'sessionNow' | 'retryProvisioning' | 'retryClaims' | 'signOut' | 'PROVISIONING_PATIENCE_MS'
 >;
 
 /** Sign in, and let the first listener answer: the profile is not there yet. */
@@ -157,11 +166,14 @@ beforeEach(async () => {
   offline = false;
   lookups = 0;
   freshConnections = 0;
+  tokenDown = false;
+  tokenClaims = { role: 'member', status: 'pending' };
+  warnings.length = 0;
   listeners.length = 0;
   authCallbacks.length = 0;
   fakeAuth.currentUser = null;
-  const { sessionNow, retryProvisioning, signOut, PROVISIONING_PATIENCE_MS } = await import('./session');
-  session = { sessionNow, retryProvisioning, signOut, PROVISIONING_PATIENCE_MS };
+  const { sessionNow, retryProvisioning, retryClaims, signOut, PROVISIONING_PATIENCE_MS } = await import('./session');
+  session = { sessionNow, retryProvisioning, retryClaims, signOut, PROVISIONING_PATIENCE_MS };
 });
 
 afterEach(() => {
@@ -238,5 +250,57 @@ describe('an account the server refused', () => {
     await vi.advanceTimersByTimeAsync(4_000);
     await session.signOut();
     expect(session.sessionNow()).toEqual({ state: 'signed-out' });
+  });
+});
+
+describe('an approved account whose token service does not answer (#116)', () => {
+  const ACTIVE = { role: 'admin', status: 'active' };
+
+  /** A reload with the cached token expired: the profile is there, the token service is not. */
+  async function reloadWithTheTokenServiceDown() {
+    tokenClaims = { ...ACTIVE };
+    serverProfile = { ...PROFILE, ...ACTIVE };
+    tokenDown = true;
+    setAuthUser(user());
+    await vi.advanceTimersByTimeAsync(0);
+  }
+
+  it('is told the server cannot be reached, never Waiting for approval, and gets in by itself once it answers', async () => {
+    await reloadWithTheTokenServiceDown();
+    expect(session.sessionNow()).toEqual({ state: 'unreachable', uid: 'u1' });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0][2]).toBe('warning');
+    tokenDown = false;
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(session.sessionNow()).toMatchObject({ state: 'signed-in', user: { status: 'active', role: 'admin' } });
+  });
+
+  it('keeps asking, less often, while the service stays down', async () => {
+    await reloadWithTheTokenServiceDown();
+    await vi.advanceTimersByTimeAsync(5_000 + 10_000 + 20_000);
+    expect(warnings).toHaveLength(4);
+    expect(session.sessionNow()).toEqual({ state: 'unreachable', uid: 'u1' });
+  });
+
+  it('Try again asks at once', async () => {
+    await reloadWithTheTokenServiceDown();
+    tokenDown = false;
+    await session.retryClaims();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(session.sessionNow()).toMatchObject({ state: 'signed-in', user: { status: 'active' } });
+  });
+
+  it('a failed read after a good one keeps what the session knew', async () => {
+    tokenClaims = { ...ACTIVE };
+    serverProfile = { ...PROFILE, ...ACTIVE };
+    setAuthUser(user());
+    await vi.advanceTimersByTimeAsync(0);
+    expect(session.sessionNow()).toMatchObject({ state: 'signed-in', user: { status: 'active' } });
+    tokenDown = true;
+    // The server says the claims moved, so the next snapshot asks the token service.
+    const moved = { ...serverProfile, claimsUpdatedAt: { toMillis: () => 2 } };
+    listeners.filter((l) => l.active).forEach((l) => l.next(snap(moved)));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(session.sessionNow()).toMatchObject({ state: 'signed-in', user: { status: 'active', role: 'admin' } });
   });
 });

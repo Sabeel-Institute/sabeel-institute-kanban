@@ -167,6 +167,20 @@ async function switchReads(locator, want, ms = 20000) {
   }
 }
 
+/**
+ * Wait for a confirmation or notice matching `re` to have been shown on this
+ * page: the dialog handler records each one, so this is the positive signal
+ * that a control asked before anything else is read.
+ */
+async function dialogShown(page, re, ms = 15000) {
+  const deadline = Date.now() + ms;
+  for (;;) {
+    if (re.test(lastConfirm.get(page) ?? '')) return true;
+    if (Date.now() > deadline) return false;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+}
+
 /** Run `fn` with this page's next confirmation declined instead of accepted. */
 async function decliningConfirm(page, fn) {
   declineNext.add(page);
@@ -1012,15 +1026,34 @@ try {
   await sara.getByText('Book venue').first().waitFor({ timeout: 25000 });
   check('another person sees new and moved cards live', true);
 
-  // A column with cards cannot be deleted.
+  // The board's column headings carry the name, the count and the bell, and
+  // nothing that renames or deletes: both are Board settings → Columns.
+  check(
+    'the board has no column rename or delete of its own',
+    (await admin.getByRole('button', { name: /^(Rename|Delete) column / }).count()) === 0,
+  );
+
+  // A column with cards cannot be deleted. The page's delete waits for the
+  // board's cards (Playwright clicks only an enabled control), so the refusal
+  // below is about the count, never a list still loading.
+  await admin.getByRole('button', { name: 'Board settings' }).click();
+  await settingsPage(admin, 'Columns');
+  lastConfirm.delete(admin);
   await admin.getByRole('button', { name: 'Delete column To Do' }).click();
-  await admin.getByText(/still has \d+ card/).waitFor({ timeout: 15000 });
-  check('deleting a non-empty column is refused, with a reason', true);
-  await admin.screenshot({
-    path: join(SHOTS, 'p3-column-delete-blocked-light.png'),
-    fullPage: true,
-  });
-  await admin.getByRole('button', { name: 'Dismiss' }).click();
+  check(
+    'deleting a non-empty column in Board settings is refused, with a reason',
+    await dialogShown(admin, /Cannot delete this column[\s\S]*still has \d+ card/),
+    lastConfirm.get(admin) ?? '(no dialog)',
+  );
+  check(
+    'and the refused column stays',
+    await admin
+      .getByRole('button', { name: 'Delete column To Do' })
+      .isVisible()
+      .catch(() => false),
+  );
+  await admin.getByRole('button', { name: 'Back' }).first().click();
+  await admin.locator('[data-testid="card-Draft newsletter"]').waitFor({ timeout: 20000 });
 
   // Archiving removes a card from the board.
   await admin.getByRole('button', { name: 'Archive Draft newsletter' }).click();
@@ -1128,20 +1161,34 @@ try {
   });
   check('a bulk move takes the whole selection to one column', movedTogether);
 
-  // And the emptied column can now be deleted, which was the point.
-  await admin.getByRole('button', { name: 'Delete column Blocked' }).click();
-  // Deleting a column is a TWO-step inline confirm — the ✕ only opens
-  // "Delete the column “Blocked”?", and the destructive action is the button
-  // inside it. Without this the ✕ never detaches and the wait below times out
-  // against a perfectly healthy app.
-  await admin.getByRole('button', { name: 'Delete column', exact: true }).click();
-  // Assert the column's own delete control is gone, not that the WORD Blocked
-  // has left the page — it also appears in the move panel's column dropdown, so
-  // a text match resolves to something that never detaches.
-  await admin
-    .getByRole('button', { name: 'Delete column Blocked' })
-    .waitFor({ state: 'detached', timeout: 20000 });
-  check('a column emptied by a bulk move can then be deleted', true);
+  // And the emptied column can now be deleted, in Board settings → Columns,
+  // which was the point. Declined once first: a delete with no confirmation
+  // behind it would pass the accepted run identically.
+  await admin.getByRole('button', { name: 'Board settings' }).click();
+  await settingsPage(admin, 'Columns');
+  const deleteBlocked = admin.getByRole('button', { name: 'Delete column Blocked' });
+  lastConfirm.delete(admin);
+  await decliningConfirm(admin, async () => {
+    await deleteBlocked.click();
+    await dialogShown(admin, /Delete “Blocked”\?/);
+  });
+  await admin.waitForTimeout(1500);
+  check(
+    'deleting an empty column asks first, saying it cannot be undone',
+    /Delete “Blocked”\?[\s\S]*cannot be undone/.test(lastConfirm.get(admin) ?? ''),
+    lastConfirm.get(admin) ?? '(no dialog)',
+  );
+  check('a declined delete keeps the column', await deleteBlocked.isVisible().catch(() => false));
+  await deleteBlocked.click();
+  // The column's own delete control is gone once the write lands.
+  check(
+    'a column emptied by a bulk move can then be deleted',
+    await deleteBlocked
+      .waitFor({ state: 'detached', timeout: 20000 })
+      .then(() => true, () => false),
+  );
+  await admin.getByRole('button', { name: 'Back' }).first().click();
+  await admin.getByRole('checkbox', { name: 'Select Bulk one' }).waitFor({ timeout: 20000 });
 
   // Bulk archive clears them off the board in one batch.
   await admin.getByRole('checkbox', { name: 'Select Bulk one' }).click();

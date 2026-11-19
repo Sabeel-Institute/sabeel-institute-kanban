@@ -1290,6 +1290,23 @@ async function tour(page, tag, width) {
       }
       await page.waitForTimeout(300);
     });
+    if (name === 'Columns') {
+      // The one place a column is renamed and deleted: every column has both.
+      const ctl = await page.evaluate(() => {
+        const shown = [...document.querySelectorAll('[role="button"]')]
+          .filter((e) => e.getBoundingClientRect().width > 2)
+          .map((e) => e.getAttribute('aria-label') || '');
+        return {
+          rename: shown.filter((n) => n.startsWith('Rename column ')).length,
+          remove: shown.filter((n) => n.startsWith('Delete column ')).length,
+        };
+      });
+      check(
+        `${tag} / Board settings → Columns renames and deletes every column`,
+        ctl.rename > 0 && ctl.remove === ctl.rename,
+        JSON.stringify(ctl),
+      );
+    }
     if (!wide) {
       await page.getByRole('button', { name: 'Back' }).first().click();
       await page.waitForTimeout(500);
@@ -1306,9 +1323,10 @@ async function tour(page, tag, width) {
   });
 
   /**
-   * THE BOARD WITH LANES: each column lists the board's lanes under a heading
-   * with one badge. Checked by what a screen reader hears of the headings in
-   * view, which carries both the name and what the badge's colour says.
+   * THE BOARD WITH LANES: on a phone each column lists the board's lanes under
+   * a heading; wide, the board is a grid, a lane's heading once at the left of
+   * its row. Checked by what a screen reader hears of the headings in view,
+   * which carries both the name and what the badge's colour says.
    */
   await visit('lanes-board', async () => {
     await nav('Boards');
@@ -1336,8 +1354,61 @@ async function tour(page, tag, width) {
       headings.slice(0, 4).join(' | '),
     );
   }
+  if (wide) {
+    // The grid's promises (2026-11-19): every cell of a row is one height,
+    // and after scrolling to the far corner a column's + is still at the top
+    // and a lane's + still at the left, each the thing a click there hits.
+    // The seeded board fits some windows, so the grid is held to 220 by 600
+    // while it is scrolled, and the check fails unless it really scrolled both ways:
+    // a board that fits proves nothing about what stays (it once passed with
+    // the headings not frozen at all).
+    const grid = await page.evaluate(async () => {
+      const sc = document.querySelector('[data-testid="board-columns"]');
+      const heights = {};
+      for (const c of document.querySelectorAll('[data-testid="lane-cell"]')) {
+        (heights[c.dataset.lane] ??= new Set()).add(Math.round(c.getBoundingClientRect().height));
+      }
+      const rowsEven = Object.values(heights).length > 0 && Object.values(heights).every((h) => h.size === 1);
+      const was = { height: sc.style.height, width: sc.style.width, flex: sc.style.flex };
+      Object.assign(sc.style, { height: '220px', width: '600px', flex: 'none' });
+      sc.scrollTop = sc.scrollHeight;
+      sc.scrollLeft = sc.scrollWidth;
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const box = sc.getBoundingClientRect();
+      const hit = (el) => {
+        const r = el.getBoundingClientRect();
+        const x = r.left + r.width / 2;
+        const y = r.top + r.height / 2;
+        if (x < box.left || x > box.right || y < box.top || y > box.bottom) return null;
+        const at = document.elementFromPoint(x, y);
+        return at && el.contains(at) ? r : null;
+      };
+      const plus = [...document.querySelectorAll('[aria-label^="Add a card to "]')];
+      const headingPlus = plus.filter((b) => !b.getAttribute('aria-label').endsWith(' lane')).map(hit).filter(Boolean);
+      const lanePlus = plus.filter((b) => b.getAttribute('aria-label').endsWith(' lane')).map(hit).filter(Boolean);
+      const out = {
+        rowsEven,
+        sideways: sc.scrollLeft > 0,
+        down: sc.scrollTop > 0,
+        headingsStay: headingPlus.some((r) => r.top - box.top < 60),
+        lanesStay: lanePlus.some((r) => r.left - box.left < 260),
+      };
+      sc.scrollTop = 0;
+      sc.scrollLeft = 0;
+      Object.assign(sc.style, was);
+      return out;
+    });
+    check(
+      `${tag} / lanes-board is a grid: rows even, headings and lane names stay as it scrolls`,
+      grid.rowsEven && grid.sideways && grid.down && grid.headingsStay && grid.lanesStay,
+      JSON.stringify(grid),
+    );
+  }
   await visit('lanes-add-card', async () => {
-    await page.getByRole('button', { name: '+ Add card' }).first().click();
+    // Wide, the + on To Do's heading, which asks for the lane; on a phone,
+    // the column's + Add card.
+    if (wide) await page.getByRole('button', { name: 'Add a card to To Do', exact: true }).click();
+    else await page.getByRole('button', { name: '+ Add card' }).first().click();
     await page.getByLabel('Lane', { exact: true }).first().waitFor({ timeout: 15000 });
   });
   await page.keyboard.press('Escape');
@@ -1490,11 +1561,15 @@ async function tour(page, tag, width) {
    * is now ALWAYS present and its NAME is what changes, so checking only for the
    * absence of "Board settings" would pass just as well if the control had
    * vanished entirely and stranded the member with no roster.
+   *
+   * Neither of them, owner included, finds a column rename or delete on the
+   * board: both are Board settings → Columns, asserted on the admin's tour. The
+   * owner is the case that tells: the board gave an owner both.
    */
   if (width < WIDE_BREAKPOINT) {
     for (const [who, role, wants] of [
-      ['sara', 'owner', { deleteColumn: true, settings: true, members: false, clone: true }],
-      ['omar', 'member', { deleteColumn: false, settings: false, members: true, clone: false }],
+      ['sara', 'owner', { settings: true, members: false, clone: true }],
+      ['omar', 'member', { settings: false, members: true, clone: false }],
     ]) {
       const roleCtx = await browser.newContext({ viewport: { width, height: 900 } });
       const rp = await roleCtx.newPage();
@@ -1523,7 +1598,7 @@ async function tour(page, tag, width) {
         );
         return {
           addCard: vis.some((e) => nm(e) === '+ Add card'),
-          deleteColumn: vis.some((e) => nm(e).startsWith('Delete column')),
+          editColumn: vis.some((e) => /^(Rename|Delete) column /.test(nm(e))),
           archived: vis.some((e) => nm(e) === 'Archived cards'),
           settings: vis.some((e) => nm(e) === 'Board settings'),
           members: vis.some((e) => nm(e) === 'About this board'),
@@ -1534,7 +1609,7 @@ async function tour(page, tag, width) {
         got.addCard &&
         got.archived &&
         got.bleed <= 1 &&
-        got.deleteColumn === wants.deleteColumn &&
+        !got.editColumn &&
         got.settings === wants.settings &&
         got.members === wants.members &&
         roleErrors.length === 0;

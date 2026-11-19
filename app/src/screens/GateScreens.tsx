@@ -10,7 +10,7 @@ import { Linking, Platform, StyleSheet, Text } from 'react-native';
 import { ALLOWED_EMAIL_DOMAIN, APP_ID, APP_NAME } from '@sabeel/shared';
 import { BUILD_INFO } from '../build-info';
 import type { SessionUser } from '../session';
-import { retryProvisioning, signOut } from '../session';
+import { retryClaims, retryProvisioning, signOut } from '../session';
 import { acceptRules } from '../reports';
 import { useAction } from '../useAction';
 import { Body, Button, Card, Hint, Screen, Spinner, Title } from '../components/ui';
@@ -40,6 +40,28 @@ export function ProvisioningScreen({ slow }: { slow: boolean }) {
         <Body>This is taking longer than usual. Try again in a minute.</Body>
       </Card>
       <Button label="Try again" busy={busy} onPress={() => void run(retryProvisioning)} />
+      <Button label="Sign out" variant="secondary" disabled={busy} onPress={signOut} />
+    </Screen>
+  );
+}
+
+/**
+ * Signed in, but the account's role and status could not be read: the token
+ * service did not answer and this session had not read them before (#116).
+ * Says so, rather than "Waiting for approval", and tries again by itself.
+ */
+export function UnreachableScreen() {
+  const { run, busy } = useAction('retryClaims');
+  return (
+    <Screen width="read">
+      <Title>Can&rsquo;t reach the server</Title>
+      <Card>
+        <Body>
+          The app couldn&rsquo;t check your account just now. It tries again by
+          itself, or you can try now.
+        </Body>
+      </Card>
+      <Button label="Try again" busy={busy} onPress={() => void run(retryClaims)} />
       <Button label="Sign out" variant="secondary" disabled={busy} onPress={signOut} />
     </Screen>
   );

@@ -30,9 +30,6 @@ import {
   type BoardColumn,
   type BoardLane,
   canManageBoard,
-  columnDeleteBlocked,
-  columnsPatch,
-  finishedColumnDeleteNote,
   groupByLane,
   isFinished,
   type Label,
@@ -47,13 +44,11 @@ import {
   useBoardCards,
   type Card,
 } from '../../cards';
-import { updateBoard, useBoard, type BoardMemberProfile } from '../../boards';
+import { useBoard, type BoardMemberProfile } from '../../boards';
 import { CardFace } from '../CardFace';
 import { cardTileName } from '../../cardTileName';
-import { ColumnNameEditor } from '../ColumnNameEditor';
 import { useSelection } from '../../useSelection';
 import { BulkBar } from '../BulkBar';
-import { confirmAction } from '../../confirm';
 import type { SessionUser } from '../../session';
 import { useNav } from '../../nav';
 import {
@@ -69,6 +64,7 @@ import {
   Title,
 } from '../ui';
 import { AddCardForm, type AddCardDraft } from './AddCardForm';
+import { ColumnHeading } from './ColumnHeading';
 import { WatchColumnBell, WatchLaneBell } from './Bells';
 import { LaneHeading } from './LaneHeading';
 import { useLaneInfo } from './useLaneInfo';
@@ -180,8 +176,6 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
   const [adding, setAdding] = useState(false);
   const [retry, setRetry] = useState<(AddCardDraft & { columnId: string }) | null>(null);
   const { run, busy, error, setError } = useAction('narrowBoard');
-  // Editing the column name takes over the pager row (see the header below).
-  const [renaming, setRenaming] = useState(false);
   // Has the pager been scrolled to the remembered column yet? Starts true when
   // there is nothing to restore, so the common case paints immediately.
   const [restored, setRestored] = useState(() => (lastPageByBoard.get(boardId) ?? 0) === 0);
@@ -365,41 +359,6 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
   }
 
 
-  /**
-   * Deleting a column is irreversible and sits one tap away, so it ASKS.
-   * Emptiness is not consent — an empty column can still be one someone just
-   * cleared and is about to refill.
-   */
-  /**
-   * BOTH ANSWERS ARRIVE AS A MODAL, next to the thumb that asked.
-   *
-   * The bin sits bottom-right; the confirmation used to render as a Panel near
-   * the TOP of the screen, and the "still has cards" refusal went to the error
-   * banner up there too. On a tall phone that is a screen away from where you
-   * are looking, and a Panel reads as one more card rather than as an answer.
-   * Reported as exactly that. `confirmAction` is centred and modal, and it is
-   * already what the archive's permanent delete uses.
-   */
-  function askRemoveColumn(col: BoardColumn) {
-    void (async () => {
-      const blocked = columnDeleteBlocked(col.name, (byColumn.get(col.id) ?? []).length);
-      if (blocked) {
-        await confirmAction('Cannot delete this column', blocked);
-        return;
-      }
-      const ok = await confirmAction(
-        `Delete “${col.name}”?`,
-        ['The column is empty, but deleting it cannot be undone.', board.data ? finishedColumnDeleteNote(board.data, col.id) : null]
-          .filter(Boolean)
-          .join(' '),
-      );
-      if (!ok) return;
-      await run(() =>
-        updateBoard(boardId, columnsPatch(board.data ?? { columns }, columns.filter((c) => c.id !== col.id))),
-      );
-    })();
-  }
-
   if (board.status === 'loading' || cards.status === 'loading') {
     return <Spinner label="Loading board…" />;
   }
@@ -495,48 +454,32 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
           Arrows rather than "‹ Prev"/"Next ›": two labelled buttons cost ~150px
           of a 320px row, which is width the column name needs. They are NOT
           `arrow-back` — that glyph means "leave this screen" everywhere else in
-          the app. While the name is being edited they step aside entirely. */}
+          the app. The name is read-only: a column is renamed and deleted in
+          Board settings → Columns. */}
       <Row style={styles.pager}>
-        {!renaming ? (
-          <IconAction
-            icon="chevron-left"
-            label="Previous column"
-            onPress={() => goTo(visiblePage - 1)}
-          />
-        ) : null}
+        <IconAction
+          icon="chevron-left"
+          label="Previous column"
+          onPress={() => goTo(visiblePage - 1)}
+        />
         <View style={styles.pagerLabel}>
           {current ? (
-            <ColumnNameEditor
-              column={current}
-              columns={columns}
-              canEdit={canManage}
-              center
-              // Two lines here and nowhere else: the pager squeezes the name
-              // between Prev and Next, and there is nothing above or below it
-              // to displace.
-              lines={2}
-              busy={busy}
-              onError={setError}
-              onEditingChange={setRenaming}
-              onRename={(next) => updateBoard(boardId, columnsPatch(b, next))}
-              run={run}
-            />
+            // Two lines here and nowhere else: the pager squeezes the name
+            // between Prev and Next, and there is nothing above or below it
+            // to displace.
+            <ColumnHeading name={current.name} center lines={2} />
           ) : (
             <Body>—</Body>
           )}
-          {!renaming ? (
-            <Hint>
-              {columns.length > 0 ? `${visiblePage + 1} of ${columns.length}` : 'No columns'}
-            </Hint>
-          ) : null}
+          <Hint>
+            {columns.length > 0 ? `${visiblePage + 1} of ${columns.length}` : 'No columns'}
+          </Hint>
         </View>
-        {!renaming ? (
-          <IconAction
-            icon="chevron-right"
-            label="Next column"
-            onPress={() => goTo(visiblePage + 1)}
-          />
-        ) : null}
+        <IconAction
+          icon="chevron-right"
+          label="Next column"
+          onPress={() => goTo(visiblePage + 1)}
+        />
       </Row>
 
       {collapse.error ? (
@@ -795,14 +738,6 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
                       onPress={() =>
                         run(() => setColumnWatched(user, boardId, col.id, !watching(col.id)))
                       }
-                    />
-                  ) : null}
-                  {canManage ? (
-                    <IconAction
-                      icon="delete-outline"
-                      danger
-                      label={`Delete column ${col.name}`}
-                      onPress={() => askRemoveColumn(col)}
                     />
                   ) : null}
                   {/*

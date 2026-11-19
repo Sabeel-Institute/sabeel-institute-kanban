@@ -154,7 +154,7 @@ its own bell if you want to follow it. A card that passes through on its way to
 another column doesn't count.
 
 **On a phone the row along the bottom holds everything else**: beside **+ Add
-card** are icons to watch the column, delete it (owners of the board only), open the
+card** are icons to watch the column, open the
 board's **archived cards**, and open the board's **settings** — or, if you do not
 own it, **About this board**, the pages of settings you can use. They sit
 there rather than in the header so the board's name has the top row to itself.
@@ -168,10 +168,18 @@ there rather than in the header so the board's name has the top row to itself.
 
 Some boards are divided into **lanes** as well as columns: a program's board
 might have *Planning*, *Marketing* and *Supplies*. A card then sits in one
-column and one lane. Every column lists the board's lanes in the same order,
-each under its own heading with that lane's cards beneath it. A lane keeps its
-heading even in a column that has none of its cards, so the lanes stay in the
-same place as you move between columns.
+column and one lane.
+
+In a browser the board is a **grid**, like a spreadsheet: the columns run
+across the top and the lanes down the left, so each lane is a row and each
+card sits where its lane meets its column. A row is as tall as its fullest
+column. The column headings stay at the top as you scroll down, and the lane
+names stay at the left as you scroll across.
+
+On a phone you see one column at a time, and it lists the board's lanes in the
+same order, each under its own heading with that lane's cards beneath it. A
+lane keeps its heading even in a column that has none of its cards, so the
+lanes stay in the same place as you move between columns.
 
 Beside each lane's name is how many of its cards are **finished**, out of all
 its cards in every column: *2 of 4*. On a board with lanes, one column holds
@@ -201,26 +209,33 @@ adding one to it, or linking a card that isn't finished under it, is
 refused. Move the card out of the finished column (or restore it) first.
 
 Cards without a lane, such as those added before the board had lanes, sit
-under **No lane**, at the foot of each column.
+under **No lane**: the last row of the grid, or the foot of each column on a
+phone.
 
-**Adding a card** on a board with lanes asks which lane it goes in: choose one
-before **Add**. A subtask starts in the lane of the card it belongs to.
+**Adding a card** on a board with lanes asks where it goes. In a browser, the
+**+** on a column's heading asks which lane, and the **+** beside a lane's name
+asks which column: choose one before **Add card**. On a phone, **+ Add card**
+at the foot of the column asks which lane. A subtask starts in the lane of the
+card it belongs to.
 
 **Folding a lane.** Tap a lane's heading to fold its cards away, in every
 column at once; the heading stays, with its count and its colour, so a folded
-lane still shows when something in it is late. Tap it again to open it. Two
-icons fold every lane at once and open them all again: in a browser they're
-at the top of the board, beside **Archived cards**; on a phone they're just
-above the first lane. A folded lane's heading also says how many of its
-cards are in the column you're looking at. A card dropped on a folded lane's
-heading goes to the top of that lane, and the lane opens; adding a card to a
-folded lane opens it too, so you see the card arrive. Cards you had selected
-in a lane are unselected when it folds.
+lane still shows when something in it is late. Tap it again to open it. When a
+lane grows too tall to work with, fold it: a lane never scrolls on its own.
+Two icons fold every lane at once and open them all again: in a browser
+they're at the top of the board, beside **Archived cards**; on a phone they're
+just above the first lane. In a browser a folded lane is a thin row that says
+how many of its cards are in each column, and how many are late; on a phone,
+its heading says how many are in the column you're looking at. A card dropped
+on a folded lane goes to the top of that lane, and the lane opens; adding a
+card to a folded lane opens it too, so you see the card arrive. Cards you had
+selected in a lane are unselected when it folds.
 
 **Watching a lane.** Each lane's heading has a **bell** beside its count:
 tap it to be told whenever a card arrives in that lane, in any column, by
 being added to it, moved into it, or restored into it. It works like a
-column's bell, and the lane's bell shows the same in every column. If you
+column's bell. In a browser the bell is beside the lane's name, once; on a
+phone it's on the lane's heading in every column, and they all do the same. If you
 watch both the column and the lane a card lands in, you hear once. One
 setting covers both bells: **A card arrives in a column or lane you watch**. What you fold stays folded, on this device and your others,
 until you open it.
@@ -832,15 +847,16 @@ The pages:
 - **General** — rename the board, mark it as a **template** (see *Cloning a
   board*), and archive it (or restore it, once it is archived). This page is the only place that renames a board, which is why a
   member who cannot open it cannot rename a board either.
-- **Columns** — add, rename, and reorder. Tap the **pencil** beside a column's
-  name to rename it; drag the handle to reorder. A column can only be deleted
-  once it's **empty**, so no cards vanish with it, and deleting one **asks first**
-  because it cannot be undone. Deleting is done on the board, beside the
-  column's name. To clear a column quickly, select its cards and move or
-  archive them in one go.
+- **Columns** — add, rename, reorder and delete. This page is the only place
+  that renames or deletes a column; on the board a column shows its name, its
+  count and its bell. Tap the **pencil** beside a column's name to rename it;
+  drag the handle to reorder. Delete one with its **bin**: only once it's
+  **empty**, so no cards vanish with it, and it **asks first** because it
+  cannot be undone. To clear a column quickly, select its cards on the board
+  and move or archive them in one go.
 
   <div class="pair">
-    <figure class="ph"><img src="manual/img/columns-phone.png" alt="The Columns page on a phone: each column with a handle and a pencil, and a field to add one"><figcaption>On a phone</figcaption></figure>
+    <figure class="ph"><img src="manual/img/columns-phone.png" alt="The Columns page on a phone: each column with a handle, a pencil and a bin, and a field to add one"><figcaption>On a phone</figcaption></figure>
     <figure class="wd"><img src="manual/img/columns-wide.png" alt="The Columns page in a browser"><figcaption>In a browser</figcaption></figure>
   </div>
 - **Lanes** — divide the board into lanes as well as columns (see *Lanes* in
@@ -945,11 +961,6 @@ it is you and you want to hand the board on. Ask an admin.
 A board can end up with **nobody** owning it — its creator left it, or an admin
 took the last owner off. Nothing is lost, but only an admin can change that board
 until somebody is made an owner again.
-
-**Renaming a column without opening Settings.** Column names are editable from
-the board itself too — tap the **pencil** beside the column name (on a phone, in
-the column header at the top; on a wide screen, at the top of each column). Only
-the board's owners and admins see it; everyone else just sees the name.
 
 **Joining or leaving a board yourself.** Neither is self-service for an ordinary
 member: an owner of the board adds you, and an owner takes you off. **Leave** is
@@ -1147,7 +1158,7 @@ Sign in with your @oursabeel.com Google account, then wait on the approval scree
 until an admin lets you in (it updates by itself).
 
 **…add a card?**
-Open the board → **+ Add card** at the foot of a column → type a title → Enter.
+Open the board → **+ Add card** at the foot of a column → type a title → Enter. On a board with lanes in a browser, use the **+** on a column's heading or beside a lane's name instead.
 
 **…change a card's priority, due date, or assignees?**
 Open the card → tap a priority / due date / **Assign someone** → choose.
@@ -1192,7 +1203,7 @@ assignees. Turn on the bell beside Clone to be subscribed to every card.
 **…rename a board?** *(the board's owners)*
 Open the board → **settings** → **General**. That page is the only place that does it.
 
-**…rename or add columns?** *(the board's owners)*
+**…rename, add or delete columns?** *(the board's owners)*
 Open the board → **settings** → **Columns**.
 
 **…record a board's start date, its teachers or a meeting link?** *(the board's owners)*
