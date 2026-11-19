@@ -898,10 +898,12 @@ another session's run. `npx sabeel-ci emulator headless` refuses to boot it
 twice and names the process running it; to look first:
 
 ```sh
-ps -eo pid,args --no-headers | grep "[q]emu-system"   # empty = no AVD running
+ps -eo pid=,args= | awk '$2 ~ /qemu-system/'   # empty = no AVD running
 ```
 
-Use that, not `adb devices` — `adb devices` *starts* a daemon as a side effect,
+It tests the program run, as `sabeel-ci emulator` does: a pattern over the
+whole command line also matches `earlyoom`, whose arguments name
+`qemu-system-x86`. Use that, not `adb devices` — `adb devices` *starts* a daemon as a side effect,
 and a live adb server does **not** mean an emulator is running. If one is
 already running it belongs to someone else: ask before killing it or starting a
 second. The box has 15 GiB of RAM and a 16 GiB swapfile, so a second AVD (~5 GB)
