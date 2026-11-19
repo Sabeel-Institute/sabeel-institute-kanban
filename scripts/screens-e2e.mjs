@@ -558,9 +558,21 @@ const layoutFaults = (page, width) =>
      * Only elements with visible area are considered, so the pager's
      * off-screen pages — laid out to the right by design — are not flagged.
      */
+    // Cut off by the wide board's column scroller, which can scroll to it, is
+    // by design: what is past the edge is a scroll away. Only that scroller:
+    // a control cut off anywhere else (a chip row, `overflow: hidden`, the
+    // window) cannot be reached and is a fault.
+    const scrollsTo = (e, right) => {
+      const a = e.closest('[data-testid="board-columns"]');
+      return (
+        !!a &&
+        a.scrollWidth > a.clientWidth + 1 &&
+        right > a.getBoundingClientRect().right
+      );
+    };
     for (const e of els) {
       const raw = e.getBoundingClientRect();
-      if (raw.right > w + 1 && area(visibleRect(e)) > 4) {
+      if (raw.right > w + 1 && area(visibleRect(e)) > 4 && !scrollsTo(e, raw.right)) {
         faults.push(`"${name(e)}" is clipped by the right edge (${Math.round(raw.right - w)}px past)`);
       }
     }
@@ -666,7 +678,7 @@ async function rulesScreen(page, tag, width) {
 }
 
 // ---- The tour --------------------------------------------------------------
-const SCREENS = 38;
+const SCREENS = 39;
 
 /**
  * Text that does not reach the brand's contrast against what it is drawn on:
@@ -867,6 +879,20 @@ async function tour(page, tag, width) {
     ovFaults.length === 0,
     ovFaults.join('; ').slice(0, 200),
   );
+  // A row's details, open under it (#118): swept like any screen, and the
+  // lane names and marks must not move for it.
+  await visit('overview-details', async () => {
+    await page.getByRole('button', { name: 'Details of Summer Program', exact: true }).click();
+    await page.getByTestId('overview-details').waitFor({ timeout: 10000 });
+  });
+  const ovDetailFaults = await overviewFaults(page);
+  check(
+    `${tag} / overview with details open: every mark apart and on screen, every lane name in full`,
+    ovDetailFaults.length === 0,
+    ovDetailFaults.join('; ').slice(0, 200),
+  );
+  // Closed again, so the next width starts from the overview as it opens.
+  await page.getByRole('button', { name: 'Details of Summer Program', exact: true }).click();
   await page.getByLabel('Name of the clone').waitFor({ state: 'detached', timeout: 15000 });
 
   await visit('mywork', () => nav('My Work'));
@@ -1287,11 +1313,11 @@ async function tour(page, tag, width) {
   await visit('lanes-board', async () => {
     await nav('Boards');
     await page.getByText('Summer Program', { exact: true }).first().click();
-    await page.locator('[role="heading"][aria-label^="Planning,"]').first().waitFor({ timeout: 20000 });
+    await page.locator('[data-testid="lane-heading"][aria-label^="Planning,"]').first().waitFor({ timeout: 20000 });
   });
   {
     const headings = await page.evaluate(() =>
-      [...document.querySelectorAll('[role="heading"][aria-label]')]
+      [...document.querySelectorAll('[data-testid="lane-heading"][aria-label]')]
         .filter((h) => {
           const r = h.getBoundingClientRect();
           return r.width > 0 && r.left >= 0 && r.right <= window.innerWidth + 1;

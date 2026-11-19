@@ -72,6 +72,8 @@ import { AddCardForm, type AddCardDraft } from './AddCardForm';
 import { WatchColumnBell } from './Bells';
 import { LaneHeading } from './LaneHeading';
 import { useLaneInfo } from './useLaneInfo';
+import { useLaneCollapse } from './useLaneCollapse';
+import { LaneCollapseActions } from './LaneCollapseActions';
 import { setColumnWatched, useWatchedColumns } from '../../notifications';
 import { useLabels } from '../../labels';
 import { radius, space, useTheme } from '../../theme';
@@ -88,7 +90,8 @@ const NO_LANES: BoardLane[] = [];
 /** One row of a column's list: a card, or on a board with lanes a lane's heading. */
 type ColumnRow =
   | { kind: 'card'; card: Card }
-  | { kind: 'lane'; lane: BoardLane | null };
+  /** `count`: the lane's cards in this column, said when it is folded. */
+  | { kind: 'lane'; lane: BoardLane | null; count: number };
 
 function CardTile({
   card,
@@ -241,6 +244,14 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
   const live = laneBoard ? lanesLive(laneBoard) : false;
   const lanes = laneBoard?.lanes ?? NO_LANES;
   const infoByLane = useLaneInfo(laneBoard ?? null, live, cards.data ?? EMPTY_CARDS);
+  const collapse = useLaneCollapse(
+    user,
+    boardId,
+    laneBoard ?? null,
+    live,
+    cards.data ?? EMPTY_CARDS,
+    selection.deselect,
+  );
   const rowsByColumn = useMemo(() => {
     const map = new Map<string, ColumnRow[]>();
     for (const [columnId, colCards] of byColumn) {
@@ -248,14 +259,17 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
         columnId,
         live && laneBoard
           ? groupByLane(colCards, laneBoard, cards.data ?? EMPTY_CARDS).flatMap((g) => [
-              { kind: 'lane' as const, lane: g.lane },
-              ...g.cards.map((card) => ({ kind: 'card' as const, card })),
+              { kind: 'lane' as const, lane: g.lane, count: g.cards.length },
+              // A collapsed lane keeps its heading, in every column.
+              ...(collapse.isCollapsed(g.lane?.id ?? null)
+                ? []
+                : g.cards.map((card) => ({ kind: 'card' as const, card }))),
             ])
           : colCards.map((card) => ({ kind: 'card' as const, card })),
       );
     }
     return map;
-  }, [byColumn, live, laneBoard, cards.data]);
+  }, [byColumn, live, laneBoard, cards.data, collapse]);
 
   /**
    * The page actually being shown, which is NOT always the remembered one.
@@ -332,6 +346,8 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
     setAdding(false);
     // Only this column's: a refused add waiting elsewhere is kept.
     setRetry((r) => (r?.columnId === columnId ? null : r));
+    // The card is drawn at once; a folded lane would swallow it from view.
+    if (laneId) void collapse.reveal(laneId);
     const added = await run(() =>
       createCard({
         boardId,
@@ -521,6 +537,12 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
         ) : null}
       </Row>
 
+      {collapse.error ? (
+        <Panel>
+          <Body>{collapse.error}</Body>
+          <Button label="Dismiss" variant="secondary" onPress={collapse.clearError} />
+        </Panel>
+      ) : null}
       {error ? (
         <Panel>
           <Body>{error}</Body>
@@ -545,6 +567,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
         currentBoardId={boardId}
         columns={columns}
         lanes={live && laneBoard ? laneBoard.lanes : undefined}
+        doneColumnId={laneBoard?.doneColumnId}
         allCards={cards.data ?? []}
         selection={selection}
         members={members}
@@ -668,6 +691,9 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
                     <LaneHeading
                       name={row.lane?.name ?? 'No lane'}
                       info={row.lane ? (infoByLane.get(row.lane.id) ?? null) : null}
+                      collapsed={collapse.isCollapsed(row.lane?.id ?? null)}
+                      onToggle={() => void collapse.toggle(row.lane?.id ?? null)}
+                      here={row.count}
                     />
                   ) : (
                     <CardTile
@@ -691,6 +717,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
                     />
                   )
                 }
+                ListHeaderComponent={live ? <LaneCollapseActions collapse={collapse} row /> : null}
                 ListEmptyComponent={<Hint>No cards in {col.name}.</Hint>}
                 contentContainerStyle={styles.listContent}
               />

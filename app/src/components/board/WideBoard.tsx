@@ -45,7 +45,10 @@ import {
 import { AddCardForm, type AddCardDraft } from './AddCardForm';
 import { WatchColumnBell } from './Bells';
 import { LaneHeading } from './LaneHeading';
+import { allowMove } from '../../moveGuard';
 import { useLaneInfo } from './useLaneInfo';
+import { LaneCollapseActions } from './LaneCollapseActions';
+import { useLaneCollapse } from './useLaneCollapse';
 import { setColumnWatched, useWatchedColumns } from '../../notifications';
 import { useLabels } from '../../labels';
 import { radius, space, useTheme } from '../../theme';
@@ -119,6 +122,14 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   const laneBoard = board.data;
   const live = laneBoard ? lanesLive(laneBoard) : false;
   const infoByLane = useLaneInfo(laneBoard ?? null, live, cards.data ?? EMPTY_CARDS);
+  const collapse = useLaneCollapse(
+    user,
+    boardId,
+    laneBoard ?? null,
+    live,
+    cards.data ?? EMPTY_CARDS,
+    selection.deselect,
+  );
 
   // The title comes from `AddCardForm`, already trimmed and non-empty — the
   // draft lives there so typing one does not re-render the board.
@@ -132,6 +143,8 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
     setAdding(null);
     // Only this column's: a refused add waiting elsewhere is kept.
     setRetry((r) => (r?.columnId === columnId ? null : r));
+    // The card is drawn at once; a folded lane would swallow it from view.
+    if (laneId) void collapse.reveal(laneId);
     const added = await run(() =>
       createCard({
         boardId,
@@ -149,6 +162,14 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   async function moveTo(card: Card, column: BoardColumn) {
     const target = (byColumn.get(column.id) ?? []).filter((c) => c.id !== card.id);
     setMoving(null);
+    // A parent waits for its subtasks, and a subtask is not reopened under a
+    // finished parent (#111).
+    if (
+      laneBoard &&
+      !(await allowMove({ board: laneBoard, boardId, toColumnId: column.id, moving: [card], cards: cards.data ?? [] }))
+    ) {
+      return;
+    }
     await run(() =>
       moveCard({
         card,
@@ -223,6 +244,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
           {b.name}
         </Title>
         <Row style={styles.headerActions}>
+          {live ? <LaneCollapseActions collapse={collapse} /> : null}
           {/* Everyone gets this, not just owners: members can archive, so
               members must be able to un-archive. */}
           <IconAction
@@ -248,6 +270,12 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         <Panel>
           <Body>{error}</Body>
           <Button label="Dismiss" variant="secondary" onPress={() => setError(null)} />
+        </Panel>
+      ) : null}
+      {collapse.error ? (
+        <Panel>
+          <Body>{collapse.error}</Body>
+          <Button label="Dismiss" variant="secondary" onPress={collapse.clearError} />
         </Panel>
       ) : null}
 
@@ -283,6 +311,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         currentBoardId={boardId}
         columns={columns}
         lanes={live && laneBoard ? laneBoard.lanes : undefined}
+        doneColumnId={laneBoard?.doneColumnId}
         allCards={cards.data ?? []}
         selection={selection}
         members={members}
@@ -347,17 +376,23 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
               <ScrollView style={styles.fill} keyboardShouldPersistTaps="handled">
                 {(live && laneBoard
                   ? groupByLane(colCards, laneBoard, cards.data ?? EMPTY_CARDS).flatMap((g) => [
-                      { lane: g.lane, card: null },
-                      ...g.cards.map((card) => ({ lane: g.lane, card })),
+                      { lane: g.lane, card: null, count: g.cards.length },
+                      // A collapsed lane keeps its heading, in every column.
+                      ...(collapse.isCollapsed(g.lane?.id ?? null)
+                        ? []
+                        : g.cards.map((card) => ({ lane: g.lane, card, count: 0 }))),
                     ])
-                  : colCards.map((card) => ({ lane: null, card }))
-                ).map(({ lane, card }) => {
+                  : colCards.map((card) => ({ lane: null, card, count: 0 }))
+                ).map(({ lane, card, count }) => {
                   if (!card) {
                     return (
                       <LaneHeading
                         key={`lane:${lane?.id ?? 'none'}`}
                         name={lane?.name ?? 'No lane'}
                         info={lane ? (infoByLane.get(lane.id) ?? null) : null}
+                        collapsed={collapse.isCollapsed(lane?.id ?? null)}
+                        onToggle={() => void collapse.toggle(lane?.id ?? null)}
+                        here={count}
                       />
                     );
                   }

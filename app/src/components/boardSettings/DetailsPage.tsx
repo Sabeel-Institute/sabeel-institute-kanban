@@ -9,6 +9,7 @@ import {
   addableFieldTypes,
   fieldAddBlocked,
   isDateType,
+  isRealDate,
   isNamedType,
   safeLink,
   shortDay,
@@ -215,7 +216,8 @@ function DetailValue({
           </Pressable>
         ) : (
           <Text style={[type.body, { color: t.text.primary }]} selectable>
-            {isDateType(field.type) ? shortDay(value, todayInOrgTz()) : value}
+            {/* A date in a shape the app never writes reads as written. */}
+            {isDateType(field.type) && isRealDate(value) ? shortDay(value, todayInOrgTz()) : value}
           </Text>
         )}
       </View>

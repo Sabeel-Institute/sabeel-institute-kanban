@@ -60,8 +60,8 @@ function placement(page) {
     for (const list of document.querySelectorAll('[data-testid^="column-cards-"]')) {
       const column = list.getAttribute('data-testid').slice('column-cards-'.length);
       let lane = null;
-      for (const el of list.querySelectorAll('[role="heading"], [data-testid^="card-"]')) {
-        if (el.getAttribute('role') === 'heading') {
+      for (const el of list.querySelectorAll('[data-testid="lane-heading"], [data-testid^="card-"]')) {
+        if (el.getAttribute('data-testid') === 'lane-heading') {
           lane = (el.getAttribute('aria-label') || '').split(',')[0];
         } else {
           out[el.getAttribute('data-testid').slice('card-'.length)] = { column, lane };
@@ -79,8 +79,8 @@ async function laneOrder(page, column, lane) {
       const list = document.querySelector(`[data-testid="column-cards-${col}"]`);
       const out = [];
       let current = null;
-      for (const el of list.querySelectorAll('[role="heading"], [data-testid^="card-"]')) {
-        if (el.getAttribute('role') === 'heading') current = (el.getAttribute('aria-label') || '').split(',')[0];
+      for (const el of list.querySelectorAll('[data-testid="lane-heading"], [data-testid^="card-"]')) {
+        if (el.getAttribute('data-testid') === 'lane-heading') current = (el.getAttribute('aria-label') || '').split(',')[0];
         else if ((current === 'No lane' ? null : current) === want) out.push(el.getAttribute('data-testid').slice(5));
       }
       return out;
@@ -93,7 +93,7 @@ async function laneOrder(page, column, lane) {
 function barIn(page, column, lane) {
   return page.evaluate(
     ([col, name]) => {
-      const h = [...document.querySelectorAll(`[data-testid="column-cards-${col}"] [role="heading"]`)].find((el) => {
+      const h = [...document.querySelectorAll(`[data-testid="column-cards-${col}"] [data-testid="lane-heading"]`)].find((el) => {
         const label = el.getAttribute('aria-label') || '';
         return label === name || label.startsWith(`${name},`);
       });
@@ -109,7 +109,7 @@ function barIn(page, column, lane) {
 
 /** A lane heading's words, as a screen reader hears it: name, finished of total, late. */
 async function heading(page, lane) {
-  const h = page.locator(`[role="heading"][aria-label^="${lane},"]`).first();
+  const h = page.locator(`[data-testid="lane-heading"][aria-label^="${lane},"]`).first();
   await h.waitFor({ timeout: 20000 });
   return h.getAttribute('aria-label');
 }
@@ -239,7 +239,7 @@ try {
   await page.locator('[data-testid="card-Before lanes"]').waitFor({ timeout: 20000 });
   check(
     'a board without lanes draws no lane headings, and Add card asks for none',
-    (await page.locator('[role="heading"][aria-label]').count()) === 0 &&
+    (await page.locator('[data-testid="lane-heading"][aria-label]').count()) === 0 &&
       (await page.getByRole('button', { name: '+ Add card' }).first().click().then(
         () => page.getByLabel('Lane', { exact: true }).count(),
       )) === 0,
@@ -302,7 +302,7 @@ try {
   // ---- The board, with lanes --------------------------------------------------
   check('a card from before lanes is under No lane', await placed(page, 'Before lanes', 'To Do', 'No lane'));
   const toDoHeadings = await page.evaluate(() =>
-    [...document.querySelectorAll('[data-testid="column-cards-In Progress"] [role="heading"]')].map(
+    [...document.querySelectorAll('[data-testid="column-cards-In Progress"] [data-testid="lane-heading"]')].map(
       (h) => h.getAttribute('aria-label').split(',')[0],
     ),
   );
@@ -397,6 +397,171 @@ try {
   await page.getByRole('button', { name: /^Overdue filter/ }).click();
   await openBoard(BOARD);
 
+  // ---- A parent waits for its subtasks (#111) ------------------------------------
+  // A parent and one open subtask, written straight in, in To Do, Marketing.
+  // Every way of moving the parent to Done is refused in a notice (a dialog,
+  // recorded here), and the parent stays where it was; once the subtask is
+  // finished, the move goes. Then the subtask cannot be reopened while its
+  // parent is finished or archived, by any path, until it is unlinked.
+  {
+    const boardDoc = (await db.collection('boards').where('name', '==', BOARD).get()).docs[0];
+    const bd = boardDoc.data();
+    const col = (name) => bd.columns.find((c) => c.name === name).id;
+    const marketing = bd.lanes.find((l) => l.name === 'Marketing').id;
+    const by = bd.createdBy;
+    const put = (title, extra) =>
+      db.collection('cards').add({
+        boardId: boardDoc.id, title, description: '', columnId: col('To Do'), rank: `y${title.length}`,
+        laneId: marketing, priority: 'none', assigneeUids: [], subscriberUids: [], labelIds: [],
+        archived: false, commentCount: 0,
+        createdAt: Date.now(), createdBy: by, updatedAt: Date.now(), updatedBy: by, ...extra,
+      });
+    const parentRef = await put('Run the fair');
+    const childRef = await put('Book the stalls', { parentId: parentRef.id });
+    await page.locator('[data-testid="card-Run the fair"]').waitFor({ timeout: 20000 });
+    const at = async (ref) => (await ref.get()).data();
+    // Every notice the page raises, recorded; the page's own dialog handler
+    // (set up with the page) accepts it, as a person would.
+    const notices = [];
+    const onDialog = (d) => {
+      notices.push(d.message());
+    };
+    page.on('dialog', onDialog);
+    const noticed = async (re, ms = 10000) => {
+      const until = Date.now() + ms;
+      while (Date.now() < until) {
+        if (notices.some((m) => re.test(m))) return true;
+        await page.waitForTimeout(200);
+      }
+      return false;
+    };
+    const HELD = /“Run the fair” can’t go to Done while its subtask is still open: “Book the stalls”/;
+
+    await htmlDrag(
+      page,
+      '[data-testid="card-Run the fair"]',
+      '[data-testid="column-cards-Done"] [data-testid="lane-heading"][aria-label^="Marketing,"]',
+    );
+    check(
+      'a parent dragged to Done with a subtask open stays put, and a notice says why',
+      (await noticed(HELD)) && (await at(parentRef)).columnId === col('To Do'),
+    );
+
+    notices.length = 0;
+    await openCard('Run the fair');
+    await page.getByLabel('Column', { exact: true }).selectOption({ label: 'Done' });
+    const pickSaid = await noticed(HELD);
+    await page.waitForTimeout(800);
+    check(
+      'and so does choosing Done on the card',
+      pickSaid && (await at(parentRef)).columnId === col('To Do') &&
+        (await page.getByLabel('Column', { exact: true }).inputValue()) === col('To Do'),
+    );
+    await back();
+
+    notices.length = 0;
+    await page.getByRole('checkbox', { name: 'Select Run the fair' }).click();
+    await page.getByRole('button', { name: 'Move selected cards' }).click();
+    await page.getByLabel('Destination column', { exact: true }).selectOption({ label: 'Done' });
+    await page.getByRole('button', { name: 'Move', exact: true }).click();
+    const bulkSaid = await noticed(HELD);
+    await page.waitForTimeout(800);
+    check('and so does Move on the selection bar', bulkSaid && (await at(parentRef)).columnId === col('To Do'));
+    // Out of Move (Cancel), then out of the selection (Clear selection), or a
+    // tap on a card below would select it rather than open it.
+    await page.getByRole('button', { name: 'Cancel', exact: true }).first().click();
+    await page.getByRole('button', { name: 'Clear selection', exact: true }).click();
+
+    // Its subtask finished, the parent goes.
+    await childRef.update({ columnId: col('Done'), updatedAt: Date.now() });
+    await page.waitForTimeout(1500);
+    await openCard('Run the fair');
+    await page.getByLabel('Column', { exact: true }).selectOption({ label: 'Done' });
+    let moved = false;
+    for (let i = 0; i < 40 && !moved; i += 1) {
+      moved = (await at(parentRef)).columnId === col('Done');
+      if (!moved) await page.waitForTimeout(250);
+    }
+    check('once its subtask is finished, the parent goes to Done', moved);
+    await back();
+
+    // Reopening the subtask under its finished parent: refused on the card.
+    const REOPEN = (why) =>
+      new RegExp(
+        why === 'archived'
+          ? '“Book the stalls” is a subtask of “Run the fair”, which is archived\\. Restore “Run the fair” first, or to reopen'
+          : '“Book the stalls” is a subtask of “Run the fair”, which is finished\\. To reopen it, first unlink it',
+      );
+    notices.length = 0;
+    await openCard('Book the stalls');
+    await page.getByLabel('Column', { exact: true }).selectOption({ label: 'To Do' });
+    const reopenSaid = await noticed(REOPEN('finished'));
+    await page.waitForTimeout(800);
+    check(
+      'a finished subtask is not reopened while its parent is finished, and the notice says to unlink it',
+      reopenSaid && (await at(childRef)).columnId === col('Done'),
+      notices.join(' | '),
+    );
+    await back();
+
+    // Under an archived parent, refused on a drag too. The parent is read
+    // from its document, since an archived card is not on the board.
+    await parentRef.update({ archived: true, archivedAt: Date.now(), updatedAt: Date.now() });
+    await page.locator('[data-testid="card-Run the fair"]').waitFor({ state: 'detached', timeout: 20000 });
+    notices.length = 0;
+    await htmlDrag(
+      page,
+      '[data-testid="card-Book the stalls"]',
+      '[data-testid="column-cards-To Do"] [data-testid="lane-heading"][aria-label^="Marketing,"]',
+    );
+    check(
+      'and not while its parent is archived, dragged or otherwise',
+      (await noticed(REOPEN('archived'))) && (await at(childRef)).columnId === col('Done'),
+      notices.join(' | '),
+    );
+
+    // Restoring it open from the archive under its finished parent: refused.
+    await parentRef.update({ archived: false, columnId: col('Done'), updatedAt: Date.now() });
+    await childRef.update({ archived: true, archivedAt: Date.now(), columnId: col('To Do'), updatedAt: Date.now() });
+    await page.locator('[data-testid="card-Book the stalls"]').waitFor({ state: 'detached', timeout: 20000 });
+    notices.length = 0;
+    await page.getByRole('button', { name: 'Archived cards' }).click();
+    await page.getByRole('button', { name: 'Restore Book the stalls to the board' }).click();
+    const restoreSaid = await noticed(REOPEN('finished'));
+    await page.waitForTimeout(800);
+    check(
+      'and restoring it from the archive into an open column is refused the same way',
+      restoreSaid && (await at(childRef)).archived === true,
+      notices.join(' | '),
+    );
+    await back();
+
+    // Unlinked from its parent, it reopens.
+    await childRef.update({ archived: false, columnId: col('Done'), updatedAt: Date.now() });
+    await page.locator('[data-testid="card-Book the stalls"]').waitFor({ timeout: 20000 });
+    await openCard('Book the stalls');
+    await page.getByRole('button', { name: 'Unlink from parent card' }).click();
+    let unlinked = false;
+    for (let i = 0; i < 40 && !unlinked; i += 1) {
+      unlinked = !(await at(childRef)).parentId;
+      if (!unlinked) await page.waitForTimeout(250);
+    }
+    await page.getByLabel('Column', { exact: true }).selectOption({ label: 'To Do' });
+    let reopened = false;
+    for (let i = 0; i < 40 && !reopened; i += 1) {
+      reopened = (await at(childRef)).columnId === col('To Do');
+      if (!reopened) await page.waitForTimeout(250);
+    }
+    check('unlinked from its parent, it reopens', unlinked && reopened);
+    await back();
+    page.off('dialog', onDialog);
+
+    // Out of the way of the checks below, which count this board's cards.
+    await parentRef.update({ archived: true, archivedAt: Date.now() });
+    await childRef.update({ archived: true, archivedAt: Date.now() });
+    await openBoard(BOARD);
+  }
+
   // ---- In bulk ----------------------------------------------------------------
   await page.getByRole('checkbox', { name: 'Select Order the books' }).click();
   await page.getByRole('checkbox', { name: 'Select Book the hall' }).click();
@@ -440,7 +605,7 @@ try {
   const groups = await page.evaluate(() => {
     const out = {};
     let group = null;
-    for (const el of document.querySelectorAll('[role="heading"], [data-testid^="card-"], div')) {
+    for (const el of document.querySelectorAll('[data-testid="lane-heading"], [data-testid^="card-"], div')) {
       const text = el.textContent || '';
       if (el.children.length === 0 && /^(Overdue|Finished|Today|Next 7 days|Later|No due date) \(\d+\)$/.test(text)) {
         group = text.replace(/ \(\d+\)$/, '');
@@ -461,7 +626,7 @@ try {
   await htmlDrag(
     page,
     '[data-testid="card-Before lanes"]',
-    '[data-testid="column-cards-In Progress"] [role="heading"][aria-label^="Supplies,"]',
+    '[data-testid="column-cards-In Progress"] [data-testid="lane-heading"][aria-label^="Supplies,"]',
   );
   check(
     'a card dragged onto a lane heading in another column lands in that lane and column',
@@ -534,6 +699,190 @@ try {
     );
   }
 
+  // ---- Collapsing lanes (#115) ----------------------------------------------------
+  // Supplies holds Drag A, B and C in To Do and Before lanes in In Progress;
+  // Drag N is in No lane. Folding a lane folds it in every column, keeps its
+  // count, and is stored on the account.
+  {
+    const boardDoc = (await db.collection('boards').where('name', '==', BOARD).get()).docs[0];
+    const bd = boardDoc.data();
+    const supplies = bd.lanes.find((l) => l.name === 'Supplies').id;
+    const me = db.doc(`users/${bd.createdBy}`);
+    const storedLanes = async (want, ms = 15000) => {
+      const until = Date.now() + ms;
+      for (;;) {
+        const got = (await me.get()).data()?.collapsedLanes?.[boardDoc.id];
+        if (want(got) || Date.now() > until) return got;
+        await page.waitForTimeout(250);
+      }
+    };
+    const suppliesHeads = page.locator('[data-testid="lane-heading"][aria-label^="Supplies,"]');
+    const states = async (loc) =>
+      loc.evaluateAll((els) => els.map((e) => e.getAttribute('aria-expanded')));
+    const visibleCards = (titles) =>
+      Promise.all(titles.map((t) => page.locator(`[data-testid="card-${t}"]`).count())).then((n) =>
+        n.reduce((a, b) => a + b, 0),
+      );
+    const SUPPLIES_CARDS = ['Drag A', 'Drag B', 'Drag C', 'Before lanes'];
+
+    const shownBefore = await visibleCards(SUPPLIES_CARDS);
+    // A card selected in the lane: folding hides it, so it leaves the
+    // selection rather than riding along, unseen, in a bulk action.
+    await page.getByRole('checkbox', { name: 'Select Drag A' }).click();
+    const selectedFirst = await page.getByRole('button', { name: 'Clear selection', exact: true }).isVisible();
+    await suppliesHeads.first().click();
+    await page.waitForFunction(
+      () => [...document.querySelectorAll('[data-testid="lane-heading"][aria-label^="Supplies,"]')].every((e) => e.getAttribute('aria-expanded') === 'false'),
+      null,
+      { timeout: 10000 },
+    );
+    const headsShut = await states(suppliesHeads);
+    const counted = /finished|no cards/.test((await suppliesHeads.first().getAttribute('aria-label')) ?? '');
+    const hereLabel =
+      (await page
+        .locator('[data-testid="column-cards-To Do"] [data-testid="lane-heading"][aria-label^="Supplies,"]')
+        .getAttribute('aria-label')) ?? '';
+    check(
+      'a folded lane gives its count in this column, and its selected cards leave the selection',
+      selectedFirst &&
+        /, 3 in this column$/.test(hereLabel) &&
+        (await page.getByRole('button', { name: 'Clear selection', exact: true }).count()) === 0,
+      hereLabel,
+    );
+    check(
+      'a lane folds in every column at once, keeping its count, and only its cards go',
+      shownBefore === 4 &&
+        headsShut.length >= 2 &&
+        headsShut.every((x) => x === 'false') &&
+        counted &&
+        (await visibleCards(SUPPLIES_CARDS)) === 0 &&
+        (await visibleCards(['Drag N'])) === 1,
+      `${shownBefore} shown before; headings ${JSON.stringify(headsShut)}`,
+    );
+    const saved = await storedLanes((g) => Array.isArray(g) && g.includes(supplies));
+    // A reload starts on the Boards list (routes are not in the URL), so the
+    // board is opened again, as a person would.
+    await page.reload();
+    await openBoard(BOARD);
+    // The folded heading coming back is the board answering with the stored
+    // choice; only then is a card's absence evidence.
+    const back = await page
+      .waitForFunction(
+        () => {
+          const hs = [...document.querySelectorAll('[data-testid="lane-heading"][aria-label^="Supplies,"]')];
+          return hs.length > 0 && hs.every((e) => e.getAttribute('aria-expanded') === 'false');
+        },
+        null,
+        { timeout: 30000 },
+      )
+      .then(() => true, () => false);
+    check(
+      'and stays folded after a reload, stored on the account',
+      back && (saved ?? []).includes(supplies) && (await visibleCards(SUPPLIES_CARDS)) === 0,
+      `stored ${JSON.stringify(saved)}`,
+    );
+
+    // A drop on a folded lane's heading lands first in the lane.
+    await htmlDrag(
+      page,
+      '[data-testid="card-Drag N"]',
+      '[data-testid="column-cards-To Do"] [data-testid="lane-heading"][aria-label^="Supplies,"]',
+    );
+    const ranked = async () => {
+      const snap = await db.collection('cards').where('boardId', '==', boardDoc.id).get();
+      const inLane = snap.docs
+        .map((d) => d.data())
+        .filter((c) => !c.archived && c.columnId === bd.columns.find((x) => x.name === 'To Do').id && c.laneId === supplies)
+        .sort((x, y) => (x.rank < y.rank ? -1 : 1));
+      return inLane.map((c) => c.title);
+    };
+    let order = [];
+    for (let i = 0; i < 40 && order[0] !== 'Drag N'; i += 1) {
+      order = await ranked();
+      if (order[0] !== 'Drag N') await page.waitForTimeout(250);
+    }
+    const dropOpened = await page
+      .waitForFunction(
+        () => [...document.querySelectorAll('[data-testid="lane-heading"][aria-label^="Supplies,"]')].every((e) => e.getAttribute('aria-expanded') === 'true'),
+        null,
+        { timeout: 10000 },
+      )
+      .then(() => true, () => false);
+    check(
+      'a card dropped on a folded lane lands first in it, and the lane opens to show it',
+      order[0] === 'Drag N' && dropOpened && (await page.locator('[data-testid="card-Drag N"]').isVisible()),
+      order.join(),
+    );
+
+    // Adding a card to a folded lane opens it, so the card is seen landing.
+    await suppliesHeads.first().click();
+    await page.waitForFunction(
+      () => [...document.querySelectorAll('[data-testid="lane-heading"][aria-label^="Supplies,"]')].every((e) => e.getAttribute('aria-expanded') === 'false'),
+      null,
+      { timeout: 10000 },
+    );
+    await storedLanes((g) => Array.isArray(g) && g.includes(supplies));
+    await addCard('Into the fold', 'Supplies');
+    const opened = await storedLanes((g) => !(g ?? []).includes(supplies));
+    check(
+      'adding a card to a folded lane opens the lane, card in view',
+      (await states(suppliesHeads)).every((x) => x === 'true') &&
+        (await page.locator('[data-testid="card-Into the fold"]').isVisible()) &&
+        !(opened ?? []).includes(supplies),
+      `stored ${JSON.stringify(opened)}`,
+    );
+
+    // Collapse all, then expand all.
+    const allHeads = page.locator('[data-testid="lane-heading"]');
+    await page.getByRole('button', { name: 'Collapse all lanes' }).click();
+    await page.waitForFunction(
+      () => [...document.querySelectorAll('[data-testid="lane-heading"]')].every((e) => e.getAttribute('aria-expanded') === 'false'),
+      null,
+      { timeout: 10000 },
+    );
+    const allShut = await storedLanes((g) => Array.isArray(g) && g.includes(supplies) && g.length >= bd.lanes.length);
+    const collapseOff = await page.getByRole('button', { name: 'Collapse all lanes' }).isDisabled();
+    await page.getByRole('button', { name: 'Expand all lanes' }).click();
+    await page.waitForFunction(
+      () => [...document.querySelectorAll('[data-testid="lane-heading"]')].every((e) => e.getAttribute('aria-expanded') === 'true'),
+      null,
+      { timeout: 10000 },
+    );
+    const allOpen = await storedLanes((g) => g === undefined);
+    check(
+      'Collapse all folds every lane, and Expand all opens them and leaves nothing stored',
+      (allShut ?? []).length >= bd.lanes.length &&
+        collapseOff &&
+        allOpen === undefined &&
+        (await page.getByRole('button', { name: 'Expand all lanes' }).isDisabled()) &&
+        (await allHeads.count()) > 0,
+      `folded ${JSON.stringify(allShut)}, then ${JSON.stringify(allOpen)}`,
+    );
+
+    // On a phone the same controls sit in a row above the lanes.
+    await page.setViewportSize({ width: 360, height: 800 });
+    const phoneCollapse = page.getByRole('button', { name: 'Collapse all lanes' }).first();
+    await phoneCollapse.waitFor({ timeout: 15000 });
+    // By role: the pager draws every column, the ones off screen aria-hidden,
+    // and a role lookup skips those.
+    const head = page.getByRole('button', { name: /^Supplies,/ }).first();
+    await head.click();
+    const phoneShut = await page
+      .waitForFunction(
+        () => document.querySelector('[data-testid="lane-heading"][aria-label^="Supplies,"]')?.getAttribute('aria-expanded') === 'false',
+        null,
+        { timeout: 10000 },
+      )
+      .then(() => true, () => false);
+    await page.screenshot({ path: join(SHOTS, 'lanes-folded-phone.png'), fullPage: true });
+    await head.click();
+    await page.getByRole('button', { name: 'Expand all lanes' }).first().click().catch(() => {});
+    await storedLanes((g) => g === undefined);
+    await page.setViewportSize({ width: 1280, height: 950 });
+    await page.getByText('To Do').first().waitFor({ timeout: 20000 });
+    check('on a phone, a lane folds from its heading, with the collapse controls above the lanes', phoneShut);
+  }
+
   // ---- A refused add keeps its form ---------------------------------------------
   // The rules check a new card's column against the board's `columnIds`
   // mirror; with To Do taken out of it, the board still draws To Do and the
@@ -603,7 +952,7 @@ try {
   const off = await placement(page);
   check(
     'lanes off: the board is drawn as it always was, every card still on it',
-    (await page.locator('[role="heading"][aria-label]').count()) === 0 &&
+    (await page.locator('[data-testid="lane-heading"][aria-label]').count()) === 0 &&
       ['Before lanes', 'Book the hall', 'Design the flyer'].every((t) => off[t]),
     JSON.stringify(off),
   );

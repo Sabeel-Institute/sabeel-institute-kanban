@@ -595,7 +595,9 @@ Each section's heading folds it away and opens it again (#110). Folded, the
 heading says how many boards the section holds, so folding hides boards and
 never the fact that they are there. What a person folds is stored on their
 user document (`collapsedBoardSections`), across reloads and devices, like
-their stars; it hides nothing from anyone else.
+their stars; it hides nothing from anyone else. While **Filter boards** holds
+text every section is open, so a match is never behind a fold, and the
+headings do not fold until the filter is cleared.
 
 No folders or groups: they need curation, a permission story of their own, and a
 second tree to navigate on a phone. Revisit only if the team passes ~50 boards and
@@ -711,6 +713,28 @@ learn for boards that are not programs.
   cards" when empty. A lane keeps its heading in a column with none of its
   cards, so it holds its place from column to column. The wide board is not a
   swimlane grid: lanes do not line up across columns (decision A).
+- **A lane folds, per person** (#115): its heading folds the lane's cards away
+  in every column at once, keeping its count and colour; two icons fold and
+  open every lane. Stored on the person's user document (`collapsedLanes`, by
+  board), across reloads and devices, and decided in one hook for every layout
+  (`useLaneCollapse`). Folded, a heading also says how many of the lane's
+  cards are in that column. A drop on a folded heading lands first in the
+  lane and opens it, as an add into a folded lane does. A folded lane's
+  cards leave the selection as it folds, and a range or select-all takes
+  only cards on view: a bulk action never reaches a card nobody can see.
+  Opening the last folded lane, or Expand all, deletes the board's entry;
+  folds on a board nobody opens again stay, bounded at 500 boards.
+- **A parent waits for its subtasks** (#111, 2026-11-18): on a board with
+  lanes, a card with an open subtask (same board, not finished, not archived)
+  cannot be moved into the finished column, by any path; the move is refused
+  in words naming the open subtasks, and nothing is written. Subtasks moved
+  with it into the finished column count as finished. Always on, no setting;
+  a board without lanes has no finished column and is unchanged. Nor is a
+  subtask reopened (moved out of the finished column, or restored from the
+  archive to an open column) while its parent is finished or archived: the
+  notice says to unlink it from its parent first. Both refusals are a notice
+  dialog. Adding or linking an open subtask under a finished parent is
+  allowed.
 - **Add card asks for a lane** on a board with lanes, none chosen, and adds
   nothing until one is. A subtask starts in its parent's lane. A card's lane is
   a second choice beside its column on the card; No lane is offered only while
@@ -775,6 +799,13 @@ lanes; read-only, and it stores two preferences per person and nothing else.
 - **Reached from an icon in the Boards header**, shown only to someone with at
   least one board it lists (a hidden one counts), so people who never use
   lanes never see it. Not a tab and not in More (decision D).
+- **A row shows its board's details on request** (#118, 2026-11-18): a
+  chevron at the top right of the name opens, under the row, the details that
+  have a value, less Start date and End date, which the row already shows;
+  links open through `safeLink`. No chevron on a board with nothing else to
+  show. The chevron sits beside the row's button, never inside it, and the
+  row's padding and the group's lane geometry do not change. Open rows are
+  view state, kept for the session and not stored.
 - **It lists the boards you can see that have live lanes** (`lanesLive`), are
   not marked as templates and are not archived (`overviewBoards`): the boards
   you are on, and every such board for an admin, as in the Boards list.

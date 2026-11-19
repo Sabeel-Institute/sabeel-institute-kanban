@@ -119,8 +119,9 @@ last under their own heading, each with a small *Template* badge.
 
 Tap a heading (*Starred*, *Recent*, *All boards*, *Templates*) to fold that
 section away; the heading stays, with the number of boards it holds, and tapping
-it again opens it. What you fold stays folded, on this device and your others,
-until you open it again.
+it again opens it. While you type in **Filter boards**, every section opens
+so nothing you're looking for is hidden. What you fold stays folded, on this
+device and your others, until you open it again.
 
 Every board shows as a card in a grid on wide screens, and as a single-column list
 on a phone. If your account can create boards, **New board** is at the top (see
@@ -183,11 +184,35 @@ says *No cards*.
 how late it is, and it isn't *Overdue* anywhere: not on the card, in My Work
 or in Search, and nobody is reminded about it.
 
+**A card waits for its subtasks.** A card with a subtask that isn't finished
+can't go into the finished column, however you move it: dragging, choosing
+the column on the card, or **Move** on a selection. The app says which
+subtasks are still open; finish them (or archive any that are no longer
+needed), and the card can go. Moving a card together with all its open
+subtasks is fine, since they finish with it.
+
+The other way round, a **finished subtask stays finished while the card it
+belongs to is finished or archived**: moving it out of the finished column,
+or restoring it from the archive into another column, is refused. To reopen
+it, open it and tap **Unlink from parent card** first.
+
 Cards without a lane, such as those added before the board had lanes, sit
 under **No lane**, at the foot of each column.
 
 **Adding a card** on a board with lanes asks which lane it goes in: choose one
 before **Add**. A subtask starts in the lane of the card it belongs to.
+
+**Folding a lane.** Tap a lane's heading to fold its cards away, in every
+column at once; the heading stays, with its count and its colour, so a folded
+lane still shows when something in it is late. Tap it again to open it. Two
+icons fold every lane at once and open them all again: in a browser they're
+at the top of the board, beside **Archived cards**; on a phone they're just
+above the first lane. A folded lane's heading also says how many of its
+cards are in the column you're looking at. A card dropped on a folded lane's
+heading goes to the top of that lane, and the lane opens; adding a card to a
+folded lane opens it too, so you see the card arrive. Cards you had selected
+in a lane are unselected when it folds. What you fold stays folded, on this device and your others,
+until you open it.
 
 A board without lanes looks exactly as described above. Lanes are switched on
 in the board's settings (Part 2).
@@ -215,6 +240,14 @@ The **overview** film in **More → Help** goes through the marks one by one.
 
 Boards with the same lanes sit together under one row of lane names. Tap a
 row to open its board.
+
+A board with **details** beyond its dates (teachers, a meeting link, a fee:
+whatever its owners added in Board settings → Details) has a small **arrow**
+at the top right of its row. Tap it to show those details under the row, and
+again to hide them; links open from there. Only details with a value are
+shown, and not the dates, which the row already gives. Tapping the arrow
+doesn't open the board; tapping the rest of the row still does. Rows you open
+stay open while you use the app.
 
 **Order** sorts the boards by **Start date** (where it starts), **Date
 created** or **Most overdue**, and the arrows beside it turn that order the

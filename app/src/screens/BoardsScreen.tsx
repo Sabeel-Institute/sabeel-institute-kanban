@@ -72,12 +72,15 @@ function BoardsSection({
   count,
   collapsed,
   onToggle,
+  filtering,
   children,
 }: {
   title: string;
   count: number;
   collapsed: boolean;
   onToggle: () => void;
+  /** A filter is typed: every section is open and none folds until it clears. */
+  filtering: boolean;
   children: React.ReactNode;
 }) {
   const t = useTheme();
@@ -89,7 +92,7 @@ function BoardsSection({
   return (
     <>
       <View style={styles.sectionGap}>
-        <DisclosureHeading label={label} expanded={!collapsed} onToggle={onToggle}>
+        <DisclosureHeading label={label} expanded={!collapsed} onToggle={onToggle} disabled={filtering}>
           <Text style={[type.heading, { color: t.text.primary }]}>{words}</Text>
         </DisclosureHeading>
       </View>
@@ -229,6 +232,9 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
   const collapsedPrefs = useMyCollapsed(user);
   const collapsed = collapsedPrefs.data?.sections ?? NO_SECTIONS;
   const collapseAction = useAction('collapseSection');
+  // While a filter is typed every section is open: a match must never sit
+  // behind a fold where the person is not looking.
+  const filtering = filter.trim() !== '';
   function toggleSection(section: BoardSection) {
     return collapseAction.run(() =>
       setSectionCollapsed(user, section, !collapsed.includes(section)),
@@ -398,6 +404,7 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
       {collapseAction.error ? (
         <Card style={styles.form}>
           <Body>{collapseAction.error}</Body>
+          <Button label="Dismiss" variant="secondary" onPress={() => collapseAction.setError(null)} />
         </Card>
       ) : null}
 
@@ -416,7 +423,8 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
           <BoardsSection
             title={'Starred'}
             count={sections.favourites.length}
-            collapsed={collapsed.includes('starred')}
+            collapsed={!filtering && collapsed.includes('starred')}
+            filtering={filtering}
             onToggle={() => toggleSection('starred')}
           >
           <CardGrid>
@@ -440,7 +448,8 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
           <BoardsSection
             title={'Recent'}
             count={sections.recents.length}
-            collapsed={collapsed.includes('recent')}
+            collapsed={!filtering && collapsed.includes('recent')}
+            filtering={filtering}
             onToggle={() => toggleSection('recent')}
           >
           <CardGrid>
@@ -464,7 +473,8 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
           <BoardsSection
             title={sections.favourites.length + sections.recents.length > 0 ? 'All boards' : 'Boards'}
             count={sections.others.length}
-            collapsed={collapsed.includes('all')}
+            collapsed={!filtering && collapsed.includes('all')}
+            filtering={filtering}
             onToggle={() => toggleSection('all')}
           >
           <CardGrid>
@@ -490,7 +500,8 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
           <BoardsSection
             title={'Templates'}
             count={sections.templates.length}
-            collapsed={collapsed.includes('templates')}
+            collapsed={!filtering && collapsed.includes('templates')}
+            filtering={filtering}
             onToggle={() => toggleSection('templates')}
           >
           <CardGrid>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { deleteCard, restoreCard, useArchivedBoardCards } from '../cards';
+import { deleteCard, restoreCard, restoreColumnId, useArchivedBoardCards, useBoardCards } from '../cards';
+import { allowMove } from '../moveGuard';
 import { canManageBoard, isFinished } from '@sabeel/shared';
 import { useBoard } from '../boards';
 import { useLabels } from '../labels';
@@ -50,6 +51,10 @@ export function BoardArchiveScreen({
   // Permanent deletion is this board's owners and admins — not a rank.
   const canManage = canManageBoard(user, board.data);
   const cards = useArchivedBoardCards(boardId);
+  // The board's open cards, which a restore is checked against: a parent
+  // restored to the finished column waits for its subtasks, and a subtask is
+  // not restored open under a finished parent (#111).
+  const openCards = useBoardCards(boardId);
   const allLabels = useLabels();
   const { run, busy, error } = useAction('boardArchive');
   /** Set only when a restore had to land the card somewhere else. */
@@ -145,9 +150,20 @@ export function BoardArchiveScreen({
             <IconAction
               icon="unarchive"
               label={`Restore ${card.title} to the board`}
-              disabled={busy}
-              onPress={() =>
-                run(async () => {
+              // Held until the board's open cards are in: a restore is checked
+              // against them (#111).
+              disabled={busy || openCards.status !== 'ready'}
+              onPress={() => {
+                const to = restoreColumnId(card, b.columns);
+                return run(async (untimed) => {
+                  const allowed =
+                    to === null ||
+                    (await allowMove(
+                      { board: b, boardId, toColumnId: to, moving: [card], cards: openCards.data ?? [] },
+                      'Not restored',
+                      untimed,
+                    ));
+                  if (!allowed) return;
                   const { movedTo } = await restoreCard(card, user, b.columns);
                   // Its own column may have been deleted while it sat here. Say
                   // where it actually went rather than letting it reappear
@@ -155,8 +171,8 @@ export function BoardArchiveScreen({
                   if (movedTo) {
                     setNote(`“${card.title}” went back to ${movedTo} — the column it was archived from no longer exists.`);
                   }
-                })
-              }
+                });
+              }}
             />
             {/* Permanent deletion stays this board's owners and admins, as on the
                 card itself — the archive is not a back door around that.

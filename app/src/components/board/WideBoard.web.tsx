@@ -32,6 +32,9 @@ import { BulkBar } from '../BulkBar';
 import { IconAction, LoadError } from '../ui';
 import { NewCardBell, WatchColumnBell } from './Bells';
 import { LaneHeading } from './LaneHeading';
+import { LaneCollapseActions } from './LaneCollapseActions';
+import { useLaneCollapse } from './useLaneCollapse';
+import { allowMove } from '../../moveGuard';
 import { useLaneInfo } from './useLaneInfo';
 import { setColumnWatched, useWatchedColumns } from '../../notifications';
 import {
@@ -391,6 +394,14 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   const laneBoard = board.data;
   const live = laneBoard ? lanesLive(laneBoard) : false;
   const infoByLane = useLaneInfo(laneBoard ?? null, live, cards.data ?? EMPTY_CARDS);
+  const collapse = useLaneCollapse(
+    user,
+    boardId,
+    laneBoard ?? null,
+    live,
+    cards.data ?? EMPTY_CARDS,
+    selection.deselect,
+  );
 
   const drop = useCallback(
     async (target: DropTarget, cardIdFromEvent: string | null) => {
@@ -409,6 +420,21 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
 
       const moving = (cards.data ?? []).find((c) => c.id === cardId);
       if (!moving) return;
+      // A parent waits for its subtasks, and a subtask is not reopened under
+      // a finished parent (#111): the card stays where it was, and a notice
+      // says why.
+      if (
+        laneBoard &&
+        !(await allowMove({
+          board: laneBoard,
+          boardId,
+          toColumnId: columnId,
+          moving: [moving],
+          cards: cards.data ?? [],
+        }))
+      ) {
+        return;
+      }
 
       const drawnColumn = byColumn.get(columnId) ?? [];
       const column = drawnColumn.filter((c) => c.id !== moving.id);
@@ -422,6 +448,10 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         : drawnColumn;
       const place = dropPlacement(group, index, moving.id);
       if (!place) return;
+      // Dropped on a folded lane's heading: open it now, as an add does, so
+      // the card is seen landing rather than vanishing until the server
+      // answers (or, offline, until the write is sent).
+      if (inLane && target.laneId) void collapse.reveal(target.laneId);
 
       try {
         await moveCard({
@@ -439,7 +469,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         setError(toUserMessage(e, 'moveCard'));
       }
     },
-    [drag, cards.data, byColumn, laneBoard, user, autoScroll],
+    [drag, cards.data, byColumn, laneBoard, boardId, user, autoScroll, collapse],
   );
 
   // The title comes from `WebAddCardForm`, already trimmed and non-empty — the
@@ -454,6 +484,8 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
     setAdding(null);
     // Only this column's: a refused add waiting elsewhere is kept.
     setRetry((r) => (r?.columnId === columnId ? null : r));
+    // The card is drawn at once; a folded lane would swallow it from view.
+    if (laneId) void collapse.reveal(laneId);
     try {
       await createCard({
         boardId,
@@ -597,6 +629,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         <div style={{ display: 'flex', gap: space.xs, flexShrink: 0 }}>
           {/* Everyone, not just owners: members can archive, so members must
               be able to un-archive. */}
+          {live ? <LaneCollapseActions collapse={collapse} /> : null}
           <IconAction
             icon="inventory-2"
             label="Archived cards"
@@ -622,6 +655,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
           currentBoardId={boardId}
           columns={b.columns}
           lanes={live && laneBoard ? laneBoard.lanes : undefined}
+          doneColumnId={laneBoard?.doneColumnId}
           allCards={cards.data ?? []}
           selection={selection}
           members={members}
@@ -663,6 +697,14 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
           </button>
         </div>
       ) : null}
+      {collapse.error ? (
+        <div style={banner(t)}>
+          {collapse.error}{' '}
+          <button onClick={collapse.clearError} style={{ ...btn(t), marginLeft: 8 }}>
+            Dismiss
+          </button>
+        </div>
+      ) : null}
 
       <div
         ref={columnsRef}
@@ -688,7 +730,8 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
           const colCards = byColumn.get(col.id) ?? [];
           const groups = live && laneBoard ? groupByLane(colCards, laneBoard, cards.data ?? EMPTY_CARDS) : null;
           // The order the column DRAWS its cards in, which shift-click follows.
-          const drawn = groups ? groups.flatMap((g) => g.cards) : colCards;
+          // Folded lanes' cards are not drawn, so a range never takes them.
+          const drawn = groups ? collapse.visible(groups.flatMap((g) => g.cards)) : colCards;
           // Dropped anywhere in the column but a lane: the end of the dragged
           // card's own lane, or of the column on a board without lanes. The
           // index counts the group as drawn, the dragged card included, so the
@@ -874,18 +917,32 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
                       if (drag) setDropTarget({ columnId: col.id, laneId, index });
                       driveAutoScroll(e.clientX, e.clientY, col.id);
                     };
+                    // Collapsed, the lane keeps its heading and takes a drop
+                    // at its top: the bar shows under the heading, and the
+                    // card lands first in the lane, as a drop on any heading
+                    // does.
+                    const folded = collapse.isCollapsed(laneId);
                     return (
-                      <div key={laneId ?? 'none'} onDragOver={into(g.cards.length)}>
+                      <div key={laneId ?? 'none'} onDragOver={into(folded ? 0 : g.cards.length)}>
                         {/* Over the heading: the top of the lane. */}
                         <div onDragOver={into(0)}>
                           <LaneHeading
                             name={g.lane?.name ?? 'No lane'}
                             info={g.lane ? (infoByLane.get(g.lane.id) ?? null) : null}
+                            collapsed={folded}
+                            onToggle={() => void collapse.toggle(laneId)}
+                            here={g.cards.length}
                           />
                         </div>
                         <div style={{ height: space.xs }} />
-                        {g.cards.map((card, i) => renderCard(card, i, laneId))}
-                        {marks(laneId, g.cards.length) ? dropBar : null}
+                        {folded ? (
+                          marks(laneId, 0) ? dropBar : null
+                        ) : (
+                          <>
+                            {g.cards.map((card, i) => renderCard(card, i, laneId))}
+                            {marks(laneId, g.cards.length) ? dropBar : null}
+                          </>
+                        )}
                       </div>
                     );
                   })

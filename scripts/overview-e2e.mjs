@@ -180,12 +180,51 @@ try {
   //   created: Gamma, Alpha, Delta, Beta
   //   late:    Gamma (2020), Delta (2024), Alpha (2025), Beta (none late)
   // Alpha and Beta share their lanes, so they share a heading.
-  await board('ov_alpha', 'Alpha Camp', PS, { details: { f_start: '2027-07-01' }, createdAt: 2000 }, [F, O]);
+  // Alpha has details beyond its start date, one of them empty (#118).
+  await board(
+    'ov_alpha',
+    'Alpha Camp',
+    PS,
+    {
+      fields: [
+        { id: 'f_start', name: 'Start date', type: 'start' },
+        { id: 'f_teach', name: 'Teachers', type: 'text' },
+        { id: 'f_zoom', name: 'Zoom link', type: 'link' },
+        { id: 'f_fee', name: 'Fee', type: 'number' },
+        { id: 'f_notes', name: 'Notes', type: 'text' },
+      ],
+      details: {
+        f_start: '2027-07-01',
+        f_teach: 'Sara and Omar',
+        f_zoom: 'https://meet.example.org/alpha',
+        f_fee: '1200',
+      },
+      createdAt: 2000,
+    },
+    [F, O],
+  );
   await board('ov_beta', 'Beta Course', PS, { details: { f_start: '2027-03-01' }, createdAt: 4000 }, [O]);
-  await board('ov_gamma', 'Gamma Circle', ['Prep', 'Teach'], { createdAt: 1000 }, [F, O]);
+  // Gamma has a detail and no dates: its name is the title's one line (#118).
+  await board(
+    'ov_gamma',
+    'Gamma Circle',
+    ['Prep', 'Teach'],
+    {
+      createdAt: 1000,
+      fields: [
+        { id: 'f_start', name: 'Start date', type: 'start' },
+        { id: 'f_host', name: 'Host', type: 'text' },
+      ],
+      details: { f_host: 'Omar' },
+    },
+    [F, O],
+  );
   await board('ov_delta', 'Delta Retreat', [...PS, 'Wrap-up'], { details: { f_start: '2027-05-01' }, createdAt: 3000 }, [F]);
   await board('ov_tmpl', 'Template Program', PS, { template: true, createdAt: 5000 }, [F, O]);
   await board('ov_old', 'Old Program', PS, { archived: true, createdAt: 6000 }, [F, O]);
+  // Without lanes, so never on the overview; a seventh active board for the
+  // admin, so the Boards list draws Filter boards (#110's check below).
+  await board('ov_extra', 'Extra Board', PS, { lanesOn: false, createdAt: 8000 }, [F]);
   // Alpha: a finished card long past its date (not late), and a late one.
   await card('ov_alpha', 0, 0, 'c_done', '2020-01-01', F.uid);
   await card('ov_alpha', 1, 1, 'c_todo', '2025-06-01', F.uid);
@@ -316,6 +355,33 @@ try {
   got = await settled(page, START);
   check('and back with them, whatever the capitals', same(got, START), flat(got));
 
+  // ---- A row with details and no dates, on a phone (#118) ---------------------------------
+  // Before Hide and show, which hides Gamma.
+  {
+    await page.setViewportSize({ width: 380, height: 820 });
+    await page.getByRole('button', { name: 'Details of Gamma Circle', exact: true }).waitFor({ timeout: 15000 });
+    await page.waitForTimeout(500);
+    // On a phone, a row with no dates line keeps its marks below the chevron's
+    // 44-point box, so a tap on a mark opens the board, not the details.
+    const gap = await page.evaluate(() => {
+      const chevron = [...document.querySelectorAll('[aria-label="Details of Gamma Circle"]')].find(
+        (e) => e.getBoundingClientRect().width > 0,
+      );
+      const row = document.querySelector('[data-testid="overview-row:Gamma Circle"]');
+      const marks = row ? [...row.querySelectorAll('[data-testid="overview-mark"]')] : [];
+      if (!chevron || marks.length === 0) return null;
+      const bottom = chevron.getBoundingClientRect().bottom;
+      return Math.min(...marks.map((m) => m.getBoundingClientRect().top)) - bottom;
+    });
+    check(
+      'on a phone, a row with details and no dates keeps its marks clear of the chevron',
+      gap !== null && gap >= 0,
+      `marks start ${gap}px below the chevron`,
+    );
+    await page.setViewportSize({ width: 1280, height: 950 });
+    await page.waitForTimeout(500);
+  }
+
   // ---- Hide and show ------------------------------------------------------------------------
   await page.getByTestId('overview-row:Alpha Camp').click({ button: 'right' });
   await page.getByText('Hide from my overview').click();
@@ -369,6 +435,42 @@ try {
   await page.getByRole('button', { name: 'Show Delta Retreat', exact: true }).click();
   await settled(page, [['Beta Course', 'Alpha Camp'], ['Delta Retreat']]);
 
+  // ---- A row's details (#118) ---------------------------------------------------------------
+  const alphaToggle = page.getByRole('button', { name: 'Details of Alpha Camp', exact: true });
+  const panel = page.getByTestId('overview-details');
+  {
+    await alphaToggle.waitFor({ timeout: 15000 });
+    const shut = (await alphaToggle.getAttribute('aria-expanded')) === 'false' && (await panel.count()) === 0;
+    const betaHas = await page.getByRole('button', { name: 'Details of Beta Course', exact: true }).count();
+    await alphaToggle.click();
+    await panel.waitFor({ timeout: 10000 });
+    const text = await panel.innerText();
+    const link = page.getByRole('link', { name: 'Zoom link: https://meet.example.org/alpha' });
+    check(
+      'a row with details beyond its dates opens them from its chevron, the filled ones only',
+      shut &&
+        betaHas === 0 &&
+        (await alphaToggle.getAttribute('aria-expanded')) === 'true' &&
+        /Sara and Omar/.test(text) &&
+        /1200/.test(text) &&
+        (await link.count()) === 1 &&
+        !/Notes|Start date/i.test(text),
+      text.replace(/\n/g, ' | '),
+    );
+    check(
+      'and opening them does not open the board',
+      (await overviewButton(page).count()) === 0 &&
+        (await page.getByRole('button', { name: 'Board settings' }).count()) === 0 &&
+        (await page.getByTestId('overview-row:Alpha Camp').isVisible()),
+    );
+    await page.screenshot({ path: join(SHOTS, 'overview-details-wide.png'), fullPage: true });
+    await page.setViewportSize({ width: 380, height: 820 });
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: join(SHOTS, 'overview-details-phone.png'), fullPage: true });
+    await page.setViewportSize({ width: 1280, height: 950 });
+    await page.waitForTimeout(500);
+  }
+
   // ---- A row opens its board --------------------------------------------------------------
   await page.getByTestId('overview-row:Delta Retreat').click();
   check(
@@ -377,6 +479,15 @@ try {
       .getByRole('button', { name: 'Board settings' })
       .waitFor({ timeout: 20000 })
       .then(() => page.getByText('Delta Retreat').first().isVisible(), () => false),
+  );
+  // Back on the overview, the details opened above are still open: kept for
+  // the session (#118).
+  await page.getByRole('button', { name: 'Back' }).first().click();
+  check(
+    'and coming back from a board finds them still open',
+    await alphaToggle
+      .waitFor({ timeout: 15000 })
+      .then(async () => (await alphaToggle.getAttribute('aria-expanded')) === 'true' && (await panel.isVisible()), () => false),
   );
 
   // ---- Collapsing a section of the Boards list (#110) ---------------------------------------
@@ -421,6 +532,15 @@ try {
         (await others.getAttribute('aria-expanded').catch(() => null)) === 'true',
       `stored ${JSON.stringify(savedShut)}`,
     );
+    // While a filter is typed, a folded section opens, so a match in it shows.
+    await page.getByPlaceholder('Filter boards').fill('Template Prog');
+    const matchShows = await page
+      .getByText('Template Program', { exact: true })
+      .waitFor({ timeout: 10000 })
+      .then(() => true, () => false);
+    await page.getByPlaceholder('Filter boards').fill('');
+    await shut.waitFor({ timeout: 10000 });
+    check('filtering shows a match inside a folded section, which folds again once cleared', matchShows);
     await shut.click();
     await open.waitFor({ timeout: 10000 });
     const savedOpen = await stored((g) => !g.includes('templates'));

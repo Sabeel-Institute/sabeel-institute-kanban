@@ -56,6 +56,17 @@ export function useSelection(allCards: readonly Card[]) {
     [anchor, toggle],
   );
 
+  /** Unselect these cards, if selected: a lane folding away hides them (#115). */
+  const deselect = useCallback((cardIds: readonly string[]) => {
+    if (cardIds.length === 0) return;
+    setIds((prev) => {
+      if (!cardIds.some((id) => prev.has(id))) return prev;
+      const next = new Set(prev);
+      for (const id of cardIds) next.delete(id);
+      return next;
+    });
+  }, []);
+
   const selectAllIn = useCallback((columnCards: readonly Card[]) => {
     setIds((prev) => {
       const next = new Set(prev);
@@ -79,6 +90,7 @@ export function useSelection(allCards: readonly Card[]) {
     toggle,
     selectRangeTo,
     selectAllIn,
+    deselect,
     clear,
   };
 }

@@ -16,3 +16,17 @@ export function confirmAction(title: string, message: string): Promise<boolean> 
     ]);
   });
 }
+
+/**
+ * A notice with one button: something was not done, and why. Native: an alert
+ * with OK. Used where a refusal must not be missed, wherever the person is on
+ * a long screen (a parent card held out of the finished column, a subtask that
+ * cannot be reopened).
+ */
+export function noticeAction(title: string, message: string): Promise<void> {
+  return new Promise((resolve) => {
+    Alert.alert(title, message, [{ text: 'OK', onPress: () => resolve() }], {
+      onDismiss: () => resolve(),
+    });
+  });
+}
