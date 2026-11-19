@@ -246,8 +246,10 @@ its `laneId`. What is load-bearing:
   either wide board, the selection bar's Move, Restore on the card and in the
   archive. A parent off the board (archived) is read from its document.
   Rules cannot see subtasks, so this is the app's, and a build without it
-  could still do it until the version floor passes it. Adding or linking an
-  open subtask under a finished parent is not refused.
+  could still do it until the version floor passes it. **Nor does a finished
+  or archived parent take new open work**: adding a subtask to it, or linking
+  an open card under it, is refused on the card (`subtaskAddRefusal`);
+  linking a card already finished is not.
 - **A lane change is history and a notice**, like a column move, except on a
   move to another board, which clears the lane and records none.
 - **12 lanes at most** (`LANES_MAX`), restated in `firestore.rules`, where

@@ -485,6 +485,38 @@ try {
     check('once its subtask is finished, the parent goes to Done', moved);
     await back();
 
+    // No new open work under a finished parent: adding a subtask is refused,
+    // its title kept, and linking an open card is refused; nothing written.
+    const spareRef = await put('Hire a tent');
+    await page.locator('[data-testid="card-Hire a tent"]').waitFor({ timeout: 20000 });
+    const childrenOf = async (id) =>
+      (await db.collection('cards').where('parentId', '==', id).get()).docs.filter((d) => !d.data().archived).length;
+    const kidsBefore = await childrenOf(parentRef.id);
+    notices.length = 0;
+    await openCard('Run the fair');
+    await page.getByLabel('New subtask title').fill('Order the banners');
+    await page.getByRole('button', { name: 'Add subtask', exact: true }).click();
+    const addSaid = await noticed(/A subtask can’t be added to “Run the fair”, which is finished\. To add open work under it, first move “Run the fair” out of Done/);
+    await page.waitForTimeout(800);
+    const titleKept = (await page.getByLabel('New subtask title').inputValue()) === 'Order the banners';
+    notices.length = 0;
+    await page.getByRole('button', { name: 'Link an existing card' }).click();
+    await page.getByRole('button', { name: 'Link Hire a tent as a subtask' }).click();
+    const linkSaid = await noticed(/“Hire a tent” can’t become a subtask of “Run the fair”, which is finished/);
+    await page.waitForTimeout(800);
+    check(
+      'a finished parent takes no new subtask (its title kept) and no open card linked under it',
+      addSaid &&
+        titleKept &&
+        linkSaid &&
+        (await childrenOf(parentRef.id)) === kidsBefore &&
+        !(await spareRef.get()).data().parentId,
+      notices.join(' | '),
+    );
+    await page.getByLabel('New subtask title').fill('');
+    await back();
+    await spareRef.update({ archived: true, archivedAt: Date.now() });
+
     // Reopening the subtask under its finished parent: refused on the card.
     const REOPEN = (why) =>
       new RegExp(

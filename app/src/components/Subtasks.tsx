@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { CARD_TITLE_MAX, childrenOf, linkableUnder, type BoardColumn } from '@sabeel/shared';
 import type { Card } from '../cards';
+import { noticeAction } from '../confirm';
 import { Body, Button, Hint, IconAction, PickerList, Row, TextField } from './ui';
 import { radius, space, useTheme } from './../theme';
 
@@ -33,16 +34,24 @@ import { radius, space, useTheme } from './../theme';
 function AddSubtaskRow({
   busy,
   onCreate,
+  refusal,
 }: {
   busy: boolean;
   /** Called with a trimmed, non-empty title. */
   onCreate: (title: string) => void;
+  /** Why no subtask may be added here now, or null (`subtaskAddRefusal`). */
+  refusal?: string | null;
 }) {
   const [title, setTitle] = useState('');
 
   function create() {
     const trimmed = title.trim();
     if (!trimmed) return;
+    // Refused before anything is written, the title kept for when it can go.
+    if (refusal) {
+      void noticeAction('Not added', refusal);
+      return;
+    }
     setTitle('');
     onCreate(trimmed);
   }
@@ -79,6 +88,8 @@ export function Subtasks({
   onCreate,
   onLink,
   onUnlink,
+  addRefusal,
+  linkRefusal,
 }: {
   parentId: string;
   /** Every live card on this board, rank-ordered. */
@@ -89,6 +100,12 @@ export function Subtasks({
   onCreate: (title: string) => void;
   onLink: (cardId: string) => void;
   onUnlink: (cardId: string) => void;
+  /**
+   * Why no subtask may be added, or null; and why a given card may not be
+   * linked. A finished or archived parent takes no new open work (#111).
+   */
+  addRefusal?: string | null;
+  linkRefusal?: (card: Card) => string | null;
 }) {
   const t = useTheme();
   const [picking, setPicking] = useState(false);
@@ -146,7 +163,7 @@ export function Subtasks({
           actions with settled icons, so neither gets a labelled button — a
           full-width one costs a row of the card every time you open it. */}
       <Row style={styles.addRow}>
-        <AddSubtaskRow busy={!!busy} onCreate={onCreate} />
+        <AddSubtaskRow busy={!!busy} onCreate={onCreate} refusal={addRefusal} />
         <IconAction
           icon="add-link"
           label="Link an existing card"
@@ -183,6 +200,11 @@ export function Subtasks({
                 accessibilityRole="button"
                 accessibilityLabel={`Link ${c.title} as a subtask`}
                 onPress={() => {
+                  const refused = linkRefusal?.(c);
+                  if (refused) {
+                    void noticeAction('Not linked', refused);
+                    return;
+                  }
                   onLink(c.id);
                   setFilter('');
                   setPicking(false);

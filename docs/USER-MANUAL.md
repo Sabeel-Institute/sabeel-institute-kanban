@@ -196,6 +196,10 @@ belongs to is finished or archived**: moving it out of the finished column,
 or restoring it from the archive into another column, is refused. To reopen
 it, open it and tap **Unlink from parent card** first.
 
+For the same reason, a finished or archived card takes no new subtasks:
+adding one to it, or linking a card that isn't finished under it, is
+refused. Move the card out of the finished column (or restore it) first.
+
 Cards without a lane, such as those added before the board had lanes, sit
 under **No lane**, at the foot of each column.
 

@@ -733,8 +733,9 @@ learn for boards that are not programs.
   subtask reopened (moved out of the finished column, or restored from the
   archive to an open column) while its parent is finished or archived: the
   notice says to unlink it from its parent first. Both refusals are a notice
-  dialog. Adding or linking an open subtask under a finished parent is
-  allowed.
+  dialog. Nor does a finished or archived parent take new open work: adding
+  a subtask to it, or linking an open card under it, is refused the same way
+  (linking a card already finished is not).
 - **Add card asks for a lane** on a board with lanes, none chosen, and adds
   nothing until one is. A subtask starts in its parent's lane. A card's lane is
   a second choice beside its column on the card; No lane is offered only while
