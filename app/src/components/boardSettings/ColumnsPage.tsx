@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import {
   columnDeleteBlocked,
@@ -31,6 +31,11 @@ export function ColumnsPage({ board }: { board: BoardListItem }) {
   // Which column is mid-rename: its delete steps aside, so the field keeps the
   // row at 320px and the bin is never beside the rename's cancel.
   const [renaming, setRenaming] = useState<string | null>(null);
+  // The board and its cards as they are NOW: a confirmation is a wait, and
+  // another owner may add a column or a card meanwhile. The delete writes
+  // from these, never from what the tap saw.
+  const live = useRef({ board, cards: cards.data });
+  live.current = { board, cards: cards.data };
 
   // Returns whether the column was ADDED, so the row knows whether to clear
   // itself: a name refused here or by the rules stays in the field.
@@ -62,8 +67,18 @@ export function ColumnsPage({ board }: { board: BoardListItem }) {
         .join(' '),
     );
     if (!ok) return;
+    const now = live.current;
+    // Filled while the question was open: refused, as it would have been.
+    const nowBlocked = columnDeleteBlocked(col.name, cardsInColumn(now.cards ?? [], col.id).length);
+    if (nowBlocked || !now.cards) {
+      await noticeAction('Cannot delete this column', nowBlocked ?? 'The board’s cards could not be read.');
+      return;
+    }
     await run(() =>
-      updateBoard(board.id, columnsPatch(board, board.columns.filter((c) => c.id !== col.id))),
+      updateBoard(
+        now.board.id,
+        columnsPatch(now.board, now.board.columns.filter((c) => c.id !== col.id)),
+      ),
     );
   }
 

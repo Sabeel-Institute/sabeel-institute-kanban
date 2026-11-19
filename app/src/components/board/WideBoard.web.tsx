@@ -342,6 +342,7 @@ function FloatingForm({
   scroller,
   side,
   label,
+  onClose,
   children,
 }: {
   anchor: HTMLElement;
@@ -349,33 +350,41 @@ function FloatingForm({
   /** Under the + (a column heading's) or beside it (a lane's). */
   side: 'below' | 'beside';
   label: string;
+  /** The form's ✕: a touch screen has no Escape key. */
+  onClose: () => void;
   children: React.ReactNode;
 }) {
   const t = useWebTheme();
   const box = useRef<HTMLDivElement | null>(null);
   const [at, setAt] = useState<{ left: number; top: number } | null>(null);
-  useLayoutEffect(() => {
-    function place() {
-      const r = anchor.getBoundingClientRect();
-      const w = box.current?.offsetWidth ?? FORM_WIDTH;
-      const h = box.current?.offsetHeight ?? 0;
-      const want =
-        side === 'below'
-          ? { left: r.right - w, top: r.bottom + space.xs }
-          : { left: r.right + space.xs, top: r.top };
-      setAt({
-        left: Math.max(space.md, Math.min(want.left, window.innerWidth - w - space.md)),
-        top: Math.max(space.md, Math.min(want.top, window.innerHeight - h - space.md)),
-      });
-    }
-    place();
-    scroller?.addEventListener('scroll', place, { passive: true });
-    window.addEventListener('resize', place);
-    return () => {
-      scroller?.removeEventListener('scroll', place);
-      window.removeEventListener('resize', place);
+  // Placed after every render as well as on every scroll and resize: a
+  // banner or a card arriving above the + moves it without either.
+  function place() {
+    const r = anchor.getBoundingClientRect();
+    const w = box.current?.offsetWidth ?? FORM_WIDTH;
+    const h = box.current?.offsetHeight ?? 0;
+    const want =
+      side === 'below'
+        ? { left: r.right - w, top: r.bottom + space.xs }
+        : { left: r.right + space.xs, top: r.top };
+    const next = {
+      left: Math.max(space.md, Math.min(want.left, window.innerWidth - w - space.md)),
+      top: Math.max(space.md, Math.min(want.top, window.innerHeight - h - space.md)),
     };
-  }, [anchor, scroller, side]);
+    setAt((was) => (was && was.left === next.left && was.top === next.top ? was : next));
+  }
+  const placeNow = useRef(place);
+  placeNow.current = place;
+  useLayoutEffect(() => placeNow.current());
+  useLayoutEffect(() => {
+    const follow = () => placeNow.current();
+    scroller?.addEventListener('scroll', follow, { passive: true });
+    window.addEventListener('resize', follow);
+    return () => {
+      scroller?.removeEventListener('scroll', follow);
+      window.removeEventListener('resize', follow);
+    };
+  }, [scroller]);
   return createPortal(
     <div
       ref={box}
@@ -396,7 +405,10 @@ function FloatingForm({
         padding: space.md,
       }}
     >
-      <div style={{ fontWeight: 700, color: t.text.primary, marginBottom: space.sm }}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: space.xs, marginBottom: space.xs }}>
+        <div style={{ flex: 1, minWidth: 0, fontWeight: 700, color: t.text.primary }}>{label}</div>
+        <IconAction icon="close" label="Cancel" onPress={onClose} />
+      </div>
       {children}
     </div>,
     document.body,
@@ -437,7 +449,11 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   const plusRefs = useRef(new Map<string, HTMLElement>());
   // The grid's heading row, measured: a lane's name stays just under it while
   // its row scrolls by.
-  const headingRow = useRef<HTMLDivElement | null>(null);
+  // An element in state, not a ref: the row mounts only once the board and
+  // its cards are in, after the first render, and the observer must follow
+  // it (a ref read in an effect missed it and left lane names at 0, under
+  // the headings).
+  const [headingRow, setHeadingRow] = useState<HTMLDivElement | null>(null);
   const [headingHeight, setHeadingHeight] = useState(0);
   const selection = useSelection(cards.data ?? EMPTY_CARDS);
 
@@ -506,14 +522,13 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   const today = todayInOrgTz();
 
   useEffect(() => {
-    const row = headingRow.current;
-    if (!live || !row) return;
-    const measure = () => setHeadingHeight(row.offsetHeight);
+    if (!headingRow) return;
+    const measure = () => setHeadingHeight(headingRow.offsetHeight);
     measure();
     const seen = new ResizeObserver(measure);
-    seen.observe(row);
+    seen.observe(headingRow);
     return () => seen.disconnect();
-  }, [live, board.data?.columns.length]);
+  }, [headingRow]);
   const infoByLane = useLaneInfo(laneBoard ?? null, live, cards.data ?? EMPTY_CARDS);
   const collapse = useLaneCollapse(
     user,
@@ -569,7 +584,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         : drawnColumn;
       const place = dropPlacement(group, index, moving.id);
       if (!place) return;
-      // Dropped on a folded lane's heading: open it now, as an add does, so
+      // Dropped into a folded lane: open it now, as an add does, so
       // the card is seen landing rather than vanishing until the server
       // answers (or, offline, until the write is sent).
       if (inLane && target.laneId) void collapse.reveal(target.laneId);
@@ -984,14 +999,22 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
 
     const formColumn = shownKey?.startsWith('column:') ? columns.find((c) => `column:${c.id}` === shownKey) : undefined;
     const formLane = shownKey?.startsWith('lane:') ? lb.lanes?.find((l) => `lane:${l.id}` === shownKey) : undefined;
+    // A + gone from the page (its lane or column removed meanwhile) has no form.
     const anchor = shownKey ? plusRefs.current.get(shownKey) : undefined;
+    const closeForm = () => {
+      setGridAdd(null);
+      setRetry((r) => (r?.key === shownKey ? null : r));
+    };
 
     return (
       <div
         ref={columnsRef}
         data-testid="board-columns"
         onDragOver={(e) => {
-          e.preventDefault();
+          // Outside a cell (a lane's name, a heading, a gap) nothing takes
+          // the card: no preventDefault, so the cursor says so, and no cell
+          // stays lit as if it would. Only the scrolling is driven.
+          if (dropTarget) setDropTarget(null);
           driveAutoScroll(e.clientX, e.clientY, null);
         }}
         style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingBottom: space.lg }}
@@ -1007,7 +1030,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         >
           {/* The corner, frozen both ways; the heading row is measured on it. */}
           <div
-            ref={headingRow}
+            ref={setHeadingRow}
             style={{
               position: 'sticky',
               top: 0,
@@ -1115,10 +1138,11 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
             );
           })}
         </div>
-        {anchor && (formColumn || formLane) && shownKey ? (
+        {anchor?.isConnected && (formColumn || formLane) && shownKey ? (
           <FloatingForm
             anchor={anchor}
             scroller={columnsRef.current}
+            onClose={closeForm}
             side={formColumn ? 'below' : 'beside'}
             label={formColumn ? `New card in ${formColumn.name}` : `New card in the ${formLane!.name} lane`}
           >
@@ -1144,10 +1168,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
                   ? void addCard(shownKey, formColumn.id, title, subscribe, picked)
                   : void addCard(shownKey, picked!, title, subscribe, formLane!.id)
               }
-              onCancel={() => {
-                setGridAdd(null);
-                setRetry((r) => (r?.key === shownKey ? null : r));
-              }}
+              onCancel={closeForm}
             />
           </FloatingForm>
         ) : null}

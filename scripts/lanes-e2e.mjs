@@ -990,6 +990,20 @@ try {
     await page.getByPlaceholder('Card title').press('Escape');
   }
 
+  // ---- The add form's ✕ ------------------------------------------------------------
+  // A touch screen has no Escape key, so the floating form has its own close.
+  {
+    const form = page.getByRole('dialog', { name: 'New card in the Supplies lane' });
+    await page.getByRole('button', { name: 'Add a card to the Supplies lane', exact: true }).click();
+    await form.waitFor({ timeout: 10000 });
+    await page.getByPlaceholder('Card title').fill('Never added');
+    await form.getByRole('button', { name: 'Cancel', exact: true }).click();
+    check(
+      "the add form's ✕ closes it, and adds nothing",
+      (await form.count()) === 0 && (await page.locator('[data-testid="card-Never added"]').count()) === 0,
+    );
+  }
+
   // ---- Removing a lane -----------------------------------------------------------
   await settingsPage('Lanes');
   dialogs.length = 0;

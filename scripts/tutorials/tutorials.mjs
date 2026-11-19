@@ -243,7 +243,7 @@ export const TUTORIALS = [
         do: (t) => t.highlight(t.label(/^Planning,/)),
       },
       {
-        say: "Every column lists the same lanes, in the same order, so a lane stays in one place as you move between columns. Beside each lane is how many of its cards are finished, out of all of them.",
+        say: "Every lane runs through every column, in the same order, so a lane stays in one place wherever you look. Beside each lane is how many of its cards are finished, out of all of them.",
         do: (t) => t.highlight(t.label(/^Programme,/)),
       },
       {
@@ -258,7 +258,7 @@ export const TUTORIALS = [
         },
       },
       {
-        say: "To add a card, tap a plus, type its title, and say where it goes. It won't go in until it has a lane and a column.",
+        say: "To add a card, tap a plus, type its title, and choose where it goes.",
         do: async (t) => {
           // The phone adds from its column and asks for the lane; the
           // computer's grid adds from the lane's + and asks for the column.

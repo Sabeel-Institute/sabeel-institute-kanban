@@ -54,6 +54,8 @@ let freshConnections = 0;
 /** The token service: down, it answers neither a refresh nor a cached read (#116). */
 let tokenDown = false;
 let tokenClaims: Profile = { role: 'member', status: 'pending' };
+/** While set, the token service has not answered yet: a read in flight. */
+let tokenHeld: Promise<void> | null = null;
 const warnings: unknown[][] = [];
 const listeners: { next: (s: Snap) => void; active: boolean }[] = [];
 const authCallbacks: ((u: FakeUser | null) => void)[] = [];
@@ -124,7 +126,9 @@ function user(uid = 'u1'): FakeUser {
     displayName: 'Faisal',
     getIdToken: async () => 'token',
     getIdTokenResult: async () => {
-      if (tokenDown) throw new Error('auth/network-request-failed');
+      const failing = tokenDown;
+      if (tokenHeld) await tokenHeld;
+      if (failing) throw new Error('auth/network-request-failed');
       return { claims: { ...tokenClaims }, signInProvider: 'google.com' };
     },
   };
@@ -168,6 +172,7 @@ beforeEach(async () => {
   freshConnections = 0;
   tokenDown = false;
   tokenClaims = { role: 'member', status: 'pending' };
+  tokenHeld = null;
   warnings.length = 0;
   listeners.length = 0;
   authCallbacks.length = 0;
@@ -302,5 +307,50 @@ describe('an approved account whose token service does not answer (#116)', () =>
     listeners.filter((l) => l.active).forEach((l) => l.next(snap(moved)));
     await vi.advanceTimersByTimeAsync(0);
     expect(session.sessionNow()).toMatchObject({ state: 'signed-in', user: { status: 'active', role: 'admin' } });
+  });
+
+  it('Sign out while a failing read is in flight stays signed out', async () => {
+    let answer = () => undefined as void;
+    tokenHeld = new Promise<void>((r) => (answer = r));
+    await reloadWithTheTokenServiceDown();
+    await session.signOut();
+    expect(session.sessionNow()).toEqual({ state: 'signed-out' });
+    answer();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(session.sessionNow()).toEqual({ state: 'signed-out' });
+  });
+
+  it('a read answered after a newer snapshot was read is dropped, and nothing older comes back', async () => {
+    tokenClaims = { ...ACTIVE };
+    serverProfile = { ...PROFILE, ...ACTIVE };
+    setAuthUser(user());
+    await vi.advanceTimersByTimeAsync(0);
+    // Snapshot A's read hangs, then fails.
+    let answerA = () => undefined as void;
+    tokenHeld = new Promise<void>((r) => (answerA = r));
+    tokenDown = true;
+    const a = { ...serverProfile, claimsUpdatedAt: { toMillis: () => 2 } };
+    listeners.filter((l) => l.active).forEach((l) => l.next(snap(a)));
+    await vi.advanceTimersByTimeAsync(0);
+    // Snapshot B: the rules accepted, read while A still hangs, and answered.
+    tokenHeld = null;
+    tokenDown = false;
+    const b = { ...a, rulesVersion: 999, displayName: 'Faisal B' };
+    listeners.filter((l) => l.active).forEach((l) => l.next(snap(b)));
+    await vi.advanceTimersByTimeAsync(0);
+    answerA();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(session.sessionNow()).toMatchObject({ state: 'signed-in', user: { displayName: 'Faisal B' } });
+    expect(warnings).toHaveLength(0);
+  });
+
+  it('Try again stays busy until the answer is in', async () => {
+    await reloadWithTheTokenServiceDown();
+    tokenDown = false;
+    let done = false;
+    const p = session.retryClaims().then(() => (done = true));
+    expect(done).toBe(false);
+    await p;
+    expect(session.sessionNow()).toMatchObject({ state: 'signed-in' });
   });
 });

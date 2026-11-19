@@ -143,7 +143,9 @@ Each card shows, at a glance: its **title**, a **priority badge**, its **labels*
 its **due date** (red if overdue), and the **people assigned** (as name chips) —
 so you can read a card without opening it. A card with no priority set shows no
 badge. Tap **+ Add card** at the bottom of a column, type a title, press Enter —
-that's a new card (on a board with lanes, choose its lane first; see *Lanes*). The **bell** beside the title is on, so you're subscribed to the
+that's a new card (on a board with lanes, choose its lane first; in a browser,
+a lane board adds from the **+** on a column's heading or beside a lane's name
+instead; see *Lanes*). The **bell** beside the title is on, so you're subscribed to the
 card you make and hear about everything on it (see **Subscribe**, below); tap it
 before adding if you'd rather not.
 
@@ -1321,6 +1323,7 @@ stay.
 | What you see | What it means | What to do |
 |---|---|---|
 | "Waiting for approval" after signing in | Your account awaits admin approval | Ask your admin; the screen unlocks by itself once approved |
+| "Can't reach the server" after signing in | The app couldn't check your account: a slow or dropped connection | Nothing to do: it tries again by itself. **Try again** asks at once; your account is fine |
 | "Before you continue" after approval | The institute's rules, which every account accepts once | Read them and tap **I agree**; it does not come back |
 | "Your report was saved but the email did not go out" | Your report is kept, but its email failed | Nothing to do: the administrators will still see it |
 | "You have sent 5 reports in the last hour" | Five reports an hour is the most one account can send | Wait a while; or tell an administrator directly |

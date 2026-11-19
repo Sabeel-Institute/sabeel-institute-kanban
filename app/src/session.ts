@@ -104,7 +104,15 @@ let lastClaimsStamp: number | null = null;
  */
 let lastClaims: { uid: string; role: Role; status: UserStatus } | null = null;
 /** A failed read is asked again on this timer, the delay doubling to a minute. */
-let claimsRetry: { timer: ReturnType<typeof setTimeout>; again: () => void } | null = null;
+let claimsRetry: { timer: ReturnType<typeof setTimeout>; again: () => Promise<void> } | null = null;
+/**
+ * Which claims read is current. A read is awaited; by the time it answers a
+ * newer snapshot may have been read, or the person signed out, and its
+ * answer must then be dropped rather than emitted over theirs.
+ */
+let claimsRead = 0;
+/** The newest user document heard: what a retry reads with, never an older one. */
+let latestSnap: DocumentSnapshot | null = null;
 let claimsRetryDelay = CLAIMS_RETRY_FIRST_MS;
 let provisioningTimer: ReturnType<typeof setTimeout> | null = null;
 /** Which uid this device has already registered a push token for. */
@@ -150,6 +158,8 @@ function stopWatchingUserDoc() {
   unsubUserDoc?.();
   unsubUserDoc = null;
   lastClaimsStamp = null;
+  latestSnap = null;
+  claimsRead += 1;
   stopClaimsRetry();
   if (provisioningTimer) {
     clearTimeout(provisioningTimer);
@@ -315,14 +325,19 @@ async function handleUserSnapshot(fbUser: User, snap: DocumentSnapshot): Promise
   lastClaimsStamp = stamp;
 
   stopClaimsRetry();
+  latestSnap = snap;
+  const mine = ++claimsRead;
   const read = await readClaims(fbUser, claimsChanged);
+  // Superseded while it was asked: a newer snapshot's read, a sign-out or
+  // another account. Its answer, and any retry, belong to that one.
+  if (mine !== claimsRead || auth.currentUser !== fbUser || !unsubUserDoc) return;
   if (read) {
     lastClaims = { uid: fbUser.uid, ...read };
     claimsRetryDelay = CLAIMS_RETRY_FIRST_MS;
   } else {
     // The next attempt refreshes the token, whatever the stamp says.
     lastClaimsStamp = null;
-    armClaimsRetry(fbUser, snap);
+    armClaimsRetry(fbUser);
   }
   // What this session last read, when this read failed; with nothing read
   // yet, say the server could not be reached rather than guess.
@@ -366,16 +381,17 @@ async function handleUserSnapshot(fbUser: User, snap: DocumentSnapshot): Promise
   }
 }
 
-/** Ask again for the claims a failed read could not get, sooner each time it fails less. */
-function armClaimsRetry(fbUser: User, snap: DocumentSnapshot) {
-  const again = () => {
+/** Ask again, with the newest user document, for the claims a failed read could not get. */
+function armClaimsRetry(fbUser: User) {
+  const again = async () => {
     claimsRetry = null;
-    if (auth.currentUser !== fbUser || !unsubUserDoc) return;
-    void handleUserSnapshot(fbUser, snap).catch((e) => {
+    const snap = latestSnap;
+    if (auth.currentUser !== fbUser || !unsubUserDoc || !snap) return;
+    await handleUserSnapshot(fbUser, snap).catch((e) => {
       console.warn('claims retry failed', e);
     });
   };
-  claimsRetry = { timer: setTimeout(again, claimsRetryDelay), again };
+  claimsRetry = { timer: setTimeout(() => void again(), claimsRetryDelay), again };
   claimsRetryDelay = Math.min(claimsRetryDelay * 2, CLAIMS_RETRY_MAX_MS);
 }
 
@@ -384,7 +400,8 @@ export async function retryClaims(): Promise<void> {
   const pending = claimsRetry;
   if (!pending) return;
   clearTimeout(pending.timer);
-  pending.again();
+  // Awaited, so Try again stays busy until the answer is in.
+  await pending.again();
 }
 
 function watchUserDoc(fbUser: User) {
