@@ -59,14 +59,13 @@ When a release changes what an old build gets wrong, raise the version floor
 to it last, once the web, Play and TestFlight have it (`docs/DEPLOY.md`
 § Retiring old builds).
 
-**Owed now: nothing.** v0.22.0 recorded every film (`lanes` and
-`board-settings` with new narration), retook the manual's pictures and
-rendered its PDF at its release (2026-11-19). A change that moves a screen a
-film or a picture shows adds it here:
+**Owed now: nothing.** v0.23.0 recorded the `comments` film anew (its @
+list opens with Everyone on this board) and published the set; v0.22.0
+recorded every film and retook the manual's pictures (2026-11-19). A change
+that moves a screen a film or a picture shows adds it here:
 
 | Film or picture | What it lacks |
 |---|---|
-| `comments` film (one line reworded; render its narration) | The @ list's first row is **Everyone on this board** (`@all`) |
 
 ## What works today (2026-10-16)
 
