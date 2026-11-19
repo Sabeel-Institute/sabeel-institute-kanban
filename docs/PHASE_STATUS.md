@@ -59,14 +59,13 @@ When a release changes what an old build gets wrong, raise the version floor
 to it last, once the web, Play and TestFlight have it (`docs/DEPLOY.md`
 § Retiring old builds).
 
-**Owed now: nothing.** v0.22.0 recorded every film (`lanes` and
-`board-settings` with new narration), retook the manual's pictures and
-rendered its PDF at its release (2026-11-19). A change that moves a screen a
-film or a picture shows adds it here:
+**Owed now: nothing.** v0.23.0 recorded the `comments` film anew (its @
+list opens with Everyone on this board) and published the set; v0.22.0
+recorded every film and retook the manual's pictures (2026-11-19). A change
+that moves a screen a film or a picture shows adds it here:
 
 | Film or picture | What it lacks |
 |---|---|
-| `comments` film (one line reworded; render its narration) | The @ list's first row is **Everyone on this board** (`@all`) |
 
 ## What works today (2026-10-16)
 
@@ -458,6 +457,24 @@ the team.
 ---
 
 ## Deploy log
+
+### 2026-11-19 — @all, and names on every comment and history line — v0.23.0
+
+- **@all tells the whole board.** In a comment, type **@** and pick
+  **Everyone on this board** (it's the first row), or write `@all`.
+  Everyone on the board but you is mentioned, and the comment says
+  *mentioned everyone on the board*. Each person's mention setting and board
+  mute still apply.
+- **No more "Someone".** An admin who comments on, or changes a card on, a
+  board they aren't a member of is now named on the comment and in the card's
+  history, and so is anyone after they leave a board. The name is stored when
+  it happens; older comments and history lines have had their names filled in.
+- The comments help film shows the new first row.
+
+Deploy the rules and functions before the apps (comments carry a name the
+server stamps), then fill in older names with `node
+scripts/backfill-names.mjs` (dry run first). The version floor goes to
+0.23.0 once the web, Play and TestFlight have it.
 
 ### 2026-11-19 — Lanes as a grid in the browser, columns edited in settings — v0.22.0
 
