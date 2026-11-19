@@ -48,6 +48,7 @@ const statusRank: Record<UserStatus, number> = {
  */
 export function UsersScreen({ actor }: { actor: SessionUser }) {
   const nav = useNav();
+  const t = useTheme();
   const users = useAllUsers();
   const [error, setError] = useState<string | null>(null);
   const [busyUid, setBusyUid] = useState<string | null>(null);
@@ -127,7 +128,13 @@ export function UsersScreen({ actor }: { actor: SessionUser }) {
   async function askAccess(user: AdminUserRow, next: boolean) {
     setMenuFor(null);
     let orphaned: { id: string; name: string }[] = [];
-    if (!next) orphaned = await boardsSolelyOwnedBy(user.uid).catch(() => []);
+    if (!next) {
+      // Busy while the boards are looked up, so a second ⋮ cannot stack a
+      // second confirmation.
+      setBusyUid(user.uid);
+      orphaned = await boardsSolelyOwnedBy(user.uid).catch(() => []);
+      setBusyUid(null);
+    }
     const stranded =
       orphaned.length > 0
         ? ` They are the only owner of ${orphaned.map((b) => `“${b.name}”`).join(', ')} — nobody but an admin will be able to change ${
@@ -162,7 +169,7 @@ export function UsersScreen({ actor }: { actor: SessionUser }) {
         </Card>
       ) : null}
 
-      <Text style={[type.label, styles.section]}>Waiting for approval ({pending.length})</Text>
+      <Text style={[type.label, styles.section, { color: t.text.secondary }]}>Waiting for approval ({pending.length})</Text>
       {pending.length === 0 ? <Hint>Nobody is waiting.</Hint> : null}
       {pending.map((u) => (
         <Card key={u.uid} style={styles.pending}>
@@ -202,7 +209,7 @@ export function UsersScreen({ actor }: { actor: SessionUser }) {
         </Card>
       ))}
 
-      <Text style={[type.label, styles.section]}>Everyone ({others.length})</Text>
+      <Text style={[type.label, styles.section, { color: t.text.secondary }]}>Everyone ({others.length})</Text>
       {others.length === 0 ? <Hint>Nobody has signed in yet.</Hint> : null}
       {others.length > 0 ? (
         <Card style={styles.list}>

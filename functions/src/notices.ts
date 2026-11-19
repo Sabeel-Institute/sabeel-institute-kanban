@@ -9,6 +9,7 @@ import {
   arrivalText,
   laneArrivalOf,
   laneArrivalText,
+  laneOf,
   changeNoticeText,
   noticeAllowed,
   noticeDue,
@@ -165,8 +166,12 @@ async function noticesFor(cardId: string, entries: NoticeEntry[]): Promise<Notic
     : [];
   // A lane's watchers, on a board with live lanes, for a card that arrived in
   // one of its lanes. Someone a column arrival already reaches hears once.
-  const laneId =
-    board.lanesOn === true && lanes.some((l) => l.id === card.laneId) ? (card.laneId as string) : null;
+  // Through lanes.ts, as every lane question: a card's lane, or null for No
+  // lane (lanes off, none, or one since removed).
+  const laneId = laneOf(
+    { laneId: card.laneId as string | undefined },
+    { columns, lanesOn: board.lanesOn === true, lanes },
+  );
   const laneArrival = laneArrivalOf(entries, { laneId, archived });
   const laneWatchers =
     laneArrival && laneId

@@ -285,11 +285,15 @@ export const TUTORIALS = [
         do: (t) => t.select(t.label('Lane'), 'Programme'),
       },
       {
-        say: "The board's owners switch lanes on and name them in its settings, under Lanes.",
+        say: "Tap the bell beside a lane, and you'll be told whenever a card arrives in it, in any column.",
         do: async (t) => {
           await t.tap(t.btn('Back'));
-          await t.highlight(t.btn('About this board'));
+          await t.highlight(t.btn('Watch the Venue lane'));
         },
+      },
+      {
+        say: "The board's owners switch lanes on and name them in its settings, under Lanes.",
+        do: (t) => t.highlight(t.btn('About this board')),
       },
     ],
   },
