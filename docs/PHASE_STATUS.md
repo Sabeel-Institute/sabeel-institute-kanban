@@ -59,23 +59,13 @@ When a release changes what an old build gets wrong, raise the version floor
 to it last, once the web, Play and TestFlight have it (`docs/DEPLOY.md`
 § Retiring old builds).
 
-**Owed now: nothing.** v0.20.0 recorded every film (three of them new:
-`lanes`, `details` and `overview`, which carries the legend for the
-overview's marks), retook the manual's pictures and rendered its PDF at its
-release (2026-11-18). A change that moves a screen a film or a picture shows
-adds it here:
+**Owed now: nothing.** v0.21.0 recorded every film (`roles` and `lanes`
+with new narration), retook the manual's pictures and rendered its PDF at
+its release (2026-11-19). A change that moves a screen a film or a picture
+shows adds it here:
 
 | Film or picture | What it lacks |
 |---|---|
-| `lanes` film (a step added for the bell; render its narration); `lanes-*` pictures | The bell beside each lane's count, to watch the lane |
-| `notifications` film | The column-arrival preference now reads "A card arrives in a column or lane you watch" |
-| `roles` film (script rewritten for the ⋮ sheet; narration changed, render it again); `people-*`, `owners-*` pictures | People as compact rows with role chips, changes behind ⋮ (#125) |
-| `overview` film; `boards-*` pictures | The Overview button beside the title, worded (#124) |
-| `board-people` film | The add-someone list's **Filter people** field (#112) |
-| `lanes` film; `lanes-*`, `overview-*` pictures | Lane headings fold, with a chevron, and the collapse/expand-all icons (#115) |
-| `overview` film; `overview-*` pictures | A row's details chevron, and the details it opens (#118) |
-| `boards-phone`, `boards-wide`, `clone-*`, `overview-*` pictures; every film that shows the Boards list (`getting-around`, `new-board`, `clone-board`, `overview`, `signing-in`) | The Boards list's section headings are collapsible, with a chevron (#110) |
-| `lanes` film | A line on a parent waiting for its subtasks before it can go to the finished column, and on a subtask not reopened under a finished parent (#111); no screen changes |
 
 ## What works today (2026-10-16)
 
@@ -467,6 +457,39 @@ the team.
 ---
 
 ## Deploy log
+
+### 2026-11-19 — Fold and watch lanes, subtasks that finish together, a clearer People — v0.21.0
+
+- **Lanes fold.** Tap a lane's heading to fold its cards away, in every
+  column at once; the heading keeps its count and colour, and says how many
+  of its cards are in the column you're on. Two icons fold and open every
+  lane. What you fold stays folded on all your devices.
+- **Watch a lane.** The bell beside a lane's count tells you when a card
+  arrives in it, in any column, as a column's bell does. One setting covers
+  both: "A card arrives in a column or lane you watch".
+- **A finished card never has open subtasks.** On a board with lanes, a
+  card can't go to the finished column while a subtask is still open; a
+  finished subtask can't be reopened while its parent is finished or
+  archived (unlink it first); and a finished or archived card takes no new
+  subtasks. Each refusal says why and what to do.
+- **The Boards list's sections fold**, each heading showing its count when
+  folded; typing in Filter boards opens them all.
+- **The overview shows a board's details**: the arrow on a row opens its
+  teachers, links and other details under it. The Overview button on the
+  Boards screen is now worded, beside the title.
+- **Filtering people works the same everywhere**: adding someone to a board
+  (which can now be filtered), assigning a card, Search and @mentions all
+  match a name or the start of an address, never the shared domain.
+- **More → People is compact**: one row per person, their role as a
+  coloured tag, changes behind the ⋮ at the end of the row.
+- Also: a long board name no longer pushes its bell off the row on Mute a
+  board.
+- The help films and the manual cover all of it.
+
+Deploy the rules before the clients: 0.21.0 writes collapsed sections and
+lanes and watched lanes, which the 0.20.0 rules refuse. The version floor
+goes to 0.21.0 once the web, Play and TestFlight have it: the subtask rules
+are the app's, and an older build would not keep them.
 
 ### 2026-11-18 — Lanes, board details, templates and the overview — v0.20.0
 

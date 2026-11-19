@@ -1,6 +1,6 @@
 # Sabeel Institute Kanban — User Manual
 
-*For app version 0.20.0 · October 2026*
+*For app version 0.21.0 · October 2026*
 
 Welcome! This guide covers everything you can do in Sabeel Kanban — from finding
 your first board to running boards and approving accounts. It is organized by
@@ -1296,11 +1296,11 @@ They sign in once with Google → **More → People** → **Approve** their pend
 card.
 
 **…make someone an organizer or admin?** *(admins)*
-**People** → their card → set the **role** → confirm the dialog. This does NOT
+**People** → the **⋮** at the end of their row → the role → confirm the dialog. This does NOT
 decide who runs a board — that lives on the board itself.
 
 **…disable someone who left?** *(admins)*
-**People** → their card → **Active** off → confirm. Their assignments and history
+**People** → the **⋮** at the end of their row → **Disable access** → confirm. Their assignments and history
 stay.
 
 ---
