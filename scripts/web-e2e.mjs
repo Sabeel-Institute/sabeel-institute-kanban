@@ -20,6 +20,7 @@ import { todayInOrgTz } from '../packages/shared/lib/due.js';
 import { PASSWORD_SIGN_IN_EMAIL } from '../packages/shared/lib/constants.js';
 import { REPORT_TEXT_MAX } from '../packages/shared/lib/report.js';
 import { HELP_FILMS_ORIGIN, HELP_VARIANTS, HELP_VIDEOS, helpFilmUrl } from '../packages/shared/lib/help.js';
+import { NOTIFY_EVENTS } from '../packages/shared/lib/notify.js';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { readFile, readdir, mkdir } from 'node:fs/promises';
@@ -421,6 +422,31 @@ try {
     /approve/i.test(approveConfirm) && /sign in/i.test(approveConfirm),
     approveConfirm.replace(/\n+/g, ' ').slice(0, 90),
   );
+
+  // Once approved, she is a row in Everyone with her role as a chip, and her
+  // role changes from the row's ⋮ (#125), confirmed, the chip following.
+  {
+    const change = admin.getByRole('button', { name: 'Change Sara', exact: true });
+    await change.waitFor({ timeout: 25000 });
+    const row = admin.locator('div').filter({ has: change }).last();
+    const memberChip = await row.getByText('Member', { exact: true }).isVisible().catch(() => false);
+    await change.click();
+    await admin.getByRole('button', { name: 'Organizer', exact: true }).click();
+    const roleConfirm = lastConfirm.get(admin) ?? '';
+    const chipFollows = await row
+      .getByText('Organizer', { exact: true })
+      .waitFor({ timeout: 20000 })
+      .then(() => true, () => false);
+    check(
+      "a person's row shows their role as a chip, changed from its ⋮ with a confirmation",
+      memberChip && /organizer/i.test(roleConfirm) && chipFollows,
+      roleConfirm.replace(/\n+/g, ' ').slice(0, 90),
+    );
+    // Back to member, so the rest of the suite meets her as it expects.
+    await change.click();
+    await admin.getByRole('button', { name: 'Member', exact: true }).click();
+    await row.getByText('Member', { exact: true }).waitFor({ timeout: 20000 });
+  }
 
   // Her open page must un-gate on its own too.
   //
@@ -1869,7 +1895,10 @@ try {
   );
 
   // The two burst events are new, and on for someone who never chose.
-  for (const label of ['A card you follow changes', 'A card arrives in a column you watch']) {
+  // The labels from the one list the screen draws, so a reworded switch
+  // cannot leave this check looking for words that are gone.
+  const labelOf = (event) => NOTIFY_EVENTS.find((e) => e.event === event).label;
+  for (const label of [labelOf('cardChanged'), labelOf('columnArrival')]) {
     const toggle = sara.getByRole('switch', { name: label });
     const on = await toggle
       .waitFor({ timeout: 15000 })

@@ -234,8 +234,9 @@ its `laneId`. What is load-bearing:
   moved it again, silently. **A finished card is never late, anywhere**: the board, the card,
   the archive, My Work (under Finished), Search's Overdue and the 08:00
   reminder. A board without lanes is unchanged; never apply the rule there.
-- **A parent card stays out of the finished column while it has an open
-  subtask** (#111; Faisal, 2026-11-18: always, on every lane board, no
+- **One invariant: a finished or archived parent never has an open child.**
+  Its three faces follow. **A parent card stays out of the finished column
+  while it has an open subtask** (#111; Faisal, 2026-11-18: always, on every lane board, no
   setting). Open is same board, neither finished nor archived. **Nor is a
   subtask reopened while its parent is finished or archived** — taken out of
   the finished column, or restored from the archive anywhere else — until it

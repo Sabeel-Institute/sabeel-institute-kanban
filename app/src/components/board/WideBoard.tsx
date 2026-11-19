@@ -43,12 +43,13 @@ import {
   Title,
 } from '../ui';
 import { AddCardForm, type AddCardDraft } from './AddCardForm';
-import { WatchColumnBell } from './Bells';
+import { WatchColumnBell, WatchLaneBell } from './Bells';
 import { LaneHeading } from './LaneHeading';
 import { allowMove } from '../../moveGuard';
 import { useLaneInfo } from './useLaneInfo';
 import { LaneCollapseActions } from './LaneCollapseActions';
 import { useLaneCollapse } from './useLaneCollapse';
+import { useLaneWatch } from './useLaneWatch';
 import { setColumnWatched, useWatchedColumns } from '../../notifications';
 import { useLabels } from '../../labels';
 import { radius, space, useTheme } from '../../theme';
@@ -98,6 +99,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   // subscribers to members, and the notice sweep sends arrivals to members
   // alone, so an admin visiting a board they are not on gets neither bell.
   const isMember = board.data?.memberUids.includes(user.uid) ?? false;
+  const laneWatch = useLaneWatch(user, boardId, isMember);
   const watched = useWatchedColumns(user);
   // The bells stay disabled until the list is ready: `?? []` reads a list
   // still loading, or one that failed, as watching nothing.
@@ -278,6 +280,12 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
           <Button label="Dismiss" variant="secondary" onPress={collapse.clearError} />
         </Panel>
       ) : null}
+      {laneWatch.error ? (
+        <Panel>
+          <Body>{laneWatch.error}</Body>
+          <Button label="Dismiss" variant="secondary" onPress={laneWatch.clearError} />
+        </Panel>
+      ) : null}
 
       {/* Destructive and irreversible, so it gets a labelled button and a
           sentence — not an icon you can brush past. Gated with the icon that
@@ -393,6 +401,16 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
                         collapsed={collapse.isCollapsed(lane?.id ?? null)}
                         onToggle={() => void collapse.toggle(lane?.id ?? null)}
                         here={count}
+                        bell={
+                          lane && laneWatch.show ? (
+                            <WatchLaneBell
+                              laneName={lane.name}
+                              watching={laneWatch.watching(lane.id)}
+                              busy={laneWatch.busy}
+                              onPress={() => void laneWatch.toggle(lane!.id)}
+                            />
+                          ) : undefined
+                        }
                       />
                     );
                   }

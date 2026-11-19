@@ -1,5 +1,5 @@
-import { useMemo, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { ROLES, type Role, type UserStatus } from '@sabeel/shared';
 import { setUserAccess, useAllUsers, type AdminUserRow } from '../users';
 import { boardsSolelyOwnedBy } from '../boards';
@@ -18,8 +18,8 @@ import {
   Screen,
   Spinner,
   Title,
-  Toggle,
 } from '../components/ui';
+import { Sheet, SheetOption } from '../components/Sheet';
 import { radius, space, type, useTheme } from '../theme';
 
 /** Pending first — they are the thing an admin came here to act on. */
@@ -37,17 +37,22 @@ const statusRank: Record<UserStatus, number> = {
  * apps share the same admins, and controls that behave differently between them
  * would be a trap.
  *
- * The core idea is **state editors, not verb buttons**. Each row SHOWS the
- * current value — a toggle that is on, a segment that is selected — and changing
- * it asks for confirmation. A mistap is then a visible flip you decline, rather
- * than an action you discover afterwards. Every confirmation spells out the
- * actual consequence, because "Are you sure?" teaches people to click yes.
+ * Compact rows, as the LMS's People → Staff (#125): one card, a person per
+ * row, the name over the address, and the ROLE as a coloured chip so the
+ * admins and organizers stand out at a glance. Changes live behind the row's
+ * ⋮, in a sheet that SHOWS the current role as selected, so it is still a
+ * state editor rather than verbs; and every change asks for confirmation that
+ * spells out the actual consequence, because "Are you sure?" teaches people to
+ * click yes. People waiting for approval keep Approve and Reject in view: that
+ * decision is what an admin came here for.
  */
 export function UsersScreen({ actor }: { actor: SessionUser }) {
   const nav = useNav();
   const users = useAllUsers();
   const [error, setError] = useState<string | null>(null);
   const [busyUid, setBusyUid] = useState<string | null>(null);
+  /** Whose ⋮ sheet is open. */
+  const [menuFor, setMenuFor] = useState<string | null>(null);
 
   const sorted = useMemo(
     () =>
@@ -95,6 +100,48 @@ export function UsersScreen({ actor }: { actor: SessionUser }) {
   }
 
   const pending = sorted.filter((u) => u.status === 'pending');
+  const others = sorted.filter((u) => u.status !== 'pending');
+  const editing = others.find((u) => u.uid === menuFor) ?? null;
+
+  /** Role changes: the consequence in the confirmation, then the write. */
+  async function askRole(user: AdminUserRow, next: Role) {
+    setMenuFor(null);
+    const ok = await confirmAction(
+      next === 'admin' ? `Make ${user.displayName} an admin?` : `Change role to ${next}?`,
+      next === 'admin'
+        ? `This is full control. ${user.displayName} will be able to approve, reject and disable ANY account including yours, promote others to admin, manage the institute's labels, read Stats, and see and run every board. Only grant this to someone you fully trust.`
+        : next === 'organizer'
+          ? `${user.displayName} will be able to create new boards, and will own the ones they create. It grants nothing on any other board — they still see only boards they are added to.`
+          : `${user.displayName} will no longer be able to create boards. They keep whatever boards they already own, and still see only boards they are added to.`,
+    );
+    if (ok) await change(user.uid, next, user.status);
+  }
+
+  /**
+   * Disabling does NOT touch board ownership — the board keeps its owner, that
+   * owner just cannot act. So there is nothing broken to prevent, only a
+   * situation to point at: name the boards that will be left with nobody able
+   * to run them, then proceed. Asked BEFORE the dialog, so the consequence is
+   * IN it rather than a surprise afterwards.
+   */
+  async function askAccess(user: AdminUserRow, next: boolean) {
+    setMenuFor(null);
+    let orphaned: { id: string; name: string }[] = [];
+    if (!next) orphaned = await boardsSolelyOwnedBy(user.uid).catch(() => []);
+    const stranded =
+      orphaned.length > 0
+        ? ` They are the only owner of ${orphaned.map((b) => `“${b.name}”`).join(', ')} — nobody but an admin will be able to change ${
+            orphaned.length === 1 ? 'it' : 'them'
+          } until you give someone else ownership.`
+        : '';
+    const ok = await confirmAction(
+      next ? 'Restore access?' : `Disable ${user.displayName}?`,
+      next
+        ? `${user.displayName} will be able to sign in again. Any cards still assigned to them stay assigned.`
+        : `${user.displayName} will be signed out immediately and unable to sign back in. Their card assignments are KEPT, so nothing loses its owner — a board owner can reassign them.${stranded}`,
+    );
+    if (ok) await change(user.uid, user.role, next ? 'active' : 'disabled');
+  }
 
   return (
     <Screen width="read">
@@ -115,240 +162,173 @@ export function UsersScreen({ actor }: { actor: SessionUser }) {
         </Card>
       ) : null}
 
-      {pending.length > 0 ? (
-        <Hint>
-          {pending.length} waiting for approval — they cannot see anything until
-          you approve them.
-        </Hint>
-      ) : null}
-
-      {sorted.map((u) => (
-        <UserCard
-          key={u.uid}
-          user={u}
-          isSelf={u.uid === actor.uid}
-          busy={busyUid === u.uid}
-          onChange={change}
-        />
+      <Text style={[type.label, styles.section]}>Waiting for approval ({pending.length})</Text>
+      {pending.length === 0 ? <Hint>Nobody is waiting.</Hint> : null}
+      {pending.map((u) => (
+        <Card key={u.uid} style={styles.pending}>
+          <PersonLines user={u} isSelf={u.uid === actor.uid} />
+          <Hint>They cannot see anything until you approve them.</Hint>
+          <Row style={styles.wrap}>
+            <Button
+              label={`Approve`}
+              busy={busyUid === u.uid}
+              onPress={async () => {
+                if (
+                  await confirmAction(
+                    `Approve ${u.displayName}?`,
+                    `${u.email} will be able to sign in and see the boards they are added to.`,
+                  )
+                ) {
+                  await change(u.uid, u.role, 'active');
+                }
+              }}
+            />
+            <Button
+              label="Reject"
+              variant="danger"
+              busy={busyUid === u.uid}
+              onPress={async () => {
+                if (
+                  await confirmAction(
+                    `Reject ${u.displayName}?`,
+                    `${u.email} will be signed out and refused access. You can restore them later.`,
+                  )
+                ) {
+                  await change(u.uid, u.role, 'rejected');
+                }
+              }}
+            />
+          </Row>
+        </Card>
       ))}
 
-      {sorted.length === 0 ? <Hint>Nobody has signed in yet.</Hint> : null}
+      <Text style={[type.label, styles.section]}>Everyone ({others.length})</Text>
+      {others.length === 0 ? <Hint>Nobody has signed in yet.</Hint> : null}
+      {others.length > 0 ? (
+        <Card style={styles.list}>
+          {others.map((u, i) => (
+            <PersonRow
+              key={u.uid}
+              user={u}
+              isSelf={u.uid === actor.uid}
+              first={i === 0}
+              busy={busyUid === u.uid}
+              onMenu={() => setMenuFor(u.uid)}
+            />
+          ))}
+        </Card>
+      ) : null}
 
+      <Sheet visible={editing !== null} title={editing?.displayName ?? ''} onClose={() => setMenuFor(null)}>
+        {editing && editing.status === 'active'
+          ? ROLES.map((r) => (
+              <SheetOption
+                key={r}
+                label={ROLE_WORDS[r]}
+                detail={ROLE_DETAIL[r]}
+                selected={editing.role === r}
+                onPress={() => void askRole(editing, r)}
+              />
+            ))
+          : null}
+        {editing ? (
+          <SheetOption
+            label={editing.status === 'active' ? 'Disable access' : 'Restore access'}
+            detail={
+              editing.status === 'active'
+                ? 'Signed out now, and cannot sign back in. Assignments are kept.'
+                : 'Able to sign in again, with the role they had.'
+            }
+            onPress={() => void askAccess(editing, editing.status !== 'active')}
+          />
+        ) : null}
+      </Sheet>
     </Screen>
   );
 }
 
-function UserCard({
+const ROLE_WORDS: Record<Role, string> = { admin: 'Admin', organizer: 'Organizer', member: 'Member' };
+const ROLE_DETAIL: Record<Role, string> = {
+  admin: 'Approves people, sets roles, sees and runs every board.',
+  organizer: 'Creates boards, and owns the ones they create.',
+  member: 'Sees the boards they are added to.',
+};
+
+/** The name, its chips, and the address: the two lines every row shows. */
+function PersonLines({ user, isSelf }: { user: AdminUserRow; isSelf: boolean }) {
+  const t = useTheme();
+  return (
+    <View style={styles.lines}>
+      <View style={styles.nameLine}>
+        <Text style={[type.body, styles.name, { color: t.text.primary }]} numberOfLines={1}>
+          {user.displayName}
+          {isSelf ? ' (you)' : ''}
+        </Text>
+        <RoleChip role={user.role} />
+        {user.status === 'disabled' || user.status === 'rejected' ? <StatusChip status={user.status} /> : null}
+      </View>
+      <Text style={[type.caption, { color: t.text.secondary }]} numberOfLines={1}>
+        {user.email}
+      </Text>
+    </View>
+  );
+}
+
+function PersonRow({
   user,
   isSelf,
+  first,
   busy,
-  onChange,
+  onMenu,
 }: {
   user: AdminUserRow;
   isSelf: boolean;
+  first: boolean;
   busy: boolean;
-  onChange: (uid: string, role: Role, status: UserStatus) => void;
+  onMenu: () => void;
 }) {
   const t = useTheme();
-  const active = user.status === 'active';
-
   return (
-    <Card
-      style={
-        user.status === 'pending'
-          ? { borderColor: t.feedback.warning, borderWidth: 2 }
-          : undefined
-      }
-    >
-      <Body>
-        {user.displayName}
-        {isSelf ? '  (you)' : ''}
-      </Body>
-      <Hint>{user.email}</Hint>
-      <Row style={styles.wrap}>
-        <Badge label={user.status} tone={active ? 'good' : 'muted'} />
-        <Badge label={user.role} tone={user.role === 'admin' ? 'accent' : 'muted'} />
-      </Row>
-
+    <View style={[styles.row, !first && { borderTopColor: t.border.subtle, borderTopWidth: StyleSheet.hairlineWidth }]}>
+      <PersonLines user={user} isSelf={isSelf} />
+      {/* No menu on your own row: you cannot change your own access (ask
+          another admin), which also stops an admin locking themselves out. */}
       {isSelf ? (
-        <Hint>
-          You cannot change your own access — ask another admin. That guard also
-          stops an admin locking themselves out.
-        </Hint>
-      ) : null}
-
-      {/* Pending is a decision, not a state to edit: approve or reject. */}
-      {!isSelf && user.status === 'pending' ? (
-        <Row style={styles.wrap}>
-          <Button
-            label="Approve"
-            busy={busy}
-            onPress={async () => {
-              if (
-                await confirmAction(
-                  `Approve ${user.displayName}?`,
-                  `${user.email} will be able to sign in and see the boards they are added to.`,
-                )
-              ) {
-                onChange(user.uid, user.role, 'active');
-              }
-            }}
-          />
-          <Button
-            label="Reject"
-            variant="danger"
-            busy={busy}
-            onPress={async () => {
-              if (
-                await confirmAction(
-                  `Reject ${user.displayName}?`,
-                  `${user.email} will be signed out and refused access. You can restore them later.`,
-                )
-              ) {
-                onChange(user.uid, user.role, 'rejected');
-              }
-            }}
-          />
-        </Row>
-      ) : null}
-
-      {!isSelf && user.status !== 'pending' ? (
-        <>
-          <StateRow label="Role">
-            <Segmented
-              options={ROLES}
-              value={user.role}
-              disabled={!active || busy}
-              onChange={async (next) => {
-                const ok = await confirmAction(
-                  next === 'admin'
-                    ? `Make ${user.displayName} an admin?`
-                    : `Change role to ${next}?`,
-                  next === 'admin'
-                    ? `This is full control. ${user.displayName} will be able to approve, reject and disable ANY account including yours, promote others to admin, manage the institute's labels, read Stats, and see and run every board. Only grant this to someone you fully trust.`
-                    : next === 'organizer'
-                      ? `${user.displayName} will be able to create new boards, and will own the ones they create. It grants nothing on any other board — they still see only boards they are added to.`
-                      : `${user.displayName} will no longer be able to create boards. They keep whatever boards they already own, and still see only boards they are added to.`,
-                );
-                if (ok) onChange(user.uid, next, user.status);
-              }}
-            />
-          </StateRow>
-
-          <StateRow label={active ? 'Active' : 'No access'}>
-            <Toggle
-              value={active}
-              disabled={busy}
-              label={`Account access for ${user.displayName}`}
-              onValueChange={async (next) => {
-                /**
-                 * Disabling does NOT touch board ownership — the board keeps its
-                 * owner, that owner just cannot act. So there is nothing broken
-                 * to prevent, only a situation to point at: name the boards that
-                 * will be left with nobody able to run them, then proceed.
-                 * Blocking would mean not being able to disable a departing
-                 * colleague until every board they touched had been reassigned.
-                 *
-                 * Asked BEFORE the dialog, so the consequence is IN it rather
-                 * than a surprise afterwards — the shape countMemberAssignments
-                 * already uses on the board settings screen.
-                 */
-                let orphaned: { id: string; name: string }[] = [];
-                if (!next) {
-                  orphaned = await boardsSolelyOwnedBy(user.uid).catch(() => []);
-                }
-                const stranded =
-                  orphaned.length > 0
-                    ? ` They are the only owner of ${orphaned
-                        .map((b) => `“${b.name}”`)
-                        .join(', ')} — nobody but an admin will be able to change ${
-                        orphaned.length === 1 ? 'it' : 'them'
-                      } until you give someone else ownership.`
-                    : '';
-                const ok = await confirmAction(
-                  next ? 'Restore access?' : `Disable ${user.displayName}?`,
-                  next
-                    ? `${user.displayName} will be able to sign in again. Any cards still assigned to them stay assigned.`
-                    : `${user.displayName} will be signed out immediately and unable to sign back in. Their card assignments are KEPT, so nothing loses its owner — a board owner can reassign them.${stranded}`,
-                );
-                if (ok) onChange(user.uid, user.role, next ? 'active' : 'disabled');
-              }}
-            />
-          </StateRow>
-        </>
-      ) : null}
-    </Card>
+        <View style={styles.menuSpace} />
+      ) : (
+        <IconAction icon="more-vert" label={`Change ${user.displayName}`} disabled={busy} onPress={onMenu} />
+      )}
+    </View>
   );
 }
 
-function StateRow({ label, children }: { label: string; children: ReactNode }) {
+/**
+ * The role, coloured so it stands out (#125): an admin filled in the brand's
+ * raspberry, an organizer tinted, a member outlined. Always in words too, so
+ * colour is never the only signal; every pair reaches 4.5:1 (the sweep checks).
+ */
+function RoleChip({ role }: { role: Role }) {
+  const t = useTheme();
+  const look =
+    role === 'admin'
+      ? { backgroundColor: t.accent.base, borderColor: t.accent.base, color: t.text.inverse }
+      : role === 'organizer'
+        ? { backgroundColor: t.bg.accentSoft, borderColor: t.bg.accentSoft, color: t.text.accent }
+        : { backgroundColor: 'transparent', borderColor: t.border.strong, color: t.text.secondary };
+  return (
+    <View style={[styles.chip, { backgroundColor: look.backgroundColor, borderColor: look.borderColor }]}>
+      <Text style={[type.caption, styles.chipText, { color: look.color }]}>{ROLE_WORDS[role]}</Text>
+    </View>
+  );
+}
+
+function StatusChip({ status }: { status: 'disabled' | 'rejected' }) {
   const t = useTheme();
   return (
-    <View style={styles.stateRow}>
-      <Text style={[type.label, styles.stateLabel, { color: t.text.muted }]}>
-        {label}
+    <View style={[styles.chip, { borderColor: t.feedback.danger }]}>
+      <Text style={[type.caption, styles.chipText, { color: t.feedback.danger }]}>
+        {status === 'disabled' ? 'Disabled' : 'Rejected'}
       </Text>
-      {children}
-    </View>
-  );
-}
-
-/** Segmented control that SHOWS the current value rather than offering verbs. */
-function Segmented<T extends string>({
-  options,
-  value,
-  onChange,
-  disabled,
-}: {
-  options: readonly T[];
-  value: T;
-  onChange: (next: T) => void;
-  disabled?: boolean;
-}) {
-  const t = useTheme();
-  return (
-    <View
-      style={[
-        styles.seg,
-        { borderColor: t.border.subtle, opacity: disabled ? 0.5 : 1 },
-      ]}
-    >
-      {options.map((o) => {
-        const on = o === value;
-        return (
-          <Pressable
-            key={o}
-            disabled={disabled || on}
-            accessibilityRole="button"
-            accessibilityLabel={`Set role ${o}`}
-            onPress={() => onChange(o)}
-            style={[
-              styles.segOpt,
-              on && { backgroundColor: t.accent.base },
-            ]}
-          >
-            <Text
-              style={[
-                type.caption,
-                { color: on ? t.accent.onAccent : t.text.secondary },
-              ]}
-            >
-              {o}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
-function Badge({ label, tone }: { label: string; tone: 'good' | 'accent' | 'muted' }) {
-  const t = useTheme();
-  const color =
-    tone === 'good' ? t.feedback.success : tone === 'accent' ? t.accent.base : t.text.muted;
-  return (
-    <View style={[styles.badge, { borderColor: color }]}>
-      <Text style={[type.caption, { color }]}>{label}</Text>
     </View>
   );
 }
@@ -356,33 +336,26 @@ function Badge({ label, tone }: { label: string; tone: 'good' | 'accent' | 'mute
 const styles = StyleSheet.create({
   between: { justifyContent: 'space-between' },
   wrap: { flexWrap: 'wrap' },
-  // Label and control sit TOGETHER on the left. They were previously pushed to
-  // opposite edges with space-between, which on a wide card left a gulf between
-  // "Role" and the control it names — the two read as unrelated, and the eye had
-  // to travel the width of the card to connect them.
-  stateRow: {
+  section: { marginTop: space.md, letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: '700' },
+  pending: { gap: space.xs },
+  list: { paddingVertical: 0, gap: 0 },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.md,
-    marginTop: space.xs,
-  },
-  stateLabel: { minWidth: 56 },
-  seg: {
-    flexDirection: 'row',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: radius.pill,
-    overflow: 'hidden',
-  },
-  segOpt: {
-    paddingHorizontal: space.md,
+    gap: space.sm,
     paddingVertical: space.sm,
-    minHeight: 36,
-    justifyContent: 'center',
+    minHeight: 56,
   },
-  badge: {
+  lines: { flex: 1, minWidth: 0, gap: 2 },
+  nameLine: { flexDirection: 'row', alignItems: 'center', gap: space.xs, flexWrap: 'wrap' },
+  // Shrinks beside the chips: Yoga's flexShrink defaults to 0.
+  name: { fontWeight: '600', flexShrink: 1 },
+  menuSpace: { width: 44 },
+  chip: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: radius.pill,
     paddingHorizontal: space.sm,
-    paddingVertical: 2,
+    paddingVertical: 1,
   },
+  chipText: { fontWeight: '600' },
 });

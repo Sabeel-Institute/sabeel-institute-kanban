@@ -915,6 +915,40 @@ try {
     check('on a phone, a lane folds from its heading, with the collapse controls above the lanes', phoneShut);
   }
 
+  // ---- Watching a lane ------------------------------------------------------------
+  // The bell beside a lane's count watches it, on every column's heading at
+  // once (one watch per lane), stored on the account as board/lane.
+  {
+    const boardDoc = (await db.collection('boards').where('name', '==', BOARD).get()).docs[0];
+    const bd = boardDoc.data();
+    const supplies = bd.lanes.find((l) => l.name === 'Supplies').id;
+    const me = db.doc(`users/${bd.createdBy}`);
+    const key = `${boardDoc.id}/${supplies}`;
+    const storedWatch = async (want, ms = 15000) => {
+      const until = Date.now() + ms;
+      for (;;) {
+        const got = (await me.get()).data()?.watchedLanes ?? [];
+        if (want(got) || Date.now() > until) return got;
+        await page.waitForTimeout(250);
+      }
+    };
+    const watch = page.getByRole('button', { name: 'Watch the Supplies lane', exact: true });
+    const stop = page.getByRole('button', { name: 'Stop watching the Supplies lane', exact: true });
+    const before = await watch.count();
+    await watch.first().click();
+    await stop.first().waitFor({ timeout: 10000 });
+    const on = await storedWatch((g) => g.includes(key));
+    const stops = await stop.count();
+    await stop.first().click();
+    await watch.first().waitFor({ timeout: 10000 });
+    const off = await storedWatch((g) => !g.includes(key));
+    check(
+      'a lane is watched from the bell beside its count, on every column at once, and unwatched',
+      before >= 2 && stops === before && (await watch.count()) === before && on.includes(key) && !off.includes(key),
+      `${before} bells; stored ${JSON.stringify(on)} then ${JSON.stringify(off)}`,
+    );
+  }
+
   // ---- A refused add keeps its form ---------------------------------------------
   // The rules check a new card's column against the board's `columnIds`
   // mirror; with To Do taken out of it, the board still draws To Do and the

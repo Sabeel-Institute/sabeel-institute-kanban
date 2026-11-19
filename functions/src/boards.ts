@@ -112,9 +112,14 @@ export const removeBoardMember = onCall({ secrets: [sentryDsn] }, guarded(async 
   // sweep sends arrivals to board members only — but an entry nothing can
   // ever answer is clutter, and it counts against their watch limit.
   const userRef = db.doc(`users/${uid}`);
-  const watched = ((await userRef.get()).data()?.watchedColumns as string[] | undefined) ?? [];
+  const userData = (await userRef.get()).data();
+  const watched = (userData?.watchedColumns as string[] | undefined) ?? [];
   // Removed by value, so a column they watch elsewhere in the meantime stays.
   const watchedHere = watched.filter((k) => watchKeyOnBoard(k, boardId));
+  // …and the lanes they watch here, for the same reasons.
+  const lanesHere = ((userData?.watchedLanes as string[] | undefined) ?? []).filter((k) =>
+    watchKeyOnBoard(k, boardId),
+  );
 
   const batch = db.batch();
   batch.update(boardRef, {
@@ -149,8 +154,11 @@ export const removeBoardMember = onCall({ secrets: [sentryDsn] }, guarded(async 
     // in the card's history or in the Search browse order.
     batch.update(card.ref, { subscriberUids: FieldValue.arrayRemove(uid) });
   }
-  if (watchedHere.length > 0) {
-    batch.update(userRef, { watchedColumns: FieldValue.arrayRemove(...watchedHere) });
+  if (watchedHere.length > 0 || lanesHere.length > 0) {
+    batch.update(userRef, {
+      ...(watchedHere.length > 0 ? { watchedColumns: FieldValue.arrayRemove(...watchedHere) } : {}),
+      ...(lanesHere.length > 0 ? { watchedLanes: FieldValue.arrayRemove(...lanesHere) } : {}),
+    });
   }
 
   await batch.commit();

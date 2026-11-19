@@ -44,10 +44,12 @@ export const NOTIFY_EVENTS: NotifyEventSpec[] = [
     defaultOn: true,
   },
   {
+    // Lanes share it (2026-11-18): one switch for both bells, so watching a
+    // lane adds no setting (the set stays small; see notify.test.ts).
     event: 'columnArrival',
-    label: 'A card arrives in a column you watch',
+    label: 'A card arrives in a column or lane you watch',
     description:
-      "Watch a column with its bell: on the column's header, or on a phone, in the row along the bottom.",
+      "Watch a column with its bell: on the column's header, or on a phone, in the row along the bottom. On a board with lanes, watch a lane with the bell beside its name.",
     defaultOn: true,
   },
   {
@@ -118,7 +120,7 @@ export function notificationText(params: {
     case 'cardChanged':
       return `${params.actorName} changed ${card}`;
     case 'columnArrival':
-      return `${params.actorName} moved ${card} into a column you watch`;
+      return `${params.actorName} moved ${card} into a column or lane you watch`;
     case 'dueSoon':
       return `${card} is due soon`;
     case 'newUserPending':

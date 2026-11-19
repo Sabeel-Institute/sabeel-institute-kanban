@@ -23,6 +23,9 @@ const OUT = 'ns_out'; // watches Review, but is not on the board
 const UMA = 'ns_uma'; // assigned, then unassigned
 const RAE = 'ns_rae'; // assigned, then removed from the board
 const GUS = 'ns_gus'; // assigned during a burst
+const LIL = 'ns_lil'; // watches the Marketing lane
+const LOT = 'ns_lot'; // watches the Marketing lane, but is not on the board
+const BOTH = 'ns_both'; // watches the Review column AND the Marketing lane
 
 /** Well past the longest a notice can wait, so a sweep at this time sends it. */
 const later = () => Date.now() + NOTICE_MAX_WAIT_MS + 1000;
@@ -90,6 +93,9 @@ beforeAll(async () => {
     [UMA, 'Uma'],
     [RAE, 'Rae'],
     [GUS, 'Gus'],
+    [LIL, 'Lil'],
+    [LOT, 'Lot'],
+    [BOTH, 'Bo'],
   ]) {
     await makeUser({ uid, email: `${uid}@oursabeel.com`, role: 'member', status: 'active', displayName: name });
   }
@@ -109,7 +115,7 @@ beforeAll(async () => {
       { id: 'ln_mkt', name: 'Marketing' },
     ],
     doneColumnId: 'done',
-    memberUids: [ADA, FAY, WES, WYN, UMA, RAE, GUS],
+    memberUids: [ADA, FAY, WES, WYN, UMA, RAE, GUS, LIL, BOTH],
     memberProfiles: {},
     createdAt: 1,
     createdBy: ADA,
@@ -117,6 +123,11 @@ beforeAll(async () => {
   await adminDb().doc(`users/${WES}`).update({ watchedColumns: [watchKey(B, 'review')] });
   await adminDb().doc(`users/${WYN}`).update({ watchedColumns: [watchKey(B, 'done')] });
   await adminDb().doc(`users/${OUT}`).update({ watchedColumns: [watchKey(B, 'review')] });
+  await adminDb().doc(`users/${LIL}`).update({ watchedLanes: [watchKey(B, 'ln_mkt')] });
+  await adminDb().doc(`users/${LOT}`).update({ watchedLanes: [watchKey(B, 'ln_mkt')] });
+  await adminDb()
+    .doc(`users/${BOTH}`)
+    .update({ watchedColumns: [watchKey(B, 'review')], watchedLanes: [watchKey(B, 'ln_mkt')] });
 });
 
 afterAll(async () => {
@@ -242,6 +253,49 @@ describe('column watchers', () => {
     expect(await inbox(WES, C, 'columnArrival')).toHaveLength(0);
     expect((await inbox(WYN, C, 'columnArrival')).map((n) => n.text)).toEqual([
       'Ada moved “Passing” into Done',
+    ]);
+  });
+});
+
+describe('lane watchers', () => {
+  it('hear when a card arrives in their lane, and only members do', async () => {
+    const C = 'ns_lane_in';
+    await seed(C, { title: 'Print flyers', laneId: 'ln_plan' });
+    await edit(C, { laneId: 'ln_mkt' });
+    await waitForPending(C, 1);
+    await runNoticeSweep(later());
+
+    expect((await inbox(LIL, C, 'columnArrival')).map((n) => n.text)).toEqual([
+      'Ada moved “Print flyers” into the Marketing lane',
+    ]);
+    // Watching a lane on a board you are not on yields nothing.
+    expect(await inbox(LOT, C, 'columnArrival')).toHaveLength(0);
+  });
+
+  it('hear of a card added to their lane, and nothing when it leaves for another', async () => {
+    const C = 'ns_lane_other';
+    await seed(C, { title: 'Book a van', laneId: 'ln_mkt' });
+    await edit(C, { laneId: 'ln_plan' });
+    await waitForPending(C, 1);
+    await runNoticeSweep(later());
+
+    // The creation, in their lane; the move out tells them nothing.
+    expect((await inbox(LIL, C, 'columnArrival')).map((n) => n.text)).toEqual([
+      'Ada added “Book a van” to the Marketing lane',
+    ]);
+  });
+
+  it('who also watch the column it lands in hear once, of the column', async () => {
+    const C = 'ns_lane_both';
+    await seed(C, { title: 'Sign off', laneId: 'ln_plan' });
+    await edit(C, { columnId: 'review', laneId: 'ln_mkt' });
+    await waitForPending(C, 2);
+    await runNoticeSweep(later());
+
+    // One notice, of the column, not a second of the lane.
+    expect((await inbox(BOTH, C, 'columnArrival')).map((n) => n.text)).toEqual(['Ada moved “Sign off” into Review']);
+    expect((await inbox(LIL, C, 'columnArrival')).map((n) => n.text)).toEqual([
+      'Ada moved “Sign off” into the Marketing lane',
     ]);
   });
 });

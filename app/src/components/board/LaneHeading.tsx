@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { describeLane, laneBadge, type LaneInfo } from '@sabeel/shared';
 import { space, type, useTheme } from '../../theme';
@@ -26,6 +27,7 @@ export function LaneHeading({
   collapsed,
   onToggle,
   here,
+  bell,
 }: {
   name: string;
   info: LaneInfo | null;
@@ -41,6 +43,8 @@ export function LaneHeading({
    * when the cards are not there to count: the badge is the whole board's.
    */
   here?: number;
+  /** The lane's bell, beside its count and outside the fold button. */
+  bell?: ReactNode;
 }) {
   const t = useTheme();
   const colour =
@@ -66,15 +70,18 @@ export function LaneHeading({
   );
   if (onToggle) {
     return (
-      <View style={styles.toggleGap}>
-        <DisclosureHeading
+      <View style={[styles.toggleGap, styles.withBell]}>
+        <View style={styles.grow}>
+          <DisclosureHeading
           label={label}
           expanded={!collapsed}
           onToggle={onToggle}
           testID={LANE_HEADING_TEST_ID}
         >
-          <View style={[styles.row, styles.inToggle]}>{words}</View>
-        </DisclosureHeading>
+            <View style={[styles.row, styles.inToggle]}>{words}</View>
+          </DisclosureHeading>
+        </View>
+        {bell}
       </View>
     );
   }
@@ -111,6 +118,8 @@ const styles = StyleSheet.create({
   // without the plain heading's own top padding.
   toggleGap: { paddingTop: space.xs },
   inToggle: { paddingTop: 0, paddingHorizontal: 0 },
+  withBell: { flexDirection: 'row', alignItems: 'center' },
+  grow: { flex: 1, minWidth: 0 },
   // Ordinary case and weight beside the capitals: a count, not a name.
   here: { textTransform: 'none', letterSpacing: 0, fontWeight: '400' },
 });

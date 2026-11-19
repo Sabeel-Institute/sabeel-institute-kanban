@@ -114,7 +114,7 @@ service cloud.firestore {
           .hasOnly(['favoriteBoardIds', 'recentBoardIds', 'mutedBoardIds',
                     'notifyPrefs', 'unreadNotifCount', 'watchedColumns',
                     'overviewSort', 'overviewReverse', 'overviewHiddenBoardIds',
-                    'collapsedBoardSections', 'collapsedLanes']);
+                    'collapsedBoardSections', 'collapsedLanes', 'watchedLanes']);
       }
       // Boards-list sections and lanes collapsed, by this person, for this
       // person: display preferences that hide nothing from anyone else.
@@ -149,9 +149,14 @@ service cloud.firestore {
       // cannot look up every board the list names. So the rule only bounds
       // the list (MAX_WATCHED_COLUMNS in @sabeel/shared).
       function watchesBounded() {
-        return !('watchedColumns' in request.resource.data)
-          || (request.resource.data.watchedColumns is list
-              && request.resource.data.watchedColumns.size() <= 200);
+        return (!('watchedColumns' in request.resource.data)
+            || (request.resource.data.watchedColumns is list
+                && request.resource.data.watchedColumns.size() <= 200))
+          // Lanes as columns (MAX_WATCHED_LANES): the sweep sends a lane's
+          // arrivals to that board's members only.
+          && (!('watchedLanes' in request.resource.data)
+            || (request.resource.data.watchedLanes is list
+                && request.resource.data.watchedLanes.size() <= 200));
       }
 
       // Your own doc: needed even while pending, so the gate screen can show

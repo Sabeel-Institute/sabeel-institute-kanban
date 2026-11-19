@@ -1244,32 +1244,39 @@ export const TUTORIALS = [
         do: async (t) => {
           await t.tap(t.btn('More'));
           await t.tap(t.btn('People'));
-          await t.scrollTo(t.switch('Account access for Omar'));
+          await t.scrollTo(t.btn('Change Omar'));
         },
       },
       {
-        say: "Everyone has a role. Members see the boards they've been added to, and that's it.",
-        do: (t) => t.highlight(t.person('Omar').getByRole('button', { name: 'Set role member', exact: true })),
+        say: "Each person's role is the coloured tag beside their name. Members see the boards they've been added to, and that's it.",
+        do: (t) => t.highlight(t.person('Omar').getByText('Member', { exact: true })),
       },
       {
-        say: 'Organizers can do the same, and they can also create new boards.',
-        do: (t) => t.highlight(t.person('Omar').getByRole('button', { name: 'Set role organizer', exact: true })),
+        say: 'To change it, tap the three dots at the end of their row.',
+        do: (t) => t.tap(t.btn('Change Omar')),
+      },
+      {
+        say: 'Organizers can do what members do, and they can also create new boards.',
+        do: (t) => t.highlight(t.btn('Organizer')),
       },
       {
         say: 'And admins can do everything, including managing people, labels, and Stats.',
-        do: (t) => t.highlight(t.person('Omar').getByRole('button', { name: 'Set role admin', exact: true })),
+        do: (t) => t.highlight(t.btn('Admin')),
       },
       {
-        say: "To change someone's role, tap the one you want, and confirm. Let's make Omar an organizer.",
-        do: (t) => t.tap(t.person('Omar').getByRole('button', { name: 'Set role organizer', exact: true })),
+        say: "Tap the role you want, and confirm. Let's make Omar an organizer.",
+        do: (t) => t.tap(t.btn('Organizer')),
       },
       {
-        say: "The Active switch turns an account off. They're signed out straight away and can't get back in, but their cards are kept just as they were.",
-        do: (t) => t.highlight(t.switch('Account access for Omar')),
+        say: "The same dots turn an account off, with Disable access. They're signed out straight away and can't get back in, but their cards are kept just as they were.",
+        do: async (t) => {
+          await t.tap(t.btn('Change Omar'));
+          await t.highlight(t.btn('Disable access'));
+        },
       },
       {
-        say: "Turn it back on any time, because nothing's ever deleted. And you can't change your own access, which stops an admin from locking themselves out.",
-        do: (t) => t.wait(600),
+        say: "Restore it any time, because nothing's ever deleted. And your own row has no dots, which stops an admin from locking themselves out.",
+        do: (t) => t.tap(t.btn('Cancel')),
       },
     ],
   },

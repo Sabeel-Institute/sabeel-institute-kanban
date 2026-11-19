@@ -26,6 +26,7 @@ import {
   COLLAPSED_SECTIONS_MAX,
   EMULATOR_PROJECT_ID,
   MAX_WATCHED_COLUMNS,
+  MAX_WATCHED_LANES,
   NO_LANE_KEY,
   OVERVIEW_HIDDEN_MAX,
   PASSWORD_SIGN_IN_EMAIL,
@@ -374,6 +375,16 @@ describe('preference self-writes', () => {
     await assertFails(
       updateDoc(doc(db, 'users/org1'), { collapsedBoardSections: arrayUnion('starred') }),
     );
+  });
+
+  it('an active user watches lanes, within bounds, on their own document only', async () => {
+    const db = ctx('member1', 'member', 'active');
+    await assertSucceeds(updateDoc(doc(db, 'users/member1'), { watchedLanes: arrayUnion(watchKey('b1', 'ln-1')) }));
+    const full = Array.from({ length: MAX_WATCHED_LANES }, (_, i) => watchKey('b1', `ln-${i}`));
+    await assertSucceeds(updateDoc(doc(db, 'users/member1'), { watchedLanes: full }));
+    await assertFails(updateDoc(doc(db, 'users/member1'), { watchedLanes: arrayUnion('b1/one-more') }));
+    await assertFails(updateDoc(doc(db, 'users/member1'), { watchedLanes: 'b1/ln-1' }));
+    await assertFails(updateDoc(doc(db, 'users/org1'), { watchedLanes: [watchKey('b1', 'ln-1')] }));
   });
 
   it('nobody may watch columns on someone else’s behalf', async () => {

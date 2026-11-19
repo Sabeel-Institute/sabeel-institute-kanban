@@ -286,7 +286,12 @@ export function NotificationsScreen({ user }: { user: SessionUser }) {
             return (
               <Panel key={b.id}>
                 <Row style={styles.between}>
-                  <Body>{b.name}</Body>
+                  {/* Shrinks and wraps beside the bell: Yoga's flexShrink
+                      defaults to 0, so a long name pushed the bell off the row
+                      (#123). */}
+                  <View style={styles.name}>
+                    <Body>{b.name}</Body>
+                  </View>
                   {/* The bell says the state and changes it in one tap: struck
                       through means silenced. */}
                   <IconAction
@@ -449,6 +454,7 @@ export function NotificationsScreen({ user }: { user: SessionUser }) {
 
 const styles = StyleSheet.create({
   between: { justifyContent: 'space-between', alignItems: 'center' },
+  name: { flex: 1, minWidth: 0 },
   grow: { flex: 1, gap: space.xs },
   actions: { gap: space.xs },
 });

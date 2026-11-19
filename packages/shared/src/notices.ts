@@ -33,6 +33,8 @@ export const NOTICE_PHRASE_LIMIT = 4;
 
 /** The most columns one person may watch; firestore.rules holds the same number. */
 export const MAX_WATCHED_COLUMNS = 200;
+/** The most lanes one person may watch, as `watchKey(boardId, laneId)`. Restated in firestore.rules. */
+export const MAX_WATCHED_LANES = 200;
 
 /** One history entry as a pending notice stores it. */
 export interface NoticeEntry {
@@ -220,6 +222,61 @@ export function changeNoticeText(params: {
 }
 
 export type ArrivalKind = 'created' | 'moved' | 'restored';
+
+/**
+ * Did the card ARRIVE in the lane it is in now, during this burst (lane watching,
+ * Faisal, 2026-11-18)? The same reading as `arrivalOf`, for lanes:
+ * created there, restored from the archive, or its earliest lane change in the
+ * burst started from another lane. `laneId` is its lane now, already checked
+ * to be one of the board's live lanes; null (No lane) never arrives.
+ */
+export function laneArrivalOf(
+  entries: readonly NoticeEntry[],
+  card: { laneId: string | null; archived: boolean },
+): { kind: ArrivalKind; actorUid: string } | null {
+  if (card.archived || card.laneId === null) return null;
+  const list = chronological(entries);
+  const created = list.find((e) => e.type === 'created');
+  const restored = list.find((e) => e.type === 'archived')?.from === 'true';
+  const firstChange = list.find((e) => e.type === 'lane');
+  const movedIn = firstChange !== undefined && firstChange.from !== card.laneId;
+  if (!created && !restored && !movedIn) return null;
+  const by =
+    lastOf(list, (e) => e.type === 'lane' && e.to === card.laneId) ??
+    lastOf(list, (e) => e.type === 'archived' && e.to === 'false') ??
+    created ??
+    list[list.length - 1];
+  const kind: ArrivalKind =
+    by.type === 'lane'
+      ? 'moved'
+      : by.type === 'archived'
+        ? 'restored'
+        : created
+          ? 'created'
+          : restored
+            ? 'restored'
+            : 'moved';
+  return { kind, actorUid: by.actorUid };
+}
+
+/** A lane arrival in words: "Omar moved “Order tents” into the Supplies lane". */
+export function laneArrivalText(params: {
+  kind: ArrivalKind;
+  actorName: string;
+  cardTitle: string;
+  laneName: string;
+}): string {
+  const card = `“${params.cardTitle}”`;
+  const lane = `the ${params.laneName} lane`;
+  switch (params.kind) {
+    case 'created':
+      return `${params.actorName} added ${card} to ${lane}`;
+    case 'moved':
+      return `${params.actorName} moved ${card} into ${lane}`;
+    case 'restored':
+      return `${params.actorName} restored ${card} to ${lane}`;
+  }
+}
 
 /**
  * Did the card ARRIVE in the column it is in now, during this burst?
