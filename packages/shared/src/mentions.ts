@@ -16,29 +16,47 @@ export interface MentionCandidate {
 }
 
 
-/** Everyone whose handle appears as `@handle` in the text. */
+/** What a handle may contain. The ONE definition; everything else derives. */
+const HANDLE_CHARS = '[A-Za-z0-9._%+-]';
+
+/**
+ * `@all` is everyone on the board (Faisal, 2026-11-19). A reserved handle,
+ * not a person: it expands to every candidate's uid, so the rules, the
+ * notice, its preference and the board mute need nothing new.
+ */
+const ALL = 'all';
+
+/** The suggestion row for `@all`, inserted like anyone else's handle. Its uid is no one's. */
+export const MENTION_ALL: MentionCandidate = {
+  uid: '*all',
+  displayName: 'Everyone on this board',
+  email: `${ALL}@`,
+};
+
+/**
+ * Every handle written as `@handle`, lower-cased. A handle runs to the first
+ * character that cannot appear in an email local part, and trailing dots are
+ * the sentence's, so "@sara," and "@sara." are sara; "@sarah" is not.
+ */
+function handlesIn(body: string): Set<string> {
+  const tokens = body.match(new RegExp(`@${HANDLE_CHARS}+`, 'g')) ?? [];
+  return new Set(tokens.map((t) => t.slice(1).toLowerCase().replace(/\.+$/, '')));
+}
+
+/** Whether the text mentions everyone on the board. */
+export function mentionsAll(body: string): boolean {
+  return handlesIn(body).has(ALL);
+}
+
+/** Everyone the text mentions: by handle, or all of them for `@all`. */
 export function extractMentions(
   body: string,
   candidates: readonly MentionCandidate[],
 ): string[] {
-  const found = new Set<string>();
-  // A handle runs to the first character that cannot appear in an email local
-  // part, so "@sara," and "@sara." resolve to sara.
-  const tokens = body.match(/@[A-Za-z0-9._%+-]+/g) ?? [];
-
-  for (const token of tokens) {
-    const handle = token.slice(1).toLowerCase();
-    for (const c of candidates) {
-      const h = handleFor(c.email);
-      // Trailing punctuation is not part of the handle: "@sara." matches sara,
-      // but "@sarah" must NOT match sara.
-      if (handle === h || handle.replace(/[.]+$/, '') === h) {
-        found.add(c.uid);
-      }
-    }
-  }
-
-  return [...found];
+  const handles = handlesIn(body);
+  return candidates
+    .filter((c) => handles.has(ALL) || handles.has(handleFor(c.email)))
+    .map((c) => c.uid);
 }
 
 /**
@@ -63,7 +81,12 @@ export function mentionSuggestions(
   opts: { prioritise?: readonly string[] } = {},
 ): MentionCandidate[] {
   const top = new Set(opts.prioritise ?? []);
-  return matchPeople(partial, candidates, { first: (c) => top.has(c.uid) });
+  const people = matchPeople(partial, candidates, { first: (c) => top.has(c.uid) });
+  // Everyone, first, when what is typed could be "all" or "everyone", and
+  // there is more than one person to mean.
+  const q = partial.trim().toLowerCase();
+  const offersAll = candidates.length > 1 && (ALL.startsWith(q) || 'everyone'.startsWith(q));
+  return offersAll ? [MENTION_ALL, ...people] : people;
 }
 
 /** The trigger character. One definition; both editors and the parser derive. */
@@ -102,9 +125,6 @@ export function mentionInsertion(candidate: MentionCandidate): {
     literal: `${MENTION_INDICATOR}${handle}`,
   };
 }
-
-/** What a handle may contain. The ONE definition; everything else derives. */
-const HANDLE_CHARS = '[A-Za-z0-9._%+-]';
 
 /**
  * The partial handle currently being typed, or null when the caret is not in a

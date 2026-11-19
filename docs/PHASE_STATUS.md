@@ -66,6 +66,7 @@ shows adds it here:
 
 | Film or picture | What it lacks |
 |---|---|
+| `comments` film, if it shows the @ list | The list's first row is **Everyone on this board** (`@all`) |
 | `lanes` film, both cuts (two lines reworded, the add step re-scripted for the computer's lane +; render their narration); `overview` film, computer cut where it opens a lane board; `lanes-wide` picture | The wide board with lanes is a grid: lanes as rows, frozen headings and lane names, one bell each, a + on each heading |
 | Film `board-settings` | Deleting moves from the board to the Columns page: a new line deletes the column just added with its bin, and the closing line about deleting on the board is gone. New narration; both cuts. |
 | Films `new-board`, `clone-board`, `details`, `board-people`, `board-archive` | Shot as a board's owner, so their board frames show a pencil, and a delete, on each column heading; the board has neither now. Both cuts. |
