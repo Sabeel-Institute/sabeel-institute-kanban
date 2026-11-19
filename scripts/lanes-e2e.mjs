@@ -485,6 +485,38 @@ try {
     check('once its subtask is finished, the parent goes to Done', moved);
     await back();
 
+    // No new open work under a finished parent: adding a subtask is refused,
+    // its title kept, and linking an open card is refused; nothing written.
+    const spareRef = await put('Hire a tent');
+    await page.locator('[data-testid="card-Hire a tent"]').waitFor({ timeout: 20000 });
+    const childrenOf = async (id) =>
+      (await db.collection('cards').where('parentId', '==', id).get()).docs.filter((d) => !d.data().archived).length;
+    const kidsBefore = await childrenOf(parentRef.id);
+    notices.length = 0;
+    await openCard('Run the fair');
+    await page.getByLabel('New subtask title').fill('Order the banners');
+    await page.getByRole('button', { name: 'Add subtask', exact: true }).click();
+    const addSaid = await noticed(/A subtask can’t be added to “Run the fair”, which is finished\. To add open work under it, first move “Run the fair” out of Done/);
+    await page.waitForTimeout(800);
+    const titleKept = (await page.getByLabel('New subtask title').inputValue()) === 'Order the banners';
+    notices.length = 0;
+    await page.getByRole('button', { name: 'Link an existing card' }).click();
+    await page.getByRole('button', { name: 'Link Hire a tent as a subtask' }).click();
+    const linkSaid = await noticed(/“Hire a tent” can’t become a subtask of “Run the fair”, which is finished/);
+    await page.waitForTimeout(800);
+    check(
+      'a finished parent takes no new subtask (its title kept) and no open card linked under it',
+      addSaid &&
+        titleKept &&
+        linkSaid &&
+        (await childrenOf(parentRef.id)) === kidsBefore &&
+        !(await spareRef.get()).data().parentId,
+      notices.join(' | '),
+    );
+    await page.getByLabel('New subtask title').fill('');
+    await back();
+    await spareRef.update({ archived: true, archivedAt: Date.now() });
+
     // Reopening the subtask under its finished parent: refused on the card.
     const REOPEN = (why) =>
       new RegExp(
@@ -881,6 +913,40 @@ try {
     await page.setViewportSize({ width: 1280, height: 950 });
     await page.getByText('To Do').first().waitFor({ timeout: 20000 });
     check('on a phone, a lane folds from its heading, with the collapse controls above the lanes', phoneShut);
+  }
+
+  // ---- Watching a lane ------------------------------------------------------------
+  // The bell beside a lane's count watches it, on every column's heading at
+  // once (one watch per lane), stored on the account as board/lane.
+  {
+    const boardDoc = (await db.collection('boards').where('name', '==', BOARD).get()).docs[0];
+    const bd = boardDoc.data();
+    const supplies = bd.lanes.find((l) => l.name === 'Supplies').id;
+    const me = db.doc(`users/${bd.createdBy}`);
+    const key = `${boardDoc.id}/${supplies}`;
+    const storedWatch = async (want, ms = 15000) => {
+      const until = Date.now() + ms;
+      for (;;) {
+        const got = (await me.get()).data()?.watchedLanes ?? [];
+        if (want(got) || Date.now() > until) return got;
+        await page.waitForTimeout(250);
+      }
+    };
+    const watch = page.getByRole('button', { name: 'Watch the Supplies lane', exact: true });
+    const stop = page.getByRole('button', { name: 'Stop watching the Supplies lane', exact: true });
+    const before = await watch.count();
+    await watch.first().click();
+    await stop.first().waitFor({ timeout: 10000 });
+    const on = await storedWatch((g) => g.includes(key));
+    const stops = await stop.count();
+    await stop.first().click();
+    await watch.first().waitFor({ timeout: 10000 });
+    const off = await storedWatch((g) => !g.includes(key));
+    check(
+      'a lane is watched from the bell beside its count, on every column at once, and unwatched',
+      before >= 2 && stops === before && (await watch.count()) === before && on.includes(key) && !off.includes(key),
+      `${before} bells; stored ${JSON.stringify(on)} then ${JSON.stringify(off)}`,
+    );
   }
 
   // ---- A refused add keeps its form ---------------------------------------------

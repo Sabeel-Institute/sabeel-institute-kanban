@@ -11,6 +11,7 @@ import {
   lanesLive,
   priorityLabel,
   readableInkOn,
+  subtaskAddRefusal,
   todayInOrgTz,
 } from '@sabeel/shared';
 import {
@@ -455,6 +456,9 @@ export function CardScreen({
             })
           }
           onLink={(id) => run(() => updateCard(id, { parentId: cardId }, user))}
+          // A finished or archived card takes no new open work (#111).
+          addRefusal={subtaskAddRefusal({ board: b, parent: c })}
+          linkRefusal={(child) => subtaskAddRefusal({ board: b, parent: c, child })}
           // `undefined` is how updateCard clears a field (deleteField), so an
           // unlink leaves the card intact and merely unparented.
           onUnlink={(id) => run(() => updateCard(id, { parentId: undefined }, user))}

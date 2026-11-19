@@ -5,6 +5,8 @@ import {
   NOTICE_MAX_WAIT_MS,
   NOTICE_QUIET_MS,
   arrivalOf,
+  laneArrivalOf,
+  laneArrivalText,
   arrivalText,
   changeNoticeText,
   noticeAllowed,
@@ -310,5 +312,47 @@ describe('MAX_WATCHED_COLUMNS', () => {
   it('is the bound firestore.rules holds, since rules cannot import it', () => {
     const rules = readFileSync(new URL('../../../firestore.rules', import.meta.url), 'utf8');
     expect(rules).toContain(`watchedColumns.size() <= ${MAX_WATCHED_COLUMNS}`);
+  });
+});
+
+describe('laneArrivalOf', () => {
+  const inLane = (laneId: string | null) => ({ laneId, archived: false });
+
+  it('is a lane change from another lane', () => {
+    const burst = [e('lane', 'sara', T, { from: 'ln-a', to: 'ln-b' })];
+    expect(laneArrivalOf(burst, inLane('ln-b'))).toEqual({ kind: 'moved', actorUid: 'sara' });
+  });
+
+  it('is not a card passed through the lane, or moved out and back', () => {
+    const through = [
+      e('lane', 'sara', T, { from: 'ln-a', to: 'ln-b' }),
+      e('lane', 'sara', T + 1, { from: 'ln-b', to: 'ln-c' }),
+    ];
+    expect(laneArrivalOf(through, inLane('ln-c'))).toEqual({ kind: 'moved', actorUid: 'sara' });
+    const back = [
+      e('lane', 'sara', T, { from: 'ln-b', to: 'ln-c' }),
+      e('lane', 'omar', T + 1, { from: 'ln-c', to: 'ln-b' }),
+    ];
+    expect(laneArrivalOf(back, inLane('ln-b'))).toBeNull();
+  });
+
+  it('is a card created or restored in the lane', () => {
+    expect(laneArrivalOf([e('created', 'sara', T)], inLane('ln-a'))).toEqual({ kind: 'created', actorUid: 'sara' });
+    expect(laneArrivalOf([e('archived', 'omar', T, { from: 'true', to: 'false' })], inLane('ln-a'))).toEqual({
+      kind: 'restored',
+      actorUid: 'omar',
+    });
+  });
+
+  it('is nothing for a column move alone, an archived card, or No lane', () => {
+    expect(laneArrivalOf([e('moved', 'sara', T, { from: 'todo', to: 'done' })], inLane('ln-a'))).toBeNull();
+    expect(laneArrivalOf([e('created', 'sara', T)], { laneId: 'ln-a', archived: true })).toBeNull();
+    expect(laneArrivalOf([e('created', 'sara', T)], inLane(null))).toBeNull();
+  });
+
+  it('is worded with the lane', () => {
+    expect(laneArrivalText({ kind: 'moved', actorName: 'Omar', cardTitle: 'Order tents', laneName: 'Supplies' })).toBe(
+      'Omar moved “Order tents” into the Supplies lane',
+    );
   });
 });

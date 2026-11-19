@@ -32,7 +32,7 @@ export type NotifyEvent =
   | 'comment'
   /** A burst of changes to a card you follow, sent once the card is quiet. */
   | 'cardChanged'
-  /** A card arrived in a column you watch. */
+  /** A card arrived in a column, or on a board with lanes a lane, you watch. */
   | 'columnArrival'
   | 'dueSoon'
   | 'newUserPending';
@@ -50,6 +50,9 @@ export interface UserDoc {
   /** Columns whose arrivals notify me, as `watchKey(boardId, columnId)`.
    *  Absent until the first watch. */
   watchedColumns?: string[];
+  /** Lanes whose arrivals notify me, as `watchKey(boardId, laneId)`.
+   *  Absent until the first watch. */
+  watchedLanes?: string[];
   favoriteBoardIds: string[];
   recentBoardIds: string[];
   unreadNotifCount: number;

@@ -49,6 +49,7 @@ in the app.
 | Search | **Global across the boards you belong to**, client-side matching. See "Search". |
 | Notifications | Push **plus an in-app inbox** with an unread badge. |
 | Column watching | **Arrivals only** (2026-11-02). A board member may watch a column and is told when a card arrives in it: moved in, created in it, or restored into it. Watching a column does not subscribe you to its cards, and a card leaving a column notifies no one. |
+| Lane watching | **Arrivals only, as columns** (2026-11-18). On a board with lanes, a board member may watch a lane (the bell beside its count) and is told when a card arrives in it: its lane changed to it, created in it, or restored into it. Someone who watches the column and the lane a card lands in hears once, of the column. It shares the column arrivals' preference ("A card arrives in a column or lane you watch"), so the settings stay at seven. Cleared from someone removed from the board. |
 | WIP limits | **None.** Dropped from the model. |
 | Column deletion | **Blocked until the column is empty**, made painless by multi-select bulk actions. |
 | Bulk actions | **Multi-select cards** → move, archive, delete, assign. |
@@ -147,6 +148,7 @@ users/{uid}
   role:   member|organizer|admin
   notifyPrefs: { mention: bool, assigned: bool, comment: bool, … }
   mutedBoardIds: [boardId, …]
+  watchedLanes?: ['boardId/laneId', …]           # lanes whose arrivals notify me; self-written, at most 200
   watchedColumns: ['boardId/columnId', …]        # columns whose arrivals notify me; self-written,
                                                  # board membership checked when a notice is sent
   favoriteBoardIds: [boardId, …]
@@ -345,8 +347,8 @@ archived, rank)` for the board view, `(boardId, assigneeUids array-contains)` fo
 board-member removal, `(boardId, subscriberUids array-contains)` for the
 unsubscribe half of that same removal, and `(archived, dueDate)` for the due-soon
 sweep. My Work itself needs only the automatic single-field array-contains
-indexes on `assigneeUids` and `subscriberUids`, and column arrivals only the
-automatic one on `users.watchedColumns`.
+indexes on `assigneeUids` and `subscriberUids`, and column and lane arrivals
+only the automatic ones on `users.watchedColumns` and `users.watchedLanes`.
 The emulator does not enforce composite indexes — verify in production (see
 `docs/INHERITED-STACK.md`, lesson 6, and `scripts/probe-indexes.mjs`).
 
@@ -733,8 +735,9 @@ learn for boards that are not programs.
   subtask reopened (moved out of the finished column, or restored from the
   archive to an open column) while its parent is finished or archived: the
   notice says to unlink it from its parent first. Both refusals are a notice
-  dialog. Adding or linking an open subtask under a finished parent is
-  allowed.
+  dialog. Nor does a finished or archived parent take new open work: adding
+  a subtask to it, or linking an open card under it, is refused the same way
+  (linking a card already finished is not).
 - **Add card asks for a lane** on a board with lanes, none chosen, and adds
   nothing until one is. A subtask starts in its parent's lane. A card's lane is
   a second choice beside its column on the card; No lane is offered only while
@@ -957,6 +960,8 @@ Deny-by-default.
   members of the card's board, and an entry for a board you are not on yields
   nothing. `removeBoardMember` clears the removed person's entries for that
   board.
+- `watchedLanes` the same, at most 200 `boardId/laneId` strings, checked and
+  cleared the same way.
 - A user may write their own overview preferences: `overviewSort` one of the
   three orders, `overviewReverse` a boolean, `overviewHiddenBoardIds` a list of
   at most 500 (`OVERVIEW_HIDDEN_MAX`, held to it by `ruleLimits.test.ts`).

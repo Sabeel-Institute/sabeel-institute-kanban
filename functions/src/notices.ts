@@ -7,6 +7,9 @@ import {
   cleanLanes,
   arrivalOf,
   arrivalText,
+  laneArrivalOf,
+  laneArrivalText,
+  laneOf,
   changeNoticeText,
   noticeAllowed,
   noticeDue,
@@ -161,9 +164,29 @@ async function noticesFor(cardId: string, entries: NoticeEntry[]): Promise<Notic
         .map((d) => d.id)
         .filter((uid) => memberUids.includes(uid) && !followers.includes(uid))
     : [];
-  if (followers.length === 0 && watchers.length === 0) return [];
+  // A lane's watchers, on a board with live lanes, for a card that arrived in
+  // one of its lanes. Someone a column arrival already reaches hears once.
+  // Through lanes.ts, as every lane question: a card's lane, or null for No
+  // lane (lanes off, none, or one since removed).
+  const laneId = laneOf(
+    { laneId: card.laneId as string | undefined },
+    { columns, lanesOn: board.lanesOn === true, lanes },
+  );
+  const laneArrival = laneArrivalOf(entries, { laneId, archived });
+  const laneWatchers =
+    laneArrival && laneId
+      ? (
+          await db()
+            .collection('users')
+            .where('watchedLanes', 'array-contains', watchKey(boardId, laneId))
+            .get()
+        ).docs
+          .map((d) => d.id)
+          .filter((uid) => memberUids.includes(uid) && !followers.includes(uid) && !watchers.includes(uid))
+      : [];
+  if (followers.length === 0 && watchers.length === 0 && laneWatchers.length === 0) return [];
 
-  const recipients = await loadRecipients([...followers, ...watchers]);
+  const recipients = await loadRecipients([...followers, ...watchers, ...laneWatchers]);
   const nameFor = await namesFor([
     ...entries.map((e) => e.actorUid),
     ...entries.filter((e) => e.type === 'assigned' || e.type === 'unassigned').map((e) => e.to ?? ''),
@@ -207,6 +230,22 @@ async function noticesFor(cardId: string, entries: NoticeEntry[]): Promise<Notic
           laneNameFor,
         }),
         actorUid,
+        boardId,
+        cardId,
+      });
+    } else if (laneWatchers.includes(r.uid)) {
+      // The column arrival's preference and kind: one switch for both bells.
+      if (!laneArrival || !laneId || !allowed('columnArrival', laneArrival.actorUid)) continue;
+      notices.push({
+        uid: r.uid,
+        event: 'columnArrival',
+        text: laneArrivalText({
+          kind: laneArrival.kind,
+          actorName: nameFor(laneArrival.actorUid),
+          cardTitle,
+          laneName: laneNameFor(laneId) ?? 'a',
+        }),
+        actorUid: laneArrival.actorUid,
         boardId,
         cardId,
       });

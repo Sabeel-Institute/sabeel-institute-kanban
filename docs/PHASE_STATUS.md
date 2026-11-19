@@ -67,6 +67,10 @@ adds it here:
 
 | Film or picture | What it lacks |
 |---|---|
+| `lanes` film (a step added for the bell; render its narration); `lanes-*` pictures | The bell beside each lane's count, to watch the lane |
+| `notifications` film | The column-arrival preference now reads "A card arrives in a column or lane you watch" |
+| `roles` film (script rewritten for the ⋮ sheet; narration changed, render it again); `people-*`, `owners-*` pictures | People as compact rows with role chips, changes behind ⋮ (#125) |
+| `overview` film; `boards-*` pictures | The Overview button beside the title, worded (#124) |
 | `board-people` film | The add-someone list's **Filter people** field (#112) |
 | `lanes` film; `lanes-*`, `overview-*` pictures | Lane headings fold, with a chevron, and the collapse/expand-all icons (#115) |
 | `overview` film; `overview-*` pictures | A row's details chevron, and the details it opens (#118) |

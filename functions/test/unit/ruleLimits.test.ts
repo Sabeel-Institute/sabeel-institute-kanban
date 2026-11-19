@@ -7,6 +7,8 @@ import {
   COLLAPSED_SECTIONS_MAX,
   COMMENT_BODY_MAX,
   LANES_MAX,
+  MAX_WATCHED_COLUMNS,
+  MAX_WATCHED_LANES,
   OVERVIEW_HIDDEN_MAX,
   OVERVIEW_SORTS,
 } from '@sabeel/shared';
@@ -39,6 +41,11 @@ describe('limits restated in firestore.rules', () => {
 
   it('bounds the boards one person hides from the overview at OVERVIEW_HIDDEN_MAX', () => {
     expect(sizeBounds('overviewHiddenBoardIds')).toEqual([OVERVIEW_HIDDEN_MAX]);
+  });
+
+  it('bounds the columns and lanes one person watches', () => {
+    expect(sizeBounds('watchedColumns')).toEqual([MAX_WATCHED_COLUMNS]);
+    expect(sizeBounds('watchedLanes')).toEqual([MAX_WATCHED_LANES]);
   });
 
   it('bounds what one person collapses at the shared limits', () => {

@@ -202,3 +202,29 @@ export function moveRefusalFor<T extends FinishCard>(params: {
   const blocked = reopenBlockers(params);
   return blocked.length > 0 ? reopenBlockedMessage(blocked) : null;
 }
+
+/**
+ * No new open work goes under a parent that is finished or archived (Faisal,
+ * 2026-11-18): adding a subtask to it, or linking an open card under it, is
+ * refused, as reopening a subtask there is. Linking a card that is itself
+ * finished adds no open work and is allowed. On a board with lanes only, as
+ * the other two rules; `child` is the card being linked, absent for a new one.
+ */
+export function subtaskAddRefusal(params: {
+  board: Omit<LaneBoard, 'columns'> & { columns: readonly { id: string; name: string }[] };
+  parent: ParentState;
+  child?: FinishCard;
+}): string | null {
+  const { board, parent, child } = params;
+  const done = finishedColumnId(board);
+  if (done === null) return null;
+  const archived = parent.archived === true;
+  if (!archived && parent.columnId !== done) return null;
+  if (child && !child.archived && isFinished(child, board)) return null;
+  const quote = (s: string) => `“${s}”`;
+  const where = board.columns.find((c) => c.id === done)?.name ?? 'the finished column';
+  const what = child ? `${quote(child.title)} can’t become a subtask of ${quote(parent.title)}` : `A subtask can’t be added to ${quote(parent.title)}`;
+  return archived
+    ? `${what}, which is archived. Restore ${quote(parent.title)} first.`
+    : `${what}, which is finished. To add open work under it, first move ${quote(parent.title)} out of ${where}.`;
+}

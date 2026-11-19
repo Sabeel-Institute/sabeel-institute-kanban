@@ -4,6 +4,7 @@ import {
   finishBlockers,
   finishRefusal,
   moveRefusalFor,
+  subtaskAddRefusal,
   reopenBlockedMessage,
   reopenBlockers,
   reopenCandidates,
@@ -194,5 +195,33 @@ describe('moveRefusalFor (what every move path asks)', () => {
   it('refuses restoring an archived parent into Done past an open subtask', () => {
     const p = card('parent', { columnId: 'done', archived: true });
     expect(ask([p], [openA], 'done')).toMatch(/can’t go to Done while its subtask is still open/);
+  });
+});
+
+describe('subtaskAddRefusal', () => {
+  const named = { ...board, columns: [{ id: 'todo', name: 'To Do' }, { id: 'doing', name: 'Doing' }, { id: 'done', name: 'Done' }] };
+  const finishedP: ParentState = { id: 'p', title: 'Run the fair', columnId: 'done' };
+  const archivedP: ParentState = { id: 'p', title: 'Run the fair', columnId: 'doing', archived: true };
+  const openP: ParentState = { id: 'p', title: 'Run the fair', columnId: 'doing' };
+
+  it('refuses a new subtask under a finished or archived parent', () => {
+    expect(subtaskAddRefusal({ board: named, parent: finishedP })).toBe(
+      'A subtask can’t be added to “Run the fair”, which is finished. To add open work under it, first move “Run the fair” out of Done.',
+    );
+    expect(subtaskAddRefusal({ board: named, parent: archivedP })).toBe(
+      'A subtask can’t be added to “Run the fair”, which is archived. Restore “Run the fair” first.',
+    );
+  });
+
+  it('refuses linking an open card, and allows linking a finished one', () => {
+    expect(subtaskAddRefusal({ board: named, parent: finishedP, child: card('Book the stalls') })).toMatch(
+      /^“Book the stalls” can’t become a subtask of “Run the fair”, which is finished/,
+    );
+    expect(subtaskAddRefusal({ board: named, parent: finishedP, child: card('Booked', { columnId: 'done' }) })).toBeNull();
+  });
+
+  it('allows anything under an open parent, and on a board without lanes', () => {
+    expect(subtaskAddRefusal({ board: named, parent: openP })).toBeNull();
+    expect(subtaskAddRefusal({ board: { ...named, lanesOn: false }, parent: finishedP })).toBeNull();
   });
 });

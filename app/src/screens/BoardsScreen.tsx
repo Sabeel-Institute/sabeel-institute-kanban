@@ -34,7 +34,6 @@ import {
   Card,
   CardGrid,
   DisclosureHeading,
-  IconAction,
   LoadError,
   Row,
   Screen,
@@ -61,6 +60,29 @@ const EMPTY: string[] = [];
  * Shift+F10) fires the same `contextmenu` a right-click does.
  */
 const NO_SECTIONS: readonly BoardSection[] = [];
+
+/**
+ * The way into the overview, worded as well as drawn (#124): a bare icon in
+ * the corner went unnoticed. A compact pill, not a full-width button, so it
+ * sits beside the title on a phone; its name is still "Overview".
+ */
+function OverviewEntry({ onPress }: { onPress: () => void }) {
+  const t = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Overview"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.overviewEntry,
+        { backgroundColor: pressed ? t.bg.inset : t.bg.accentSoft, borderColor: t.accent.base },
+      ]}
+    >
+      <Icon name="checklist" size={20} color={t.text.accent} />
+      <Text style={[type.label, styles.overviewEntryText, { color: t.text.accent }]}>Overview</Text>
+    </Pressable>
+  );
+}
 
 /**
  * One section of the list, collapsible (#110): the heading toggles it, and
@@ -359,7 +381,7 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
       <Row style={styles.between}>
         <Title>Boards</Title>
         {hasOverview ? (
-          <IconAction icon="checklist" label="Overview" onPress={() => nav.push({ name: 'overview' })} />
+          <OverviewEntry onPress={() => nav.push({ name: 'overview' })} />
         ) : null}
       </Row>
 
@@ -597,6 +619,16 @@ function ArchivedBoards({
 
 const styles = StyleSheet.create({
   sectionGap: { marginTop: space.lg },
+  overviewEntry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
+    minHeight: 44,
+    paddingHorizontal: space.md,
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  overviewEntryText: { fontWeight: '700' },
   between: { justifyContent: 'space-between' },
   nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space.sm },
   shrink: { flexShrink: 1 },

@@ -196,6 +196,10 @@ belongs to is finished or archived**: moving it out of the finished column,
 or restoring it from the archive into another column, is refused. To reopen
 it, open it and tap **Unlink from parent card** first.
 
+For the same reason, a finished or archived card takes no new subtasks:
+adding one to it, or linking a card that isn't finished under it, is
+refused. Move the card out of the finished column (or restore it) first.
+
 Cards without a lane, such as those added before the board had lanes, sit
 under **No lane**, at the foot of each column.
 
@@ -211,7 +215,14 @@ above the first lane. A folded lane's heading also says how many of its
 cards are in the column you're looking at. A card dropped on a folded lane's
 heading goes to the top of that lane, and the lane opens; adding a card to a
 folded lane opens it too, so you see the card arrive. Cards you had selected
-in a lane are unselected when it folds. What you fold stays folded, on this device and your others,
+in a lane are unselected when it folds.
+
+**Watching a lane.** Each lane's heading has a **bell** beside its count:
+tap it to be told whenever a card arrives in that lane, in any column, by
+being added to it, moved into it, or restored into it. It works like a
+column's bell, and the lane's bell shows the same in every column. If you
+watch both the column and the lane a card lands in, you hear once. One
+setting covers both bells: **A card arrives in a column or lane you watch**. What you fold stays folded, on this device and your others,
 until you open it.
 
 A board without lanes looks exactly as described above. Lanes are switched on
@@ -225,7 +236,7 @@ in the board's settings (Part 2).
 </div>
 
 If you're on a board with lanes, the **Boards** screen has an **Overview**
-button at the top (a list with ticks). It shows every board with lanes that
+button at the top, beside the title. It shows every board with lanes that
 you can open, one row each: the board's name, its start and end dates if it
 has them, and a mark for each lane, under the lane's name.
 
@@ -1007,36 +1018,42 @@ it — the one exception to boards being private.
   <figure class="wd"><img src="manual/img/people-wide.png" alt="The People screen in a browser"><figcaption>In a browser</figcaption></figure>
 </div>
 
-Open **More → People**. It lists everyone who has signed in. A new account
-waits on **pending** and sees nothing until you approve it — approve it here and
-their screen unlocks live, wherever they are. Admins also get a push notification
-when someone is waiting.
+Open **More → People**. At the top, **Waiting for approval** lists new
+accounts, each with **Approve** and **Reject**: a new account sees nothing
+until you approve it, and once you do their screen unlocks live, wherever they
+are. Admins also get a push notification when someone is waiting.
+
+Below, **Everyone** lists the rest, one compact row each: the name, the
+address, and the person's **role as a coloured tag** — *Admin* filled in, 
+*Organizer* tinted, *Member* outlined — so you can pick out the admins and
+organizers at a glance. A disabled or rejected account also carries a red tag
+saying so.
 
 ## 3.2 Managing a user
 
-Each person's role and access are shown as **controls set to their current
-value** — a **role** (member / organizer / admin) and an **Active** toggle —
-rather than buttons you press. You change someone by moving the control to where
-you want it:
+To change someone, tap the **three dots** at the end of their row. The sheet
+that opens shows their **role** with the current one marked, and **Disable
+access** (or **Restore access**):
 
 - **Member** — sees only the boards they've been added to.
 - **Organizer** — the same, plus **creating boards**. That is the only
   difference. They own the boards they create, and nothing on anyone else's.
 - **Admin** — everything: every board, the institute labels, Stats, and approving
   accounts and changing roles.
-- **Active** — turn off to **disable** an account. Whatever they have open
-  switches to an "Account disabled" screen straight away, wherever they are, and
-  they cannot sign back in. **Their card assignments are kept** so nothing is
-  left ownerless — an owner of that board can reassign at leisure. Turn back on
-  to restore. Nothing is ever deleted.
+- **Disable access** — whatever they have open switches to an "Account
+  disabled" screen straight away, wherever they are, and they cannot sign back
+  in. **Their card assignments are kept** so nothing is left ownerless — an
+  owner of that board can reassign at leisure. **Restore access** brings them
+  back. Nothing is ever deleted.
 
   If they are the **only owner of a board**, the confirmation names it. Disabling
   still goes ahead — losing access is usually the urgent half — but that board
   then needs a new owner, which you can give it from its settings, under **People**.
 
 Every change asks you to **confirm**, spelling out what it will actually let that
-person do, so a stray tap can't promote or lock out anyone. You **cannot change
-your own access** — that's what stops an admin locking themselves out.
+person do, so a stray tap can't promote or lock out anyone. Your own row has no
+dots: you **cannot change your own access**, which is what stops an admin
+locking themselves out.
 
 **Who runs a board is NOT set here.** It is set on the board, under
 *Board settings → People*, and is independent of the role above. An admin can
@@ -1208,6 +1225,10 @@ and you'll hear about its comments and changes.
 **…know when a card lands in a column?**
 The **bell** on the column (on a phone, in the row along the bottom) → you're
 told whenever a card arrives in it.
+
+**…know when a card lands in a lane?**
+On a board with lanes, the **bell** beside the lane's name → you're told
+whenever a card arrives in that lane, in any column.
 
 **…find every card with a particular label?**
 **Search → Filters → Labels**, and pick one. Pick more than one and you get cards

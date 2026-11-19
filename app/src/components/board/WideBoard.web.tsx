@@ -30,10 +30,11 @@ import { useSelection } from '../../useSelection';
 import { createAutoScroller } from './autoScroll';
 import { BulkBar } from '../BulkBar';
 import { IconAction, LoadError } from '../ui';
-import { NewCardBell, WatchColumnBell } from './Bells';
+import { NewCardBell, WatchColumnBell, WatchLaneBell } from './Bells';
 import { LaneHeading } from './LaneHeading';
 import { LaneCollapseActions } from './LaneCollapseActions';
 import { useLaneCollapse } from './useLaneCollapse';
+import { useLaneWatch } from './useLaneWatch';
 import { allowMove } from '../../moveGuard';
 import { useLaneInfo } from './useLaneInfo';
 import { setColumnWatched, useWatchedColumns } from '../../notifications';
@@ -365,6 +366,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   // subscribers to members, and the notice sweep sends arrivals to members
   // alone, so an admin visiting a board they are not on gets neither bell.
   const isMember = board.data?.memberUids.includes(user.uid) ?? false;
+  const laneWatch = useLaneWatch(user, boardId, isMember);
   const watched = useWatchedColumns(user);
   // The bells stay disabled until the list is ready: `?? []` reads a list
   // still loading, or one that failed, as watching nothing.
@@ -705,6 +707,14 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
           </button>
         </div>
       ) : null}
+      {laneWatch.error ? (
+        <div style={banner(t)}>
+          {laneWatch.error}{' '}
+          <button onClick={laneWatch.clearError} style={{ ...btn(t), marginLeft: 8 }}>
+            Dismiss
+          </button>
+        </div>
+      ) : null}
 
       <div
         ref={columnsRef}
@@ -932,6 +942,16 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
                             collapsed={folded}
                             onToggle={() => void collapse.toggle(laneId)}
                             here={g.cards.length}
+                            bell={
+                              g.lane && laneWatch.show ? (
+                                <WatchLaneBell
+                                  laneName={g.lane.name}
+                                  watching={laneWatch.watching(g.lane.id)}
+                                  busy={laneWatch.busy}
+                                  onPress={() => void laneWatch.toggle(g.lane!.id)}
+                                />
+                              ) : undefined
+                            }
                           />
                         </div>
                         <div style={{ height: space.xs }} />

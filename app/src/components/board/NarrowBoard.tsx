@@ -69,10 +69,11 @@ import {
   Title,
 } from '../ui';
 import { AddCardForm, type AddCardDraft } from './AddCardForm';
-import { WatchColumnBell } from './Bells';
+import { WatchColumnBell, WatchLaneBell } from './Bells';
 import { LaneHeading } from './LaneHeading';
 import { useLaneInfo } from './useLaneInfo';
 import { useLaneCollapse } from './useLaneCollapse';
+import { useLaneWatch } from './useLaneWatch';
 import { LaneCollapseActions } from './LaneCollapseActions';
 import { setColumnWatched, useWatchedColumns } from '../../notifications';
 import { useLabels } from '../../labels';
@@ -217,6 +218,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
   // subscribers to members, and the notice sweep sends arrivals to members
   // alone, so an admin visiting a board they are not on gets neither bell.
   const isMember = board.data?.memberUids.includes(user.uid) ?? false;
+  const laneWatch = useLaneWatch(user, boardId, isMember);
   const watched = useWatchedColumns(user);
   // The bells stay disabled until the list is ready: `?? []` reads a list
   // still loading, or one that failed, as watching nothing.
@@ -543,6 +545,12 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
           <Button label="Dismiss" variant="secondary" onPress={collapse.clearError} />
         </Panel>
       ) : null}
+      {laneWatch.error ? (
+        <Panel>
+          <Body>{laneWatch.error}</Body>
+          <Button label="Dismiss" variant="secondary" onPress={laneWatch.clearError} />
+        </Panel>
+      ) : null}
       {error ? (
         <Panel>
           <Body>{error}</Body>
@@ -694,6 +702,16 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
                       collapsed={collapse.isCollapsed(row.lane?.id ?? null)}
                       onToggle={() => void collapse.toggle(row.lane?.id ?? null)}
                       here={row.count}
+                      bell={
+                        row.lane && laneWatch.show ? (
+                          <WatchLaneBell
+                            laneName={row.lane.name}
+                            watching={laneWatch.watching(row.lane.id)}
+                            busy={laneWatch.busy}
+                            onPress={() => void laneWatch.toggle(row.lane!.id)}
+                          />
+                        ) : undefined
+                      }
                     />
                   ) : (
                     <CardTile

@@ -237,12 +237,11 @@ function helpers(page, variant, world) {
     id: (testId) => visible(page.getByTestId(testId)),
     card: (title) => visible(page.getByTestId(`card-${title}`)),
     editor: () => visible(page.locator('[contenteditable="true"]')),
-    /** One person's card on People: the innermost block holding both their access switch and the role buttons. */
+    /** One person's row on People: the innermost block holding their ⋮ ("Change <name>"). */
     person: (name) =>
       page
         .locator('div')
-        .filter({ has: page.getByRole('switch', { name: `Account access for ${name}`, exact: true }) })
-        .filter({ has: page.getByRole('button', { name: 'Set role organizer', exact: true }) })
+        .filter({ has: page.getByRole('button', { name: `Change ${name}`, exact: true }) })
         .last(),
     // Actions.
     waitFor: (loc, timeout = 20000) => loc.waitFor({ timeout }),

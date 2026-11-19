@@ -298,6 +298,29 @@ export function useWatchedColumns(user: SessionUser) {
   );
 }
 
+/** The lanes this person watches, live: `watchKey(boardId, laneId)`. */
+export function useWatchedLanes(user: SessionUser) {
+  return useLiveDoc<string[]>(
+    () => doc(db, 'users', user.uid),
+    [user.uid],
+    'watched-lanes',
+    (d) => (d?.data.watchedLanes as string[] | undefined) ?? [],
+  );
+}
+
+/** Watch or stop watching a lane: one entry at a time, as columns. */
+export async function setLaneWatched(
+  user: SessionUser,
+  boardId: string,
+  laneId: string,
+  on: boolean,
+): Promise<void> {
+  const key = watchKey(boardId, laneId);
+  await updateDoc(doc(db, 'users', user.uid), {
+    watchedLanes: on ? arrayUnion(key) : arrayRemove(key),
+  });
+}
+
 /**
  * Watch or stop watching a column. `arrayUnion`/`arrayRemove` rather than
  * writing the whole list back, so watching columns from two devices at once

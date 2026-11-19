@@ -59,3 +59,30 @@ export function WatchColumnBell({
     />
   );
 }
+
+/**
+ * Watch a lane: told when a card arrives in it (lane watching, Faisal
+ * 2026-11-18). Beside the lane's count on its heading, never inside the
+ * heading's fold button: two controls, one for each job.
+ */
+export function WatchLaneBell({
+  laneName,
+  watching,
+  busy,
+  onPress,
+}: {
+  laneName: string;
+  watching: boolean;
+  busy?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <IconAction
+      icon={watching ? 'notifications-active' : 'notifications-none'}
+      label={watching ? `Stop watching the ${laneName} lane` : `Watch the ${laneName} lane`}
+      accent={watching}
+      disabled={busy}
+      onPress={onPress}
+    />
+  );
+}
