@@ -59,18 +59,13 @@ When a release changes what an old build gets wrong, raise the version floor
 to it last, once the web, Play and TestFlight have it (`docs/DEPLOY.md`
 § Retiring old builds).
 
-**Owed now: the rows below.** v0.21.0 recorded every film (`roles` and `lanes`
-with new narration), retook the manual's pictures and rendered its PDF at
-its release (2026-11-19). A change that moves a screen a film or a picture
-shows adds it here:
+**Owed now: nothing.** v0.22.0 recorded every film (`lanes` and
+`board-settings` with new narration), retook the manual's pictures and
+rendered its PDF at its release (2026-11-19). A change that moves a screen a
+film or a picture shows adds it here:
 
 | Film or picture | What it lacks |
 |---|---|
-| `lanes` film, both cuts (two lines reworded, the add step re-scripted for the computer's lane +; render their narration); `overview` film, computer cut where it opens a lane board; `lanes-wide` picture | The wide board with lanes is a grid: lanes as rows, frozen headings and lane names, one bell each, a + on each heading |
-| Film `board-settings` | Deleting moves from the board to the Columns page: a new line deletes the column just added with its bin, and the closing line about deleting on the board is gone. New narration; both cuts. |
-| Films `new-board`, `clone-board`, `details`, `board-people`, `board-archive` | Shot as a board's owner, so their board frames show a pencil, and a delete, on each column heading; the board has neither now. Both cuts. |
-| Pictures `columns-phone`, `columns-wide` | Each column has a bin beside its pencil. |
-| Pictures `board-phone`, `board-wide`, `lanes-phone`, `lanes-wide`, `bulk-phone`, `bulk-wide` | Taken as an admin, so each column heading shows a pencil and a delete; the board has neither now. |
 
 ## What works today (2026-10-16)
 
@@ -462,6 +457,32 @@ the team.
 ---
 
 ## Deploy log
+
+### 2026-11-19 — Lanes as a grid in the browser, columns edited in settings — v0.22.0
+
+- **A board with lanes is a grid in the browser.** Columns run across the
+  top and lanes down the left, so each card sits where its lane meets its
+  column. The column headings stay at the top as you scroll down, and the
+  lane names stay at the left as you scroll across. Each lane and each
+  column has one bell, where before a lane's bell was repeated in every
+  column. A row is as tall as its fullest column; a lane that gets too tall
+  is folded, and a folded lane shows how many of its cards each column holds.
+- **Adding a card on a lane board in the browser:** the **+** on a column's
+  heading asks for the lane, and the **+** beside a lane's name asks for the
+  column. Dragging a card into a cell sets both at once.
+- **Columns are renamed and deleted in Board settings → Columns**, on every
+  board, on the phone too. The pencil and the delete button are gone from
+  the board itself. A column with cards still can't be deleted.
+- **"Can't reach the server" instead of "Waiting for approval".** When the
+  sign-in service doesn't answer, an approved account is no longer told it
+  needs approval: the app keeps what it knew, or says it can't reach the
+  server, tries again by itself, and offers Try again.
+- The phone keeps its one-column-at-a-time board. A tablet keeps its
+  current wide board; its browser has the grid.
+- The help films and the manual cover all of it.
+
+No server change: nothing to deploy before the apps. The version floor goes
+to 0.22.0 once the web, Play and TestFlight have it.
 
 ### 2026-11-19 — Fold and watch lanes, subtasks that finish together, a clearer People — v0.21.0
 
