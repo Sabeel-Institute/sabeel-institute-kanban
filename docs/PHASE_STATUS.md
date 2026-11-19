@@ -468,6 +468,39 @@ the team.
 
 ## Deploy log
 
+### 2026-11-19 — Fold and watch lanes, subtasks that finish together, a clearer People — v0.21.0
+
+- **Lanes fold.** Tap a lane's heading to fold its cards away, in every
+  column at once; the heading keeps its count and colour, and says how many
+  of its cards are in the column you're on. Two icons fold and open every
+  lane. What you fold stays folded on all your devices.
+- **Watch a lane.** The bell beside a lane's count tells you when a card
+  arrives in it, in any column, as a column's bell does. One setting covers
+  both: "A card arrives in a column or lane you watch".
+- **A finished card never has open subtasks.** On a board with lanes, a
+  card can't go to the finished column while a subtask is still open; a
+  finished subtask can't be reopened while its parent is finished or
+  archived (unlink it first); and a finished or archived card takes no new
+  subtasks. Each refusal says why and what to do.
+- **The Boards list's sections fold**, each heading showing its count when
+  folded; typing in Filter boards opens them all.
+- **The overview shows a board's details**: the arrow on a row opens its
+  teachers, links and other details under it. The Overview button on the
+  Boards screen is now worded, beside the title.
+- **Filtering people works the same everywhere**: adding someone to a board
+  (which can now be filtered), assigning a card, Search and @mentions all
+  match a name or the start of an address, never the shared domain.
+- **More → People is compact**: one row per person, their role as a
+  coloured tag, changes behind the ⋮ at the end of the row.
+- Also: a long board name no longer pushes its bell off the row on Mute a
+  board.
+- The help films and the manual cover all of it.
+
+Deploy the rules before the clients: 0.21.0 writes collapsed sections and
+lanes and watched lanes, which the 0.20.0 rules refuse. The version floor
+goes to 0.21.0 once the web, Play and TestFlight have it: the subtask rules
+are the app's, and an older build would not keep them.
+
 ### 2026-11-18 — Lanes, board details, templates and the overview — v0.20.0
 
 - **A board can be divided into lanes as well as columns**, so a program's
