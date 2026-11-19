@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { laneKey, laneOf, NO_LANE_KEY, type LaneBoard, type LaneCard } from '@sabeel/shared';
 import { setAllLanesCollapsed, setLaneCollapsed, useMyCollapsed } from '../../boards';
 import type { SessionUser } from '../../session';
@@ -35,6 +35,15 @@ export function useLaneCollapse<C extends LaneCard & { id: string }>(
   const { run, error, setError } = useAction('collapseLane');
   const stored = prefs.data?.lanes[boardId] ?? NONE;
 
+  // A fold can arrive from elsewhere (another tab, the phone), not only from
+  // a press here, so whatever is folded leaves the selection whenever the
+  // stored folds change: a bulk action never reaches a hidden card.
+  useEffect(() => {
+    if (!live || !laneBoard || stored.length === 0) return;
+    const folded = new Set(stored);
+    deselect(cards.filter((c) => folded.has(laneKey(laneOf(c, laneBoard)))).map((c) => c.id));
+  }, [live, laneBoard, stored, cards, deselect]);
+
   return useMemo(() => {
     const on = live && laneBoard !== null;
     const collapsed = new Set(on ? stored : NONE);
@@ -51,7 +60,9 @@ export function useLaneCollapse<C extends LaneCard & { id: string }>(
     // Opening the last folded lane deletes the board's entry, so nothing is
     // left behind for a board whose lanes are all open.
     const open = (key: string) =>
-      stored.every((k) => k === key)
+      // A stored key for a lane that is gone, or for a No lane not drawn,
+      // does not keep the entry alive.
+      stored.every((k) => k === key || !keys.includes(k))
         ? setAllLanesCollapsed(user, boardId, null)
         : setLaneCollapsed(user, boardId, key, false);
     return {

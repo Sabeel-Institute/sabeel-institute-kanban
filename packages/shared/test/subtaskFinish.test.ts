@@ -3,6 +3,7 @@ import {
   finishBlockedMessage,
   finishBlockers,
   finishRefusal,
+  moveRefusalFor,
   reopenBlockedMessage,
   reopenBlockers,
   reopenCandidates,
@@ -168,5 +169,30 @@ describe('reopenBlockedMessage under an archived parent', () => {
     expect(msg).toBe(
       '“s” is a subtask of “parent”, which is archived. Restore “parent” first, or to reopen “s” on its own, unlink it from its parent: open “s” and tap “Unlink from parent card”.',
     );
+  });
+});
+
+describe('moveRefusalFor (what every move path asks)', () => {
+  const named = { ...board, columns: [{ id: 'todo', name: 'To Do' }, { id: 'doing', name: 'Doing' }, { id: 'done', name: 'Done' }] };
+  const ask = (moving: FinishCard[], cards: FinishCard[], to: string) => {
+    const all = new Map([...cards, ...moving].map((c) => [c.id, c]));
+    return moveRefusalFor({ board: named, toColumnId: to, moving, cards, parentOf: (id) => all.get(id) });
+  };
+
+  it('lets a parent and its finished subtask leave Done together', () => {
+    const p = card('parent', { columnId: 'done' });
+    const sub = card('s', { parentId: 'parent', columnId: 'done' });
+    expect(ask([p, sub], [p, sub], 'doing')).toBeNull();
+  });
+
+  it('still refuses the subtask leaving alone', () => {
+    const p = card('parent', { columnId: 'done' });
+    const sub = card('s', { parentId: 'parent', columnId: 'done' });
+    expect(ask([sub], [p, sub], 'doing')).toMatch(/which is finished/);
+  });
+
+  it('refuses restoring an archived parent into Done past an open subtask', () => {
+    const p = card('parent', { columnId: 'done', archived: true });
+    expect(ask([p], [openA], 'done')).toMatch(/can’t go to Done while its subtask is still open/);
   });
 });

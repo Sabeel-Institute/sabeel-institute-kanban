@@ -51,7 +51,9 @@ export function finishBlockers<T extends FinishCard>(params: {
     // Already finished, it is not going INTO the finished column: a reorder
     // or a lane change within it is not refused (a board that switches lanes
     // on, or moves its finish, can hold finished parents with open subtasks).
-    if (isFinished(parent, board)) continue;
+    // An archived parent is not in its column, so a restore into the
+    // finished column is still going in.
+    if (parent.archived !== true && isFinished(parent, board)) continue;
     const open = cards.filter(
       (c) =>
         c.parentId === parent.id &&
@@ -180,4 +182,23 @@ export function reopenBlockedMessage<T extends FinishCard>(blockers: readonly Re
   return `${blockers.length} of these cards are subtasks of cards that are finished or archived: ${blockers
     .map((b) => quote(b.card.title))
     .join(', ')}. To reopen them, first unlink each from its parent card.`;
+}
+
+/**
+ * Both rules for one move, in words, or null: what every move and restore
+ * path asks (through the app's `moveRefusal`, which only looks parents up).
+ * `moving` is the WHOLE move, so a parent travelling with its subtask is seen
+ * by both rules; `parentOf` answers for any parent, on the board or not.
+ */
+export function moveRefusalFor<T extends FinishCard>(params: {
+  board: Omit<LaneBoard, 'columns'> & { columns: readonly { id: string; name: string }[] };
+  toColumnId: string;
+  moving: readonly T[];
+  cards: readonly T[];
+  parentOf: (id: string) => ParentState | undefined;
+}): string | null {
+  const finish = finishRefusal(params);
+  if (finish) return finish;
+  const blocked = reopenBlockers(params);
+  return blocked.length > 0 ? reopenBlockedMessage(blocked) : null;
 }

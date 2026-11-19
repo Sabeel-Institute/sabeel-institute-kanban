@@ -596,7 +596,8 @@ heading says how many boards the section holds, so folding hides boards and
 never the fact that they are there. What a person folds is stored on their
 user document (`collapsedBoardSections`), across reloads and devices, like
 their stars; it hides nothing from anyone else. While **Filter boards** holds
-text every section is open, so a match is never behind a fold.
+text every section is open, so a match is never behind a fold, and the
+headings do not fold until the filter is cleared.
 
 No folders or groups: they need curation, a permission story of their own, and a
 second tree to navigate on a phone. Revisit only if the team passes ~50 boards and

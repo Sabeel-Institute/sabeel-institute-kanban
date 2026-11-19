@@ -1,6 +1,7 @@
 import { moveRefusal } from './cards';
 import { noticeAction } from './confirm';
 import { captureError } from './sentry';
+import type { Untimed } from './slowWrites';
 
 /**
  * Ask before a move or a restore on a board with lanes (`moveRefusal`), and
@@ -12,6 +13,12 @@ import { captureError } from './sentry';
 export async function allowMove(
   params: Parameters<typeof moveRefusal>[0],
   title = 'Not moved',
+  /**
+   * From `run`, when called inside it: the notice waits on a person reading
+   * it, which is not a slow write, so it is left out of the timing. The
+   * parent's read stays timed.
+   */
+  untimed?: Untimed,
 ): Promise<boolean> {
   let refused: string | null;
   try {
@@ -24,6 +31,6 @@ export async function allowMove(
     return true;
   }
   if (!refused) return true;
-  await noticeAction(title, refused);
+  await (untimed ? untimed(() => noticeAction(title, refused)) : noticeAction(title, refused));
   return false;
 }

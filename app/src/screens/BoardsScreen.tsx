@@ -72,12 +72,15 @@ function BoardsSection({
   count,
   collapsed,
   onToggle,
+  filtering,
   children,
 }: {
   title: string;
   count: number;
   collapsed: boolean;
   onToggle: () => void;
+  /** A filter is typed: every section is open and none folds until it clears. */
+  filtering: boolean;
   children: React.ReactNode;
 }) {
   const t = useTheme();
@@ -89,7 +92,7 @@ function BoardsSection({
   return (
     <>
       <View style={styles.sectionGap}>
-        <DisclosureHeading label={label} expanded={!collapsed} onToggle={onToggle}>
+        <DisclosureHeading label={label} expanded={!collapsed} onToggle={onToggle} disabled={filtering}>
           <Text style={[type.heading, { color: t.text.primary }]}>{words}</Text>
         </DisclosureHeading>
       </View>
@@ -421,6 +424,7 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
             title={'Starred'}
             count={sections.favourites.length}
             collapsed={!filtering && collapsed.includes('starred')}
+            filtering={filtering}
             onToggle={() => toggleSection('starred')}
           >
           <CardGrid>
@@ -445,6 +449,7 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
             title={'Recent'}
             count={sections.recents.length}
             collapsed={!filtering && collapsed.includes('recent')}
+            filtering={filtering}
             onToggle={() => toggleSection('recent')}
           >
           <CardGrid>
@@ -469,6 +474,7 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
             title={sections.favourites.length + sections.recents.length > 0 ? 'All boards' : 'Boards'}
             count={sections.others.length}
             collapsed={!filtering && collapsed.includes('all')}
+            filtering={filtering}
             onToggle={() => toggleSection('all')}
           >
           <CardGrid>
@@ -495,6 +501,7 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
             title={'Templates'}
             count={sections.templates.length}
             collapsed={!filtering && collapsed.includes('templates')}
+            filtering={filtering}
             onToggle={() => toggleSection('templates')}
           >
           <CardGrid>

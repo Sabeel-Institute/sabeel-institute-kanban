@@ -26,8 +26,7 @@ import {
   labelIdsAfterBoardChange,
   type Label,
   finishRefusal,
-  reopenBlockedMessage,
-  reopenBlockers,
+  moveRefusalFor,
   reopenCandidates,
   type ParentState,
 } from '@sabeel/shared';
@@ -312,18 +311,17 @@ export async function moveRefusal(params: {
   cards: readonly Card[];
 }): Promise<string | null> {
   const { board, boardId, toColumnId, moving, cards } = params;
-  const finish = finishRefusal({ board, toColumnId, moving, cards });
-  if (finish) return finish;
-
-  // Only a subtask being reopened can be refused for its parent, so only its
-  // parent is looked up, and only when it is not on the board: an ordinary
-  // move never waits on a read.
-  const candidates = reopenCandidates({ board, toColumnId, moving });
-  if (candidates.length === 0) return null;
   const parents = new Map<string, ParentState>();
-  for (const c of cards) parents.set(c.id, c);
+  for (const c of [...cards, ...moving]) parents.set(c.id, c);
+  // Only a subtask being reopened can be refused for its parent, so only its
+  // parent is looked up, and only when it is not already in hand: an
+  // ordinary move never waits on a read.
   const missing = [
-    ...new Set(candidates.map((c) => c.parentId).filter((id): id is string => !!id && !parents.has(id))),
+    ...new Set(
+      reopenCandidates({ board, toColumnId, moving })
+        .map((c) => c.parentId)
+        .filter((id): id is string => !!id && !parents.has(id)),
+    ),
   ];
   await Promise.all(
     missing.map(async (id) => {
@@ -346,8 +344,7 @@ export async function moveRefusal(params: {
       }
     }),
   );
-  const blocked = reopenBlockers({ board, toColumnId, moving: candidates, parentOf: (id) => parents.get(id) });
-  return blocked.length > 0 ? reopenBlockedMessage(blocked) : null;
+  return moveRefusalFor({ board, toColumnId, moving, cards, parentOf: (id) => parents.get(id) });
 }
 
 /** Members archive; only this board's owners and admins destroy. Rules enforce both. */

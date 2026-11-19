@@ -352,14 +352,14 @@ export function CardScreen({
               // under a finished parent (#111): refused in a notice, nothing
               // written.
               // Inside `run`, so `busy` holds the picker while it asks.
-              return run(async () => {
+              return run(async (untimed) => {
                 const allowed = await allowMove({
                   board: b,
                   boardId,
                   toColumnId,
                   moving: [c],
                   cards: boardCards.data ?? NO_CARDS,
-                });
+                }, 'Not moved', untimed);
                 if (!allowed) return;
                 // Give it a fresh rank at the END of the destination. Carrying
                 // the old rank across would drop the card at an arbitrary
@@ -683,12 +683,13 @@ export function CardScreen({
             label="Restore to the board"
             onPress={async () => {
               const to = restoreColumnId(c, b.columns);
-              return run(async () => {
+              return run(async (untimed) => {
                 const allowed =
                   to === null ||
                   (await allowMove(
                     { board: b, boardId, toColumnId: to, moving: [c], cards: boardCards.data ?? NO_CARDS },
                     'Not restored',
+                    untimed,
                   ));
                 if (!allowed) return;
                 // May land in a different column if its own was deleted while it

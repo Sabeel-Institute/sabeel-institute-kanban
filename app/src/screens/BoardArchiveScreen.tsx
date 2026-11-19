@@ -155,12 +155,13 @@ export function BoardArchiveScreen({
               disabled={busy || openCards.status !== 'ready'}
               onPress={() => {
                 const to = restoreColumnId(card, b.columns);
-                return run(async () => {
+                return run(async (untimed) => {
                   const allowed =
                     to === null ||
                     (await allowMove(
                       { board: b, boardId, toColumnId: to, moving: [card], cards: openCards.data ?? [] },
                       'Not restored',
+                      untimed,
                     ));
                   if (!allowed) return;
                   const { movedTo } = await restoreCard(card, user, b.columns);

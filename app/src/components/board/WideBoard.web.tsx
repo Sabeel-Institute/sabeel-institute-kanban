@@ -448,6 +448,10 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         : drawnColumn;
       const place = dropPlacement(group, index, moving.id);
       if (!place) return;
+      // Dropped on a folded lane's heading: open it now, as an add does, so
+      // the card is seen landing rather than vanishing until the server
+      // answers (or, offline, until the write is sent).
+      if (inLane && target.laneId) void collapse.reveal(target.laneId);
 
       try {
         await moveCard({
@@ -461,9 +465,6 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         });
         // Background tidy-up; never blocks the user.
         void rerankColumnIfNeeded(column).catch(() => {});
-        // Dropped on a folded lane's heading: open it, so the card is seen
-        // landing rather than vanishing.
-        if (inLane && target.laneId) void collapse.reveal(target.laneId);
       } catch (e) {
         setError(toUserMessage(e, 'moveCard'));
       }
