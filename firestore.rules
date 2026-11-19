@@ -813,8 +813,11 @@ service cloud.firestore {
       // Only the author edits — an owner rewriting someone's words under their
       // name would be worse than useless.
       allow update: if onBoard()
-        && comment().keys().hasOnly(['authorUid', 'body', 'mentionUids', 'createdAt', 'editedAt'])
+        && comment().keys().hasOnly(['authorUid', 'authorName', 'body', 'mentionUids', 'createdAt', 'editedAt'])
         && resource.data.authorUid == request.auth.uid
+        // The name the server stamped stays as it stamped it. A create may not
+        // carry one at all (the create rule's list leaves it out).
+        && comment().get('authorName', null) == resource.data.get('authorName', null)
         && comment().authorUid == resource.data.authorUid
         && comment().createdAt == resource.data.createdAt
         && comment().body is string

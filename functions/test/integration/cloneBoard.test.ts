@@ -216,7 +216,10 @@ describe('cloneBoard: the clone', () => {
     const createdLines = async (id: string) =>
       (await adminDb().collection(`cards/${id}/activity`).get()).docs.map((d) => d.data()).filter((e) => e.type === 'created');
     for (const c of cards) {
-      expect(await createdLines(c.id)).toEqual([{ type: 'created', actorUid: ORG, at: c.createdAt }]);
+      // Named, as every history line is (functions/src/names.ts).
+      expect(await createdLines(c.id)).toEqual([
+        { type: 'created', actorUid: ORG, actorName: 'Olive Organizer', at: c.createdAt },
+      ]);
     }
     // The board's history opens with "cloned from", written with the board;
     // the history trigger adds no "created" beside it (checked below, once

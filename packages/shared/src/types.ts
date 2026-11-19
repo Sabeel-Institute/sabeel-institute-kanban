@@ -347,6 +347,11 @@ export interface CardDoc {
 
 export interface CommentDoc {
   authorUid: string;
+  /**
+   * The author's name, stamped by the server once the comment exists
+   * (onCommentNotify, functions/src/names.ts). Never written by a client.
+   */
+  authorName?: string;
   body: string;
   mentionUids: string[];
   createdAt: number;
@@ -562,6 +567,8 @@ export interface StatsRootDoc {
 export interface ActivityDoc {
   type: ActivityType;
   actorUid: string;
+  /** Who did it, by name, stored by the server when it happened (functions/src/names.ts). */
+  actorName?: string;
   at: number;
   from?: string;
   to?: string;

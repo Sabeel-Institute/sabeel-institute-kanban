@@ -5,6 +5,7 @@ import { guardedEvent, sentryDsn } from './sentry';
 import { getFirestore } from 'firebase-admin/firestore';
 import { diffCard, SYSTEM_ACTOR, UNKNOWN_ACTOR, type CardSnapshot } from '@sabeel/shared';
 import { recordStat } from './stats';
+import { storedName } from './names';
 
 /**
  * Card history, written by the server so it cannot be forged.
@@ -38,6 +39,10 @@ export const onCardWritten = onDocumentWritten(
     const { cardId } = event.params;
     const boardId = (after?.boardId ?? before?.boardId ?? '') as string;
     const actorUid = (after?.updatedBy ?? after?.createdBy ?? UNKNOWN_ACTOR) as string;
+    // Stored with each line (names.ts): the history names who did it whether
+    // or not they are on the board when someone reads it.
+    const actorName = await storedName(actorUid);
+    const by = { actorUid, ...(actorName ? { actorName } : {}) };
     const at = Date.now();
 
     const db = getFirestore();
@@ -46,7 +51,7 @@ export const onCardWritten = onDocumentWritten(
       const ref = db.collection(`cards/${cardId}/activity`).doc();
       batch.set(ref, {
         type: entry.type,
-        actorUid,
+        ...by,
         at,
         // Firestore rejects undefined, so only set what exists.
         ...(entry.from !== undefined ? { from: entry.from } : {}),
@@ -68,7 +73,7 @@ export const onCardWritten = onDocumentWritten(
           if (!otherId) continue;
           batch.set(db.collection(`cards/${otherId}/activity`).doc(), {
             type: 'subtask',
-            actorUid,
+            ...by,
             at,
             ...(to !== undefined ? { to } : { from: cardId }),
           });

@@ -4,6 +4,7 @@ import { onCall, HttpsError, type CallableRequest } from 'firebase-functions/v2/
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions/v2';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { storedName } from './names';
 import { getStorage } from 'firebase-admin/storage';
 import {
   ATTACHMENT_MAX_BYTES,
@@ -118,7 +119,12 @@ async function recordActivity(
   entry: { type: ActivityType; actorUid: string; to?: string; from?: string },
 ): Promise<void> {
   try {
-    await db().collection(`cards/${cardId}/activity`).add({ ...entry, at: Date.now() });
+    const actorName = await storedName(entry.actorUid);
+    await db().collection(`cards/${cardId}/activity`).add({
+      ...entry,
+      ...(actorName ? { actorName } : {}),
+      at: Date.now(),
+    });
   } catch (e) {
     logger.warn('attachment activity write failed', { cardId, error: String(e) });
   }
