@@ -66,7 +66,7 @@ film or a picture shows adds it here:
 
 | Film or picture | What it lacks |
 |---|---|
-| `comments` film, if it shows the @ list | The list's first row is **Everyone on this board** (`@all`) |
+| `comments` film (one line reworded; render its narration) | The @ list's first row is **Everyone on this board** (`@all`) |
 
 ## What works today (2026-10-16)
 
