@@ -55,7 +55,7 @@
     "@sabeel-institute/ci-tools": "github:Sabeel-Institute/ci-tools#7393513",
     "@sabeel/shared": "*",
     "@types/node": "^22.20.5",
-    "eslint": "^9.39.0",
+    "eslint": "^10.15.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "firebase-admin": "^14.5.0",
     "globals": "^16.5.0",
