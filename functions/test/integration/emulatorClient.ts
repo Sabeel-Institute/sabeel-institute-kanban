@@ -56,7 +56,7 @@ const authHost = () => requireEnv('FIREBASE_AUTH_EMULATOR_HOST');
  * functions. So this one comes from `firebase.json`, which is what the emulator
  * actually bound, rather than from a literal that could disagree with it.
  */
-function functionsOrigin(): string {
+export function functionsOrigin(): string {
   const config = JSON.parse(
     // cwd is the functions workspace under vitest, as elsewhere in these suites.
     readFileSync(resolve('..', 'firebase.json'), 'utf8'),

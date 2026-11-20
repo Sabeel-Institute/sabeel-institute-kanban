@@ -7,7 +7,7 @@ import {
   query,
   updateDoc,
 } from 'firebase/firestore';
-import { extractMentions, type MentionCandidate } from '@sabeel/shared';
+import { commentMentions, newCommentDoc, type MentionCandidate } from '@sabeel/shared';
 import { db } from './firebase';
 import { useLiveQuery } from './liveQuery';
 import type { SessionUser } from './session';
@@ -55,11 +55,6 @@ export function useComments(cardId: string) {
  * body server-side would have to agree exactly with this parser to be useful,
  * which is a duplication waiting to drift.
  */
-/** Who a comment mentions: never its author, whom `@all` would otherwise take. */
-function mentionsBy(authorUid: string, body: string, candidates: readonly MentionCandidate[]): string[] {
-  return extractMentions(body, candidates).filter((u) => u !== authorUid);
-}
-
 export async function addComment(params: {
   cardId: string;
   body: string;
@@ -69,12 +64,10 @@ export async function addComment(params: {
   const body = params.body.trim();
   if (!body) return;
 
-  await addDoc(commentsRef(params.cardId), {
-    authorUid: params.user.uid,
-    body,
-    mentionUids: mentionsBy(params.user.uid, body, params.candidates),
-    createdAt: Date.now(),
-  });
+  await addDoc(
+    commentsRef(params.cardId),
+    newCommentDoc({ authorUid: params.user.uid, body, candidates: params.candidates, now: Date.now() }),
+  );
 }
 
 /**
@@ -99,7 +92,7 @@ export async function editComment(params: {
 
   await updateDoc(commentRef(params.cardId, params.commentId), {
     body,
-    mentionUids: mentionsBy(params.authorUid, body, params.candidates),
+    mentionUids: commentMentions(params.authorUid, body, params.candidates),
     editedAt: Date.now(),
   });
 }

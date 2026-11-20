@@ -39,3 +39,4 @@ export {
 } from './notifications';
 export { onActivityNotice, noticeSweep } from './notices';
 export { healthCheck } from './health';
+export { mcp } from './mcp';

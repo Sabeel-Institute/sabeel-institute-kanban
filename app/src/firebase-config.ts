@@ -1,5 +1,6 @@
 import {
   EMULATOR_PROJECT_ID,
+  FIREBASE_WEB_CONFIG,
   EMULATOR_STORAGE_BUCKET,
   GOOGLE_WEB_CLIENT_ID,
   STORAGE_BUCKET,
@@ -13,20 +14,7 @@ import { USE_EMULATORS } from './env';
  * Real values for the `sabeel-institute-kanban` project (registered 2026-07-19).
  * Local development still runs against the emulators — see USE_EMULATORS below.
  */
-const realConfig = {
-  apiKey: 'AIzaSyDnHBj4vlBquHotVRjexa2yB1_x18XWqaI',
-  // The HOSTING domain, not firebaseapp.com. Hosting serves /__/auth/* itself,
-  // so the whole sign-in redirect stays same-origin — required in
-  // storage-partitioned browsers (the in-app webviews people arrive in from a
-  // WhatsApp or Slack link), where the cross-origin helper dies with
-  // "missing initial state". Redirect URI registered on the Web OAuth client
-  // 2026-07-19; the firebaseapp.com entries are kept as a working fallback.
-  authDomain: 'sabeel-institute-kanban.web.app',
-  projectId: 'sabeel-institute-kanban',
-  storageBucket: STORAGE_BUCKET,
-  messagingSenderId: '826656438175',
-  appId: '1:826656438175:web:d9d89ccb61181de5c5efaa',
-};
+const realConfig = { ...FIREBASE_WEB_CONFIG, storageBucket: STORAGE_BUCKET };
 
 /**
  * The WEB OAuth client id now lives in `@sabeel/shared` — `accountExists` must
