@@ -187,6 +187,10 @@ describe("what's waiting on me, in two calls", () => {
       createdAt: 1, createdBy: OTHER, updatedAt: 1, updatedBy: OTHER,
     });
     expect(await titles({ assignee: 'none' })).toEqual(['Find a caterer']);
+    expect(await titles({ due_to: '2020-12-31' })).toEqual(['Pay the hall deposit']);
+    expect(await titles({ due_from: '2021-01-01' })).toEqual([]);
+    const bad = await client.callTool({ name: 'search_cards', arguments: { due_from: 'next week' } });
+    expect(bad.isError).toBe(true);
     const unknown = await client.callTool({ name: 'search_cards', arguments: { assignee: 'nobody.here' } });
     expect(unknown.isError).toBe(true);
 
