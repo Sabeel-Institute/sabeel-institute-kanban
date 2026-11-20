@@ -198,6 +198,36 @@ describe('filterCards', () => {
   });
 });
 
+describe('date ranges', () => {
+  const day = (d: string) => Date.parse(`${d}T18:00:00Z`); // midday in Chicago
+  const cards = [
+    card({ id: 'nov', dueDate: '2026-11-30', lastActivityAt: day('2026-11-02') }),
+    card({ id: 'dec1', dueDate: '2026-12-01', lastActivityAt: day('2026-11-18') }),
+    card({ id: 'dec31', dueDate: '2026-12-31', lastActivityAt: day('2026-11-20') }),
+    card({ id: 'undated', lastActivityAt: day('2026-11-19') }),
+  ];
+  const ids = (f: Parameters<typeof filterCards>[1]) => filterCards(cards, f, TODAY).map((c) => c.id);
+
+  it('a due range is inclusive at both ends, and a card with no due date is never in one', () => {
+    expect(ids({ dueFrom: '2026-12-01', dueTo: '2026-12-31' })).toEqual(['dec1', 'dec31']);
+    expect(ids({ dueTo: '2026-12-01' })).toEqual(['nov', 'dec1']);
+    expect(ids({ dueFrom: '2026-12-02' })).toEqual(['dec31']);
+  });
+
+  it('an activity range reads the last activity as a day in the org timezone, inclusive', () => {
+    expect(ids({ activeFrom: '2026-11-18', activeTo: '2026-11-19' })).toEqual(['dec1', 'undated']);
+    expect(ids({ activeFrom: '2026-11-19' })).toEqual(['dec31', 'undated']);
+    // 03:00 UTC on the 21st is still the 20th in Chicago.
+    const late = [card({ id: 'late', lastActivityAt: Date.parse('2026-11-21T03:00:00Z') })];
+    expect(filterCards(late, { activeTo: '2026-11-20' }, TODAY).map((c) => c.id)).toEqual(['late']);
+  });
+
+  it('counts as an active filter', () => {
+    expect(hasActiveFilters({ dueFrom: '2026-12-01' })).toBe(true);
+    expect(hasActiveFilters({ activeTo: '2026-11-20' })).toBe(true);
+  });
+});
+
 describe('hasActiveFilters', () => {
   it('is false for an empty filter set', () => {
     expect(hasActiveFilters({})).toBe(false);

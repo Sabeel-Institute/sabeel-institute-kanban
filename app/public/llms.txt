@@ -29,7 +29,7 @@ MCP server: https://sabeel-institute-kanban.web.app/mcp (Streamable HTTP). Sign-
 The server says whose account it is acting for: "me" means that person.
 
 - What's waiting on me: `my_work` (assigned cards, overdue first), then `my_alerts` (unread mentions, replies, assignments). Two calls; do not read boards one by one.
-- Finding cards: `search_cards` is the app's Search with every filter, across all boards in one call: text, assignee ("me", a handle or "none"), labels, priorities, due (overdue, today, soon, none), board, column, lane, finished, the archive, and sort (best, newest, oldest, due). Never read boards one by one to find something.
+- Finding cards: `search_cards` is the app's Search with every filter, across all boards in one call: text, assignee ("me", a handle or "none"), labels, priorities, due (overdue, today, soon, none), board, column, lane, finished, the archive, due and activity date ranges (due_from/due_to, active_from/active_to), and sort (best, newest, oldest, due). Never read boards one by one to find something.
 - A board: `list_boards` for ids, `get_board` (optionally one column or lane).
 - One card's discussion: `get_card`.
 - Writing: `add_card` (ask which column, and lane on a lane board) and `comment` (`@handle` mentions; `@all` mentions the whole board).

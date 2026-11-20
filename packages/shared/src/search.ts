@@ -16,6 +16,7 @@ import type { Priority } from './types';
  */
 
 import { toPlainText } from './richtext';
+import { todayInOrgTz } from './due';
 
 export interface SearchableCard {
   id: string;
@@ -151,6 +152,19 @@ export interface CardFilters {
    * would be a union of disjoint sets rather than a narrowing.
    */
   boardId?: string;
+  /**
+   * Due on or between these days (YYYY-MM-DD, both inclusive), either end
+   * optional. A card with no due date never falls in a due range.
+   */
+  dueFrom?: string;
+  dueTo?: string;
+  /**
+   * Last active (`lastActivityOf`, as a day in the org's timezone) on or
+   * between these days, both inclusive, either end optional: "what changed
+   * this week".
+   */
+  activeFrom?: string;
+  activeTo?: string;
 }
 
 /** Normalise once per search rather than per card. */
@@ -191,6 +205,17 @@ export function filterCards(
     if (filters.archivedOnly ? !c.archived : c.archived) return false;
 
     if (filters.boardId && c.boardId !== filters.boardId) return false;
+
+    if (filters.dueFrom || filters.dueTo) {
+      if (!c.dueDate) return false;
+      if (filters.dueFrom && c.dueDate < filters.dueFrom) return false;
+      if (filters.dueTo && c.dueDate > filters.dueTo) return false;
+    }
+    if (filters.activeFrom || filters.activeTo) {
+      const day = todayInOrgTz(new Date(lastActivityOf(c)));
+      if (filters.activeFrom && day < filters.activeFrom) return false;
+      if (filters.activeTo && day > filters.activeTo) return false;
+    }
 
     if (q && !matchesText(c, q)) return false;
     if (filters.assigneeUid && !c.assigneeUids.includes(filters.assigneeUid)) {
@@ -249,7 +274,11 @@ export function hasActiveFilters(filters: CardFilters): boolean {
       (filters.priorities && filters.priorities.length > 0) ||
       (filters.due && filters.due !== 'any') ||
       filters.archivedOnly ||
-      filters.boardId,
+      filters.boardId ||
+      filters.dueFrom ||
+      filters.dueTo ||
+      filters.activeFrom ||
+      filters.activeTo,
   );
 }
 
