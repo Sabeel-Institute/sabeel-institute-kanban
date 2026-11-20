@@ -13,6 +13,8 @@ export * from './due';
 export * from './help';
 export * from './lanes';
 export * from './mentions';
+export * from './newDocs';
+export * from './firebaseWeb';
 export * from './people';
 export * from './migration';
 export * from './notices';

@@ -46,6 +46,30 @@
         "destination": "/support.html"
       },
       {
+        "source": "/mcp",
+        "function": { "functionId": "mcp", "region": "us-central1" }
+      },
+      {
+        "source": "/oauth/**",
+        "function": { "functionId": "mcp", "region": "us-central1" }
+      },
+      {
+        "source": "/.well-known/oauth-protected-resource",
+        "function": { "functionId": "mcp", "region": "us-central1" }
+      },
+      {
+        "source": "/.well-known/oauth-protected-resource/**",
+        "function": { "functionId": "mcp", "region": "us-central1" }
+      },
+      {
+        "source": "/.well-known/oauth-authorization-server",
+        "function": { "functionId": "mcp", "region": "us-central1" }
+      },
+      {
+        "source": "/.well-known/oauth-authorization-server/**",
+        "function": { "functionId": "mcp", "region": "us-central1" }
+      },
+      {
         "source": "!/_expo/**",
         "destination": "/index.html"
       }

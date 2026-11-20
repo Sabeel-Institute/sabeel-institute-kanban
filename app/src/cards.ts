@@ -18,10 +18,10 @@ import {
   compareRank,
   needsRerank,
   parentAfterMove,
+  newCardDoc,
   rankBetween,
   rerank,
   type BoardColumn,
-  type CardDoc,
   type Priority,
   labelIdsAfterBoardChange,
   type Label,
@@ -193,26 +193,16 @@ export async function createCard(params: {
   laneId?: string;
 }): Promise<string> {
   const last = params.columnCards[params.columnCards.length - 1] ?? null;
-  const now = Date.now();
-  const card: CardDoc = {
+  const card = newCardDoc({
     boardId: params.boardId,
-    title: params.title.trim(),
-    description: '',
     columnId: params.columnId,
-    rank: rankBetween(last?.rank ?? null, null),
-    assigneeUids: [],
-    subscriberUids: params.subscribe ? [params.user.uid] : [],
-    priority: 'none',
-    labelIds: [],
-    archived: false,
-    commentCount: 0,
-    attachmentCount: 0,
-    createdAt: now,
-    createdBy: params.user.uid,
-    updatedAt: now,
-    updatedBy: params.user.uid,
-    ...(params.laneId ? { laneId: params.laneId } : {}),
-  };
+    title: params.title,
+    uid: params.user.uid,
+    lastRank: last?.rank ?? null,
+    subscribe: params.subscribe,
+    laneId: params.laneId,
+    now: Date.now(),
+  });
   const ref = await addDoc(cardsRef(), card);
   return ref.id;
 }
