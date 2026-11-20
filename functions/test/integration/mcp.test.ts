@@ -100,7 +100,15 @@ async function connect(accessToken: string) {
   return client;
 }
 
-const parsed = (r: unknown) => JSON.parse(((r as { content: { text: string }[] }).content[0]).text);
+/** A tool's JSON answer; a refusal or error text fails with that text, not a JSON parse error. */
+const parsed = (r: unknown) => {
+  const t = (r as { content: { text: string }[] }).content[0].text;
+  try {
+    return JSON.parse(t);
+  } catch {
+    throw new Error(`Not JSON: ${t}`);
+  }
+};
 
 beforeAll(async () => {
   await makeUser({ uid: ME, email: 'mcpme@oursabeel.com', role: 'member', status: 'active', displayName: 'Mona' });
@@ -133,72 +141,116 @@ describe('stores nothing it does not need', () => {
   });
 });
 
-describe("what's waiting on me, in two calls", () => {
-  it('my_work lists my open cards, overdue first, and my_alerts my unread ones; search filters by assignee and due', async () => {
-    await adminDb().doc('cards/mcp_mine_late').set({
-      boardId: 'mcp_b1', title: 'Pay the hall deposit', description: '', columnId: 'todo', rank: 'a', assigneeUids: [ME],
-      subscriberUids: [], priority: 'high', labelIds: [], archived: false, commentCount: 0, attachmentCount: 0,
-      dueDate: '2020-01-01', parentId: 'mcp_theirs', createdAt: 1, createdBy: OTHER, updatedAt: 1, updatedBy: OTHER,
-    });
-    await adminDb().doc('cards/mcp_theirs').set({
-      boardId: 'mcp_b1', title: 'Book the speakers', description: '', columnId: 'todo', rank: 'b', assigneeUids: [OTHER],
-      subscriberUids: [], priority: 'none', labelIds: [], archived: false, commentCount: 0, attachmentCount: 0,
-      createdAt: 1, createdBy: OTHER, updatedAt: 1, updatedBy: OTHER,
-    });
+const seedCard = (id: string, over: Record<string, unknown>) =>
+  adminDb().doc(`cards/${id}`).set({
+    boardId: 'mcp_b1', title: id, description: '', columnId: 'todo', rank: 'V', assigneeUids: [], subscriberUids: [],
+    priority: 'none', labelIds: [], archived: false, commentCount: 0, attachmentCount: 0,
+    createdAt: Date.parse('2026-11-02T18:00:00Z'), createdBy: OTHER, updatedAt: Date.parse('2026-11-02T18:00:00Z'), updatedBy: OTHER,
+    ...over,
+  });
+
+describe('composable queries: every question in at most two calls', () => {
+  it('answers each recipe the server teaches, as the person, under the rules', async () => {
+    await adminDb().doc('labels/mcp_venue').set({ name: 'Venue', color: 'sage', createdAt: 1 });
+    await seedCard('mcp_late', { title: 'Pay the hall deposit', assigneeUids: [ME], priority: 'high', dueDate: '2020-01-01' });
+    await seedCard('mcp_theirs', { title: 'Book the speakers', assigneeUids: [OTHER], labelIds: ['mcp_venue'], priority: 'low', dueDate: '2099-06-01' });
+    await seedCard('mcp_sub', { title: 'Confirm the speakers', parentId: 'mcp_theirs', assigneeUids: [OTHER] });
+    await seedCard('mcp_free', { title: 'Find a caterer', columnId: 'done' });
+    await seedCard('mcp_gone', { title: 'Old speakers quote', archived: true });
     await adminDb().collection(`users/${ME}/notifications`).add({
       type: 'mention', boardId: 'mcp_b1', cardId: 'mcp_theirs', actorUid: OTHER, text: 'Otto mentioned you on “Book the speakers”', read: false, at: Date.now(),
     });
     await adminDb().collection(`users/${ME}/notifications`).add({
       type: 'comment', boardId: 'mcp_b1', cardId: 'mcp_theirs', actorUid: OTHER, text: 'Old news', read: true, at: Date.now() - 1000,
     });
+
     const client = await connect((await signIn(ME)).access_token);
-    const work = parsed(await client.callTool({ name: 'my_work', arguments: {} }));
-    expect(work.cards[0]).toMatchObject({ title: 'Pay the hall deposit', due_state: 'overdue', priority: 'high', board: 'Agent Board', column: 'To Do' });
-    expect(work.cards.map((c: { title: string }) => c.title)).not.toContain('Book the speakers');
-    const alerts = parsed(await client.callTool({ name: 'my_alerts', arguments: {} }));
-    // Unread only: the mention (and the assignment the trigger just sent), never the read one.
+    const names = (await client.listTools()).tools.map((t) => t.name).sort();
+    expect(names).toEqual(['add_card', 'comment', 'query_activity', 'query_alerts', 'query_boards', 'query_cards']);
+    expect(client.getInstructions()).toContain('Mona (@mcpme)');
+    const call = async (name: string, args: Record<string, unknown>) => parsed(await client.callTool({ name, arguments: args }));
+    const titles = async (args: Record<string, unknown>) => (await call('query_cards', args)).cards.map((c: { title: string }) => c.title);
+
+    // Waiting on me: my cards, then my unread alerts.
+    const mine = await call('query_cards', { person: 'me', finished: 'exclude', sort: 'due' });
+    expect(mine.cards.map((c: { title: string }) => c.title)).toEqual(['Pay the hall deposit']);
+    expect(mine.cards[0]).toMatchObject({ due_state: 'overdue', board: 'Agent Board', column: 'To Do', url: 'https://sabeel-institute-kanban.web.app/c/mcp_late' });
+    const alerts = await call('query_alerts', {});
     const texts = alerts.alerts.map((a: { text: string }) => a.text);
     expect(texts).toContain('Otto mentioned you on “Book the speakers”');
     expect(texts).not.toContain('Old news');
-    expect(alerts.alerts.every((a: { unread: boolean }) => a.unread)).toBe(true);
-    const mention = alerts.alerts.find((a: { text: string }) => a.text.startsWith('Otto mentioned'));
-    expect(mention.url).toBe('https://sabeel-institute-kanban.web.app/c/mcp_theirs');
-    const late = parsed(await client.callTool({ name: 'search_cards', arguments: { assignee: 'me', due: 'overdue' } }));
-    expect(late.cards.map((c: { title: string }) => c.title)).toEqual(['Pay the hall deposit']);
-    const ottos = parsed(await client.callTool({ name: 'search_cards', arguments: { assignee: 'mcpother' } }));
-    expect(ottos.cards.map((c: { title: string }) => c.title)).toEqual(['Book the speakers']);
-    // The app's filters, in one call each.
-    await adminDb().doc('labels/mcp_venue').set({ name: 'Venue', color: 'sage', createdAt: 1 });
-    await adminDb().doc('cards/mcp_theirs').update({ labelIds: ['mcp_venue'], priority: 'low' });
-    await adminDb().doc('cards/mcp_gone').set({
-      boardId: 'mcp_b1', title: 'Old speakers quote', description: 'superseded', columnId: 'todo', rank: 'c', assigneeUids: [],
-      subscriberUids: [], priority: 'none', labelIds: [], archived: true, commentCount: 0, attachmentCount: 0,
-      createdAt: 1, createdBy: OTHER, updatedAt: 1, updatedBy: OTHER,
-    });
-    const titles = async (args: Record<string, unknown>) =>
-      parsed(await client.callTool({ name: 'search_cards', arguments: args })).cards.map((c: { title: string }) => c.title);
-    expect(await titles({ labels: ['venue'] })).toEqual(['Book the speakers']);
-    expect(await titles({ priorities: ['urgent', 'high'] })).toEqual(['Pay the hall deposit']);
-    expect(await titles({ text: 'speakers' })).toEqual(['Book the speakers']);
-    expect(await titles({ text: 'speakers', archived_only: true })).toEqual(['Old speakers quote']);
-    await adminDb().doc('cards/mcp_free').set({
-      boardId: 'mcp_b1', title: 'Find a caterer', description: '', columnId: 'todo', rank: 'd', assigneeUids: [],
-      subscriberUids: [], priority: 'none', labelIds: [], archived: false, commentCount: 0, attachmentCount: 0,
-      createdAt: 1, createdBy: OTHER, updatedAt: 1, updatedBy: OTHER,
-    });
-    expect(await titles({ assignee: 'none' })).toEqual(['Find a caterer']);
-    expect(await titles({ due_to: '2020-12-31' })).toEqual(['Pay the hall deposit']);
-    expect(await titles({ due_from: '2021-01-01' })).toEqual([]);
-    const bad = await client.callTool({ name: 'search_cards', arguments: { due_from: 'next week' } });
-    expect(bad.isError).toBe(true);
-    const unknown = await client.callTool({ name: 'search_cards', arguments: { assignee: 'nobody.here' } });
-    expect(unknown.isError).toBe(true);
 
-    // A card names its subtasks, and a subtask its parent, without a hunt.
-    const parentCard = parsed(await client.callTool({ name: 'get_card', arguments: { card_id: 'mcp_theirs' } }));
-    expect(parentCard.subtasks.map((c: { title: string }) => c.title)).toEqual(['Pay the hall deposit']);
-    const child = parsed(await client.callTool({ name: 'get_card', arguments: { card_id: 'mcp_mine_late' } }));
-    expect(child.parent).toMatchObject({ id: 'mcp_theirs', title: 'Book the speakers' });
+    // Filters, by name, in one call each.
+    expect(await titles({ board: 'agent', labels: 'venue' })).toEqual(['Book the speakers']);
+    expect(await titles({ priorities: ['urgent', 'high'] })).toEqual(['Pay the hall deposit']);
+    expect(await titles({ person: 'mcpother', sort: 'created' })).toEqual(expect.arrayContaining(['Book the speakers', 'Confirm the speakers']));
+    expect(await titles({ person: 'none' })).toEqual(['Find a caterer']);
+    expect(await titles({ text: 'speakers', archived: true })).toEqual(['Old speakers quote']);
+    expect(await titles({ parent: 'mcp_theirs' })).toEqual(['Confirm the speakers']);
+    expect(await titles({ due_to: '2020-12-31' })).toEqual(['Pay the hall deposit']);
+    expect(await titles({ column: 'Done' })).toEqual(['Find a caterer']);
+    expect((await client.callTool({ name: 'query_cards', arguments: { person: 'nobody.here' } })).isError).toBe(true);
+    expect((await client.callTool({ name: 'query_cards', arguments: { due_from: 'next week' } })).isError).toBe(true);
+
+    // Counts instead of rows: workload by person.
+    const load = await call('query_cards', { group_by: ['person'] });
+    expect(load.groups).toEqual(
+      expect.arrayContaining([
+        { person: 'Otto', count: 2, overdue: 0 },
+        { person: 'Mona', count: 1, overdue: 1 },
+        { person: 'unassigned', count: 1, overdue: 0 },
+      ]),
+    );
+
+    // Depth on particular cards: subtasks and description, live and archived alike.
+    const deep = await call('query_cards', { ids: ['mcp_theirs', 'mcp_gone'], include: { subtasks: true, description: true } });
+    const theirs = deep.cards.find((c: { id: string }) => c.id === 'mcp_theirs');
+    expect(theirs.subtasks.map((c: { title: string }) => c.title)).toEqual(['Confirm the speakers']);
+    expect(deep.cards.find((c: { id: string }) => c.id === 'mcp_gone')).toMatchObject({ archived: true, description: '' });
+
+    // Paging: a cursor walks the rest.
+    const first = await call('query_cards', { limit: 2, sort: 'created' });
+    expect(first.cards).toHaveLength(2);
+    expect(first.next_cursor).toBeTruthy();
+    const rest = await call('query_cards', { limit: 2, sort: 'created', cursor: first.next_cursor });
+    expect(rest.cards.map((c: { id: string }) => c.id)).not.toContain(first.cards[0].id);
+
+    // Status of everything: boards with counts and details.
+    const boards = await call('query_boards', { include: { counts: true, members: true, columns: true } });
+    expect(boards.map((b: { name: string }) => b.name)).toEqual(['Agent Board']);
+    expect(boards[0]).toMatchObject({ member: true, owner: true, url: 'https://sabeel-institute-kanban.web.app/b/mcp_b1' });
+    expect(boards[0].counts).toMatchObject({ open: 4, overdue: 1, unassigned: 1, by_column: { 'To Do': 3, Done: 1 } });
+    expect(boards[0].members).toEqual(expect.arrayContaining([{ name: 'Otto', handle: 'mcpother' }]));
+
+    // A board they are not on: not listed, and refused by name.
+    expect((await client.callTool({ name: 'query_cards', arguments: { board: 'Not Mine' } })).isError).toBe(true);
+    await client.close();
+  });
+
+  it('what happened: history, comments and the board, newest first, by type and person', async () => {
+    const client = await connect((await signIn(ME)).access_token);
+    const call = async (name: string, args: Record<string, unknown>) => parsed(await client.callTool({ name, arguments: args }));
+    // A column is always named: the agent asks, it does not guess.
+    expect((await client.callTool({ name: 'add_card', arguments: { board: 'Agent Board', title: 'No column' } })).isError).toBe(true);
+    const added = await call('add_card', { board: 'Agent Board', title: 'Order the chairs', column: 'To Do' });
+    expect((await adminDb().doc(`cards/${added.added}`).get()).data()).toMatchObject({ boardId: 'mcp_b1', columnId: 'todo', createdBy: ME, subscriberUids: [ME] });
+    await call('comment', { card_id: added.added, text: 'Done by Friday, @mcpother' });
+    const stored = (await adminDb().collection(`cards/${added.added}/comments`).get()).docs[0].data();
+    expect(stored.mentionUids).toEqual([OTHER]);
+
+    const lines = await waitFor('the card created and the comment, in the activity', async () => {
+      const a = await call('query_activity', { board: 'Agent Board', person: 'me' });
+      const mine = a.lines.filter((l: { card?: { id: string } }) => l.card?.id === added.added);
+      return mine.some((l: { what: string }) => l.what === 'created') && mine.some((l: { what: string }) => l.what === 'comment') ? mine : undefined;
+    });
+    const comment = lines.find((l: { what: string }) => l.what === 'comment');
+    expect(comment).toMatchObject({ by: 'Mona', text: 'Done by Friday, @mcpother', card: { title: 'Order the chairs' } });
+    const onlyComments = await call('query_activity', { card: added.added, types: ['comment'] });
+    expect(onlyComments.lines.map((l: { what: string }) => l.what)).toEqual(['comment']);
+    // The same card read in depth carries its latest comment.
+    const deep = await call('query_cards', { ids: [added.added], include: { comments: 1, history: 5 } });
+    expect(deep.cards[0].comments).toEqual([expect.objectContaining({ by: 'Mona', text: 'Done by Friday, @mcpother' })]);
+    expect(deep.cards[0].history.map((h: { what: string }) => h.what)).toContain('created');
     await client.close();
   });
 });
@@ -217,44 +269,6 @@ describe('the MCP server', () => {
     expect((await json('/oauth/register', { redirect_uris: ['http://evil.example/cb'] })).status).toBe(400);
   });
 
-  it('signs in as the person and works under their rules', async () => {
-    const tokens = await signIn(ME);
-    const client = await connect(tokens.access_token);
-    const names = (await client.listTools()).tools.map((t) => t.name).sort();
-    expect(names).toEqual(['add_card', 'comment', 'get_board', 'get_card', 'list_boards', 'my_alerts', 'my_work', 'search_cards']);
-    // The server says whose account it acts for, so "me" is never a guess.
-    expect(client.getInstructions()).toContain('Mona (@mcpme)');
-
-    const boards = parsed(await client.callTool({ name: 'list_boards', arguments: {} }));
-    expect(boards.map((b: { name: string }) => b.name)).toEqual(['Agent Board']);
-    expect(boards[0]).toMatchObject({ member: true, owner: true });
-
-    // A column is always named: the agent asks, it does not guess.
-    const unnamed = await client.callTool({ name: 'add_card', arguments: { board_id: 'mcp_b1', title: 'No column' } });
-    expect(unnamed.isError).toBe(true);
-    const added = parsed(await client.callTool({ name: 'add_card', arguments: { board_id: 'mcp_b1', title: 'Order the chairs', column: 'To Do' } }));
-    const card = (await adminDb().doc(`cards/${added.added}`).get()).data()!;
-    expect(card).toMatchObject({ boardId: 'mcp_b1', columnId: 'todo', createdBy: ME, updatedBy: ME, subscriberUids: [ME] });
-
-    await client.callTool({ name: 'comment', arguments: { card_id: added.added, text: 'Done by Friday, @mcpother' } });
-    const full = await waitFor('the comment, named', async () => {
-      const c = parsed(await client.callTool({ name: 'get_card', arguments: { card_id: added.added } }));
-      return c.comments.length && c.history.length ? c : undefined;
-    });
-    expect(full.comments[0]).toMatchObject({ by: 'Mona', text: 'Done by Friday, @mcpother' });
-    const stored = (await adminDb().collection(`cards/${added.added}/comments`).get()).docs[0].data();
-    expect(stored.mentionUids).toEqual([OTHER]);
-
-    const found = parsed(await client.callTool({ name: 'search_cards', arguments: { text: 'chairs' } }));
-    expect(found.cards.map((c: { title: string }) => c.title)).toEqual(['Order the chairs']);
-    expect(found.cards[0].url).toBe(`https://sabeel-institute-kanban.web.app/c/${added.added}`);
-
-    // A board they are not on: the rules refuse, as they would the app.
-    const refused = await client.callTool({ name: 'get_board', arguments: { board_id: 'mcp_b2' } });
-    expect(refused.isError).toBe(true);
-    await client.close();
-  });
-
   it('a refresh token gives a new access token, once', async () => {
     const tokens = await signIn(ME);
     const fresh = await form('/oauth/token', { grant_type: 'refresh_token', refresh_token: tokens.refresh_token, client_id: tokens.clientId });
@@ -262,16 +276,15 @@ describe('the MCP server', () => {
     const replay = await form('/oauth/token', { grant_type: 'refresh_token', refresh_token: tokens.refresh_token, client_id: tokens.clientId });
     expect(replay.status).toBe(400);
     const client = await connect(fresh.body.access_token);
-    expect(parsed(await client.callTool({ name: 'list_boards', arguments: {} }))).toHaveLength(1);
+    expect(parsed(await client.callTool({ name: 'query_boards', arguments: {} }))).toHaveLength(1);
     await client.close();
   });
 
   it("an admin's agent sees every board, as the app shows an admin", async () => {
     await makeUser({ uid: 'mcp_admin', email: 'mcpadmin@oursabeel.com', role: 'admin', status: 'active', displayName: 'Ada' });
     const client = await connect((await signIn('mcp_admin')).access_token);
-    const names = parsed(await client.callTool({ name: 'list_boards', arguments: {} })).map((b: { name: string }) => b.name);
+    const names = parsed(await client.callTool({ name: 'query_boards', arguments: {} })).map((b: { name: string }) => b.name);
     expect(names).toEqual(expect.arrayContaining(['Agent Board', 'Not Mine']));
-    expect(parsed(await client.callTool({ name: 'get_board', arguments: { board_id: 'mcp_b2' } })).name).toBe('Not Mine');
     await client.close();
   });
 
