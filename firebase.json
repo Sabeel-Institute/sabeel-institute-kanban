@@ -76,6 +76,15 @@
     ],
     "headers": [
       {
+        "source": "/",
+        "headers": [
+          {
+            "key": "Link",
+            "value": "</llms.txt>; rel=\"describedby\"; type=\"text/markdown\", </mcp>; rel=\"service\""
+          }
+        ]
+      },
+      {
         "source": "**",
         "headers": [
           {

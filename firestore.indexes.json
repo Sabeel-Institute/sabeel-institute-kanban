@@ -95,9 +95,21 @@
       ]
     },
     {
-      "//": "Stats buckets are only ever read by document id, never queried by content. Firestore RECURSIVELY indexes map subfields, so left alone one month document would carry an index entry per counter per day (~250) plus one per person per day (arrays index per element) — on the most frequently written document in the system, supporting queries nothing makes. An empty `indexes` array switches that off, and subfields inherit a parent map's exemption, so this one entry covers `days.28.comments`, `days.28.actors` and the rest.",
+      "//": "Stats buckets are only ever read by document id, never queried by content. Firestore RECURSIVELY indexes map subfields, so left alone one month document would carry an index entry per counter per day (~250) plus one per person per day (arrays index per element) \u2014 on the most frequently written document in the system, supporting queries nothing makes. An empty `indexes` array switches that off, and subfields inherit a parent map's exemption, so this one entry covers `days.28.comments`, `days.28.actors` and the rest.",
       "collectionGroup": "months",
       "fieldPath": "days",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "mcpCodes",
+      "fieldPath": "expireAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "mcpTokens",
+      "fieldPath": "expireAt",
+      "ttl": true,
       "indexes": []
     }
   ]

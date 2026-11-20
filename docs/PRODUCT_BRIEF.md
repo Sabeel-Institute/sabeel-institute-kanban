@@ -228,6 +228,11 @@ cards/{cardId}/activity/{activityId}
   # for the two file types). Clients have no write access at all, so the log
   # cannot be forged or edited.
 
+mcpCodes/{sha256}  mcpTokens/{sha256}             # the MCP server's sign-in codes and tokens (functions/src/mcp.ts)
+  uid, clientId, kind?, expiresAt, expireAt       # hashed; server-only (no rule opens them);
+  # a Firestore TTL policy on expireAt deletes each once it lapses. Client
+  # registrations are not stored: the client id carries its redirects.
+
 pendingNotices/{cardId}                          # a card's changes waiting to be announced; one doc per card
   entries: { [activityId]: { type, actorUid, at, from?, to? } }
   # Server-only: no client reads or writes it. Every new activity entry lands
