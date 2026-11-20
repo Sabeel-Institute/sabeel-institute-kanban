@@ -49,12 +49,16 @@ import {
   FIREBASE_WEB_CONFIG,
   bucketFor,
   compareRank,
+  filterCards,
   isFinished,
   laneOf,
   lanesLive,
   newCardDoc,
   newCommentDoc,
+  orderCards,
+  toPlainText,
   todayInOrgTz,
+  type SearchableCard,
   type BoardColumn,
   type BoardLane,
 } from '@sabeel/shared';
@@ -550,51 +554,105 @@ function buildServer(me: Me): McpServer {
     'search_cards',
     {
       description:
-        'Find open cards with any mix of filters, across the boards the person sees (or one board): words in the title or description, assignee, label, priority, due state, column, lane. One call; no need to read boards one by one. Leave text out to filter only.',
+        "The app's Search, with every filter, across all the boards the person sees (or one board), in one call: never read boards one by one to find cards. " +
+        'Combine any filters; leave text out to filter only. Matches titles and descriptions as written (substring, any case, no fuzzy spelling). ' +
+        'Results carry board, column, lane, due state, assignees, labels, url and last activity.',
       inputSchema: {
-        text: z.string().optional().describe('Words in the title or description, any case'),
-        assignee: z.string().optional().describe('"me", or a handle (the part of an address before @), or "none"'),
-        label: z.string().optional().describe('Label name'),
-        priority: z.enum(['urgent', 'high', 'medium', 'low']).optional(),
-        due: z.enum(['overdue', 'today', 'soon', 'later', 'none']).optional().describe('soon is the next 7 days'),
+        text: z.string().optional().describe('Words in the title or description'),
+        assignee: z.string().optional().describe('"me", a handle (the part of an address before @; see get_board members), or "none" for unassigned'),
+        labels: z.array(z.string()).optional().describe('Label names; a card with ANY of them matches'),
+        priorities: z.array(z.enum(['urgent', 'high', 'medium', 'low', 'none'])).optional().describe('ANY of these'),
+        due: z.enum(['overdue', 'today', 'soon', 'none']).optional().describe('soon is the coming week; a finished card is never overdue'),
         board_id: z.string().optional().describe('Only this board (ids from list_boards)'),
         column: z.string().optional().describe('Column name'),
         lane: z.string().optional().describe('Lane name'),
-        include_finished: z.boolean().optional().describe('Include finished cards (default false)'),
+        finished: z.enum(['include', 'exclude', 'only']).optional().describe('Cards in a lane board\'s finished column; default include, as the app'),
+        archived_only: z.boolean().optional().describe('Search the archive instead of live cards (never both)'),
+        sort: z.enum(['best', 'newest', 'oldest', 'due']).optional().describe('best: title matches first (with text), else newest activity; due: soonest due date first'),
         limit: z.number().int().min(1).max(200).optional().describe('Most results (default 50)'),
       },
     },
     (f) =>
       run(async (fs) => {
         const boards = f.board_id ? [await boardOf(fs, f.board_id)] : await visibleBoards(fs, me);
+        const byId = new Map(boards.map((b) => [b.id, b]));
+        const archived = f.archived_only === true;
+        // The app's own loading: a few `boardId in [...]` queries, one archive state.
+        const ids = boards.map((b) => b.id);
+        const chunks: string[][] = [];
+        for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
+        const raw = (
+          await Promise.all(
+            chunks.map((chunk) =>
+              getDocs(query(collection(fs, 'cards'), where('boardId', 'in', chunk), where('archived', '==', archived))),
+            ),
+          )
+        ).flatMap((snap) => snap.docs.map((d): Card => ({ ...(d.data() as Card), id: d.id })));
+        const searchable: (SearchableCard & { card: Card })[] = raw.map((c) => ({
+          card: c,
+          id: c.id,
+          boardId: c.boardId,
+          title: c.title ?? '',
+          description: (c.description as string) ?? '',
+          descriptionPlain: toPlainText((c.description as string) ?? ''),
+          columnId: c.columnId,
+          assigneeUids: (c.assigneeUids as string[]) ?? [],
+          labelIds: (c.labelIds as string[]) ?? [],
+          priority: (c.priority as SearchableCard['priority']) ?? 'none',
+          dueDate: c.dueDate as string | undefined,
+          archived: c.archived === true,
+          ...(c.parentId ? { parentId: c.parentId as string } : {}),
+          updatedAt: c.updatedAt as number | undefined,
+          lastActivityAt: c.lastActivityAt as number | undefined,
+          createdAt: c.createdAt as number | undefined,
+        }));
+
+        // Names to ids: a handle across the boards searched, labels by name (any scope).
         const labels = await labelNames(fs);
-        const words = f.text?.toLowerCase().trim();
         const who = f.assignee?.toLowerCase().replace(/^@/, '');
-        const out: ReturnType<typeof summarize>[] = [];
-        // Every board's cards read at once, then filtered in order.
-        const cardsBy = await Promise.all(boards.map((b) => cardsOf(fs, b.id)));
-        for (const [i, b] of boards.entries()) {
-          const handleUid = (h: string) =>
-            Object.entries(b.memberProfiles ?? {}).find(([, m]) => handleOf(m.email) === h)?.[0];
-          const target = who === 'me' ? me.uid : who && who !== 'none' ? handleUid(who) : undefined;
-          if (who && who !== 'none' && !target) continue;
-          for (const c of cardsBy[i]) {
-            if (words && !`${c.title} ${(c.description as string) ?? ''}`.toLowerCase().includes(words)) continue;
-            const assignees = (c.assigneeUids as string[]) ?? [];
-            if (who === 'none' ? assignees.length > 0 : target && !assignees.includes(target)) continue;
-            const row = summarize(c, b, labels);
-            if (f.label && !(row.labels ?? []).some((l) => l?.toLowerCase() === f.label!.toLowerCase())) continue;
-            if (f.priority && row.priority !== f.priority) continue;
-            if (f.due && row.due_state !== f.due) continue;
-            if (f.column && row.column?.toLowerCase() !== f.column.toLowerCase()) continue;
-            if (f.lane && row.lane?.toLowerCase() !== f.lane.toLowerCase()) continue;
-            if (!f.include_finished && row.due_state === 'finished') continue;
-            out.push(row);
-          }
+        let assigneeUid: string | undefined;
+        if (who && who !== 'none') {
+          assigneeUid =
+            who === 'me'
+              ? me.uid
+              : boards.flatMap((b) => Object.entries(b.memberProfiles ?? {})).find(([, m]) => handleOf(m.email) === who)?.[0];
+          if (!assigneeUid) return refuse(`No one with the handle "${f.assignee}" on these boards. Handles are in get_board's members.`);
         }
-        out.sort(byDue);
+        const wanted = (f.labels ?? []).map((l) => l.toLowerCase());
+        const labelIds = [...labels].filter(([, name]) => wanted.includes(name.toLowerCase())).map(([id]) => id);
+        if (wanted.length && labelIds.length === 0) return refuse(`No label named ${f.labels!.join(' or ')}.`);
+
+        const today = todayInOrgTz();
+        const done = (c: SearchableCard) => isFinished(c as never, byId.get(c.boardId) as never);
+        // The app's filter and order, from @sabeel/shared: one definition.
+        const matched = filterCards(
+          searchable,
+          {
+            text: f.text,
+            assigneeUid,
+            labelIds,
+            priorities: f.priorities,
+            due: f.due,
+            archivedOnly: archived,
+            boardId: f.board_id,
+          },
+          today,
+          done,
+        ) as (SearchableCard & { card: Card })[];
+        const rows = matched
+          .filter((c) => who !== 'none' || c.assigneeUids.length === 0)
+          .filter((c) => (f.finished === 'exclude' ? !done(c) : f.finished === 'only' ? done(c) : true))
+          .map((c) => ({ c, row: summarize(c.card, byId.get(c.boardId)!, labels, today) }))
+          .filter(({ row }) => !f.column || row.column?.toLowerCase() === f.column.toLowerCase())
+          .filter(({ row }) => !f.lane || row.lane?.toLowerCase() === f.lane.toLowerCase());
+        const ordered =
+          f.sort === 'due'
+            ? rows.map((r) => r.row).sort(byDue)
+            : (orderCards(rows.map((r) => r.c), f.sort ?? 'best', f.text ?? '') as (SearchableCard & { card: Card })[]).map(
+                (c) => rows.find((r) => r.c === c)!.row,
+              );
         const max = f.limit ?? 50;
-        return text({ count: out.length, ...(out.length > max ? { showing: max } : {}), cards: out.slice(0, max) });
+        return text({ count: ordered.length, ...(ordered.length > max ? { showing: max } : {}), cards: ordered.slice(0, max) });
       }),
   );
 

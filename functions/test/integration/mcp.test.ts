@@ -55,9 +55,13 @@ async function signIn(uid: string) {
   expect(html).toContain('Copy for my agent');
   // The page's own script must at least parse: a syntax slip there breaks
   // every sign-in, and nothing else here runs it.
-  const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
-  expect(inline).toHaveLength(1);
-  expect(() => new Function(inline[0])).not.toThrow();
+  // Our own page, so plain string search, not an HTML parser by regex: the
+  // one inline script sits between the last '<script>' and its '</script>'.
+  const open = html.lastIndexOf('<script>');
+  const close = html.indexOf('</script>', open);
+  expect(open).toBeGreaterThan(-1);
+  expect(close).toBeGreaterThan(open);
+  expect(() => new Function(html.slice(open + '<script>'.length, close))).not.toThrow();
   const approved = await json('/oauth/approve', {
     client_id: reg.body.client_id,
     redirect_uri: REDIRECT,
@@ -163,6 +167,29 @@ describe("what's waiting on me, in two calls", () => {
     expect(late.cards.map((c: { title: string }) => c.title)).toEqual(['Pay the hall deposit']);
     const ottos = parsed(await client.callTool({ name: 'search_cards', arguments: { assignee: 'mcpother' } }));
     expect(ottos.cards.map((c: { title: string }) => c.title)).toEqual(['Book the speakers']);
+    // The app's filters, in one call each.
+    await adminDb().doc('labels/mcp_venue').set({ name: 'Venue', color: 'sage', createdAt: 1 });
+    await adminDb().doc('cards/mcp_theirs').update({ labelIds: ['mcp_venue'], priority: 'low' });
+    await adminDb().doc('cards/mcp_gone').set({
+      boardId: 'mcp_b1', title: 'Old speakers quote', description: 'superseded', columnId: 'todo', rank: 'c', assigneeUids: [],
+      subscriberUids: [], priority: 'none', labelIds: [], archived: true, commentCount: 0, attachmentCount: 0,
+      createdAt: 1, createdBy: OTHER, updatedAt: 1, updatedBy: OTHER,
+    });
+    const titles = async (args: Record<string, unknown>) =>
+      parsed(await client.callTool({ name: 'search_cards', arguments: args })).cards.map((c: { title: string }) => c.title);
+    expect(await titles({ labels: ['venue'] })).toEqual(['Book the speakers']);
+    expect(await titles({ priorities: ['urgent', 'high'] })).toEqual(['Pay the hall deposit']);
+    expect(await titles({ text: 'speakers' })).toEqual(['Book the speakers']);
+    expect(await titles({ text: 'speakers', archived_only: true })).toEqual(['Old speakers quote']);
+    await adminDb().doc('cards/mcp_free').set({
+      boardId: 'mcp_b1', title: 'Find a caterer', description: '', columnId: 'todo', rank: 'd', assigneeUids: [],
+      subscriberUids: [], priority: 'none', labelIds: [], archived: false, commentCount: 0, attachmentCount: 0,
+      createdAt: 1, createdBy: OTHER, updatedAt: 1, updatedBy: OTHER,
+    });
+    expect(await titles({ assignee: 'none' })).toEqual(['Find a caterer']);
+    const unknown = await client.callTool({ name: 'search_cards', arguments: { assignee: 'nobody.here' } });
+    expect(unknown.isError).toBe(true);
+
     // A card names its subtasks, and a subtask its parent, without a hunt.
     const parentCard = parsed(await client.callTool({ name: 'get_card', arguments: { card_id: 'mcp_theirs' } }));
     expect(parentCard.subtasks.map((c: { title: string }) => c.title)).toEqual(['Pay the hall deposit']);
