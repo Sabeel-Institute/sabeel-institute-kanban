@@ -203,13 +203,29 @@ firebase.initializeApp(${JSON.stringify(FIREBASE_WEB_CONFIG)});
 const auth = firebase.auth();
 ${authPort ? `auth.useEmulator('http://' + location.hostname + ':${authPort}');` : ''}
 const $ = (id) => document.getElementById(id);
+const phone = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+const provider = new firebase.auth.GoogleAuthProvider();
+provider.setCustomParameters({ hd: 'oursabeel.com', prompt: 'select_account' });
+// A popup where the browser allows one; a full-page redirect where it does
+// not (in-app browsers, some phones), which comes back to this same page.
+auth.getRedirectResult().then((r) => r.user && finish(r.user)).catch((e) => show(e));
+function show(e) { $('msg').textContent = e.message || String(e); $('go').disabled = false; }
 $('go').onclick = async () => {
   $('go').disabled = true; $('msg').textContent = '';
   try {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    provider.setCustomParameters({ hd: 'oursabeel.com', prompt: 'select_account' });
     const cred = await auth.signInWithPopup(provider);
-    const idToken = await cred.user.getIdToken();
+    await finish(cred.user);
+  } catch (e) {
+    if (['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment', 'auth/cancelled-popup-request'].includes(e.code)) {
+      await auth.signInWithRedirect(provider); return;
+    }
+    show(e);
+  }
+};
+async function finish(user) {
+  $('go').disabled = true;
+  try {
+    const idToken = await user.getIdToken();
     const r = await fetch(location.pathname.replace(/authorize$/, 'approve'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...params, idToken }),
@@ -220,10 +236,10 @@ $('go').onclick = async () => {
     if (!out.loopback) { location.href = out.redirect; return; }
     $('signin').hidden = true; $('done').hidden = false;
     $('back').href = out.redirect; $('line').value = out.redirect;
-  } catch (e) {
-    $('msg').textContent = e.message || String(e); $('go').disabled = false;
-  }
-};
+    // On a phone the agent is almost always elsewhere: the copy box first.
+    if (phone) $('done').insertBefore($('elsewhere'), $('here'));
+  } catch (e) { show(e); }
+}
 $('copy').onclick = async () => {
   $('line').select();
   try { await navigator.clipboard.writeText($('line').value); $('copied').textContent = 'Copied. Paste it to your agent.'; }
@@ -237,9 +253,9 @@ $('copy').onclick = async () => {
 <p class="hint">It can do only what you can do in the app. Sign in with your Sabeel Institute Google account to allow it.</p>
 <button id="go">Sign in with Google</button><p id="msg" class="hint err"></p></div>
 <div id="done" hidden><p>You're signed in. One last step, depending on where your agent runs:</p>
-<p class="hint"><b>Your agent is on this device:</b></p><a id="back" class="btn">Return to my agent</a>
-<p class="hint"><b>Your agent runs on another computer</b> (for example, you're on your phone, controlling a session on your computer): copy this line and paste it to your agent.</p>
-<textarea id="line" rows="4" readonly></textarea><button id="copy" class="alt">Copy for my agent</button><p id="copied" class="hint"></p>
+<div id="here"><p class="hint"><b>Your agent is on this device:</b></p><a id="back" class="btn">Return to my agent</a></div>
+<div id="elsewhere"><p class="hint"><b>Your agent runs on another computer</b> (for example, you're on your phone, controlling a session on your computer): copy this line and paste it to your agent.</p>
+<textarea id="line" rows="4" readonly></textarea><button id="copy" class="alt">Copy for my agent</button><p id="copied" class="hint"></p></div>
 <p class="hint">The line works once, for five minutes, and only for the agent that asked.</p></div>`,
       script,
     ),
@@ -470,6 +486,9 @@ function buildServer(me: Me): McpServer {
       .then(fn)
       .catch((e: unknown) => {
         logger.warn('mcp tool failed', { error: String(e) });
+        const code = (e as { code?: string }).code ?? '';
+        if (code === 'auth/user-disabled') return refuse('This account has been disabled in the kanban. Ask an admin.');
+        if (code === 'permission-denied') return refuse('The kanban refused that: this account cannot see or change it.');
         return refuse(e instanceof Error ? e.message : String(e));
       });
 
@@ -484,14 +503,11 @@ function buildServer(me: Me): McpServer {
       run(async (fs) => {
         const s = await getDocs(query(collection(fs, 'cards'), where('assigneeUids', 'array-contains', me.uid)));
         const cards = s.docs.map((d) => ({ ...(d.data() as Card), id: d.id })).filter((c) => c.archived !== true);
-        const boards = new Map<string, Board>();
-        for (const id of new Set(cards.map((c) => c.boardId))) {
-          try {
-            boards.set(id, await boardOf(fs, id));
-          } catch {
-            // A board they cannot see: its cards are not listed.
-          }
-        }
+        // In parallel; a board they cannot see drops its cards.
+        const found = await Promise.all(
+          [...new Set(cards.map((c) => c.boardId))].map((id) => boardOf(fs, id).catch(() => null)),
+        );
+        const boards = new Map(found.filter((b): b is Board => b !== null).map((b) => [b.id, b]));
         const labels = await labelNames(fs);
         const rows = cards
           .filter((c) => boards.has(c.boardId) && boards.get(c.boardId)!.archived !== true)
@@ -555,12 +571,14 @@ function buildServer(me: Me): McpServer {
         const words = f.text?.toLowerCase().trim();
         const who = f.assignee?.toLowerCase().replace(/^@/, '');
         const out: ReturnType<typeof summarize>[] = [];
-        for (const b of boards) {
+        // Every board's cards read at once, then filtered in order.
+        const cardsBy = await Promise.all(boards.map((b) => cardsOf(fs, b.id)));
+        for (const [i, b] of boards.entries()) {
           const handleUid = (h: string) =>
             Object.entries(b.memberProfiles ?? {}).find(([, m]) => handleOf(m.email) === h)?.[0];
           const target = who === 'me' ? me.uid : who && who !== 'none' ? handleUid(who) : undefined;
           if (who && who !== 'none' && !target) continue;
-          for (const c of await cardsOf(fs, b.id)) {
+          for (const c of cardsBy[i]) {
             if (words && !`${c.title} ${(c.description as string) ?? ''}`.toLowerCase().includes(words)) continue;
             const assignees = (c.assigneeUids as string[]) ?? [];
             if (who === 'none' ? assignees.length > 0 : target && !assignees.includes(target)) continue;
@@ -645,10 +663,17 @@ function buildServer(me: Me): McpServer {
         const card: Card = { ...(s.data() as Card), id: s.id };
         const board = await boardOf(fs, card.boardId);
         const names = board.memberProfiles ?? {};
-        const comments = await getDocs(query(collection(fs, 'cards', card_id, 'comments'), orderBy('createdAt')));
-        const history = await getDocs(query(collection(fs, 'cards', card_id, 'activity'), orderBy('at', 'desc'), limit(30)));
+        const [comments, history, labels, onBoard] = await Promise.all([
+          getDocs(query(collection(fs, 'cards', card_id, 'comments'), orderBy('createdAt'))),
+          getDocs(query(collection(fs, 'cards', card_id, 'activity'), orderBy('at', 'desc'), limit(30))),
+          labelNames(fs),
+          cardsOf(fs, board.id),
+        ]);
+        const parent = card.parentId ? onBoard.find((c) => c.id === card.parentId) : undefined;
         return text({
-          ...summarize(card, board, await labelNames(fs)),
+          ...summarize(card, board, labels),
+          ...(parent ? { parent: { id: parent.id, title: parent.title, url: cardUrl(parent.id) } } : {}),
+          subtasks: onBoard.filter((c) => c.parentId === card_id).map((c) => summarize(c, board, labels)),
           description: (card.description as string) || '',
           archived: card.archived === true,
           comments: comments.docs.map((d) => {

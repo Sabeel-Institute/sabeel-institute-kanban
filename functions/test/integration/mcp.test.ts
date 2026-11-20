@@ -50,7 +50,14 @@ async function signIn(uid: string) {
     })}`,
   );
   expect(page.status).toBe(200);
-  expect(await page.text()).toContain('Sign in with Google');
+  const html = await page.text();
+  expect(html).toContain('Sign in with Google');
+  expect(html).toContain('Copy for my agent');
+  // The page's own script must at least parse: a syntax slip there breaks
+  // every sign-in, and nothing else here runs it.
+  const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  expect(inline).toHaveLength(1);
+  expect(() => new Function(inline[0])).not.toThrow();
   const approved = await json('/oauth/approve', {
     client_id: reg.body.client_id,
     redirect_uri: REDIRECT,
@@ -127,7 +134,7 @@ describe("what's waiting on me, in two calls", () => {
     await adminDb().doc('cards/mcp_mine_late').set({
       boardId: 'mcp_b1', title: 'Pay the hall deposit', description: '', columnId: 'todo', rank: 'a', assigneeUids: [ME],
       subscriberUids: [], priority: 'high', labelIds: [], archived: false, commentCount: 0, attachmentCount: 0,
-      dueDate: '2020-01-01', createdAt: 1, createdBy: OTHER, updatedAt: 1, updatedBy: OTHER,
+      dueDate: '2020-01-01', parentId: 'mcp_theirs', createdAt: 1, createdBy: OTHER, updatedAt: 1, updatedBy: OTHER,
     });
     await adminDb().doc('cards/mcp_theirs').set({
       boardId: 'mcp_b1', title: 'Book the speakers', description: '', columnId: 'todo', rank: 'b', assigneeUids: [OTHER],
@@ -156,6 +163,11 @@ describe("what's waiting on me, in two calls", () => {
     expect(late.cards.map((c: { title: string }) => c.title)).toEqual(['Pay the hall deposit']);
     const ottos = parsed(await client.callTool({ name: 'search_cards', arguments: { assignee: 'mcpother' } }));
     expect(ottos.cards.map((c: { title: string }) => c.title)).toEqual(['Book the speakers']);
+    // A card names its subtasks, and a subtask its parent, without a hunt.
+    const parentCard = parsed(await client.callTool({ name: 'get_card', arguments: { card_id: 'mcp_theirs' } }));
+    expect(parentCard.subtasks.map((c: { title: string }) => c.title)).toEqual(['Pay the hall deposit']);
+    const child = parsed(await client.callTool({ name: 'get_card', arguments: { card_id: 'mcp_mine_late' } }));
+    expect(child.parent).toMatchObject({ id: 'mcp_theirs', title: 'Book the speakers' });
     await client.close();
   });
 });
