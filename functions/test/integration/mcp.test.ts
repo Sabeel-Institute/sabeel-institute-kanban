@@ -129,7 +129,10 @@ describe('the MCP server', () => {
     const boards = parsed(await client.callTool({ name: 'list_boards', arguments: {} }));
     expect(boards.map((b: { name: string }) => b.name)).toEqual(['Agent Board']);
 
-    const added = parsed(await client.callTool({ name: 'add_card', arguments: { board_id: 'mcp_b1', title: 'Order the chairs' } }));
+    // A column is always named: the agent asks, it does not guess.
+    const unnamed = await client.callTool({ name: 'add_card', arguments: { board_id: 'mcp_b1', title: 'No column' } });
+    expect(unnamed.isError).toBe(true);
+    const added = parsed(await client.callTool({ name: 'add_card', arguments: { board_id: 'mcp_b1', title: 'Order the chairs', column: 'To Do' } }));
     const card = (await adminDb().doc(`cards/${added.added}`).get()).data()!;
     expect(card).toMatchObject({ boardId: 'mcp_b1', columnId: 'todo', createdBy: ME, updatedBy: ME, subscriberUids: [ME] });
 
@@ -159,6 +162,15 @@ describe('the MCP server', () => {
     expect(replay.status).toBe(400);
     const client = await connect(fresh.body.access_token);
     expect(parsed(await client.callTool({ name: 'list_boards', arguments: {} }))).toHaveLength(1);
+    await client.close();
+  });
+
+  it("an admin's agent sees every board, as the app shows an admin", async () => {
+    await makeUser({ uid: 'mcp_admin', email: 'mcpadmin@oursabeel.com', role: 'admin', status: 'active', displayName: 'Ada' });
+    const client = await connect((await signIn('mcp_admin')).access_token);
+    const names = parsed(await client.callTool({ name: 'list_boards', arguments: {} })).map((b: { name: string }) => b.name);
+    expect(names).toEqual(expect.arrayContaining(['Agent Board', 'Not Mine']));
+    expect(parsed(await client.callTool({ name: 'get_board', arguments: { board_id: 'mcp_b2' } })).name).toBe('Not Mine');
     await client.close();
   });
 

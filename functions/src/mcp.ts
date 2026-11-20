@@ -363,13 +363,18 @@ function summarize(card: Record<string, unknown> & { id: string }, board: BoardD
   };
 }
 
-/** Boards the person is on (an admin's too: the tools act on boards they belong to). */
-async function myBoards(fs: Firestore, uid: string) {
-  const s = await getDocs(query(collection(fs, 'boards'), where('memberUids', 'array-contains', uid)));
+/**
+ * The boards the person sees in the app: the ones they are on, or for an
+ * admin every board (Faisal, 2026-11-19), as the app's Boards list.
+ */
+async function myBoards(fs: Firestore, uid: string, admin: boolean) {
+  const s = await getDocs(
+    admin ? collection(fs, 'boards') : query(collection(fs, 'boards'), where('memberUids', 'array-contains', uid)),
+  );
   return s.docs.filter((d) => d.data().archived !== true).map((d) => ({ id: d.id, ...(d.data() as BoardData) }));
 }
 
-function buildServer(uid: string, base: string): McpServer {
+function buildServer(uid: string, admin: boolean, base: string): McpServer {
   const server = new McpServer(
     { name: 'sabeel-kanban', version: '1.0.0' },
     {
@@ -392,11 +397,11 @@ function buildServer(uid: string, base: string): McpServer {
 
   server.registerTool(
     'list_boards',
-    { description: 'The boards you are on: id, name, columns and lanes.', inputSchema: {} },
+    { description: 'Your boards (an admin: every board): id, name, columns and lanes.', inputSchema: {} },
     () =>
       run(async (fs) =>
         text(
-          (await myBoards(fs, uid)).map((b) => ({
+          (await myBoards(fs, uid, admin)).map((b) => ({
             id: b.id,
             name: b.name,
             columns: b.columns.map((c) => c.name),
@@ -440,7 +445,7 @@ function buildServer(uid: string, base: string): McpServer {
     },
     ({ text: words, board_id }) =>
       run(async (fs) => {
-        const boards = board_id ? [{ id: board_id, ...(await boardOf(fs, board_id)) }] : await myBoards(fs, uid);
+        const boards = board_id ? [{ id: board_id, ...(await boardOf(fs, board_id)) }] : await myBoards(fs, uid, admin);
         const needle = words.toLowerCase();
         const found: unknown[] = [];
         for (const b of boards) {
@@ -490,20 +495,18 @@ function buildServer(uid: string, base: string): McpServer {
     'add_card',
     {
       description:
-        'Add a card at the foot of a column. On a board with lanes, a lane is required. You are subscribed to it, as in the app.',
+        'Add a card at the foot of a column. Ask the person which column (and, on a board with lanes, which lane) rather than guessing. They are subscribed to it, as in the app.',
       inputSchema: {
         board_id: z.string(),
         title: z.string().min(1).max(500),
-        column: z.string().optional().describe('Column name; the first column if left out'),
+        column: z.string().describe('Column name, as the person chose it'),
         lane: z.string().optional().describe('Lane name, on a board with lanes'),
       },
     },
     ({ board_id, title, column, lane }) =>
       run(async (fs) => {
         const board = await boardOf(fs, board_id);
-        const col = column
-          ? board.columns.find((c) => c.name.toLowerCase() === column.toLowerCase() || c.id === column)
-          : board.columns[0];
+        const col = board.columns.find((c) => c.name.toLowerCase() === column.toLowerCase() || c.id === column);
         if (!col) return refuse(`No column "${column}". Columns: ${board.columns.map((c) => c.name).join(', ')}.`);
         let laneId: string | undefined;
         if (lanesLive(board as never)) {
@@ -593,7 +596,10 @@ export const mcp = onRequest({ invoker: 'public', cors: true, memory: '512MiB' }
         return;
       }
       // Stateless: a server and a transport per request, nothing kept between.
-      const server = buildServer(uid, base);
+      // The role as it is now, from the account itself: it decides which
+      // boards are listed; the rules decide everything else.
+      const admin = (await adminAuth().getUser(uid)).customClaims?.role === 'admin';
+      const server = buildServer(uid, admin, base);
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
       res.on('close', () => {
         void transport.close();
