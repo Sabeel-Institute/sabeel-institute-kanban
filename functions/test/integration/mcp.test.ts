@@ -5,6 +5,7 @@
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
+import { Timestamp } from 'firebase-admin/firestore';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { adminDb, functionsOrigin, idTokenFor, makeUser, shutdown, waitFor } from './emulatorClient';
@@ -58,6 +59,8 @@ async function signIn(uid: string) {
     idToken: await idTokenFor(uid),
   });
   expect(approved.status).toBe(200);
+  // A callback on the agent's own machine: the page offers the line to copy.
+  expect(approved.body.loopback).toBe(true);
   const back = new URL(approved.body.redirect);
   expect(back.searchParams.get('state')).toBe('s1');
   const code = back.searchParams.get('code')!;
@@ -74,6 +77,7 @@ async function signIn(uid: string) {
     grant_type: 'authorization_code', code: code2, code_verifier: verifier, client_id: reg.body.client_id, redirect_uri: REDIRECT,
   });
   expect(tok.status).toBe(200);
+  expect(reg.body.client_id.startsWith('c1.')).toBe(true);
   return { access_token: tok.body.access_token, refresh_token: tok.body.refresh_token, clientId: reg.body.client_id };
 }
 
@@ -106,6 +110,56 @@ afterAll(async () => {
   await shutdown();
 });
 
+describe('stores nothing it does not need', () => {
+  it('a registration writes nothing; codes and tokens carry the date their TTL deletes them', async () => {
+    const before = (await adminDb().collection('mcpClients').get()).size;
+    await signIn(ME);
+    expect((await adminDb().collection('mcpClients').get()).size).toBe(before);
+    expect(before).toBe(0);
+    const tokens = (await adminDb().collection('mcpTokens').get()).docs.map((d) => d.data());
+    expect(tokens.length).toBeGreaterThan(0);
+    expect(tokens.every((t) => t.expireAt instanceof Timestamp && t.expireAt.toMillis() === t.expiresAt)).toBe(true);
+  });
+});
+
+describe("what's waiting on me, in two calls", () => {
+  it('my_work lists my open cards, overdue first, and my_alerts my unread ones; search filters by assignee and due', async () => {
+    await adminDb().doc('cards/mcp_mine_late').set({
+      boardId: 'mcp_b1', title: 'Pay the hall deposit', description: '', columnId: 'todo', rank: 'a', assigneeUids: [ME],
+      subscriberUids: [], priority: 'high', labelIds: [], archived: false, commentCount: 0, attachmentCount: 0,
+      dueDate: '2020-01-01', createdAt: 1, createdBy: OTHER, updatedAt: 1, updatedBy: OTHER,
+    });
+    await adminDb().doc('cards/mcp_theirs').set({
+      boardId: 'mcp_b1', title: 'Book the speakers', description: '', columnId: 'todo', rank: 'b', assigneeUids: [OTHER],
+      subscriberUids: [], priority: 'none', labelIds: [], archived: false, commentCount: 0, attachmentCount: 0,
+      createdAt: 1, createdBy: OTHER, updatedAt: 1, updatedBy: OTHER,
+    });
+    await adminDb().collection(`users/${ME}/notifications`).add({
+      type: 'mention', boardId: 'mcp_b1', cardId: 'mcp_theirs', actorUid: OTHER, text: 'Otto mentioned you on “Book the speakers”', read: false, at: Date.now(),
+    });
+    await adminDb().collection(`users/${ME}/notifications`).add({
+      type: 'comment', boardId: 'mcp_b1', cardId: 'mcp_theirs', actorUid: OTHER, text: 'Old news', read: true, at: Date.now() - 1000,
+    });
+    const client = await connect((await signIn(ME)).access_token);
+    const work = parsed(await client.callTool({ name: 'my_work', arguments: {} }));
+    expect(work.cards[0]).toMatchObject({ title: 'Pay the hall deposit', due_state: 'overdue', priority: 'high', board: 'Agent Board', column: 'To Do' });
+    expect(work.cards.map((c: { title: string }) => c.title)).not.toContain('Book the speakers');
+    const alerts = parsed(await client.callTool({ name: 'my_alerts', arguments: {} }));
+    // Unread only: the mention (and the assignment the trigger just sent), never the read one.
+    const texts = alerts.alerts.map((a: { text: string }) => a.text);
+    expect(texts).toContain('Otto mentioned you on “Book the speakers”');
+    expect(texts).not.toContain('Old news');
+    expect(alerts.alerts.every((a: { unread: boolean }) => a.unread)).toBe(true);
+    const mention = alerts.alerts.find((a: { text: string }) => a.text.startsWith('Otto mentioned'));
+    expect(mention.url).toBe('https://sabeel-institute-kanban.web.app/c/mcp_theirs');
+    const late = parsed(await client.callTool({ name: 'search_cards', arguments: { assignee: 'me', due: 'overdue' } }));
+    expect(late.cards.map((c: { title: string }) => c.title)).toEqual(['Pay the hall deposit']);
+    const ottos = parsed(await client.callTool({ name: 'search_cards', arguments: { assignee: 'mcpother' } }));
+    expect(ottos.cards.map((c: { title: string }) => c.title)).toEqual(['Book the speakers']);
+    await client.close();
+  });
+});
+
 describe('the MCP server', () => {
   it('an unsigned call is told where to sign in, and the metadata says how', async () => {
     const r = await fetch(base(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
@@ -124,10 +178,13 @@ describe('the MCP server', () => {
     const tokens = await signIn(ME);
     const client = await connect(tokens.access_token);
     const names = (await client.listTools()).tools.map((t) => t.name).sort();
-    expect(names).toEqual(['add_card', 'comment', 'get_board', 'get_card', 'list_boards', 'search_cards']);
+    expect(names).toEqual(['add_card', 'comment', 'get_board', 'get_card', 'list_boards', 'my_alerts', 'my_work', 'search_cards']);
+    // The server says whose account it acts for, so "me" is never a guess.
+    expect(client.getInstructions()).toContain('Mona (@mcpme)');
 
     const boards = parsed(await client.callTool({ name: 'list_boards', arguments: {} }));
     expect(boards.map((b: { name: string }) => b.name)).toEqual(['Agent Board']);
+    expect(boards[0]).toMatchObject({ member: true, owner: true });
 
     // A column is always named: the agent asks, it does not guess.
     const unnamed = await client.callTool({ name: 'add_card', arguments: { board_id: 'mcp_b1', title: 'No column' } });
@@ -146,7 +203,8 @@ describe('the MCP server', () => {
     expect(stored.mentionUids).toEqual([OTHER]);
 
     const found = parsed(await client.callTool({ name: 'search_cards', arguments: { text: 'chairs' } }));
-    expect(found.map((c: { title: string }) => c.title)).toEqual(['Order the chairs']);
+    expect(found.cards.map((c: { title: string }) => c.title)).toEqual(['Order the chairs']);
+    expect(found.cards[0].url).toBe(`https://sabeel-institute-kanban.web.app/c/${added.added}`);
 
     // A board they are not on: the rules refuse, as they would the app.
     const refused = await client.callTool({ name: 'get_board', arguments: { board_id: 'mcp_b2' } });
