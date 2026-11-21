@@ -22,6 +22,8 @@ import { useNav } from '../nav';
 import {
   chipsForIds,
   clearSearchFilters,
+  dateRangeSummary,
+  SEARCH_DATE_RANGES,
   setSearchFilters,
   toggleIn,
   useSearchFilters,
@@ -107,8 +109,8 @@ export function SearchScreen({ user }: { user: SessionUser }) {
    * gone by the time you pressed Back — the text, the chips, the labels. Back is
    * meant to return you to what you were looking at.
    */
-  const { text, archivedOnly, overdueOnly, priorities, labelIds, boardId, assigneeUid, sort } =
-    useSearchFilters();
+  const filters = useSearchFilters();
+  const { text, archivedOnly, overdueOnly, priorities, labelIds, boardId, assigneeUid, sort } = filters;
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [cards, setCards] = useState<SearchableCard[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -302,15 +304,11 @@ export function SearchScreen({ user }: { user: SessionUser }) {
    * not narrowing it, and a clear-all that silently reset the order would be
    * doing something its name does not say.
    */
-  const anyActive = hasActiveFilters({
-    text,
-    archivedOnly,
-    priorities,
-    labelIds,
-    boardId,
-    assigneeUid,
-    due: overdueOnly ? 'overdue' : undefined,
-  });
+  const cardFilters = useMemo(
+    () => ({ ...filters, due: filters.overdueOnly ? 'overdue' as const : undefined }),
+    [filters],
+  );
+  const anyActive = hasActiveFilters(cardFilters);
 
   // Search BROWSES by default: with no text and no chips it lists everything you
   // can see, most recently active first. It used to show nothing until you
@@ -329,37 +327,12 @@ export function SearchScreen({ user }: { user: SessionUser }) {
   const today = todayInOrgTz();
   const { results, total } = useMemo(() => {
     if (!cards) return { results: [], total: 0 };
-    const matched = filterCards(
-      cards,
-      {
-        text,
-        archivedOnly,
-        priorities,
-        labelIds,
-        boardId,
-        assigneeUid,
-        due: overdueOnly ? 'overdue' : undefined,
-      },
-      today,
-      finished,
-    );
+    const matched = filterCards(cards, cardFilters, today, finished);
     // The cap slices AFTER the ordering, which is what makes "Oldest first"
     // honest: it shows the 200 oldest rather than 200 arbitrary cards sorted.
     const ordered = orderCards(matched, sort, text);
     return { results: ordered.slice(0, RESULT_CAP), total: ordered.length };
-  }, [
-    cards,
-    text,
-    archivedOnly,
-    priorities,
-    overdueOnly,
-    labelIds,
-    boardId,
-    assigneeUid,
-    sort,
-    finished,
-    today,
-  ]);
+  }, [cards, cardFilters, text, sort, finished, today]);
 
   return (
     <Screen width="list">
@@ -473,6 +446,18 @@ export function SearchScreen({ user }: { user: SessionUser }) {
               }
             />
           ))}
+          {SEARCH_DATE_RANGES.map(({ title, from, to }) => {
+            const summary = dateRangeSummary(filters[from], filters[to]);
+            return summary ? (
+              <FilterChip
+                key={from}
+                label={`${title} · ${summary}`}
+                accessibilityLabel={`Remove the ${title} filter, ${summary}`}
+                active
+                onPress={() => setSearchFilters({ [from]: undefined, [to]: undefined })}
+              />
+            ) : null;
+          })}
           {/* Only ever present when there is something to clear, so it is never
               a dead control — and an icon, per the standing rule. */}
           {anyActive ? (
@@ -491,6 +476,8 @@ export function SearchScreen({ user }: { user: SessionUser }) {
           answers in the chip row above. */}
       <SearchFiltersSheet
         visible={filtersOpen}
+        dates={filters}
+        onChangeDates={setSearchFilters}
         onClose={() => setFiltersOpen(false)}
         priorities={priorities}
         onTogglePriority={(p) =>

@@ -14,19 +14,21 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
 } from 'firebase/firestore';
 import { EMULATOR_PROJECT_ID } from '@sabeel/shared';
 import { firestoreHostPort } from './emulatorHosts';
 
 let env: RulesTestEnvironment;
 
-function ctx(uid: string, role: string, status = 'active') {
+function ctx(uid: string, role: string, status = 'active', kanbanMcp = false) {
   return env
     .authenticatedContext(uid, {
       email: `${uid}@oursabeel.com`,
       email_verified: true,
       role,
       status,
+      kanbanMcp,
     })
     .firestore();
 }
@@ -40,6 +42,16 @@ const comment = (over: Record<string, unknown> = {}) => ({
 });
 
 const CARD = 'cards/card1';
+
+it('only an agent can mark a new comment and edits keep its original attribution', async () => {
+  const path = `${CARD}/comments/agent-comment`;
+  const app = doc(ctx('member1', 'member'), path);
+  const agent = doc(ctx('member1', 'member', 'active', true), path);
+  await assertFails(setDoc(app, comment({ via: 'agent' })));
+  await assertSucceeds(setDoc(agent, comment({ via: 'agent' })));
+  await assertFails(updateDoc(app, { via: deleteField() }));
+  await assertSucceeds(updateDoc(app, { body: 'Edited by the person' }));
+});
 
 beforeAll(async () => {
   env = await initializeTestEnvironment({

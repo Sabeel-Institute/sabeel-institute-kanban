@@ -18,10 +18,24 @@
  * until somebody signs out (see `session.ts`, which resets the view stores for
  * the same reason it clears the live-query cache).
  */
-import type { Priority, SearchSort } from '@sabeel/shared';
+import type { CardFilters, Priority, SearchSort } from '@sabeel/shared';
 import { createViewStore } from './viewState';
 
-export interface SearchFilters {
+export type SearchDates = Pick<CardFilters, 'dueFrom' | 'dueTo' | 'activeFrom' | 'activeTo'>;
+
+export const SEARCH_DATE_RANGES = [
+  { title: 'Due between', from: 'dueFrom', to: 'dueTo' },
+  { title: 'Active between', from: 'activeFrom', to: 'activeTo' },
+] as const;
+
+export function dateRangeSummary(from?: string, to?: string): string | undefined {
+  if (from && to) return `${from} to ${to}`;
+  if (from) return `from ${from}`;
+  if (to) return `through ${to}`;
+  return undefined;
+}
+
+export interface SearchFilters extends SearchDates {
   text: string;
   archivedOnly: boolean;
   overdueOnly: boolean;
@@ -54,6 +68,10 @@ export const EMPTY_SEARCH_FILTERS: SearchFilters = {
   labelIds: [],
   boardId: undefined,
   assigneeUid: undefined,
+  dueFrom: undefined,
+  dueTo: undefined,
+  activeFrom: undefined,
+  activeTo: undefined,
   sort: 'best',
 };
 

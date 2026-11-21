@@ -246,6 +246,7 @@ describe('composable queries: every question in at most two calls', () => {
     await call('comment', { card_id: added.added, text: 'Done by Friday, @mcpother' });
     const stored = (await adminDb().collection(`cards/${added.added}/comments`).get()).docs[0].data();
     expect(stored.mentionUids).toEqual([OTHER]);
+    expect(stored.via).toBe('agent');
 
     const lines = await waitFor('the card created and the comment, in the activity', async () => {
       const a = await call('query_activity', { board: 'Agent Board', person: 'me' });
@@ -260,6 +261,20 @@ describe('composable queries: every question in at most two calls', () => {
     const deep = await call('query_cards', { ids: [added.added], include: { comments: 1, history: 5 } });
     expect(deep.cards[0].comments).toEqual([expect.objectContaining({ by: 'Mona', text: 'Done by Friday, @mcpother' })]);
     expect(deep.cards[0].history.map((h: { what: string }) => h.what)).toContain('created');
+    const cardRef = adminDb().doc(`cards/${added.added}`);
+    const card = (await cardRef.get()).data();
+    expect(card?.agentAt).toBe(card?.updatedAt);
+    const history = cardRef.collection('activity');
+    expect((await history.where('type', '==', 'created').get()).docs[0].data()).toMatchObject({
+      via: 'agent', actorUid: ME,
+    });
+
+    // An ordinary app edit can share a timestamp with the last agent write.
+    await cardRef.update({ title: 'Title changed in the app' });
+    const humanEdit = await waitFor('the ordinary title edit', async () =>
+      (await history.where('to', '==', 'Title changed in the app').get()).docs[0]?.data(),
+    );
+    expect(humanEdit.via).toBeUndefined();
     await client.close();
   });
 });
@@ -417,6 +432,10 @@ describe('Kanban write tools', () => {
     expect(different.status).toBe(409);
     const attachment = await call('get_attachment_url', { card_id: card.id, attachment_id: upload.id });
     expect(await (await fetch(attachment.url)).text()).toBe(bytes);
+    const fileHistory = await cardRef.collection('activity').where('type', '==', 'attached').get();
+    expect(fileHistory.docs.map((entry) => entry.data())).toEqual([
+      expect.objectContaining({ via: 'agent', actorUid: organizer }),
+    ]);
     const updated = await call('update_card', { card_id: card.id, due_date: null, labels: { remove: ['Course work'] }, assignees: ['me'] });
     expect(updated.changed).toEqual(expect.arrayContaining(['due_date', 'labels', 'assignees']));
     expect((await cardRef.get()).data()).toMatchObject({ labelIds: [], assigneeUids: [organizer], attachmentCount: 1 });

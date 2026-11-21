@@ -368,6 +368,9 @@ Tap any card to open the full view.
   The list closes when you click away, and picking a name never loses your place
   in the box.
 
+  A robot next to a person's name on a comment or in a card's activity means
+  an AI assistant took that action on their behalf.
+
   To copy from a comment or a description, **long-press** it on a phone, then
   drag the handles or tap **Select all** to take the whole thing. A list's
   bullets and numbers are drawn beside its words, so they are not always
@@ -590,8 +593,8 @@ sort control:
   <figure class="wd"><img src="manual/img/searchFilters-wide.png" alt="The Filters panel in a browser"><figcaption>The Filters panel</figcaption></figure>
 </div>
 
-The second row starts with **Filters**, which opens a panel holding everything
-that is a *list of choices* rather than a switch. The sections start closed; tap
+The second row starts with **Filters**, which opens a panel with more ways to
+narrow the results. The sections start closed; tap
 one to open it, and it closes whatever was open before — so the panel stays
 readable on a phone. Each heading tells you what it is doing without being
 opened (`Board: Fundraising 2026`, `Labels (2)`):
@@ -602,6 +605,12 @@ opened (`Board: Fundraising 2026`, `Labels (2)`):
 - **Board** — narrow to a single board.
 - **Labels** — pick one or several; you get cards carrying **any** of them.
 - **Assigned to** — narrow to one person's cards, or back to **Anyone**.
+- **Due between** — find cards with a due date in the range you choose.
+- **Active between** — find cards whose last activity was in the range you choose.
+  Activity dates use the institute’s time zone.
+
+For either date range, you can set **From**, **To**, or both. The dates you
+choose are included in the results.
 
 Board, Labels and Assigned to each have a **box to type in** at the top, which
 narrows the list as you type — quicker than scrolling once there are a lot of

@@ -3,6 +3,7 @@ import { collection, limit, orderBy, query } from 'firebase/firestore';
 import {
   describeActivity,
   isKnownActivityType,
+  type ActivityDoc,
   type ActivityType,
   type BoardColumn,
   type BoardLane,
@@ -12,10 +13,11 @@ import { when } from '../activityTime';
 import { useLiveQuery } from '../liveQuery';
 import type { BoardMemberProfile } from '../boards';
 import { Hint, Row, Spinner } from './ui';
+import { AgentBadge } from './AgentBadge';
 import { StyleSheet, View } from 'react-native';
 import { radius, space, useTheme } from '../theme';
 
-interface Entry {
+interface Entry extends Omit<ActivityDoc, 'type'> {
   id: string;
   /**
    * `null` when this build does not recognise the type — an entry written by a
@@ -24,12 +26,6 @@ interface Entry {
    * worse, as some other change that did not happen.
    */
   type: ActivityType | null;
-  actorUid: string;
-  /** Stored by the server when it happened; absent on lines older than that. */
-  actorName?: string;
-  at: number;
-  from?: string;
-  to?: string;
 }
 
 /**
@@ -73,6 +69,7 @@ export function ActivityLog({
         type: isKnownActivityType(d.data.type) ? d.data.type : null,
         actorUid: (d.data.actorUid as string) ?? '',
         actorName: typeof d.data.actorName === 'string' ? d.data.actorName : undefined,
+        via: d.data.via === 'agent' ? 'agent' : undefined,
         at: (d.data.at as number) ?? 0,
         from: d.data.from as string | undefined,
         to: d.data.to as string | undefined,
@@ -105,7 +102,9 @@ export function ActivityLog({
         <Row key={e.id} style={styles.row}>
           <View style={[styles.tick, { backgroundColor: t.border.strong }]} />
           <Hint>
-            {e.actorName ?? nameFor(e.actorUid)}{' '}
+            {e.actorName ?? nameFor(e.actorUid)}
+            {e.via === 'agent' ? <AgentBadge /> : null}
+            {' '}
             {e.type === null
               ? 'made a change'
               : describeActivity(

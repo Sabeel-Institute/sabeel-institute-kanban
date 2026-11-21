@@ -27,6 +27,11 @@ service cloud.firestore {
     function isPasswordSession() {
       return request.auth.token.get('firebase', {}).get('sign_in_provider', '') == 'password';
     }
+    // A session claim minted by the MCP server. This grants provenance only.
+    function isAgentSession() {
+      return request.auth.token.get('kanbanMcp', false) == true;
+    }
+
     // Domain membership alone grants NOTHING — an admin must approve the account
     // (see docs/PRODUCT_BRIEF.md, "Domain restriction is a server-side check").
     function isActive() {
@@ -669,6 +674,11 @@ service cloud.firestore {
         return newCard().get(field, 0) == oldCard().get(field, 0)
           || notFutureStamp(newCard().get(field, 0));
       }
+      function validAgentStamp() {
+        return isAgentSession()
+          && newCard().agentAt is number
+          && newCard().agentAt == newCard().updatedAt;
+      }
       function wellFormed() {
         // No unknown keys: a card may hold ONLY these fields (the CardDoc type in
         // @sabeel/shared). Without this an approved member could bloat a card with
@@ -680,7 +690,7 @@ service cloud.firestore {
             'subscriberUids',
             'dueDate', 'priority', 'labelIds', 'archived', 'archivedAt',
             'commentCount', 'attachmentCount', 'parentId', 'laneId', 'createdAt',
-            'createdBy', 'updatedAt', 'updatedBy', 'lastActivityAt', 'sourceId',
+            'createdBy', 'updatedAt', 'updatedBy', 'lastActivityAt', 'sourceId', 'agentAt',
           ])
           && newCard().boardId is string
           && newCard().title is string
@@ -740,6 +750,7 @@ service cloud.firestore {
         && newCard().createdBy == request.auth.uid
         && newCard().updatedBy == request.auth.uid
         && newCard().archived == false
+        && (!('agentAt' in newCard()) || validAgentStamp())
         // A card is born with no comments, no files and no activity. `.get(…, 0)`
         // so omitting a field is fine — what is refused is a client CLAIMING a
         // count, or claiming the activity clock that orders Search.
@@ -762,6 +773,7 @@ service cloud.firestore {
         && newCard().createdBy == oldCard().createdBy
         && newCard().createdAt == oldCard().createdAt
         && newCard().updatedBy == request.auth.uid
+        && (!newCard().diff(oldCard()).affectedKeys().hasAny(['agentAt']) || validAgentStamp())
         // Trigger-owned, like activeCardCount on a board: the comment and
         // attachment paths move these, so a client edit carries all three
         // through unchanged.
@@ -799,7 +811,8 @@ service cloud.firestore {
 
       allow create: if onBoard()
         // Only the known CommentDoc fields — no arbitrary padding.
-        && comment().keys().hasOnly(['authorUid', 'body', 'mentionUids', 'createdAt', 'editedAt'])
+        && comment().keys().hasOnly(['authorUid', 'body', 'mentionUids', 'createdAt', 'editedAt', 'via'])
+        && (!('via' in comment()) || (isAgentSession() && comment().via == 'agent'))
         // Authorship cannot be forged: you comment as yourself or not at all.
         && comment().authorUid == request.auth.uid
         && comment().body is string
@@ -813,7 +826,8 @@ service cloud.firestore {
       // Only the author edits — an owner rewriting someone's words under their
       // name would be worse than useless.
       allow update: if onBoard()
-        && comment().keys().hasOnly(['authorUid', 'authorName', 'body', 'mentionUids', 'createdAt', 'editedAt'])
+        && comment().keys().hasOnly(['authorUid', 'authorName', 'body', 'mentionUids', 'createdAt', 'editedAt', 'via'])
+        && !comment().diff(resource.data).affectedKeys().hasAny(['via'])
         && resource.data.authorUid == request.auth.uid
         // The name the server stamped stays as it stamped it. A create may not
         // carry one at all (the create rule's list leaves it out).

@@ -345,6 +345,20 @@ name: Board, card, rich text and gestures
       TARGET: "Search"
       EXPECT: "Search cards across your boards"
       SECONDS: 30
+- tapOn: "Filters"
+- scrollUntilVisible:
+    element: "Due between"
+    direction: DOWN
+- tapOn: "Due between"
+- scrollUntilVisible:
+    element: "Due between from, pick a date"
+    direction: DOWN
+- assertVisible: "Due between from, pick a date"
+- scrollUntilVisible:
+    element: "Due between to, pick a date"
+    direction: DOWN
+- assertVisible: "Due between to, pick a date"
+- tapOn: "Done"
 - runFlow:
     file: ci-tools/tap-until.yaml
     env:

@@ -2085,6 +2085,23 @@ try {
   };
 
   const allCount = await resultCount();
+
+  await admin.getByRole('button', { name: 'Filters', exact: true }).click();
+  await admin.getByRole('button', { name: 'Due between', exact: true }).click();
+  await admin.getByLabel('Due between from', { exact: true }).fill('2199-01-01');
+  await admin.getByRole('button', { name: 'Active between', exact: true }).click();
+  await admin.getByLabel('Active between to', { exact: true }).fill('1900-01-01');
+  await admin.getByRole('button', { name: 'Done', exact: true }).click();
+  const dueRange = admin.getByRole('button', { name: /^Remove the Due between filter/ });
+  const activeRange = admin.getByRole('button', { name: /^Remove the Active between filter/ });
+  await dueRange.waitFor();
+  await activeRange.waitFor();
+  check('both date filters show as chips and narrow the results', (await resultCount()) === 0);
+  await dueRange.click();
+  check('activity range still filters after clearing the due range', (await resultCount()) === 0);
+  await activeRange.click();
+  check('removing the date range chips restores the results', (await resultCount()) === allCount);
+
   /**
    * Labels are picked from the Filters sheet now, not a dropdown.
    *

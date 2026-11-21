@@ -42,7 +42,10 @@ export const onCardWritten = onDocumentWritten(
     // Stored with each line (names.ts): the history names who did it whether
     // or not they are on the board when someone reads it.
     const actorName = await storedName(actorUid);
-    const by = { actorUid, ...(actorName ? { actorName } : {}) };
+    const viaAgent = after?.agentAt !== undefined
+      && after.agentAt !== before?.agentAt
+      && after.agentAt === after.updatedAt;
+    const by = { actorUid, ...(actorName ? { actorName } : {}), ...(viaAgent ? { via: 'agent' } : {}) };
     const at = Date.now();
 
     const db = getFirestore();

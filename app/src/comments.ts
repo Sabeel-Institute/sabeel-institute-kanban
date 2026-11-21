@@ -7,20 +7,13 @@ import {
   query,
   updateDoc,
 } from 'firebase/firestore';
-import { commentMentions, newCommentDoc, type MentionCandidate } from '@sabeel/shared';
+import { commentMentions, newCommentDoc, type CommentDoc, type MentionCandidate } from '@sabeel/shared';
 import { db } from './firebase';
 import { useLiveQuery } from './liveQuery';
 import type { SessionUser } from './session';
 
-export interface Comment {
+export interface Comment extends CommentDoc {
   id: string;
-  authorUid: string;
-  /** The author's name as the server stored it; absent until it has, and on comments older than it. */
-  authorName?: string;
-  body: string;
-  mentionUids: string[];
-  createdAt: number;
-  editedAt?: number;
 }
 
 // Comments are a subcollection UNDER the card (`cards/{cardId}/comments`), so
@@ -39,6 +32,7 @@ export function useComments(cardId: string) {
         id: d.id,
         authorUid: (d.data.authorUid as string) ?? '',
         authorName: typeof d.data.authorName === 'string' ? d.data.authorName : undefined,
+        via: d.data.via === 'agent' ? 'agent' : undefined,
         body: (d.data.body as string) ?? '',
         mentionUids: (d.data.mentionUids as string[]) ?? [],
         createdAt: (d.data.createdAt as number) ?? 0,
