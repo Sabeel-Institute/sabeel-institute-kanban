@@ -293,6 +293,7 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
     () => showAllBoards ? allBoards : allBoards.filter((board) => board.memberUids.includes(user.uid)),
     [allBoards, showAllBoards, user.uid],
   );
+  const showBoardFilter = visibleBoards.length > 6 || filter !== '';
   const nameFilter = filter.trim().toLowerCase();
 
   const sections = useMemo(() => {
@@ -426,37 +427,41 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
         </Card>
       ) : null}
 
-      {canShowAllBoards ? (
-        <Row>
-          <Body>All boards</Body>
-          <Toggle
-            label="All boards"
-            value={showAllBoards}
-            disabled={prefs.status === 'loading'}
-            onValueChange={(next) => boardScopeAction.run(() => setShowAllBoards(user, next))}
-          />
+      {showBoardFilter || canShowAllBoards ? (
+        <Row style={styles.boardFilters}>
+          {showBoardFilter ? (
+            <TextInput
+              accessibilityLabel="Filter boards"
+              value={filter}
+              onChangeText={setFilter}
+              placeholder="Filter boards"
+              placeholderTextColor={t.text.muted}
+              style={[
+                styles.input,
+                styles.boardFilterInput,
+                {
+                  backgroundColor: t.bg.inset,
+                  color: t.text.primary,
+                  borderColor: t.border.subtle,
+                },
+              ]}
+            />
+          ) : null}
+          {canShowAllBoards ? (
+            <Row style={styles.boardScope}>
+              <Body>All boards</Body>
+              <Toggle
+                label="All boards"
+                value={showAllBoards}
+                disabled={prefs.status === 'loading'}
+                onValueChange={(next) => boardScopeAction.run(() => setShowAllBoards(user, next))}
+              />
+            </Row>
+          ) : null}
         </Row>
       ) : null}
 
       {boardScopeAction.error ? <Body>{boardScopeAction.error}</Body> : null}
-
-      {visibleBoards.length > 6 || filter !== '' ? (
-        <TextInput
-          value={filter}
-          onChangeText={setFilter}
-          placeholder="Filter boards"
-          placeholderTextColor={t.text.muted}
-          style={[
-            styles.input,
-            styles.form,
-            {
-              backgroundColor: t.bg.inset,
-              color: t.text.primary,
-              borderColor: t.border.subtle,
-            },
-          ]}
-        />
-      ) : null}
 
       {collapseAction.error ? (
         <Card style={styles.form}>
@@ -677,6 +682,9 @@ const styles = StyleSheet.create({
   grow: { flex: 1, gap: space.xs },
   /** Forms and messages stay a readable width inside the wide board grid. */
   form: { maxWidth: 520 },
+  boardFilters: { flexWrap: 'nowrap' },
+  boardFilterInput: { flex: 1, minWidth: 0, maxWidth: 520 },
+  boardScope: { flexShrink: 0, flexWrap: 'nowrap' },
   input: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: radius.sm,

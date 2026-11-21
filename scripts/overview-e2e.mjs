@@ -234,6 +234,7 @@ try {
   await card('ov_delta', 0, 2, 'c_todo', '2024-01-01', F.uid);
 
   const allBoardsToggle = page.getByRole('switch', { name: 'All boards', exact: true });
+  const boardFilter = page.getByPlaceholder('Filter boards');
   const betaOnBoards = page.getByText('Beta Course', { exact: true });
   const otherArchived = page.getByText('Other Archived Program', { exact: true });
   await page.getByRole('button', { name: 'Archived (1)', exact: true }).click();
@@ -243,6 +244,7 @@ try {
       (await betaOnBoards.count()) === 0 &&
       (await otherArchived.count()) === 0,
   );
+  check('Filter boards is hidden when only six boards are listed', !(await boardFilter.isVisible()));
   await allBoardsToggle.click();
   await betaOnBoards.waitFor();
   await otherArchived.waitFor();
@@ -259,12 +261,29 @@ try {
     'All boards includes nonmember boards and survives a reload',
     storedScope === true && (await allBoardsToggle.getAttribute('aria-checked')) === 'true',
   );
-  const boardFilter = page.getByPlaceholder('Filter boards');
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.screenshot({ path: join(SHOTS, 'boards-filter-320.png') });
+  const inputBox = await boardFilter.boundingBox();
+  const switchBox = await allBoardsToggle.boundingBox();
+  check(
+    'Filter boards and All boards share one row at 320 px',
+    !!inputBox && !!switchBox &&
+      inputBox.x + inputBox.width <= switchBox.x &&
+      Math.abs(inputBox.y + inputBox.height / 2 - switchBox.y - switchBox.height / 2) < 2 &&
+      switchBox.x + switchBox.width <= 320,
+    JSON.stringify({ inputBox, switchBox }),
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: join(SHOTS, 'boards-filter-phone.png') });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.screenshot({ path: join(SHOTS, 'boards-filter-wide.png') });
+  await page.setViewportSize({ width: 1280, height: 950 });
   await boardFilter.fill('Beta Course');
   await allBoardsToggle.click();
   await betaOnBoards.waitFor({ state: 'hidden' });
   check('a filter remains clearable after switching to member boards', await boardFilter.isVisible());
   await boardFilter.fill('');
+  check('Filter boards hides again after clearing the shortened list', !(await boardFilter.isVisible()));
   await allBoardsToggle.click();
   await betaOnBoards.waitFor();
 
