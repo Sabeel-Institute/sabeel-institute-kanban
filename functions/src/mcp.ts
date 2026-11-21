@@ -393,7 +393,7 @@ function asPerson(me: Me): Promise<Firestore> {
       const [host, port] = process.env.FIRESTORE_EMULATOR_HOST.split(':');
       connectFirestoreEmulator(fs, host, Number(port));
     }
-    await signInWithCustomToken(auth, await adminAuth().createCustomToken(uid));
+    await signInWithCustomToken(auth, await adminAuth().createCustomToken(uid, { kanbanMcp: true }));
     return fs;
   })();
   clients.set(uid, { access, client });

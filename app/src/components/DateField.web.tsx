@@ -41,6 +41,7 @@ export function DateField({
   onChange,
   label,
   emptyLabel = 'No due date',
+  clearLabel,
 }: {
   value?: string;
   /**
@@ -52,6 +53,7 @@ export function DateField({
   label?: string;
   /** What it says with no date: a card's due date by default. */
   emptyLabel?: string;
+  clearLabel?: string;
 }) {
   const t = getTheme();
   // What is typed and not yet the value; null while the field shows the value.
@@ -147,6 +149,7 @@ export function DateField({
       {value ? (
         <Button
           label="Clear"
+          accessibilityLabel={clearLabel}
           variant="secondary"
           onPress={() => {
             stopWaiting();

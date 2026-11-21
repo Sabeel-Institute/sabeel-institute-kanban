@@ -16,19 +16,21 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
 } from 'firebase/firestore';
 import { EMULATOR_PROJECT_ID } from '@sabeel/shared';
 import { firestoreHostPort } from './emulatorHosts';
 
 let env: RulesTestEnvironment;
 
-function ctx(uid: string, role: string, status = 'active') {
+function ctx(uid: string, role: string, status = 'active', kanbanMcp = false) {
   return env
     .authenticatedContext(uid, {
       email: `${uid}@oursabeel.com`,
       email_verified: true,
       role,
       status,
+      kanbanMcp,
     })
     .firestore();
 }
@@ -50,6 +52,18 @@ const card = (over: Record<string, unknown> = {}) => ({
   updatedAt: 1,
   updatedBy: 'member1',
   ...over,
+});
+
+it('permits agent provenance only on agent writes and preserves ordinary edits', async () => {
+  const app = doc(ctx('member1', 'member'), 'cards/agent-card');
+  const agent = doc(ctx('member1', 'member', 'active', true), 'cards/agent-card');
+  await assertFails(setDoc(app, card({ agentAt: 1 })));
+  await assertFails(setDoc(agent, card({ agentAt: 2 })));
+  await assertSucceeds(setDoc(agent, card({ agentAt: 1 })));
+  await assertFails(updateDoc(app, { agentAt: 2, updatedAt: 2 }));
+  await assertFails(updateDoc(app, { agentAt: deleteField() }));
+  await assertSucceeds(updateDoc(app, { title: 'App edit', updatedAt: 2 }));
+  await assertSucceeds(updateDoc(agent, { agentAt: 3, updatedAt: 3 }));
 });
 
 beforeAll(async () => {

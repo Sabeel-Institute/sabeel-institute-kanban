@@ -9,15 +9,16 @@ import { space } from '../theme';
  * Uses the platform's own calendar via @react-native-community/datetimepicker,
  * the same component the sibling time-tracker app uses.
  *
- * The value is a `YYYY-MM-DD` string. It is parsed as UTC and read back in UTC,
- * never through local time: constructing `new Date('2026-07-19')` and reading
- * local getDate() can land on the 18th west of Greenwich, which is precisely the
- * class of bug all-day date strings exist to prevent.
+ * The picker uses local calendar dates, so both conversions use local fields.
+ * A UTC instant can land on the next or previous day on the device.
  */
 function toDate(dayKey?: string): Date {
   if (!dayKey) return new Date();
   const [y, m, d] = dayKey.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d, 12)); // midday UTC, safely inside the day
+  const date = new Date();
+  date.setFullYear(y, m - 1, d);
+  date.setHours(12, 0, 0, 0);
+  return date;
 }
 
 function toDayKey(date: Date): string {
@@ -33,6 +34,7 @@ export function DateField({
   onChange,
   label,
   emptyLabel = 'No due date',
+  clearLabel,
 }: {
   value?: string;
   /** Write the date; what it returns is not used here (the web sibling waits on it). */
@@ -40,6 +42,7 @@ export function DateField({
   label?: string;
   /** What it says with no date: a card's due date by default. */
   emptyLabel?: string;
+  clearLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -47,11 +50,17 @@ export function DateField({
     <Row style={styles.row}>
       <Button
         label={value ?? 'Pick a date'}
+        accessibilityLabel={label ? `${label}, ${value ?? 'pick a date'}` : undefined}
         variant="secondary"
         onPress={() => setOpen(true)}
       />
       {value ? (
-        <Button label="Clear" variant="secondary" onPress={() => onChange(undefined)} />
+        <Button
+          label="Clear"
+          accessibilityLabel={clearLabel}
+          variant="secondary"
+          onPress={() => onChange(undefined)}
+        />
       ) : (
         <Hint>{emptyLabel}</Hint>
       )}

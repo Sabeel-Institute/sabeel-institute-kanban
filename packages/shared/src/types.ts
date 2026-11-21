@@ -325,6 +325,8 @@ export interface CardDoc {
   createdBy: string;
   updatedAt: number;
   updatedBy: string;
+  /** Changes only on an MCP write. Matches updatedAt for that write. */
+  agentAt?: number;
   /**
    * When a comment or a file last moved on this card. TRIGGER-OWNED — rules pin
    * it across a client update, exactly as `attachmentCount` is pinned.
@@ -352,6 +354,8 @@ export interface CommentDoc {
    * (onCommentNotify, functions/src/names.ts). Never written by a client.
    */
   authorName?: string;
+  /** The original comment was posted through the MCP server. */
+  via?: 'agent';
   body: string;
   mentionUids: string[];
   createdAt: number;
@@ -569,6 +573,7 @@ export interface ActivityDoc {
   actorUid: string;
   /** Who did it, by name, stored by the server when it happened (functions/src/names.ts). */
   actorName?: string;
+  via?: 'agent';
   at: number;
   from?: string;
   to?: string;

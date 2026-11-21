@@ -84,6 +84,10 @@ describe('clearSearchFilters', () => {
     labelIds: ['l1'],
     boardId: 'b1',
     assigneeUid: 'u1',
+    dueFrom: '2026-11-18',
+    dueTo: '2026-11-22',
+    activeFrom: '2026-11-19',
+    activeTo: '2026-11-21',
   };
 
   it('clears every narrowing filter, which is what the control promises', () => {

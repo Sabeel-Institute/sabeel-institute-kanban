@@ -291,7 +291,8 @@ const SHOTS = {
   searchFilters: async (p) => {
     await nav(p, 'Search');
     await p.getByRole('button', { name: 'Filters', exact: true }).click();
-    await p.getByRole('button', { name: /^Labels(:| \(|$)/ }).first().click();
+    await p.getByRole('button', { name: 'Due between', exact: true }).click();
+    await p.getByLabel('Due between from', { exact: true }).waitFor();
     await p.waitForTimeout(900);
   },
   // Naming a file happens between picking it and the upload starting, so it

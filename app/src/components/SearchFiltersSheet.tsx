@@ -1,29 +1,6 @@
 /**
- * Search's filter menu: four sections, one open at a time.
- *
- * An ACCORDION rather than four independent collapsibles, and the geometry is
- * what decides it. `Sheet` bounds itself to 80% of the viewport; on a 320x568
- * phone that is ~454pt, and once padding, the title, the gaps and the footer
- * button are taken out the body is about 342pt. The four section HEADERS spend
- * 200 of that before anything is open, so one expanded section — a field, its
- * rows and a hint — already asks the sheet to scroll, and a second would double
- * what has to be scrolled past to reach the sections below it. One at a time is
- * what keeps the sheet a page rather than a stack of pages.
- *
- * The rows inside a section therefore do NOT scroll themselves
- * (`bounded={false}`): the sheet body is already a bounded scroller, and two
- * same-axis scrollers nested is a trap on iOS, where the inner one takes the pan
- * and does not chain — see `NarrowList`.
- *
- * Every section is CLOSED on open, and its state is in its own header rather
- * than behind it — `Board: Fundraising 2026`, `Labels (2)` — the shape the
- * boards screen's archived section already uses. Four headers that said only
- * `Board`, `Labels`, `Priority` would show nothing about what is filtering and
- * turn every filter into two taps to find out.
- *
- * Picks apply IMMEDIATELY and the sheet stays open, because multi-select
- * otherwise means reopening it once per value. That is also why the footer says
- * `Done` and not `Cancel`: there is nothing left to cancel.
+ * Search filters apply as they are picked. The sheet scrolls, and opening a
+ * section closes the previous one so two long lists cannot crowd a small phone.
  */
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -35,16 +12,19 @@ import {
   type Priority,
 } from '@sabeel/shared';
 import { Sheet } from './Sheet';
+import { DateField } from './DateField';
 import { NarrowList, narrowPeople, type NarrowItem } from './NarrowList';
 import { Button, FilterChip, Hint, Row } from './ui';
 import { space, useTheme } from '../theme';
+import { dateRangeSummary, SEARCH_DATE_RANGES, type SearchDates } from '../searchFilters';
 
 /** The "no board" / "anyone" row. A real id can never be empty. */
 const ANY = '';
 /** People narrow as every person picker does; "Anyone" stays first until something is typed. */
 const NARROW_PEOPLE = narrowPeople([ANY]);
 
-type Section = 'priority' | 'board' | 'labels' | 'assignee';
+type DateRange = (typeof SEARCH_DATE_RANGES)[number];
+type Section = 'priority' | 'board' | 'labels' | 'assignee' | DateRange['from'];
 
 export interface SearchFiltersSheetProps {
   visible: boolean;
@@ -60,6 +40,8 @@ export interface SearchFiltersSheetProps {
   people: readonly NarrowItem[];
   assigneeUid: string | undefined;
   onPickAssignee: (uid: string | undefined) => void;
+  dates: SearchDates;
+  onChangeDates: (dates: SearchDates) => void;
   /** Only rendered when something is actually narrowing. */
   onClearAll: (() => void) | null;
 }
@@ -92,6 +74,8 @@ function Sections({
   people,
   assigneeUid,
   onPickAssignee,
+  dates,
+  onChangeDates,
   onClearAll,
 }: SearchFiltersSheetProps) {
   const [open, setOpen] = useState<Section | null>(null);
@@ -188,6 +172,39 @@ function Sections({
         />
       </Section>
 
+      {SEARCH_DATE_RANGES.map(({ title, from, to }) => {
+        const start = dates[from];
+        const end = dates[to];
+        const summary = dateRangeSummary(start, end);
+        return (
+          <Section
+            key={from}
+            title={title}
+            summary={summary ? ` · ${summary}` : undefined}
+            open={open === from}
+            onToggle={() => toggle(from)}
+          >
+            <Hint>From</Hint>
+            <DateField
+              label={`${title} from`}
+              clearLabel={`Clear ${title} from`}
+              value={start}
+              emptyLabel="Any start date"
+              onChange={(date) => onChangeDates({ [from]: date })}
+            />
+            <Hint>To</Hint>
+            <DateField
+              label={`${title} to`}
+              clearLabel={`Clear ${title} to`}
+              value={end}
+              emptyLabel="Any end date"
+              onChange={(date) => onChangeDates({ [to]: date })}
+            />
+            {start && end && start > end ? <Hint>Choose an end date on or after the start date.</Hint> : null}
+          </Section>
+        );
+      })}
+
       {/* The screen's own clear control is BEHIND this modal, so without one
           here the sheet is a place you can filter from but not un-filter from.
 
@@ -240,7 +257,7 @@ function Section({
         onPress={onToggle}
       />
       {/* Indented behind a rule, so an open section's content reads as being
-          INSIDE it. Without that the sheet is a stack of identical pills — four
+          INSIDE it. Without that the sheet is a stack of identical pills —
           disclosures and a Done that dismisses — with nothing saying which of
           them the field and list below belong to. */}
       {open ? (

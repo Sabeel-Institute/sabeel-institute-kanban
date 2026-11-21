@@ -455,6 +455,7 @@ export function CardGrid({ children }: { children: ReactNode }) {
 
 export function Button({
   label,
+  accessibilityLabel = label,
   onPress,
   variant = 'primary',
   disabled,
@@ -463,6 +464,7 @@ export function Button({
   expanded,
 }: {
   label: string;
+  accessibilityLabel?: string;
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'danger';
   disabled?: boolean;
@@ -491,7 +493,7 @@ export function Button({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={expanded === undefined ? undefined : { expanded }}
       // react-native-web maps `accessibilityState.expanded` to nothing, as
       // with `selected` (IconAction): measured, the element carried no

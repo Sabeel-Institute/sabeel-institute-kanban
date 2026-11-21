@@ -16,6 +16,8 @@
  * first films of the sister app sounded like, and why they read as stiff.
  * Read a new line aloud before rendering it.
  */
+import { addDays, todayInOrgTz } from '@sabeel/shared';
+
 /** A small PDF to attach: a supplier's quote. */
 const QUOTE = {
   name: 'IMG_20261026_114502.pdf',
@@ -813,10 +815,19 @@ export const TUTORIALS = [
         },
       },
       {
+        say: 'If you want to see what’s due over the next week, pick a start and end date. For work that changed recently, use Active between.',
+        do: async (t) => {
+          const today = todayInOrgTz();
+          await t.tap(t.btn('Due between'));
+          await t.fill(t.label('Due between from'), today);
+          await t.fill(t.label('Due between to'), addDays(today, 7));
+        },
+      },
+      {
         say: 'Tap Done, and each filter shows up as a chip. Tap a chip to take that filter off.',
         do: async (t) => {
           await t.tap(t.btn('Done'));
-          await t.highlight(t.btn(/^Remove the /));
+          await t.highlight(t.btn(/^Remove the Due between filter/));
         },
       },
       {

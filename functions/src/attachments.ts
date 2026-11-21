@@ -17,7 +17,7 @@ import {
   contentDispositionFor,
   normalizeContentType,
   sanitizeAttachmentName,
-  type ActivityType,
+  type ActivityDoc,
   type AttachmentDoc,
   type BoardDoc,
   type CardDoc,
@@ -117,7 +117,7 @@ async function requireCardAccess(
  */
 async function recordActivity(
   cardId: string,
-  entry: { type: ActivityType; actorUid: string; to?: string; from?: string },
+  entry: Omit<ActivityDoc, 'at' | 'actorName'>,
 ): Promise<void> {
   try {
     const actorName = await storedName(entry.actorUid);
@@ -241,6 +241,7 @@ export async function applyFinalizeAttachment(
       type: 'attached',
       actorUid: won.data.uploadedBy || actorUid,
       to: name,
+      ...(isMcpAttachmentId(attachmentId) ? { via: 'agent' } : {}),
     });
     // Usage counters, in the SAME winner-only branch and for the same reason.
     // Above the transaction — or above the `status === 'ready'` fast path
