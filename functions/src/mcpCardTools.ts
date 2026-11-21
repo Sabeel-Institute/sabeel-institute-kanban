@@ -323,12 +323,12 @@ export function registerCardWrites({ server, run, me, board }: WriteTools, base:
   }));
 
   server.registerTool('move_cards', {
-    description: 'Move one or more open cards from one board into a column, optionally on another board. A cross-board move keeps comments and attachments. Use preview:true to see dropped labels and assignees before moving.',
+    description: 'Move one or more open cards into a column on this board or another. A cross-board move keeps the card id, history, comments and attachments. Access follows the destination board. Use preview:true to see which labels and assignees would be dropped.',
     inputSchema: destinationSchema,
   }, (f) => run(async (fs) => writeResult(await transferCards(fs, me, board, f, false))));
 
   server.registerTool('copy_cards', {
-    description: 'Copy one or more open cards to a column on this board or another. Copies have fresh ids. Files, comments and history stay with the originals.',
+    description: 'Make new cards in a column on this board or another. Copies carry the title, description, priority and due date. Files, comments, history and parent links stay with the originals. Across boards, copies keep institute labels and assignees who belong to the destination board.',
     inputSchema: destinationSchema,
   }, (f) => run(async (fs) => writeResult(await transferCards(fs, me, board, f, true))));
 
