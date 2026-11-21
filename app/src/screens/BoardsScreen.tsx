@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Icon } from '../icons';
 import {
   BOARD_NAME_MAX,
+  canSeeEveryBoard,
   overviewBoards,
   sortBoardsForList,
   type BoardSection,
@@ -14,6 +15,7 @@ import {
   newBoardId,
   noteBoardOpened,
   setSectionCollapsed,
+  setShowAllBoards,
   toggleFavourite,
   updateBoard,
   useMyBoardPrefs,
@@ -39,6 +41,7 @@ import {
   Screen,
   Spinner,
   Title,
+  Toggle,
 } from '../components/ui';
 import { PushNudge } from '../components/PushNudge';
 import { CloneBoardSheet } from '../components/CloneBoardSheet';
@@ -60,6 +63,7 @@ const EMPTY: string[] = [];
  * Shift+F10) fires the same `contextmenu` a right-click does.
  */
 const NO_SECTIONS: readonly BoardSection[] = [];
+const NO_BOARDS: BoardListItem[] = [];
 
 /**
  * The way into the overview, worded as well as drawn (#124): a bare icon in
@@ -241,6 +245,9 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
   const nav = useNav();
   const boards = useMyBoards(user);
   const prefs = useMyBoardPrefs(user);
+  const canShowAllBoards = canSeeEveryBoard(user);
+  const showAllBoards = canShowAllBoards && prefs.data?.showAllBoards === true;
+  const boardScopeAction = useAction('setShowAllBoards');
   const { filter } = boardsView.use();
   const setFilter = (v: string) => boardsView.set({ filter: v });
   const [creating, setCreating] = useState(false);
@@ -281,13 +288,17 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
   // would never actually memoize. Constant empties keep the identity stable.
   const favourites = prefs.data?.favourites ?? EMPTY;
   const recents = prefs.data?.recents ?? EMPTY;
+  const allBoards = boards.data ?? NO_BOARDS;
+  const visibleBoards = useMemo(
+    () => showAllBoards ? allBoards : allBoards.filter((board) => board.memberUids.includes(user.uid)),
+    [allBoards, showAllBoards, user.uid],
+  );
+  const nameFilter = filter.trim().toLowerCase();
 
   const sections = useMemo(() => {
-    const all = (boards.data ?? []).filter((b) =>
-      b.name.toLowerCase().includes(filter.trim().toLowerCase()),
-    );
-    return sortBoardsForList(all, favourites, recents);
-  }, [boards.data, favourites, recents, filter]);
+    const matching = visibleBoards.filter((board) => board.name.toLowerCase().includes(nameFilter));
+    return sortBoardsForList(matching, favourites, recents);
+  }, [visibleBoards, favourites, recents, nameFilter]);
 
   async function open(board: BoardListItem) {
     // Fire-and-forget: recording "recently opened" must never delay navigation.
@@ -363,13 +374,23 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
 
   // Hidden boards count: hiding one from the overview should not take away
   // the way back to it.
-  const hasOverview = overviewBoards(boards.data ?? []).length > 0;
+  const hasOverview = overviewBoards(allBoards).length > 0;
+  const hasShortcuts = sections.favourites.length + sections.recents.length > 0;
+  const otherBoardsTitle = canShowAllBoards && !showAllBoards ? 'My boards' : 'All boards';
   const hasAny =
     sections.favourites.length +
       sections.recents.length +
       sections.others.length +
       sections.templates.length >
     0;
+  let emptyMessage = 'You are not on any boards yet. Someone who owns a board can add you to it.';
+  if (filtering) {
+    emptyMessage = 'No boards match your filter.';
+  } else if (canShowAllBoards && !showAllBoards) {
+    emptyMessage = 'You are not on any active boards. Turn on All boards to see the full list.';
+  } else if (sessionCan.createBoards(user)) {
+    emptyMessage = 'No boards yet. Create one to get started.';
+  }
 
   return (
     <Screen width="list">
@@ -405,7 +426,21 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
         </Card>
       ) : null}
 
-      {(boards.data?.length ?? 0) > 6 ? (
+      {canShowAllBoards ? (
+        <Row>
+          <Body>All boards</Body>
+          <Toggle
+            label="All boards"
+            value={showAllBoards}
+            disabled={prefs.status === 'loading'}
+            onValueChange={(next) => boardScopeAction.run(() => setShowAllBoards(user, next))}
+          />
+        </Row>
+      ) : null}
+
+      {boardScopeAction.error ? <Body>{boardScopeAction.error}</Body> : null}
+
+      {visibleBoards.length > 6 || filter !== '' ? (
         <TextInput
           value={filter}
           onChangeText={setFilter}
@@ -432,11 +467,7 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
 
       {!hasAny ? (
         <Card style={styles.form}>
-          <Body>
-            {sessionCan.createBoards(user)
-              ? 'No boards yet. Create one to get started.'
-              : 'You are not on any boards yet. Someone who owns a board can add you to it.'}
-          </Body>
+          <Body>{emptyMessage}</Body>
         </Card>
       ) : null}
 
@@ -493,7 +524,7 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
       {sections.others.length > 0 ? (
         <>
           <BoardsSection
-            title={sections.favourites.length + sections.recents.length > 0 ? 'All boards' : 'Boards'}
+            title={hasShortcuts ? otherBoardsTitle : 'Boards'}
             count={sections.others.length}
             collapsed={!filtering && collapsed.includes('all')}
             filtering={filtering}
@@ -556,7 +587,7 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
           look at. It used to be role-gated, which meant a member who archived
           nothing still could not find a board they were on that someone else
           archived. */}
-      <ArchivedBoards user={user} onOpen={open} />
+      <ArchivedBoards user={user} showAllBoards={showAllBoards} onOpen={open} />
 
       {cloning ? (
         <CloneBoardSheet
@@ -573,14 +604,18 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
 
 function ArchivedBoards({
   user,
+  showAllBoards,
   onOpen,
 }: {
   user: SessionUser;
+  showAllBoards: boolean;
   onOpen: (b: BoardListItem) => void;
 }) {
   const archived = useArchivedBoards(user);
   const [open, setOpen] = useState(false);
-  const list = archived.data ?? [];
+  const list = (archived.data ?? NO_BOARDS).filter(
+    (board) => showAllBoards || board.memberUids.includes(user.uid),
+  );
 
   // Nothing archived: say nothing at all rather than showing an empty section.
   if (list.length === 0) return null;

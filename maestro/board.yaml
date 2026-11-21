@@ -236,12 +236,12 @@ name: Board, card, rich text and gestures
 - tapOn:
     text: "Clone"
     above: "The clone gets[\\s\\S]*"
-# The board screen first: the clone's name is in the sheet's field too, so
-# waiting on it would pass before the clone was made. The callable writes a
-# board and fourteen cards, which a busy CI Mac took over 15 s to show.
+# Wait for a copied card to appear. The clone name already appears in the
+# sheet, and the board's wrapped instructional text can be hard to match.
 - extendedWaitUntil:
-    visible: "Tap a card to open it\\.[\\s\\S]*"
-    timeout: 60000
+    visible:
+      id: "card-Book the venue"
+    timeout: 90000
 - assertVisible: "Fundraising 2026 clone[\\s\\S]*"
 # Back to the boards list, where the tabs are: a board has none of its own.
 # The app's own Back, as everywhere in this flow; ci-tools' back.yaml is for a

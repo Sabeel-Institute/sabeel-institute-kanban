@@ -377,6 +377,15 @@ describe('preference self-writes', () => {
     );
   });
 
+  it('an admin can save a boolean board scope only on their own document', async () => {
+    const db = ctx('admin1', 'admin', 'active');
+    const mine = doc(db, 'users/admin1');
+    await assertSucceeds(updateDoc(mine, { showAllBoards: true }));
+    await assertSucceeds(updateDoc(mine, { showAllBoards: false }));
+    await assertFails(updateDoc(mine, { showAllBoards: 'true' }));
+    await assertFails(updateDoc(doc(db, 'users/org1'), { showAllBoards: true }));
+  });
+
   it('an active user watches lanes, within bounds, on their own document only', async () => {
     const db = ctx('member1', 'member', 'active');
     await assertSucceeds(updateDoc(doc(db, 'users/member1'), { watchedLanes: arrayUnion(watchKey('b1', 'ln-1')) }));

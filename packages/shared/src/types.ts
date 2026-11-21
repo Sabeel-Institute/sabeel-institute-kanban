@@ -55,6 +55,8 @@ export interface UserDoc {
   watchedLanes?: string[];
   favoriteBoardIds: string[];
   recentBoardIds: string[];
+  /** Boards screen display preference for admins. Defaults to false. */
+  showAllBoards?: boolean;
   unreadNotifCount: number;
   createdAt: number;
 }

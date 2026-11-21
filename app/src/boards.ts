@@ -540,15 +540,20 @@ export async function setAllLanesCollapsed(
 
 /** The signed-in user's own list preferences, live. */
 export function useMyBoardPrefs(user: SessionUser) {
-  return useLiveDoc<{ favourites: string[]; recents: string[] }>(
+  return useLiveDoc<{ favourites: string[]; recents: string[]; showAllBoards: boolean }>(
     () => doc(db, 'users', user.uid),
     [user.uid],
     'board-prefs',
     (d) => ({
       favourites: (d?.data.favoriteBoardIds as string[]) ?? [],
       recents: (d?.data.recentBoardIds as string[]) ?? [],
+      showAllBoards: d?.data.showAllBoards === true,
     }),
   );
+}
+
+export async function setShowAllBoards(user: SessionUser, showAllBoards: boolean): Promise<void> {
+  await updateDoc(doc(db, 'users', user.uid), { showAllBoards });
 }
 
 
