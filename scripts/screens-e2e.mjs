@@ -1161,8 +1161,8 @@ async function tour(page, tag, width) {
   await visit('card', async () => {
     await page.locator('[data-testid^="card-"]').first().click();
     await page.getByRole('button', { name: 'Share card' }).waitFor({ timeout: 20000 });
-    await page.getByText(/^Faisal(?: Shah)? 🤖 created this card/).waitFor();
-    await page.getByText(/^Faisal(?: Shah)? 🤖 · /).waitFor();
+    await page.getByText(/^Faisal(?: Shah)?\s+🤖 created this card/).waitFor();
+    await page.getByText(/^Faisal(?: Shah)?\s+🤖 · /).waitFor();
     check(`${tag} / the badge follows the name in card activity and comments`, true);
   });
   /**
@@ -1301,7 +1301,7 @@ async function tour(page, tag, width) {
       await badge.waitFor();
       check(
         `${tag} / Board settings → History identifies agent activity`,
-        (await badge.count()) === 1 && await page.getByText(/Faisal 🤖 added the column “Agent review”/).isVisible(),
+        (await badge.count()) === 1 && await page.getByText(/Faisal\s+🤖 added the column “Agent review”/).isVisible(),
       );
     }
     if (name === 'Columns') {
