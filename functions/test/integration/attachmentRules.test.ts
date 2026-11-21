@@ -252,6 +252,13 @@ describe('storage: the attachment object', () => {
    */
   const bytes = (n = 4) => new Uint8Array(n);
 
+  it('reserves MCP upload ids for the server in both stores', async () => {
+    const id = 'mcp_Ab012345678901234567';
+    await assertFails(setDoc(doc(fs('member1', 'member'), attachments(CARD), id), attachment()));
+    await assertFails(uploadBytes(ref(st('member1', 'member'), attachmentStoragePath(CARD, id)), bytes()));
+    await assertSucceeds(uploadBytes(ref(st('member1', 'member'), attachmentStoragePath(CARD, 'native_upload')), bytes()));
+  });
+
   it('an active user can upload once', async () => {
     const path = attachmentStoragePath(CARD, 'obj_once');
     await assertSucceeds(uploadBytes(ref(st('member1', 'member'), path), bytes()));

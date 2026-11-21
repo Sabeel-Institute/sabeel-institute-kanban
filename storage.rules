@@ -45,7 +45,9 @@ service firebase.storage {
       // would already have been paid for. The number is mirrored from
       // ATTACHMENT_MAX_BYTES in @sabeel/shared — rules cannot import TypeScript,
       // so a test asserts the two have not drifted.
+      // MCP upload ids are reserved for its size-checked server transfer.
       allow write: if isActive()
+        && !attachmentId.matches('^mcp_[A-Za-z0-9]{20}$')
         && resource == null
         && request.resource.size <= 10 * 1024 * 1024;
 

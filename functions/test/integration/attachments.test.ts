@@ -10,6 +10,7 @@ import {
   applyFinalizeAttachment,
   runAttachmentSweep,
 } from '../../src/attachments';
+import { MCP_UPLOAD_TIMEOUT_SECONDS, uploadReservation } from '../../src/attachmentUploads';
 import {
   adminAuth,
   adminBucket,
@@ -556,6 +557,30 @@ describe('runAttachmentSweep', () => {
     expect((await attachmentRef(fresh).get()).exists).toBe(true);
     expect((await attachmentRef(done).get()).exists).toBe(true);
     expect(await objectExists(done)).toBe(true);
+  });
+
+  it('recovers late MCP bytes after the attachment was removed and preserves ready files', async () => {
+    const removed = 'mcp_Rm012345678901234567';
+    const ready = 'mcp_Rd012345678901234567';
+    const expiresAt = Date.now() + 5 * 60 * 1000;
+    for (const id of [removed, ready]) {
+      await uploadReservation(id).set({ cardId: CARD, uploadedBy: MEM, size: 32, tokenHash: 'fixture', expiresAt });
+    }
+    await putRecord(removed);
+    await uploaded(ready, { status: 'ready', sizeBytes: 32 });
+    const deletion = await callFunction('deleteAttachment', { cardId: CARD, attachmentId: removed }, memToken);
+    expect(deletion.body.result).toMatchObject({ removed: true });
+    expect((await uploadReservation(removed).get()).get('cancelled')).toBe(true);
+    // Simulate bytes arriving after delete, followed by a stopped uploader.
+    await putObject(removed);
+    await runAttachmentSweep(expiresAt + 1);
+    expect(await objectExists(removed)).toBe(true);
+    await runAttachmentSweep(expiresAt + MCP_UPLOAD_TIMEOUT_SECONDS * 1000 + 1);
+    expect(await objectExists(removed)).toBe(false);
+    expect((await uploadReservation(removed).get()).exists).toBe(false);
+    expect((await attachmentRef(ready).get()).get('status')).toBe('ready');
+    expect(await objectExists(ready)).toBe(true);
+    expect((await uploadReservation(ready).get()).exists).toBe(false);
   });
 });
 

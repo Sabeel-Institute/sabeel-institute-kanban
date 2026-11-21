@@ -35,7 +35,7 @@ const DOCUMENT_ID = /^[A-Za-z0-9]{20}$/;
  * board while still assigned to its cards would KEEP read access to them, which
  * is precisely the leak the removal was meant to close.
  *
- * Doing both halves in one server-side batch means they cannot drift.
+ * Read and write both sides in one server transaction so concurrent edits are included.
  */
 export const removeBoardMember = onCall({ secrets: [sentryDsn] }, guarded(async (request: CallableRequest<{ boardId?: unknown; uid?: unknown }>) => {
   const auth = request.auth;
@@ -54,120 +54,61 @@ export const removeBoardMember = onCall({ secrets: [sentryDsn] }, guarded(async 
 
   const db = getFirestore();
   const boardRef = db.doc(`boards/${boardId}`);
-  const board = await boardRef.get();
-  if (!board.exists) throw new HttpsError('not-found', 'No such board.');
+  const { ownersLeft, unassignedCards, unsubscribedCards } = await db.runTransaction(async (tx) => {
+    const snapshot = await tx.get(boardRef);
+    if (!snapshot.exists) throw new HttpsError('not-found', 'No such board.');
+    const board = snapshot.data() as BoardDoc;
 
-  // Authorised AFTER the board is read, because authority is now per-board: this
-  // is `ownsBoard()` from firestore.rules, in TypeScript. The board had to be
-  // fetched anyway, so the reorder costs nothing.
-  if (!canManageBoard(actor, board.data() as BoardDoc)) {
-    throw new HttpsError(
-      'permission-denied',
-      'Only an owner of this board, or an admin, can change who is on it.',
-    );
-  }
+    if (!canManageBoard(actor, board)) {
+      throw new HttpsError('permission-denied', 'Only an owner of this board, or an admin, can change who is on it.');
+    }
+    if (uid === board.createdBy && !canUnseatCreator(actor)) {
+      throw new HttpsError('permission-denied', 'Only an admin can take the person who created this board off it.');
+    }
 
-  /**
-   * CREATOR PROTECTION, repeated here because THIS is the boundary.
-   *
-   * `firestore.rules` refuses a board update that takes `createdBy` out of
-   * `boardOwnerUids`, and removing them from the board would do exactly that —
-   * but this callable is an Admin SDK batch and rules do not see it at all. The
-   * screen disables the row, and a disabled control is an affordance, not a
-   * security control: without this check, any owner could unseat the person who
-   * created the board by "removing" them, which is the one thing the rule exists
-   * to prevent.
-   *
-   * It also covers the creator LEAVING, deliberately: they cannot step down
-   * unaided. One sentence, no exceptions to remember, at the price of an admin
-   * request on the rare handover.
-   */
-  if (uid === board.data()?.createdBy && !canUnseatCreator(actor)) {
-    throw new HttpsError(
-      'permission-denied',
-      'Only an admin can take the person who created this board off it.',
-    );
-  }
+    const cards = db.collection('cards').where('boardId', '==', boardId);
+    const userRef = db.doc(`users/${uid}`);
+    // Assignment and subscription are also read grants. Read them in the
+    // transaction so a concurrent assignment cannot outlive membership.
+    const [assigned, subscribed, user] = await Promise.all([
+      tx.get(cards.where('assigneeUids', 'array-contains', uid)),
+      tx.get(cards.where('subscriberUids', 'array-contains', uid)),
+      tx.get(userRef),
+    ]);
+    const userData = user.data();
+    const watchedHere = ((userData?.watchedColumns as string[] | undefined) ?? []).filter((key) => watchKeyOnBoard(key, boardId));
+    const lanesHere = ((userData?.watchedLanes as string[] | undefined) ?? []).filter((key) => watchKeyOnBoard(key, boardId));
 
-  // Cards assigned to the person being removed. Batched with the membership
-  // change so there is no window in which they are unassigned but still a
-  // member, or removed but still assigned.
-  const assigned = await db
-    .collection('cards')
-    .where('boardId', '==', boardId)
-    .where('assigneeUids', 'array-contains', uid)
-    .get();
-
-  // …and cards they SUBSCRIBED to, which matters for the same reason and a
-  // little more sharply. The card read rule has a subscriber arm, so leaving
-  // the uid behind would keep read access to this board's cards open to someone
-  // who is no longer on it — the very leak clearing `assigneeUids` prevents.
-  const subscribed = await db
-    .collection('cards')
-    .where('boardId', '==', boardId)
-    .where('subscriberUids', 'array-contains', uid)
-    .get();
-
-  // …and the columns they watch here. Not an access question — the notice
-  // sweep sends arrivals to board members only — but an entry nothing can
-  // ever answer is clutter, and it counts against their watch limit.
-  const userRef = db.doc(`users/${uid}`);
-  const userData = (await userRef.get()).data();
-  const watched = (userData?.watchedColumns as string[] | undefined) ?? [];
-  // Removed by value, so a column they watch elsewhere in the meantime stays.
-  const watchedHere = watched.filter((k) => watchKeyOnBoard(k, boardId));
-  // …and the lanes they watch here, for the same reasons.
-  const lanesHere = ((userData?.watchedLanes as string[] | undefined) ?? []).filter((k) =>
-    watchKeyOnBoard(k, boardId),
-  );
-
-  const batch = db.batch();
-  batch.update(boardRef, {
-    memberUids: FieldValue.arrayRemove(uid),
-    // The denormalised profile goes with the membership — leaving it behind
-    // would keep a departed colleague in every assignee picker.
-    [`memberProfiles.${uid}`]: FieldValue.delete(),
-    // …and so does OWNERSHIP. Authority is `member AND owner`, so a leftover
-    // entry grants nothing today — but `addBoardMember` only writes
-    // `memberUids`, so re-adding this person later would silently hand their
-    // ownership back, with no confirmation and nothing in the activity log. The
-    // rules cannot catch it either: this batch is an Admin SDK write and bypasses
-    // them, which is exactly why there is no subset rule to lean on.
-    boardOwnerUids: FieldValue.arrayRemove(uid),
-    // Who did it, for the board's history (boardHistory.ts).
-    updatedBy: auth.uid,
-    updatedAt: Date.now(),
+    const now = Date.now();
+    tx.update(boardRef, {
+      memberUids: FieldValue.arrayRemove(uid),
+      [`memberProfiles.${uid}`]: FieldValue.delete(),
+      boardOwnerUids: FieldValue.arrayRemove(uid),
+      updatedBy: actor.uid,
+      updatedAt: now,
+    });
+    const assignedIds = new Set(assigned.docs.map((card) => card.id));
+    const subscribedIds = new Set(subscribed.docs.map((card) => card.id));
+    const changedCards = new Map([...assigned.docs, ...subscribed.docs].map((card) => [card.id, card.ref]));
+    for (const [id, ref] of changedCards) {
+      tx.update(ref, {
+        // Subscription alone is not an edit or activity on the card.
+        ...(assignedIds.has(id) ? { assigneeUids: FieldValue.arrayRemove(uid), updatedBy: actor.uid, updatedAt: now } : {}),
+        ...(subscribedIds.has(id) ? { subscriberUids: FieldValue.arrayRemove(uid) } : {}),
+      });
+    }
+    if (watchedHere.length || lanesHere.length) {
+      tx.update(userRef, {
+        ...(watchedHere.length ? { watchedColumns: FieldValue.arrayRemove(...watchedHere) } : {}),
+        ...(lanesHere.length ? { watchedLanes: FieldValue.arrayRemove(...lanesHere) } : {}),
+      });
+    }
+    return {
+      ownersLeft: (board.boardOwnerUids ?? []).filter((id) => id !== uid).length,
+      unassignedCards: assigned.size,
+      unsubscribedCards: subscribed.size,
+    };
   });
-  for (const card of assigned.docs) {
-    batch.update(card.ref, {
-      assigneeUids: FieldValue.arrayRemove(uid),
-      // Attribute the resulting `unassigned` activity entry to the person who
-      // ran the removal. Without this, onCardWritten reads the card's existing
-      // `updatedBy` — whoever last edited it — and the log names the wrong actor.
-      updatedBy: auth.uid,
-      updatedAt: Date.now(),
-    });
-  }
-  for (const card of subscribed.docs) {
-    // Only the subscription — no `updatedBy`/`updatedAt`. A subscription is not
-    // a property of the work, so removing one is not an edit anybody should see
-    // in the card's history or in the Search browse order.
-    batch.update(card.ref, { subscriberUids: FieldValue.arrayRemove(uid) });
-  }
-  if (watchedHere.length > 0 || lanesHere.length > 0) {
-    batch.update(userRef, {
-      ...(watchedHere.length > 0 ? { watchedColumns: FieldValue.arrayRemove(...watchedHere) } : {}),
-      ...(lanesHere.length > 0 ? { watchedLanes: FieldValue.arrayRemove(...lanesHere) } : {}),
-    });
-  }
-
-  await batch.commit();
-
-  // Worth a line of its own: a board with no owners left is administrable only by
-  // an admin, and nothing else in the system says so out loud.
-  const ownersLeft = ((board.data()?.boardOwnerUids as string[]) ?? []).filter(
-    (u) => u !== uid,
-  ).length;
   if (ownersLeft === 0) {
     logger.warn('Board left with no owners', { boardId, removedUid: uid, actorUid: auth.uid });
   }
@@ -177,11 +118,11 @@ export const removeBoardMember = onCall({ secrets: [sentryDsn] }, guarded(async 
     uid,
     actorUid: auth.uid,
     ownersLeft,
-    unassignedCards: assigned.size,
-    unsubscribedCards: subscribed.size,
+    unassignedCards,
+    unsubscribedCards,
   });
 
-  return { ok: true, unassignedCards: assigned.size };
+  return { ok: true, unassignedCards };
 }));
 
 /**
@@ -423,18 +364,8 @@ export const cloneBoard = onCall({ secrets: [sentryDsn] }, guarded(async (reques
   const auth = request.auth;
   if (!auth) throw new HttpsError('unauthenticated', 'Sign in first.');
 
-  const actor = actorOf(auth);
-  if (!canCreateBoards(actor)) {
-    throw new HttpsError(
-      'permission-denied',
-      'Only organizers and admins can clone a board, because a clone is a new board.',
-    );
-  }
-
-  const boardId = request.data?.boardId;
-  const name = request.data?.name;
-  const cloneId = request.data?.cloneId;
-  if (typeof boardId !== 'string' || !boardId) {
+  const { boardId, name, cloneId, subscribe } = request.data ?? {};
+  if (typeof boardId !== 'string' || !boardId || boardId.includes('/')) {
     throw new HttpsError('invalid-argument', 'A boardId is required.');
   }
   if (typeof cloneId !== 'string' || !DOCUMENT_ID.test(cloneId)) {
@@ -443,28 +374,43 @@ export const cloneBoard = onCall({ secrets: [sentryDsn] }, guarded(async (reques
   if (typeof name !== 'string') {
     throw new HttpsError('invalid-argument', 'A name is required.');
   }
-  const nameProblem = validateBoardName(name);
-  if (nameProblem) throw new HttpsError('invalid-argument', nameProblem);
-  // The sheet's bell. Absent is off, which is also what an app from before the
-  // bell gets: it offered no choice, and off is the default the bell starts at.
-  const subscribe = request.data?.subscribe;
   if (subscribe !== undefined && typeof subscribe !== 'boolean') {
     throw new HttpsError('invalid-argument', 'subscribe must be true or false.');
   }
+  return cloneBoardFor(actorOf(auth), { boardId, name, cloneId, subscribe });
+}));
+
+export async function cloneBoardFor(
+  actor: ReturnType<typeof actorOf>,
+  { boardId, name, cloneId, subscribe }: { boardId: string; name: string; cloneId: string; subscribe?: boolean },
+) {
+  if (!canCreateBoards(actor)) {
+    throw new HttpsError('permission-denied', 'Only organizers and admins can clone a board, because a clone is a new board.');
+  }
+  const nameProblem = validateBoardName(name);
+  if (nameProblem) throw new HttpsError('invalid-argument', nameProblem);
 
   const db = getFirestore();
   const cloneRef = db.doc(`boards/${cloneId}`);
+  const provenance = cloneRef.collection('private').doc('clone');
   const now = Date.now();
   const me = await db.doc(`users/${actor.uid}`).get();
 
   const landed = await db.runTransaction(async (tx) => {
     const [source, already] = await Promise.all([tx.get(db.doc(`boards/${boardId}`)), tx.get(cloneRef)]);
     if (already.exists) {
-      // The same clone asked for again: its answer was lost on the way back.
-      if (already.data()?.createdBy !== actor.uid) {
-        throw new HttpsError('already-exists', 'That board already exists.');
+      const current = already.data() as BoardDoc;
+      const recorded = (await tx.get(provenance)).data();
+      // Older clones have only the public history entry with the source name.
+      const history = recorded ? undefined : (await tx.get(cloneRef.collection('activity').doc(CLONED_ENTRY_ID))).data();
+      const sameSource = recorded
+        ? recorded.sourceBoardId === boardId
+        : history?.type === 'cloned' && history.actorUid === actor.uid && source.exists && history.from === source.data()?.name;
+      const sameClone = current.createdBy === actor.uid && sameSource;
+      if (!sameClone || (!current.memberUids?.includes(actor.uid) && !canSeeEveryBoard(actor))) {
+        throw new HttpsError('already-exists', 'A board with that id already exists. Use a new id for a new clone.');
       }
-      return { made: null, name: already.data()?.name as string };
+      return { made: null, name: current.name };
     }
     if (!source.exists) throw new HttpsError('not-found', 'No such board.');
     const board = withCleanExtras(source.data()!) as unknown as BoardDoc;
@@ -530,6 +476,7 @@ export const cloneBoard = onCall({ secrets: [sentryDsn] }, guarded(async (reques
       ...cloner,
     };
     tx.create(cloneRef.collection('activity').doc(CLONED_ENTRY_ID), cloned);
+    tx.create(provenance, { sourceBoardId: boardId });
     for (const card of clone.cards) {
       const cardRef = db.doc(`cards/${card.id}`);
       tx.create(cardRef, card.data);
@@ -548,4 +495,4 @@ export const cloneBoard = onCall({ secrets: [sentryDsn] }, guarded(async (reques
   // The name the board HAS, which differs from the one asked for when an
   // earlier try, renamed since, made it: the app renames it to this try's.
   return { boardId: cloneId, name: landed.name };
-}));
+}

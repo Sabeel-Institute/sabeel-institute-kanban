@@ -50,6 +50,10 @@
         "function": { "functionId": "mcp", "region": "us-central1" }
       },
       {
+        "source": "/mcp/attachments/**",
+        "function": { "functionId": "mcpAttachmentUpload", "region": "us-central1" }
+      },
+      {
         "source": "/oauth/**",
         "function": { "functionId": "mcp", "region": "us-central1" }
       },

@@ -8,7 +8,7 @@ import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import { Timestamp } from 'firebase-admin/firestore';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { adminDb, functionsOrigin, idTokenFor, makeUser, shutdown, waitFor } from './emulatorClient';
+import { adminDb, callFunction, functionsOrigin, idTokenFor, makeUser, shutdown, waitFor } from './emulatorClient';
 
 const ME = 'mcp_me';
 const OTHER = 'mcp_other';
@@ -166,7 +166,11 @@ describe('composable queries: every question in at most two calls', () => {
 
     const client = await connect((await signIn(ME)).access_token);
     const names = (await client.listTools()).tools.map((t) => t.name).sort();
-    expect(names).toEqual(['add_card', 'comment', 'query_activity', 'query_alerts', 'query_boards', 'query_cards']);
+    expect(names).toEqual([
+      'add_card', 'clone_board', 'comment', 'copy_cards', 'create_board', 'get_attachment_url',
+      'list_addable_people', 'move_cards', 'prepare_attachments', 'query_activity', 'query_alerts',
+      'query_boards', 'query_cards', 'set_board_archived', 'set_cards_archived', 'update_board', 'update_card',
+    ]);
     expect(client.getInstructions()).toContain('Mona (@mcpme)');
     const call = async (name: string, args: Record<string, unknown>) => parsed(await client.callTool({ name, arguments: args }));
     const titles = async (args: Record<string, unknown>) => (await call('query_cards', args)).cards.map((c: { title: string }) => c.title);
@@ -220,7 +224,7 @@ describe('composable queries: every question in at most two calls', () => {
     expect(boards.map((b: { name: string }) => b.name)).toEqual(['Agent Board']);
     expect(boards[0]).toMatchObject({ member: true, owner: true, url: 'https://sabeel-institute-kanban.web.app/b/mcp_b1' });
     expect(boards[0].counts).toMatchObject({ open: 4, overdue: 1, unassigned: 1, by_column: { 'To Do': 3, Done: 1 } });
-    expect(boards[0].members).toEqual(expect.arrayContaining([{ name: 'Otto', handle: 'mcpother' }]));
+    expect(boards[0].members).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'Otto', handle: 'mcpother' })]));
 
     // A board they are not on: not listed, and refused by name.
     expect((await client.callTool({ name: 'query_cards', arguments: { board: 'Not Mine' } })).isError).toBe(true);
@@ -295,5 +299,172 @@ describe('the MCP server', () => {
       client_id: reg.body.client_id, redirect_uri: REDIRECT, code_challenge: 'x', state: '', idToken: await idTokenFor('mcp_pending'),
     });
     expect(r.status).toBe(403);
+  });
+});
+
+describe('Kanban write tools', () => {
+  it('combines board and card edits, uses the app defaults, and transfers file bytes separately', async () => {
+    const organizer = 'mcp_writer';
+    await makeUser({ uid: organizer, email: 'mcpwriter@oursabeel.com', role: 'organizer', status: 'active', displayName: 'Writer' });
+    const client = await connect((await signIn(organizer)).access_token);
+    const call = async (name: string, args: Record<string, unknown>) => parsed(await client.callTool({ name, arguments: args }));
+    const source = await call('create_board', { name: 'MCP Course' });
+    const boardRef = adminDb().doc(`boards/${source.id}`);
+    const changed = await call('update_board', {
+      board: source.id, template: true, columns: { add: ['Review'], order: ['To Do', 'In Progress', 'Review', 'Done'] },
+      lanes: { enabled: true, add: ['Teaching', 'Logistics'], order: ['Logistics', 'Teaching'], finished_column: 'Done' },
+      detail_fields: { add: [{ type: 'start' }, { name: 'Classroom', type: 'text' }, { name: 'Instructor', type: 'text' }] },
+      details: { 'Start date': '2026-12-01', Classroom: 'A', Instructor: 'Writer' },
+      members: { add: ['Otto', 'Mona'], make_owner: ['Otto'] },
+      labels: { add: [{ name: 'Course work' }] },
+    });
+    expect(changed.id).toBe(source.id);
+    expect((await boardRef.get()).data()).toMatchObject({ memberUids: [organizer, OTHER, ME], boardOwnerUids: [organizer, OTHER], template: true, lanesOn: true });
+    await call('update_board', { board: source.id, details: { Classroom: null, 'Start date': '2026-12-03' } });
+    const [board] = await call('query_boards', { board: source.id, include: { details: true, lanes: true, columns: true, labels: true } });
+    expect(board).toMatchObject({
+      columns: ['To Do', 'In Progress', 'Review', 'Done'], lanes: ['Logistics', 'Teaching'], finished_column: 'Done',
+      details: { 'Start date': '2026-12-03', Classroom: null, Instructor: 'Writer' },
+      labels: expect.arrayContaining([expect.objectContaining({ name: 'Course work', scope: 'board' })]),
+    });
+    const invalid = await client.callTool({ name: 'update_board', arguments: { board: source.id, name: 'Should not land', details: { Missing: 'A' } } });
+    expect(invalid.isError).toBe(true);
+    expect((await boardRef.get()).data()?.name).toBe('MCP Course');
+    expect((await client.callTool({ name: 'update_board', arguments: { board: source.id, members: { remove: ['Otto'] } } })).isError).toBe(true);
+    const beforeNoop = (await boardRef.get()).get('updatedAt');
+    expect((await call('update_board', { board: source.id, template: true, members: { add: ['Otto'] },
+      details: { Classroom: null, 'Start date': '2026-12-03' } })).changed).toEqual([]);
+    expect((await boardRef.get()).get('updatedAt')).toBe(beforeNoop);
+    expect((await client.callTool({ name: 'clone_board', arguments: { board: source.id, name: 'Collision', clone_id: source.id } })).isError).toBe(true);
+
+    const bytes = 'Course handout contents';
+    const card = await call('add_card', {
+      board: source.id, column: 'To Do', lane: 'Teaching', title: 'Course handout',
+      description: 'Draft **handout**', labels: ['Course work'], assignees: ['Otto'],
+      due_date: '2026-12-02', priority: 'high', subscribe: false,
+      attachments: [{ name: 'handout.txt', content_type: 'text/plain', size_bytes: Buffer.byteLength(bytes) }],
+    });
+    expect(card).toMatchObject({ column: 'To Do', lane: 'Teaching' });
+    const cardRef = adminDb().doc(`cards/${card.id}`);
+    expect((await cardRef.get()).data()).toMatchObject({ description: 'Draft **handout**', dueDate: '2026-12-02',
+      assigneeUids: [OTHER], priority: 'high', subscriberUids: [], labelIds: [board.labels.find((label: { name: string }) => label.name === 'Course work').id] });
+    const [upload] = card.attachments;
+    const unauthorized = await fetch(upload.upload_url, { method: 'PUT', body: bytes });
+    expect(unauthorized.status, await unauthorized.text()).toBe(401);
+    const early = await callFunction('finalizeAttachment', { cardId: card.id, attachmentId: upload.id }, await idTokenFor(organizer));
+    expect(early.body.error?.message).toMatch(/Complete this upload with its Kanban MCP upload URL/);
+    const wrongSize = await fetch(upload.upload_url, { method: upload.method, headers: upload.headers, body: 'short' });
+    expect(wrongSize.status).toBe(400);
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const uploaded = await fetch(upload.upload_url, { method: upload.method, headers: upload.headers, body: bytes });
+      expect(await uploaded.json()).toMatchObject({ id: upload.id, status: 'ready' });
+      expect(uploaded.status).toBe(200);
+    }
+    const different = await fetch(upload.upload_url, { method: upload.method, headers: upload.headers, body: bytes.replace('Course', 'Lesson') });
+    expect(different.status).toBe(409);
+    const attachment = await call('get_attachment_url', { card_id: card.id, attachment_id: upload.id });
+    expect(await (await fetch(attachment.url)).text()).toBe(bytes);
+    const updated = await call('update_card', { card_id: card.id, due_date: null, labels: { remove: ['Course work'] }, assignees: ['me'] });
+    expect(updated.changed).toEqual(expect.arrayContaining(['due_date', 'labels', 'assignees']));
+    expect((await cardRef.get()).data()).toMatchObject({ labelIds: [], assigneeUids: [organizer], attachmentCount: 1 });
+    const beforeCardNoop = (await cardRef.get()).data();
+    expect(beforeCardNoop?.dueDate).toBeUndefined();
+    expect((await call('update_card', { card_id: card.id, due_date: null, labels: { remove: ['Course work'] }, assignees: ['me'] })).changed).toEqual([]);
+    expect((await cardRef.get()).get('updatedAt')).toBe(beforeCardNoop?.updatedAt);
+
+    const comment = await call('comment', { card_id: card.id, text: 'First draft' });
+    await call('comment', { card_id: card.id, comment_id: comment.commented, text: 'Updated draft' });
+    const queried = await call('query_cards', { ids: [card.id], include: { attachments: true, comments: 1 } });
+    expect(queried.cards[0]).toMatchObject({ comments: [{ id: comment.commented, text: 'Updated draft' }], attachments: [{ id: upload.id }] });
+
+    const quiet = await call('clone_board', { board: source.id, name: 'Quiet clone' });
+    const followed = await call('clone_board', { board: source.id, name: 'Followed clone', subscribe: true });
+    expect((await call('clone_board', { board: source.id, name: 'Repeated clone', clone_id: quiet.id })).id).toBe(quiet.id);
+    expect((await client.callTool({ name: 'clone_board', arguments: { board: followed.id, name: 'Wrong source', clone_id: quiet.id } })).isError).toBe(true);
+    for (const [id, subscribers] of [[quiet.id, []], [followed.id, [organizer]]] as const) {
+      const clone = await adminDb().collection('cards').where('boardId', '==', id).get();
+      expect(clone.docs[0].data()).toMatchObject({ subscriberUids: subscribers, attachmentCount: 0 });
+    }
+
+    const copied = await call('copy_cards', { card_ids: [card.id], board: quiet.id, column: 'To Do' });
+    expect((await adminDb().doc(`cards/${copied.cards[0].id}`).get()).data()).toMatchObject({ subscriberUids: [organizer], attachmentCount: 0 });
+    await call('update_card', { card_id: card.id, assignees: ['Otto'], labels: { add: ['Course work'] } });
+    const move = { card_ids: [card.id], board: quiet.id, column: 'Review' };
+    expect(await call('move_cards', { ...move, preview: true })).toMatchObject({
+      preview: true, cards: [{ dropped_labels: ['Course work'], unassigned: [OTHER] }],
+    });
+    expect((await cardRef.get()).data()?.boardId).toBe(source.id);
+    const other = await connect((await signIn(ME)).access_token);
+    const pending = parsed(await other.callTool({ name: 'prepare_attachments', arguments: {
+      card_id: card.id, attachments: [{ name: 'pending.txt', size_bytes: Buffer.byteLength(bytes) }],
+    } })).attachments[0];
+    await call('move_cards', move);
+    const lostAccess = await fetch(pending.upload_url, { method: pending.method, headers: pending.headers, body: bytes });
+    expect(lostAccess.status).toBe(403);
+    expect((await cardRef.collection('attachments').doc(pending.id).get()).get('status')).toBe('uploading');
+    expect((await cardRef.get()).data()).toMatchObject({ boardId: quiet.id, attachmentCount: 1 });
+    await call('update_card', { card_ids: [card.id, copied.cards[0].id], assignees: ['me'] });
+    expect((await cardRef.get()).data()?.assigneeUids).toEqual([organizer]);
+    expect((await adminDb().doc(`cards/${copied.cards[0].id}`).get()).data()?.assigneeUids).toEqual([organizer]);
+    await call('set_cards_archived', { card_ids: [card.id], archived: true });
+    expect((await cardRef.get()).data()?.archived).toBe(true);
+    await call('set_cards_archived', { card_ids: [card.id], archived: false });
+    expect((await cardRef.get()).data()?.archived).toBe(false);
+
+    const subtask = await call('add_card', { board: quiet.id, column: 'To Do', lane: null, title: 'Proofread it', parent_id: card.id });
+    const family = [card.id, subtask.id];
+    // Two same-rank neighbors are valid after concurrent app writes.
+    const tied = [copied.cards[0].id, subtask.id].sort();
+    await Promise.all(tied.map((id) => adminDb().doc(`cards/${id}`).update({ rank: 'V' })));
+    await call('move_cards', { card_ids: [card.id], column: 'To Do', before_card_id: tied[1] });
+    expect((await cardRef.get()).get('rank') < 'V').toBe(true);
+    for (const id of tied) expect((await adminDb().doc(`cards/${id}`).get()).get('rank')).toBe('V');
+    await call('set_cards_archived', { card_ids: family, archived: true });
+    expect((await client.callTool({ name: 'set_cards_archived', arguments: { card_ids: [subtask.id], archived: false } })).isError).toBe(true);
+    await call('set_cards_archived', { card_ids: family, archived: false });
+    expect((await adminDb().doc(`cards/${subtask.id}`).get()).data()).toMatchObject({ parentId: card.id, archived: false });
+
+    await call('set_board_archived', { board: followed.id, archived: true });
+    expect((await adminDb().doc(`boards/${followed.id}`).get()).data()?.archived).toBe(true);
+    await call('set_board_archived', { board: followed.id, archived: false });
+    expect((await adminDb().doc(`boards/${followed.id}`).get()).data()?.archived).toBe(false);
+
+    expect((await other.callTool({ name: 'update_board', arguments: { board: source.id, name: 'Unauthorised rename' } })).isError).toBe(true);
+    expect((await other.callTool({ name: 'get_attachment_url', arguments: { card_id: card.id, attachment_id: upload.id } })).isError).toBe(true);
+
+    const race = await call('add_card', { board: source.id, column: 'To Do', lane: null, title: 'Race with membership removal' });
+    const organizerToken = await idTokenFor(organizer);
+    const [removed] = await Promise.all([
+      callFunction('removeBoardMember', { boardId: source.id, uid: OTHER }, organizerToken),
+      client.callTool({ name: 'update_card', arguments: { card_id: race.id, assignees: ['Otto'] } }),
+    ]);
+    expect(removed.body.result).toMatchObject({ ok: true });
+    expect((await boardRef.get()).get('memberUids')).not.toContain(OTHER);
+    expect((await adminDb().doc(`cards/${race.id}`).get()).get('assigneeUids')).not.toContain(OTHER);
+    const [empty] = (await call('prepare_attachments', { card_id: race.id, attachments: [{ name: 'blank.txt', size_bytes: 0 }] })).attachments;
+    const emptyUpload = await fetch(empty.upload_url, { method: empty.method, headers: empty.headers, body: '' });
+    expect(await emptyUpload.json()).toMatchObject({ id: empty.id, status: 'ready', sizeBytes: 0 });
+
+    await other.close();
+    await client.close();
+  });
+
+  it('keeps the subtask hierarchy acyclic when links are edited concurrently', async () => {
+    const client = await connect((await signIn(ME)).access_token);
+    const create = async (title: string, parent_id?: string) => parsed(await client.callTool({
+      name: 'add_card', arguments: { board: 'Agent Board', column: 'To Do', title, ...(parent_id ? { parent_id } : {}) },
+    }));
+    const left = await create('Left root');
+    const right = await create('Right root');
+    const leftChild = await create('Left child', left.id);
+    const rightChild = await create('Right child', right.id);
+    const outcomes = await Promise.all([
+      client.callTool({ name: 'update_card', arguments: { card_id: left.id, parent_id: rightChild.id } }),
+      client.callTool({ name: 'update_card', arguments: { card_id: right.id, parent_id: leftChild.id } }),
+    ]);
+    expect(outcomes.filter((result) => !result.isError)).toHaveLength(1);
+    const records = await Promise.all([left, right].map((card) => adminDb().doc(`cards/${card.id}`).get()));
+    expect(records.filter((record) => record.get('parentId'))).toHaveLength(1);
+    await client.close();
   });
 });
