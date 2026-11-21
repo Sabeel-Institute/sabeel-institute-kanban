@@ -456,6 +456,12 @@ the team.
 
 ## Deploy log
 
+### 2026-11-21 — Robot badges in board history — v0.24.1
+
+- Board history identifies changes made through the Kanban MCP server, including the creation history of boards and cards made by cloning.
+- Board history, card activity and comments show the robot after the person’s name and keep it with the name when a line wraps.
+- The Board Settings help film and user manual show how to read the badge.
+
 ### 2026-11-21 — Agent activity badges and date-range search — v0.24.0
 
 - A robot badge appears beside the person’s name on comments posted by an AI agent and on card history entries it generates.
