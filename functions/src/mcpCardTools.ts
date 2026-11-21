@@ -11,15 +11,10 @@ import {
   type CardDoc, type Label,
 } from '@sabeel/shared';
 import { attachmentInputs, withAttachments } from './mcpAttachmentTools';
+import { agentEdit } from './agentActivity';
 import { cardLink, check, docId, itemNamed, named, word, writeResult, type McpActor, type WriteBoard, type WriteTools } from './mcpWrite';
 
 type Card = CardDoc & { id: string };
-
-function agentEdit(me: McpActor, now: number, card?: Card) {
-  // Each write must have a fresh marker, including two edits in one millisecond.
-  const at = Math.max(now, (card?.agentAt ?? 0) + 1);
-  return { agentAt: at, updatedAt: at, updatedBy: me.uid };
-}
 
 const ids = docId.array().min(1).max(20);
 const list = word.array().max(30);
@@ -204,7 +199,7 @@ async function transferCards(fs: Firestore, me: McpActor, board: WriteTools['boa
       const keepMembers = (uids: string[]) => uids.filter((uid) => members.includes(uid));
       const labelIds = cross ? labelIdsAfterBoardChange(card.labelIds, labels, dest.id) : card.labelIds;
       const assigneeUids = cross ? keepMembers(card.assigneeUids) : card.assigneeUids;
-      const common = { boardId: dest.id, columnId: column.id, rank, labelIds, assigneeUids, ...agentEdit(me, now, copy ? undefined : card) };
+      const common = { boardId: dest.id, columnId: column.id, rank, labelIds, assigneeUids, ...agentEdit(me.uid, now, copy ? undefined : card) };
       const ref = copy && !f.preview ? doc(collection(fs, 'cards')) : cardRef(fs, card.id);
       if (copy && !f.preview) {
         tx.set(ref, {
@@ -269,7 +264,7 @@ export function registerCardWrites({ server, run, me, board }: WriteTools, base:
       const { dueDate: _dueDate, ...details } = detailPatch(f, dest, me);
       tx.set(ref, {
         ...newCardDoc({ boardId: dest.id, columnId: column.id, title: f.title, uid: me.uid, lastRank: lastRank(cards, column.id), subscribe: f.subscribe ?? member, laneId: lane, now }),
-        ...agentEdit(me, now),
+        ...agentEdit(me.uid, now),
         ...details,
         ...(f.due_date ? { dueDate: f.due_date } : {}),
         ...(f.labels ? { labelIds: findLabels(labels, dest.id, f.labels) } : {}),
@@ -321,7 +316,7 @@ export function registerCardWrites({ server, run, me, board }: WriteTools, base:
         const changed = entries.map(([key]) => key);
         if (changed.length) {
           const updates = Object.fromEntries(entries.map(([key, value]) => [key, value === undefined ? deleteField() : value]));
-          tx.update(cardRef(fs, card.id), { ...updates, ...agentEdit(me, Date.now(), card) });
+          tx.update(cardRef(fs, card.id), { ...updates, ...agentEdit(me.uid, Date.now(), card) });
         }
         return { ...cardAnswer({ ...card, title: f.title ?? card.title }, target), changed: changed.map((key) => cardFieldNames[key] ?? key) };
       });
@@ -369,7 +364,7 @@ export function registerCardWrites({ server, run, me, board }: WriteTools, base:
       let movedRank: string | null = null;
       return placements.map(({ card, column }) => {
         if ((card.archived === true) !== f.archived) {
-          const patch: Record<string, unknown> = { archived: f.archived, archivedAt: f.archived ? now : deleteField(), ...agentEdit(me, now, card) };
+          const patch: Record<string, unknown> = { archived: f.archived, archivedAt: f.archived ? now : deleteField(), ...agentEdit(me.uid, now, card) };
           if (!f.archived && column.id !== card.columnId) {
             movedRank = rankBetween(movedRank ?? lastRank(all, column.id), null);
             Object.assign(patch, { columnId: column.id, rank: movedRank });

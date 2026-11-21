@@ -10,6 +10,7 @@ import { db } from '../firebase';
 import { useLiveQuery } from '../liveQuery';
 import { when, whenWithin } from '../activityTime';
 import { Button, Hint, Row, Spinner } from './ui';
+import { AgentBadge } from './AgentBadge';
 import { radius, space, useTheme } from '../theme';
 
 /** How many entries are shown at first, and how many each Show older adds. */
@@ -61,6 +62,7 @@ export function BoardHistory({ boardId }: { boardId: string }) {
           <View style={[styles.tick, { backgroundColor: t.border.strong }]} />
           <View style={styles.text}>
             <Hint>
+              {e.via === 'agent' ? <><AgentBadge />{' '}</> : null}
               {/* An entry newer than this build reads as a neutral line, never
                   as nothing and never as some other change. */}
               {isKnownBoardActivityType(e.type)

@@ -1000,6 +1000,9 @@ cleared, with its value. Everyone on the board
 sees it, owners or not. What happens to a card is in that card's own
 history, on the card.
 
+A robot beside a name marks a change made by an AI assistant on that
+person's behalf.
+
 Nobody can edit or delete a line of it. The newest twenty show first; **Show
 older** brings in the next twenty.
 

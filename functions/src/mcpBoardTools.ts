@@ -9,6 +9,7 @@ import {
   type BoardDoc, type BoardField, type Label,
 } from '@sabeel/shared';
 import { cloneBoardFor } from './boards';
+import { agentEdit } from './agentActivity';
 import { boardLink, check, itemNamed, named, ordered, word, writeResult, type McpActor, type WriteTools } from './mcpWrite';
 
 const rename = z.object({ from: word, to: word }).strict();
@@ -198,7 +199,7 @@ async function updateBoard(id: string, me: McpActor, f: Changes & { archived?: b
     for (const key of Object.keys(patch) as (keyof BoardDoc)[]) {
       if (isDeepStrictEqual(patch[key], board[key])) delete patch[key];
     }
-    if (Object.keys(patch).length) tx.update(ref, { ...patch, updatedBy: me.uid, updatedAt: now });
+    if (Object.keys(patch).length) tx.update(ref, { ...patch, ...agentEdit(me.uid, now, board) });
     for (const write of labelWrites) {
       const labelRef = db.doc(`labels/${write.id}`);
       if (write.create) tx.create(labelRef, write.value);
@@ -216,9 +217,11 @@ export function registerBoardWrites({ server, run, me, board }: WriteTools) {
     inputSchema: { name: word },
   }, ({ name }) => run(async (fs: Firestore) => {
     check(validateBoardName(name));
-    const saved = await addDoc(collection(fs, 'boards'), newBoard({
-      name, createdBy: me.uid, createdByProfile: { displayName: me.name, email: me.email }, now: Date.now(),
-    }));
+    const now = Date.now();
+    const data = newBoard({
+      name, createdBy: me.uid, createdByProfile: { displayName: me.name, email: me.email }, now,
+    });
+    const saved = await addDoc(collection(fs, 'boards'), { ...data, agentAt: now });
     return writeResult({ id: saved.id, name, url: boardLink(saved.id) });
   }));
 
@@ -236,7 +239,10 @@ export function registerBoardWrites({ server, run, me, board }: WriteTools) {
     },
   }, (f) => run(async (fs) => {
     const source = await board(fs, f.board);
-    const result = await cloneBoardFor(me, { boardId: source.id, name: f.name, cloneId: f.clone_id ?? doc(collection(fs, 'boards')).id, subscribe: f.subscribe });
+    const result = await cloneBoardFor(me, {
+      boardId: source.id, name: f.name, cloneId: f.clone_id ?? doc(collection(fs, 'boards')).id,
+      subscribe: f.subscribe, via: 'agent',
+    });
     return writeResult({ id: result.boardId, name: result.name, url: boardLink(result.boardId) });
   }));
 

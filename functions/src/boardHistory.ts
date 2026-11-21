@@ -3,6 +3,7 @@ import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { guardedEvent, sentryDsn } from './sentry';
 import { getFirestore } from 'firebase-admin/firestore';
 import { storedName } from './names';
+import { agentAttribution } from './agentActivity';
 import {
   withCleanExtras,
   CLONED_ENTRY_ID,
@@ -50,6 +51,7 @@ export const onBoardWritten = onDocumentWritten(
     // The name as it is NOW, stored: an admin who is not on the board has no
     // profile there, and nobody's profile survives their leaving it.
     const actorName = await storedName(actorUid);
+    const attribution = agentAttribution(before, after);
     // When the board was written, to the millisecond: the history is ordered
     // by it. Not `event.time`, which the emulator gives in whole seconds, so
     // two changes in one second tied and fell back on the entries' random ids.
@@ -58,7 +60,7 @@ export const onBoardWritten = onDocumentWritten(
 
     const batch = db.batch();
     changes.forEach((change, i) => {
-      const entry: BoardActivityDoc = { ...change, at, actorUid, actorName };
+      const entry: BoardActivityDoc = { ...change, at, actorUid, actorName, ...attribution };
       // Firestore rejects undefined, so only set what exists.
       const fields = Object.fromEntries(
         Object.entries(entry).filter(([, v]) => v !== undefined),

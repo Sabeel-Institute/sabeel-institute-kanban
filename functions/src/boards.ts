@@ -382,7 +382,13 @@ export const cloneBoard = onCall({ secrets: [sentryDsn] }, guarded(async (reques
 
 export async function cloneBoardFor(
   actor: ReturnType<typeof actorOf>,
-  { boardId, name, cloneId, subscribe }: { boardId: string; name: string; cloneId: string; subscribe?: boolean },
+  { boardId, name, cloneId, subscribe, via }: {
+    boardId: string;
+    name: string;
+    cloneId: string;
+    subscribe?: boolean;
+    via?: BoardActivityDoc['via'];
+  },
 ) {
   if (!canCreateBoards(actor)) {
     throw new HttpsError('permission-denied', 'Only organizers and admins can clone a board, because a clone is a new board.');
@@ -465,6 +471,7 @@ export async function cloneBoardFor(
     // Every line the clone writes names who cloned it (names.ts).
     const clonerName = me.data()?.displayName;
     const cloner = typeof clonerName === 'string' && clonerName ? { actorName: clonerName } : {};
+    const attribution = via ? { via } : {};
     // The clone's history opens with where it came from, and that is the only
     // record of it (Faisal, 2026-11-15: a clone is only a clone). Under a fixed
     // id, so `onBoardWritten` knows not to add a "created" line of its own.
@@ -474,13 +481,14 @@ export async function cloneBoardFor(
       at: now,
       actorUid: actor.uid,
       ...cloner,
+      ...attribution,
     };
     tx.create(cloneRef.collection('activity').doc(CLONED_ENTRY_ID), cloned);
     tx.create(provenance, { sourceBoardId: boardId });
     for (const card of clone.cards) {
       const cardRef = db.doc(`cards/${card.id}`);
       tx.create(cardRef, card.data);
-      tx.create(cardRef.collection('activity').doc(), { ...card.created, ...cloner });
+      tx.create(cardRef.collection('activity').doc(), { ...card.created, ...cloner, ...attribution });
     }
     return { made: clone.cards.length, name: clone.board.name };
   });

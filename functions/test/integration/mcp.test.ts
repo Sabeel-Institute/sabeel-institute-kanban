@@ -378,6 +378,11 @@ describe('Kanban write tools', () => {
     const call = async (name: string, args: Record<string, unknown>) => parsed(await client.callTool({ name, arguments: args }));
     const source = await call('create_board', { name: 'MCP Course' });
     const boardRef = adminDb().doc(`boards/${source.id}`);
+    const boardHistory = boardRef.collection('activity');
+    const created = await waitFor('the agent board creation', async () =>
+      (await boardHistory.where('type', '==', 'created').get()).docs[0]?.data(),
+    );
+    expect(created).toMatchObject({ actorUid: organizer, via: 'agent' });
     const changed = await call('update_board', {
       board: source.id, template: true, columns: { add: ['Review'], order: ['To Do', 'In Progress', 'Review', 'Done'] },
       lanes: { enabled: true, add: ['Teaching', 'Logistics'], order: ['Logistics', 'Teaching'], finished_column: 'Done' },
@@ -388,6 +393,19 @@ describe('Kanban write tools', () => {
     });
     expect(changed.id).toBe(source.id);
     expect((await boardRef.get()).data()).toMatchObject({ memberUids: [organizer, OTHER, ME], boardOwnerUids: [organizer, OTHER], template: true, lanesOn: true });
+    for (const type of ['columnAdded', 'laneAdded', 'detailChanged', 'memberAdded', 'ownerAdded']) {
+      const saved = await waitFor(`the agent board change: ${type}`, async () =>
+        (await boardHistory.where('type', '==', type).get()).docs[0]?.data(),
+      );
+      expect(saved).toMatchObject({ actorUid: organizer, via: 'agent' });
+    }
+    // A later app save retains the marker on the board.
+    await boardRef.update({ name: 'Renamed by a person', updatedAt: Date.now(), updatedBy: organizer });
+    const humanChange = await waitFor('the ordinary board rename', async () =>
+      (await boardHistory.where('type', '==', 'renamed').get()).docs[0]?.data(),
+    );
+    expect(humanChange.via).toBeUndefined();
+    await call('update_board', { board: source.id, name: 'MCP Course' });
     await call('update_board', { board: source.id, details: { Classroom: null, 'Start date': '2026-12-03' } });
     const [board] = await call('query_boards', { board: source.id, include: { details: true, lanes: true, columns: true, labels: true } });
     expect(board).toMatchObject({
@@ -457,8 +475,14 @@ describe('Kanban write tools', () => {
     expect((await call('clone_board', { board: source.id, name: 'Repeated clone', clone_id: quiet.id })).id).toBe(quiet.id);
     expect((await client.callTool({ name: 'clone_board', arguments: { board: followed.id, name: 'Wrong source', clone_id: quiet.id } })).isError).toBe(true);
     for (const [id, subscribers] of [[quiet.id, []], [followed.id, [organizer]]] as const) {
+      const cloneHistory = await adminDb().doc(`boards/${id}/activity/cloned`).get();
+      expect(cloneHistory.data()).toMatchObject({ actorUid: organizer, via: 'agent' });
       const clone = await adminDb().collection('cards').where('boardId', '==', id).get();
       expect(clone.docs[0].data()).toMatchObject({ subscriberUids: subscribers, attachmentCount: 0 });
+      const cardHistory = await clone.docs[0].ref.collection('activity').get();
+      expect(cardHistory.docs.map((entry) => entry.data())).toEqual([
+        expect.objectContaining({ type: 'created', actorUid: organizer, via: 'agent' }),
+      ]);
     }
 
     const copied = await call('copy_cards', { card_ids: [card.id], board: quiet.id, column: 'To Do' });
