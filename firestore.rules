@@ -371,7 +371,9 @@ service cloud.firestore {
       allow create: if canCreateBoards()
         && incoming().keys().hasOnly(['name', 'description', 'archived', 'columns',
             'columnIds', 'memberUids', 'memberProfiles', 'boardOwnerUids',
-            'activeCardCount', 'createdAt', 'createdBy'])
+            'activeCardCount', 'createdAt', 'createdBy', 'agentAt'])
+        && (!('agentAt' in incoming()) || (isAgentSession()
+            && incoming().agentAt is number && incoming().agentAt == incoming().createdAt))
         && incoming().get('boardOwnerUids', []) == [request.auth.uid]
         && incoming().createdBy == request.auth.uid
         && incoming().archived == false
@@ -410,7 +412,8 @@ service cloud.firestore {
         && incoming().keys().hasOnly(['name', 'description', 'archived', 'columns',
             'columnIds', 'memberUids', 'memberProfiles', 'boardOwnerUids',
             'activeCardCount', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy',
-            'lanesOn', 'lanes', 'doneColumnId', 'fields', 'details', 'template'])
+            'lanesOn', 'lanes', 'doneColumnId', 'fields', 'details', 'template', 'agentAt'])
+        && !incoming().diff(existing()).affectedKeys().hasAny(['agentAt'])
         && incoming().get('boardOwnerUids', []) is list
         && incoming().createdBy == existing().createdBy
         // History, not state. Neither is the client's to rewrite.

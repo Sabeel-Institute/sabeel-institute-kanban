@@ -448,12 +448,12 @@ for (const [id, columnId, title, priority] of CARDS) {
     // below is created, so seeding both made every card read "Comments (2)"
     // with one comment under it.
     commentCount: 0,
-    createdAt: now, createdBy: uid, updatedAt: now, updatedBy: uid,
+    createdAt: now, createdBy: uid, updatedAt: now, updatedBy: uid, agentAt: now,
   });
   await db.doc(`cards/${id}/comments/cm1`).set({
     authorUid: uid,
     body: 'A **formatted** comment, so the rendered thread is measured too:\n\n- with a bullet\n- and [a link](https://example.org)',
-    mentionUids: [], createdAt: now,
+    mentionUids: [], createdAt: now, authorName: 'Faisal', via: 'agent',
   });
 }
 await db.doc('cards/sw_archived').set({
@@ -467,6 +467,9 @@ await db.doc(`users/${uid}/notifications/n1`).set({
   read: false, at: now,
 });
 await db.doc(`users/${uid}`).update({ unreadNotifCount: 1 });
+await db.doc(`boards/${BOARD}/activity/agent-fixture`).set({
+  type: 'columnAdded', to: 'Agent review', actorUid: uid, actorName: 'Faisal', at: now, via: 'agent',
+});
 console.log(`  seeded 1 board, ${CARDS.length} cards, 2 labels, 1 archived card, 1 alert`);
 console.log(`  breakpoint read from source: ${WIDE_BREAKPOINT}px\n`);
 
@@ -1158,6 +1161,9 @@ async function tour(page, tag, width) {
   await visit('card', async () => {
     await page.locator('[data-testid^="card-"]').first().click();
     await page.getByRole('button', { name: 'Share card' }).waitFor({ timeout: 20000 });
+    await page.getByText(/^Faisal(?: Shah)? 🤖 created this card/).waitFor();
+    await page.getByText(/^Faisal(?: Shah)? 🤖 · /).waitFor();
+    check(`${tag} / the badge follows the name in card activity and comments`, true);
   });
   /**
    * THE EDITING STATES, which are their own layouts.
@@ -1290,6 +1296,14 @@ async function tour(page, tag, width) {
       }
       await page.waitForTimeout(300);
     });
+    if (name === 'History') {
+      const badge = page.getByLabel('Via AI agent', { exact: true });
+      await badge.waitFor();
+      check(
+        `${tag} / Board settings → History identifies agent activity`,
+        (await badge.count()) === 1 && await page.getByText(/Faisal 🤖 added the column “Agent review”/).isVisible(),
+      );
+    }
     if (name === 'Columns') {
       // The one place a column is renamed and deleted: every column has both.
       const ctl = await page.evaluate(() => {

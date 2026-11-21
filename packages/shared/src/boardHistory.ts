@@ -244,103 +244,113 @@ function shortValue(value: string): string {
  * a person the record does not have.
  */
 export function describeBoardActivity(e: Describable): string {
+  const { actor, action } = boardActivityText(e);
+  return actor ? `${actor} ${action}` : action;
+}
+
+/** Keep the author separate so activity views can render its badge inline. */
+export function boardActivityText(e: Describable) {
+  const actor = e.actorUid === undefined ? undefined : e.actorName || 'Someone';
+  return { actor, action: describeBoardAction(e) };
+}
+
+function describeBoardAction(e: Describable): string {
   const known = e.actorUid !== undefined;
-  const actor = e.actorName || 'Someone';
   const subject = e.subjectName || 'someone';
   const Subject = e.subjectName || 'Someone';
   const self = known && e.actorUid === e.subjectUid;
   const quoted = (s: string | undefined) => `“${s ?? ''}”`;
   switch (e.type) {
     case 'created':
-      return known ? `${actor} created the board` : 'The board was created';
+      return known ? 'created the board' : 'The board was created';
     case 'renamed':
       return known
-        ? `${actor} renamed the board to ${quoted(e.to)}`
+        ? `renamed the board to ${quoted(e.to)}`
         : `The board was renamed to ${quoted(e.to)}`;
     case 'archived':
-      return known ? `${actor} archived the board` : 'The board was archived';
+      return known ? 'archived the board' : 'The board was archived';
     case 'restored':
-      return known ? `${actor} restored the board` : 'The board was restored';
+      return known ? 'restored the board' : 'The board was restored';
     case 'memberAdded':
-      if (self) return `${actor} joined the board`;
-      return known ? `${actor} added ${subject}` : `${Subject} was added to the board`;
+      if (self) return 'joined the board';
+      return known ? `added ${subject}` : `${Subject} was added to the board`;
     case 'memberRemoved':
-      if (self) return `${actor} left the board`;
-      return known ? `${actor} removed ${subject}` : `${Subject} was taken off the board`;
+      if (self) return 'left the board';
+      return known ? `removed ${subject}` : `${Subject} was taken off the board`;
     case 'ownerAdded':
-      if (self) return `${actor} made themselves an owner`;
-      return known ? `${actor} made ${subject} an owner` : `${Subject} was made an owner`;
+      if (self) return 'made themselves an owner';
+      return known ? `made ${subject} an owner` : `${Subject} was made an owner`;
     case 'ownerRemoved':
-      if (self) return `${actor} stepped down as an owner`;
+      if (self) return 'stepped down as an owner';
       return known
-        ? `${actor} removed ${subject} as an owner`
+        ? `removed ${subject} as an owner`
         : `${Subject} stopped being an owner`;
     case 'columnAdded':
       return known
-        ? `${actor} added the column ${quoted(e.to)}`
+        ? `added the column ${quoted(e.to)}`
         : `The column ${quoted(e.to)} was added`;
     case 'columnRemoved':
       return known
-        ? `${actor} removed the column ${quoted(e.from)}`
+        ? `removed the column ${quoted(e.from)}`
         : `The column ${quoted(e.from)} was removed`;
     case 'columnRenamed':
       return known
-        ? `${actor} renamed the column ${quoted(e.from)} to ${quoted(e.to)}`
+        ? `renamed the column ${quoted(e.from)} to ${quoted(e.to)}`
         : `The column ${quoted(e.from)} was renamed to ${quoted(e.to)}`;
     case 'columnsReordered':
-      return known ? `${actor} reordered the columns` : 'The columns were reordered';
+      return known ? 'reordered the columns' : 'The columns were reordered';
     case 'lanesOn':
-      return known ? `${actor} turned lanes on` : 'Lanes were turned on';
+      return known ? 'turned lanes on' : 'Lanes were turned on';
     case 'lanesOff':
-      return known ? `${actor} turned lanes off` : 'Lanes were turned off';
+      return known ? 'turned lanes off' : 'Lanes were turned off';
     case 'laneAdded':
       return known
-        ? `${actor} added the lane ${quoted(e.to)}`
+        ? `added the lane ${quoted(e.to)}`
         : `The lane ${quoted(e.to)} was added`;
     case 'laneRemoved':
       return known
-        ? `${actor} removed the lane ${quoted(e.from)}`
+        ? `removed the lane ${quoted(e.from)}`
         : `The lane ${quoted(e.from)} was removed`;
     case 'laneRenamed':
       return known
-        ? `${actor} renamed the lane ${quoted(e.from)} to ${quoted(e.to)}`
+        ? `renamed the lane ${quoted(e.from)} to ${quoted(e.to)}`
         : `The lane ${quoted(e.from)} was renamed to ${quoted(e.to)}`;
     case 'lanesReordered':
-      return known ? `${actor} reordered the lanes` : 'The lanes were reordered';
+      return known ? 'reordered the lanes' : 'The lanes were reordered';
     case 'finishedColumn':
       return known
-        ? `${actor} set the finished column to ${quoted(e.to)}`
+        ? `set the finished column to ${quoted(e.to)}`
         : `The finished column was set to ${quoted(e.to)}`;
     case 'fieldAdded':
       return known
-        ? `${actor} added the field ${quoted(e.to)}`
+        ? `added the field ${quoted(e.to)}`
         : `The field ${quoted(e.to)} was added`;
     case 'fieldRemoved':
       return known
-        ? `${actor} removed the field ${quoted(e.from)}`
+        ? `removed the field ${quoted(e.from)}`
         : `The field ${quoted(e.from)} was removed`;
     case 'fieldRenamed':
       return known
-        ? `${actor} renamed the field ${quoted(e.from)} to ${quoted(e.to)}`
+        ? `renamed the field ${quoted(e.from)} to ${quoted(e.to)}`
         : `The field ${quoted(e.from)} was renamed to ${quoted(e.to)}`;
     case 'fieldsReordered':
-      return known ? `${actor} reordered the details` : 'The details were reordered';
+      return known ? 'reordered the details' : 'The details were reordered';
     case 'detailChanged':
       if (e.to === undefined) {
-        return known ? `${actor} cleared ${quoted(e.field)}` : `${quoted(e.field)} was cleared`;
+        return known ? `cleared ${quoted(e.field)}` : `${quoted(e.field)} was cleared`;
       }
       return known
-        ? `${actor} set ${quoted(e.field)} to ${quoted(shortValue(e.to))}`
+        ? `set ${quoted(e.field)} to ${quoted(shortValue(e.to))}`
         : `${quoted(e.field)} was set to ${quoted(shortValue(e.to))}`;
     case 'templateOn':
-      return known ? `${actor} marked the board as a template` : 'The board was marked as a template';
+      return known ? 'marked the board as a template' : 'The board was marked as a template';
     case 'templateOff':
       return known
-        ? `${actor} took the template mark off the board`
+        ? 'took the template mark off the board'
         : 'The board stopped being a template';
     case 'cloned':
       return known
-        ? `${actor} cloned this board from ${quoted(e.from)}`
+        ? `cloned this board from ${quoted(e.from)}`
         : `This board was cloned from ${quoted(e.from)}`;
   }
 }

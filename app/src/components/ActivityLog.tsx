@@ -13,7 +13,7 @@ import { when } from '../activityTime';
 import { useLiveQuery } from '../liveQuery';
 import type { BoardMemberProfile } from '../boards';
 import { Hint, Row, Spinner } from './ui';
-import { AgentBadge } from './AgentBadge';
+import { ActivityActor } from './ActivityActor';
 import { StyleSheet, View } from 'react-native';
 import { radius, space, useTheme } from '../theme';
 
@@ -102,8 +102,7 @@ export function ActivityLog({
         <Row key={e.id} style={styles.row}>
           <View style={[styles.tick, { backgroundColor: t.border.strong }]} />
           <Hint>
-            {e.actorName ?? nameFor(e.actorUid)}
-            {e.via === 'agent' ? <AgentBadge /> : null}
+            <ActivityActor name={e.actorName ?? nameFor(e.actorUid)} via={e.via} />
             {' '}
             {e.type === null
               ? 'made a change'

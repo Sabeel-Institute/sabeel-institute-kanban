@@ -6,6 +6,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { diffCard, SYSTEM_ACTOR, UNKNOWN_ACTOR, type CardSnapshot } from '@sabeel/shared';
 import { recordStat } from './stats';
 import { storedName } from './names';
+import { agentAttribution } from './agentActivity';
 
 /**
  * Card history, written by the server so it cannot be forged.
@@ -42,10 +43,7 @@ export const onCardWritten = onDocumentWritten(
     // Stored with each line (names.ts): the history names who did it whether
     // or not they are on the board when someone reads it.
     const actorName = await storedName(actorUid);
-    const viaAgent = after?.agentAt !== undefined
-      && after.agentAt !== before?.agentAt
-      && after.agentAt === after.updatedAt;
-    const by = { actorUid, ...(actorName ? { actorName } : {}), ...(viaAgent ? { via: 'agent' } : {}) };
+    const by = { actorUid, ...(actorName ? { actorName } : {}), ...agentAttribution(before, after) };
     const at = Date.now();
 
     const db = getFirestore();

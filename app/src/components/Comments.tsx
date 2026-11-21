@@ -15,7 +15,7 @@ import {
   Spinner,
 } from './ui';
 import { RichText } from './RichText';
-import { AgentBadge } from './AgentBadge';
+import { ActivityActor } from './ActivityActor';
 import { RichEditor } from './RichEditor';
 import { space } from '../theme';
 import { useAction } from '../useAction';
@@ -308,8 +308,7 @@ export function Comments({
                 target stays finger-sized while the visual footprint is a word. */}
             <Row style={styles.between}>
               <Hint>
-                {c.authorName ?? nameFor.get(c.authorUid) ?? 'Someone'}
-                {c.via === 'agent' ? <AgentBadge /> : null}
+                <ActivityActor name={c.authorName ?? nameFor.get(c.authorUid) ?? 'Someone'} via={c.via} />
                 {' · '}{when(c.createdAt)}
                 {c.editedAt ? ' · edited' : ''}
               </Hint>

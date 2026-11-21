@@ -16,6 +16,7 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
 } from 'firebase/firestore';
 import { EMULATOR_PROJECT_ID, PASSWORD_SIGN_IN_EMAIL } from '@sabeel/shared';
 import { firestoreHostPort } from './emulatorHosts';
@@ -38,13 +39,14 @@ import { firestoreHostPort } from './emulatorHosts';
  */
 let env: RulesTestEnvironment;
 
-function ctx(uid: string, role: string, status = 'active') {
+function ctx(uid: string, role: string, status = 'active', kanbanMcp = false) {
   return env
     .authenticatedContext(uid, {
       email: `${uid}@oursabeel.com`,
       email_verified: true,
       role,
       status,
+      kanbanMcp,
     })
     .firestore();
 }
@@ -70,6 +72,17 @@ const baseBoard =(over: Record<string, unknown> = {}) => ({
   createdAt: 1,
   createdBy: 'owner1',
   ...over,
+});
+
+it('trusts board creation attribution from an agent session and preserves it on edits', async () => {
+  const app = doc(ctx('org1', 'organizer'), 'boards/agent-board');
+  const agent = doc(ctx('org1', 'organizer', 'active', true), 'boards/agent-board');
+  const board = baseBoard({ createdBy: 'org1', memberUids: ['org1'], boardOwnerUids: ['org1'] });
+  await assertFails(setDoc(app, { ...board, agentAt: 1 }));
+  await assertFails(setDoc(agent, { ...board, agentAt: 2 }));
+  await assertSucceeds(setDoc(agent, { ...board, agentAt: 1 }));
+  await assertFails(updateDoc(app, { ...stamp('org1'), agentAt: deleteField() }));
+  await assertSucceeds(updateDoc(app, { ...stamp('org1'), name: 'Renamed in the app' }));
 });
 
 beforeAll(async () => {

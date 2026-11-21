@@ -192,6 +192,8 @@ export interface BoardDoc {
    */
   updatedAt?: number;
   updatedBy?: string;
+  /** Timestamp of the most recent MCP write, for board history attribution. */
+  agentAt?: number;
   /**
    * Whether the board is divided into lanes. Absent means off, and a board
    * that never turns them on is exactly the board it was before lanes
@@ -481,6 +483,7 @@ export interface BoardActivityDoc {
    */
   actorUid?: string;
   actorName?: string;
+  via?: 'agent';
   /** Whom a member or owner entry is about. */
   subjectUid?: string;
   subjectName?: string;
