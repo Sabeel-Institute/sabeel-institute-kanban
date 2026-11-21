@@ -1065,11 +1065,12 @@ export const TUTORIALS = [
         },
       },
       {
-        say: "History is the board's history. Everything you just did is already there, with your name on it.",
+        say: "History shows who changed the board. Everything you just did is there with your name on it. A robot by a name means an assistant made that change on their behalf.",
         do: async (t) => {
           if (t.phone) await t.tap(t.btn('Back'));
           await t.tap(t.btn('History'));
           await t.highlight(t.text(/added the column “Waiting on parents”/, false));
+          await t.highlight(t.label('Via AI agent'));
         },
       },
       {

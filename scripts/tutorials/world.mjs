@@ -95,6 +95,7 @@ const BOARDS = [
     id: 'weekend-school',
     name: 'Weekend School',
     createdBy: 'sara',
+    createdViaAgent: true,
     owners: ['sara'],
     // Faisal is not on it: he is who the members film adds.
     members: ['sara', 'omar'],
@@ -326,6 +327,7 @@ export async function buildWorld() {
       activeCardCount: 0,
       createdAt: t0,
       createdBy: uids[b.createdBy],
+      ...(b.createdViaAgent ? { agentAt: t0 } : {}),
       ...(b.lanes
         ? {
             lanesOn: true,

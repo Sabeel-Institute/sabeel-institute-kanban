@@ -5,7 +5,7 @@ export function ActivityActor({ name, via }: { name: string; via?: 'agent' }) {
   return (
     <>
       {name}
-      {via === 'agent' ? <Text accessibilityLabel="Via AI agent">{' 🤖'}</Text> : null}
+      {via === 'agent' ? <Text accessibilityLabel="Via AI agent">{'\u00a0🤖'}</Text> : null}
     </>
   );
 }
