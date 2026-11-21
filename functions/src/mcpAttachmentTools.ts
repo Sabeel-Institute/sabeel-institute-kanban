@@ -23,7 +23,7 @@ export const attachmentInputs = z.object({
 
 export type AttachmentInputs = z.infer<typeof attachmentInputs>;
 
-export async function prepareAttachments(base: string, me: McpActor, cardId: string, files: AttachmentInputs) {
+async function prepareAttachments(base: string, me: McpActor, cardId: string, files: AttachmentInputs) {
   const db = getFirestore();
   const card = db.doc(`cards/${cardId}`);
   return db.runTransaction(async (tx) => {
