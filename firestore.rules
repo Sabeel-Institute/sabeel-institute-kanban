@@ -871,6 +871,7 @@ service cloud.firestore {
       // object by finalizeAttachment and never claimed by the uploader, so a
       // client cannot write it at all.
       allow create: if onBoard()
+        && !attachmentId.matches('^mcp_[A-Za-z0-9]{20}$')
         && attachment().keys().hasOnly(['name', 'contentType', 'uploadedBy', 'uploadedAt', 'status'])
         // You attach as yourself or not at all.
         && attachment().uploadedBy == request.auth.uid

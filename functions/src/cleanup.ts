@@ -2,7 +2,7 @@ import './setup';
 import { onDocumentDeleted } from 'firebase-functions/v2/firestore';
 import { logger } from 'firebase-functions/v2';
 import { guardedEvent, reportError, sentryDsn } from './sentry';
-import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore, type DocumentReference } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { UNKNOWN_ACTOR, type AttachmentDoc } from '@sabeel/shared';
 import { recordStat } from './stats';
@@ -127,38 +127,24 @@ export const onCardDeleted = onDocumentDeleted(
       .where('parentId', '==', cardId)
       .get();
 
-    // One update per child, NOT a batch, and each failure tolerated.
-    //
-    // `update()` on a document that no longer exists fails with NOT_FOUND, and a
-    // batch is atomic — so one child deleted in the window BETWEEN this query and
-    // the commit would take every other unlink down with it, leaving those cards
-    // dangling and permanently unlinkable (the picker refuses an already-parented
-    // card). That is the exact state this sweep exists to prevent, and the unlinks
-    // are independent, so atomicity buys nothing here.
-    //
-    // To be clear about the size of the risk: the ordinary case is already safe.
-    // Deleting a parent together with its subtasks goes through `bulkDelete`, one
-    // batch, so the children are gone BEFORE this query runs and simply are not
-    // returned — measured, not assumed. The window this closes is only the narrow
-    // one where a child is deleted concurrently by someone else mid-sweep. Cheap
-    // insurance against a failure whose signature would be silent and permanent.
-    //
-    // The unlink is stamped as nobody's. The history entry it makes, and the
-    // notice its followers get, take their actor from `updatedBy`, which would
-    // otherwise still name whoever last edited the child; and a delete trigger
-    // cannot know who deleted the parent.
-    const results = await Promise.allSettled(
-      children.docs.map((child) =>
-        child.ref.update({ parentId: FieldValue.delete(), updatedBy: UNKNOWN_ACTOR }),
-      ),
-    );
-    const failed = results.filter((r) => r.status === 'rejected').length;
+    // Treat the query as a list of candidates. A child may have been
+    // reparented or deleted while cleanup was in progress.
+    const results = await Promise.allSettled(children.docs.map((child) => unlinkDeletedParent(child.ref, cardId)));
+    const unlinked = results.filter((result) => result.status === 'fulfilled' && result.value).length;
 
     logger.info('cleaned up deleted card', {
       cardId,
-      unlinkedSubtasks: children.size - failed,
-      // Expected to be non-zero only when a child was deleted concurrently.
-      skippedSubtasks: failed,
+      unlinkedSubtasks: unlinked,
+      skippedSubtasks: children.size - unlinked,
     });
   }),
 );
+
+export function unlinkDeletedParent(child: DocumentReference, parentId: string): Promise<boolean> {
+  return child.firestore.runTransaction(async (tx) => {
+    if ((await tx.get(child)).get('parentId') !== parentId) return false;
+    // The delete event does not identify who deleted the parent.
+    tx.update(child, { parentId: FieldValue.delete(), updatedBy: UNKNOWN_ACTOR });
+    return true;
+  });
+}

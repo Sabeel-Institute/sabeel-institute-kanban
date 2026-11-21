@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { onCall, HttpsError, type CallableRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions/v2';
-import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore, type Transaction } from 'firebase-admin/firestore';
 import { storedName } from './names';
 import { getStorage } from 'firebase-admin/storage';
 import {
@@ -26,6 +26,7 @@ import { guarded, guardedEvent, sentryDsn } from './sentry';
 import { isEmulatorProject } from './env';
 import { recordStat } from './stats';
 import { actorOf } from './actor';
+import { isMcpAttachmentId, MCP_UPLOAD_COLLECTION, MCP_UPLOAD_TIMEOUT_SECONDS, uploadReservation, type UploadReservation } from './attachmentUploads';
 
 /**
  * Card attachments: the three things a client cannot do for itself.
@@ -130,43 +131,9 @@ async function recordActivity(
   }
 }
 
-/**
- * Keep the card's denormalised attachment count in step.
- *
- * Best-effort, exactly like the activity entry beside it: the card may have been
- * deleted along with its attachments, and a badge being briefly wrong is never
- * worth failing a user's action over. The board reads it as `?? 0`.
- */
-async function bumpAttachmentCount(cardId: string, by: number): Promise<void> {
-  try {
-    await db().doc(`cards/${cardId}`).update({
-      attachmentCount: FieldValue.increment(by),
-      // Attaching or removing a file is activity on the card, and `updatedAt`
-      // never sees it — that field is client-written on a card EDIT, and
-      // neither of these edits a card field. See `lastActivityOf` in
-      // @sabeel/shared, and the same line in the comment trigger.
-      lastActivityAt: Date.now(),
-    });
-  } catch (e) {
-    logger.debug('attachmentCount update skipped', { cardId, error: String(e) });
-  }
-}
-
-/**
- * The board a card is on, for the usage counters.
- *
- * Read here rather than threaded down from `requireCardAccess`, because these
- * effects are also reached from the nightly sweep, where there is no request and
- * nobody has looked the card up. Returns '' if the card has gone, which
- * `recordStat` treats as nothing to record.
- */
-async function boardIdForCard(cardId: string): Promise<string> {
-  try {
-    const card = await db().doc(`cards/${cardId}`).get();
-    return (card.data()?.boardId as string) ?? '';
-  } catch {
-    return '';
-  }
+/** File activity has its own clock so a card edit cannot erase it. */
+function attachmentCountPatch(by: number, lastActivityAt: number) {
+  return { attachmentCount: FieldValue.increment(by), lastActivityAt: Math.max(lastActivityAt, Date.now()) };
 }
 
 /**
@@ -207,14 +174,19 @@ export async function applyFinalizeAttachment(
   cardId: string,
   attachmentId: string,
   actorUid: string,
+  checkAccess?: (tx: Transaction, boardId: string) => Promise<void>,
 ) {
-  const ref = db().doc(`cards/${cardId}/attachments/${attachmentId}`);
+  const cardRef = db().doc(`cards/${cardId}`);
+  const ref = cardRef.collection('attachments').doc(attachmentId);
   const snap = await ref.get();
   if (!snap.exists) throw new HttpsError('not-found', 'No such attachment.');
   const existing = snap.data() as AttachmentDoc;
 
   // Idempotent: a retry after a lost response must not log a second "attached".
-  if (existing.status === 'ready') {
+  if (!checkAccess && isMcpAttachmentId(attachmentId) && existing.status !== 'ready') {
+    throw new HttpsError('failed-precondition', 'Complete this upload with its Kanban MCP upload URL.');
+  }
+  if (existing.status === 'ready' && !checkAccess) {
     return { ok: true, sizeBytes: existing.sizeBytes ?? 0, contentType: existing.contentType };
   }
 
@@ -249,12 +221,15 @@ export async function applyFinalizeAttachment(
   // both proceed, and the card gets two "attached Budget.pdf" lines. Measured,
   // not hypothetical.
   const won = await db().runTransaction(async (tx) => {
-    const cur = await tx.get(ref);
-    if (!cur.exists) return null;
+    const [cur, card] = await Promise.all([tx.get(ref), tx.get(cardRef)]);
+    if (!cur.exists || !card.exists) throw new HttpsError('not-found', 'The card or attachment was removed.');
+    const boardId = card.get('boardId') as string;
+    await checkAccess?.(tx, boardId);
     const data = cur.data() as AttachmentDoc;
     if (data.status === 'ready') return null; // the other caller won
     tx.update(ref, { status: 'ready', name, contentType, sizeBytes });
-    return data;
+    tx.update(cardRef, attachmentCountPatch(1, (card.get('lastActivityAt') as number | undefined) ?? 0));
+    return { data, boardId };
   });
 
   if (won) {
@@ -264,24 +239,18 @@ export async function applyFinalizeAttachment(
     // true for the log to be worth keeping.
     await recordActivity(cardId, {
       type: 'attached',
-      actorUid: won.uploadedBy || actorUid,
+      actorUid: won.data.uploadedBy || actorUid,
       to: name,
     });
-    // Denormalised onto the card so the BOARD can badge a tile without a
-    // subcollection query per card. Incremented in the same branch that writes
-    // the activity entry — the transaction above already decided there is
-    // exactly one winner, so this cannot double-count. `increment` because two
-    // uploads finishing together must both land.
-    await bumpAttachmentCount(cardId, 1);
     // Usage counters, in the SAME winner-only branch and for the same reason.
     // Above the transaction — or above the `status === 'ready'` fast path
     // earlier in this function — a double tap or a retried finalize would count
     // the file twice and inflate stored bytes by its size permanently.
     await recordStat(
-      await boardIdForCard(cardId),
+      won.boardId,
       Date.now(),
       { filesAdded: 1, bytesAdded: sizeBytes },
-      won.uploadedBy || actorUid,
+      won.data.uploadedBy || actorUid,
     );
     logger.info('attachment finalized', { cardId, attachmentId, actorUid, sizeBytes });
   }
@@ -315,7 +284,20 @@ export async function applyDeleteAttachment(
   attachmentId: string,
   actorUid: string,
 ) {
-  const ref = db().doc(`cards/${cardId}/attachments/${attachmentId}`);
+  const cardRef = db().doc(`cards/${cardId}`);
+  const ref = cardRef.collection('attachments').doc(attachmentId);
+
+  if (isMcpAttachmentId(attachmentId)) {
+    const reservation = uploadReservation(attachmentId);
+    // Stop in-flight finalization before deleting the object. Keep the record
+    // for the sweep in case bytes land after this request has finished.
+    await db().runTransaction(async (tx) => {
+      const saved = await tx.get(reservation);
+      if (saved.get('cardId') === cardId && !saved.get('cancelled')) {
+        tx.update(reservation, { cancelled: true });
+      }
+    });
+  }
 
   // The object goes FIRST, and the ordering is deliberate. If this throws, the
   // record still exists, so something still knows which bytes to chase and the
@@ -336,26 +318,30 @@ export async function applyDeleteAttachment(
   const removed = await db().runTransaction(async (tx) => {
     const cur = await tx.get(ref);
     if (!cur.exists) return null;
+    const data = cur.data() as AttachmentDoc;
+    const card = data.status === 'ready' ? await tx.get(cardRef) : undefined;
     tx.delete(ref);
-    return cur.data() as AttachmentDoc;
+    if (card?.exists) {
+      tx.update(cardRef, attachmentCountPatch(-1, (card.get('lastActivityAt') as number | undefined) ?? 0));
+    }
+    return { data, boardId: (card?.get('boardId') as string | undefined) ?? '' };
   });
 
   if (!removed) return { ok: true, removed: false };
 
   // An upload that never finished was never an attachment anyone saw, so
   // rolling one back is not a removal worth recording.
-  if (removed.status === 'ready') {
-    await recordActivity(cardId, { type: 'detached', actorUid, from: removed.name });
+  if (removed.data.status === 'ready') {
+    await recordActivity(cardId, { type: 'detached', actorUid, from: removed.data.name });
     // Only READY files were ever counted, so only they are subtracted. Rolling
     // back a half-finished upload must not push the badge negative.
-    await bumpAttachmentCount(cardId, -1);
     // Same branch, same reason — and it is what keeps the stored-bytes total
     // honest: an upload that never became ready was never added to it, so
     // subtracting it here would drive the headline figure negative.
     await recordStat(
-      await boardIdForCard(cardId),
+      removed.boardId,
       Date.now(),
-      { filesRemoved: 1, bytesRemoved: removed.sizeBytes ?? 0 },
+      { filesRemoved: 1, bytesRemoved: removed.data.sizeBytes ?? 0 },
       actorUid,
     );
   }
@@ -377,22 +363,27 @@ export const getAttachmentUrl = onCall(
     const { cardId, attachmentId } = requireIds(request.data);
     await requireCardAccess(request, cardId);
 
-    const snap = await db().doc(`cards/${cardId}/attachments/${attachmentId}`).get();
-    if (!snap.exists) throw new HttpsError('not-found', 'No such attachment.');
-    const attachment = snap.data() as AttachmentDoc;
-    if (attachment.status !== 'ready') {
-      throw new HttpsError('failed-precondition', 'That upload has not finished.');
-    }
-
-    const expiresAt = Date.now() + ATTACHMENT_URL_TTL_MS;
-    return {
-      url: await readUrl(attachmentStoragePath(cardId, attachmentId), expiresAt),
-      expiresAt,
-      name: attachment.name,
-      contentType: attachment.contentType,
-    };
+    return readyAttachmentUrl(cardId, attachmentId);
   }),
 );
+
+/** The caller must have already checked access to the card. */
+export async function readyAttachmentUrl(cardId: string, attachmentId: string) {
+  const snap = await db().doc(`cards/${cardId}/attachments/${attachmentId}`).get();
+  if (!snap.exists) throw new HttpsError('not-found', 'No such attachment.');
+  const attachment = snap.data() as AttachmentDoc;
+  if (attachment.status !== 'ready') {
+    throw new HttpsError('failed-precondition', 'That upload has not finished.');
+  }
+
+  const expiresAt = Date.now() + ATTACHMENT_URL_TTL_MS;
+  return {
+    url: await readUrl(attachmentStoragePath(cardId, attachmentId), expiresAt),
+    expiresAt,
+    name: attachment.name,
+    contentType: attachment.contentType,
+  };
+}
 
 /**
  * Two paths, and the difference between them is the most dangerous seam here.
@@ -483,6 +474,7 @@ export async function runAttachmentSweep(
 
   let swept = 0;
   for (const doc of stuck.docs) {
+    if (isMcpAttachmentId(doc.id)) continue;
     const { uploadedAt } = doc.data() as AttachmentDoc;
     // A document with no usable timestamp is swept, not skipped. It is stuck in
     // `uploading`, so it will never become a file anyone can open, and skipping
@@ -505,6 +497,30 @@ export async function runAttachmentSweep(
     }
   }
 
+  swept += await sweepMcpReservations(now);
   if (swept > 0) logger.info('swept abandoned uploads', { swept });
   return { swept };
+}
+
+async function sweepMcpReservations(now: number): Promise<number> {
+  // Wait past both the reservation and the lifetime of any upload that
+  // started just before it expired.
+  const cutoff = now - MCP_UPLOAD_TIMEOUT_SECONDS * 1000;
+  const reservations = await db().collection(MCP_UPLOAD_COLLECTION).where('expiresAt', '<', cutoff).get();
+  let swept = 0;
+  for (const reservation of reservations.docs) {
+    const { cardId } = reservation.data() as UploadReservation;
+    const attachment = db().doc(`cards/${cardId}/attachments/${reservation.id}`);
+    try {
+      if ((await attachment.get()).get('status') !== 'ready') {
+        await bucket().file(attachmentStoragePath(cardId, reservation.id)).delete({ ignoreNotFound: true });
+        await attachment.delete();
+        swept += 1;
+      }
+      await reservation.ref.delete();
+    } catch (error) {
+      logger.warn('MCP attachment sweep failed', { cardId, attachmentId: reservation.id, error: String(error) });
+    }
+  }
+  return swept;
 }

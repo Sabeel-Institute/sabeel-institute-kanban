@@ -1,6 +1,7 @@
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import { FieldValue } from 'firebase-admin/firestore';
 import { SYSTEM_ACTOR, watchKey } from '@sabeel/shared';
+import { unlinkDeletedParent } from '../../src/cleanup';
 import {
   adminDb,
   callFunction,
@@ -118,6 +119,15 @@ describe('onCardDeleted unlinks subtasks', () => {
       return snap.docs.map((d) => d.data()).find((d) => d.to === undefined);
     });
     expect(entry.actorUid).toBe('unknown');
+  });
+
+  it('preserves a replacement parent if the cleanup query saw the earlier link', async () => {
+    const child = adminDb().doc('cards/ct_reparented_child');
+    await child.set(card({ parentId: 'ct_old_parent' }));
+    const candidate = (await adminDb().collection('cards').where('parentId', '==', 'ct_old_parent').get()).docs[0];
+    await child.update({ parentId: 'ct_new_parent' });
+    expect(await unlinkDeletedParent(candidate.ref, 'ct_old_parent')).toBe(false);
+    expect((await child.get()).get('parentId')).toBe('ct_new_parent');
   });
 
   it('still unlinks the survivors when a child was deleted at the same time', () =>
