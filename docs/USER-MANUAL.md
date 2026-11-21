@@ -1,6 +1,6 @@
 # Sabeel Institute Kanban — User Manual
 
-*For app version 0.24.1 · October 2026*
+*For app version 0.25.0 · October 2026*
 
 Welcome! This guide covers everything you can do in Sabeel Kanban — from finding
 your first board to running boards and approving accounts. It is organized by
@@ -112,12 +112,16 @@ rail stays put — it's narrow enough to keep out of the way.
 
 ## 1.3 Your boards
 
-**Boards** lists everything you can open. Tap the **star** beside a board to keep
+**Boards** starts with the boards you're a member of. Admins can turn on
+**All boards** to include boards they haven't joined. The switch starts off
+and remembers your choice across devices.
+
+Tap the **star** beside a board to keep
 it at the top; boards you've opened recently follow, then the rest alphabetically.
 Boards marked as **templates**, the ones people clone to start a program, come
 last under their own heading, each with a small *Template* badge.
 
-Tap a heading (*Starred*, *Recent*, *All boards*, *Templates*) to fold that
+Tap a heading (*Starred*, *Recent*, *My boards* or *All boards*, *Templates*) to fold that
 section away; the heading stays, with the number of boards it holds, and tapping
 it again opens it. While you type in **Filter boards**, every section opens
 so nothing you're looking for is hidden. What you fold stays folded, on this

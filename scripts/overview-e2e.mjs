@@ -222,6 +222,7 @@ try {
   await board('ov_delta', 'Delta Retreat', [...PS, 'Wrap-up'], { details: { f_start: '2027-05-01' }, createdAt: 3000 }, [F]);
   await board('ov_tmpl', 'Template Program', PS, { template: true, createdAt: 5000 }, [F, O]);
   await board('ov_old', 'Old Program', PS, { archived: true, createdAt: 6000 }, [F, O]);
+  await board('ov_other_old', 'Other Archived Program', PS, { archived: true, createdAt: 6100 }, [O]);
   // Without lanes, so never on the overview; a seventh active board for the
   // admin, so the Boards list draws Filter boards (#110's check below).
   await board('ov_extra', 'Extra Board', PS, { lanesOn: false, createdAt: 8000 }, [F]);
@@ -231,6 +232,60 @@ try {
   await card('ov_beta', 0, 0, 'c_todo', null, F.uid);
   await card('ov_gamma', 0, 0, 'c_todo', '2020-01-01', F.uid);
   await card('ov_delta', 0, 2, 'c_todo', '2024-01-01', F.uid);
+
+  const allBoardsToggle = page.getByRole('switch', { name: 'All boards', exact: true });
+  const boardFilter = page.getByPlaceholder('Filter boards');
+  const betaOnBoards = page.getByText('Beta Course', { exact: true });
+  const otherArchived = page.getByText('Other Archived Program', { exact: true });
+  await page.getByRole('button', { name: 'Archived (1)', exact: true }).click();
+  check(
+    'the admin’s Boards list defaults to member boards, including the archive',
+    (await allBoardsToggle.getAttribute('aria-checked')) === 'false' &&
+      (await betaOnBoards.count()) === 0 &&
+      (await otherArchived.count()) === 0,
+  );
+  check('Filter boards is hidden when only six boards are listed', !(await boardFilter.isVisible()));
+  await allBoardsToggle.click();
+  await betaOnBoards.waitFor();
+  await otherArchived.waitFor();
+  const scopeDeadline = Date.now() + 10000;
+  let storedScope;
+  do {
+    storedScope = (await faisal.ref.get()).data()?.showAllBoards;
+    if (storedScope === true) break;
+    await page.waitForTimeout(200);
+  } while (Date.now() < scopeDeadline);
+  await page.reload();
+  await betaOnBoards.waitFor();
+  check(
+    'All boards includes nonmember boards and survives a reload',
+    storedScope === true && (await allBoardsToggle.getAttribute('aria-checked')) === 'true',
+  );
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.screenshot({ path: join(SHOTS, 'boards-filter-320.png') });
+  const inputBox = await boardFilter.boundingBox();
+  const switchBox = await allBoardsToggle.boundingBox();
+  check(
+    'Filter boards and All boards share one row at 320 px',
+    !!inputBox && !!switchBox &&
+      inputBox.x + inputBox.width <= switchBox.x &&
+      Math.abs(inputBox.y + inputBox.height / 2 - switchBox.y - switchBox.height / 2) < 2 &&
+      switchBox.x + switchBox.width <= 320,
+    JSON.stringify({ inputBox, switchBox }),
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: join(SHOTS, 'boards-filter-phone.png') });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.screenshot({ path: join(SHOTS, 'boards-filter-wide.png') });
+  await page.setViewportSize({ width: 1280, height: 950 });
+  await boardFilter.fill('Beta Course');
+  await allBoardsToggle.click();
+  await betaOnBoards.waitFor({ state: 'hidden' });
+  check('a filter remains clearable after switching to member boards', await boardFilter.isVisible());
+  await boardFilter.fill('');
+  check('Filter boards hides again after clearing the shortened list', !(await boardFilter.isVisible()));
+  await allBoardsToggle.click();
+  await betaOnBoards.waitFor();
 
   await overviewButton(page).waitFor({ timeout: 20000 }).catch(() => {});
   check('a board with lanes brings the overview into the Boards header', await overviewButton(page).isVisible());
@@ -561,6 +616,10 @@ try {
   await getAuth().setCustomUserClaims(O.uid, { role: 'member', status: 'active' });
   await omar.ref.update({ claimsUpdatedAt: FieldValue.serverTimestamp() });
   await overviewButton(opage).waitFor({ timeout: 40000 }).catch(() => {});
+  check(
+    'a member has no All boards toggle',
+    (await opage.getByRole('switch', { name: 'All boards', exact: true }).count()) === 0,
+  );
   check('a member on a board with lanes is offered the overview', await overviewButton(opage).isVisible());
   await overviewButton(opage).click();
   const MINE = [['Beta Course', 'Alpha Camp'], ['Gamma Circle']];
