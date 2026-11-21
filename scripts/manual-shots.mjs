@@ -169,6 +169,14 @@ async function enrich() {
     since: Date.now() - 41 * 86400000,
     at: Date.now() - 40 * 86400000,
   });
+  await db.doc(`boards/${boardId}/activity/manual-agent`).set({
+    type: 'columnAdded',
+    to: 'Review',
+    at: Date.now(),
+    actorUid: uid,
+    actorName: 'Faisal',
+    via: 'agent',
+  });
 
   console.log(`  enriched ${touched} cards (overdue / today / +3d / +5d / +21d) + 1 subtask\n`);
 }
@@ -418,7 +426,7 @@ const SHOTS = {
     await openBoard(p);
     await p.getByRole('button', { name: 'Board settings' }).click();
     await p.getByRole('button', { name: 'History', exact: true }).click();
-    await p.getByText(/created the board/).first().waitFor({ timeout: 30000 });
+    await p.getByLabel('Via AI agent', { exact: true }).waitFor({ timeout: 30000 });
     await p.waitForTimeout(900);
   },
   // The member list as somebody who does NOT own the board: owners marked, and
