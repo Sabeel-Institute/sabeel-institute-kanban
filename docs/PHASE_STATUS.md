@@ -59,11 +59,10 @@ When a release changes what an old build gets wrong, raise the version floor
 to it last, once the web, Play and TestFlight have it (`docs/DEPLOY.md`
 § Retiring old builds).
 
-**Owed for the next store release**
+**Owed now: nothing.** v0.24.1 updated the Board Settings film and the manual’s History screenshots.
 
 | Film or picture | What it lacks |
 |---|---|
-| Board settings film and History screenshots | Show the robot badge on an AI-made board change. |
 
 ## What works today (2026-10-16)
 
