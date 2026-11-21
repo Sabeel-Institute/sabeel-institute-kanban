@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { collection, limit, orderBy, query } from 'firebase/firestore';
 import {
-  describeBoardActivity,
+  boardActivityText,
   isKnownBoardActivityType,
   type BoardActivityDoc,
 } from '@sabeel/shared';
@@ -10,7 +10,7 @@ import { db } from '../firebase';
 import { useLiveQuery } from '../liveQuery';
 import { when, whenWithin } from '../activityTime';
 import { Button, Hint, Row, Spinner } from './ui';
-import { AgentBadge } from './AgentBadge';
+import { ActivityActor } from './ActivityActor';
 import { radius, space, useTheme } from '../theme';
 
 /** How many entries are shown at first, and how many each Show older adds. */
@@ -57,23 +57,25 @@ export function BoardHistory({ boardId }: { boardId: string }) {
 
   return (
     <View style={styles.list}>
-      {entries.slice(0, shown).map((e) => (
-        <Row key={e.id} style={styles.row}>
-          <View style={[styles.tick, { backgroundColor: t.border.strong }]} />
-          <View style={styles.text}>
-            <Hint>
-              {e.via === 'agent' ? <><AgentBadge />{' '}</> : null}
-              {/* An entry newer than this build reads as a neutral line, never
-                  as nothing and never as some other change. */}
-              {isKnownBoardActivityType(e.type)
-                ? describeBoardActivity({ ...e, type: e.type })
-                : 'The board was changed'}
-              {' · '}
-              {e.since !== undefined ? whenWithin(e.since, e.at ?? 0) : when(e.at ?? 0)}
-            </Hint>
-          </View>
-        </Row>
-      ))}
+      {entries.slice(0, shown).map((e) => {
+        // An entry newer than this build has a neutral description.
+        const { actor, action } = isKnownBoardActivityType(e.type)
+          ? boardActivityText({ ...e, type: e.type })
+          : { actor: undefined, action: 'The board was changed' };
+        return (
+          <Row key={e.id} style={styles.row}>
+            <View style={[styles.tick, { backgroundColor: t.border.strong }]} />
+            <View style={styles.text}>
+              <Hint>
+                {actor ? <><ActivityActor name={actor} via={e.via} />{' '}</> : null}
+                {action}
+                {' · '}
+                {e.since !== undefined ? whenWithin(e.since, e.at ?? 0) : when(e.at ?? 0)}
+              </Hint>
+            </View>
+          </Row>
+        );
+      })}
       {entries.length > shown ? (
         <Button label="Show older" variant="secondary" onPress={() => setShown((n) => n + PAGE)} />
       ) : entries.length === FETCHED ? (
