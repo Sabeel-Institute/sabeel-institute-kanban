@@ -455,6 +455,11 @@ the team.
 
 ## Deploy log
 
+### 2026-11-21 — All boards switch for admins — v0.25.0
+
+- The Boards screen starts with boards you belong to. Admins can turn on **All boards** to see the full list. The choice is saved on the account and follows you across devices.
+- Board history, card activity, and comments show the robot badge after the name for actions taken through the Kanban MCP server.
+
 ### 2026-11-21 — Robot badges in board history — v0.24.1
 
 - Board history identifies changes made through the Kanban MCP server, including the creation history of boards and cards made by cloning.
