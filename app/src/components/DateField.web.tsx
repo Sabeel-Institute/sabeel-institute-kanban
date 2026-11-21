@@ -23,6 +23,7 @@ import { getTheme, radius, space } from '../theme';
  * the value: the date as written, or as it was when a write is refused. A
  * date waiting on the pause is written if the field goes away first, and one
  * that is not a plausible date is taken back when the field is left.
+ * Search applies valid dates immediately because its filters live locally.
  */
 const SETTLE_MS = 700;
 
@@ -42,6 +43,7 @@ export function DateField({
   label,
   emptyLabel = 'No due date',
   clearLabel,
+  immediate = false,
 }: {
   value?: string;
   /**
@@ -54,6 +56,8 @@ export function DateField({
   /** What it says with no date: a card's due date by default. */
   emptyLabel?: string;
   clearLabel?: string;
+  /** For local filters, so blur cannot move the next control during a click. */
+  immediate?: boolean;
 }) {
   const t = getTheme();
   // What is typed and not yet the value; null while the field shows the value.
@@ -126,8 +130,11 @@ export function DateField({
             return;
           }
           if (plausibleDay(next)) {
-            waiting.current = next;
-            timer.current = setTimeout(() => settle(next), SETTLE_MS);
+            if (immediate) settle(next);
+            else {
+              waiting.current = next;
+              timer.current = setTimeout(() => settle(next), SETTLE_MS);
+            }
           }
         }}
         onBlur={(e) => settle(e.target.value)}

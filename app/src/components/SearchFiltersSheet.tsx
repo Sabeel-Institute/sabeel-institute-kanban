@@ -186,6 +186,7 @@ function Sections({
           >
             <Hint>From</Hint>
             <DateField
+              immediate
               label={`${title} from`}
               clearLabel={`Clear ${title} from`}
               value={start}
@@ -194,6 +195,7 @@ function Sections({
             />
             <Hint>To</Hint>
             <DateField
+              immediate
               label={`${title} to`}
               clearLabel={`Clear ${title} to`}
               value={end}

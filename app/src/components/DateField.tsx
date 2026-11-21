@@ -43,6 +43,8 @@ export function DateField({
   /** What it says with no date: a card's due date by default. */
   emptyLabel?: string;
   clearLabel?: string;
+  /** Apply valid input immediately on web. Native picks are already immediate. */
+  immediate?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
