@@ -458,6 +458,12 @@ the team.
 
 ## Deploy log
 
+### 2026-11-21 — Agent activity badges and date-range search — v0.24.0
+
+- A robot badge appears beside the person’s name on comments posted by an AI agent and on card history entries it generates.
+- Search by due date or last activity in the app. Set either date or both, and tap a range’s chip to clear it.
+- The Search help film and user manual show how to use the date filters.
+
 ### 2026-11-19 — @all, and names on every comment and history line — v0.23.0
 
 - **@all tells the whole board.** In a comment, type **@** and pick
