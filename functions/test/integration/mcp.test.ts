@@ -5,7 +5,7 @@
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
-import { Timestamp } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { adminDb, callFunction, functionsOrigin, idTokenFor, makeUser, shutdown, waitFor } from './emulatorClient';
@@ -304,6 +304,54 @@ describe('the MCP server', () => {
       client_id: reg.body.client_id, redirect_uri: REDIRECT, code_challenge: 'x', state: '', idToken: await idTokenFor('mcp_pending'),
     });
     expect(r.status).toBe(403);
+  });
+
+  it('requires ordinary members to own a board and rechecks existing access when they lose ownership', async () => {
+    const uid = 'mcp_eligibility';
+    await makeUser({ uid, email: 'mcpeligibility@oursabeel.com', role: 'member', status: 'active' });
+    const first = adminDb().doc('boards/mcp_b1');
+    const second = adminDb().doc('boards/mcp_b2');
+    const reg = await json('/oauth/register', { redirect_uris: [REDIRECT] });
+    const approve = async () => json('/oauth/approve', {
+      client_id: reg.body.client_id, redirect_uri: REDIRECT, code_challenge: 'x', state: '', idToken: await idTokenFor(uid),
+    });
+
+    // Plain membership and a stale ownership entry on another board grant nothing.
+    await first.update({ memberUids: FieldValue.arrayUnion(uid) });
+    await second.update({ boardOwnerUids: FieldValue.arrayUnion(uid) });
+    expect(await approve()).toMatchObject({ status: 403, body: { error: 'access_denied' } });
+
+    await second.update({ memberUids: FieldValue.arrayUnion(uid) });
+    const tokens = await signIn(uid);
+    const client = await connect(tokens.access_token);
+    const boards = parsed(await client.callTool({ name: 'query_boards', arguments: {} }));
+    // Owning a board admits the account to MCP. Its app access applies on both boards.
+    expect(boards.map((board: { name: string; owner: boolean }) => [board.name, board.owner]).sort()).toEqual([
+      ['Agent Board', false], ['Not Mine', true],
+    ]);
+    const file = parsed(await client.callTool({ name: 'add_card', arguments: {
+      board: 'Agent Board', column: 'To Do', title: 'Eligibility test', subscribe: false,
+      attachments: [{ name: 'test.txt', content_type: 'text/plain', size_bytes: 4 }],
+    } })).attachments[0];
+
+    await second.update({ boardOwnerUids: FieldValue.arrayRemove(uid) });
+    const denied = await fetch(base(), {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${tokens.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'query_boards', arguments: {} } }),
+    });
+    expect(denied.status).toBe(403);
+    expect(await denied.json()).toMatchObject({ error: 'access_denied' });
+    expect(await form('/oauth/token', {
+      grant_type: 'refresh_token', refresh_token: tokens.refresh_token, client_id: tokens.clientId,
+    })).toMatchObject({ status: 400, body: { error: 'invalid_grant' } });
+    const upload = await fetch(file.upload_url, { method: file.method, headers: file.headers, body: 'test' });
+    expect(upload.status).toBe(403);
+    await client.close();
+    await Promise.all([
+      first.update({ memberUids: FieldValue.arrayRemove(uid) }),
+      second.update({ memberUids: FieldValue.arrayRemove(uid) }),
+    ]);
   });
 });
 

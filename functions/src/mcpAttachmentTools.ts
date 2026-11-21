@@ -1,5 +1,4 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, type Transaction } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { doc, getDoc, type Firestore } from 'firebase/firestore';
@@ -8,10 +7,11 @@ import { logger } from 'firebase-functions/v2';
 import { z } from 'zod';
 import {
   ATTACHMENT_MAX_BYTES, ATTACHMENT_NAME_MAX, attachmentStoragePath, canAccessBoard,
-  normalizeContentType, sanitizeAttachmentName, sessionAccess, type AttachmentDoc, type BoardDoc,
+  normalizeContentType, sanitizeAttachmentName, type AttachmentDoc, type BoardDoc,
 } from '@sabeel/shared';
 import { applyFinalizeAttachment, readyAttachmentUrl } from './attachments';
 import { MCP_UPLOAD_TIMEOUT_SECONDS, MCP_UPLOAD_TTL_MS, uploadReservation, type UploadReservation } from './attachmentUploads';
+import { mcpAccount } from './mcpAccess';
 import { docId, word, writeResult, type McpActor, type WriteTools } from './mcpWrite';
 
 const hash = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
@@ -62,9 +62,9 @@ export async function withAttachments<T extends { id: string }>(base: string, me
 }
 
 async function uploadActor(uid: string) {
-  const user = await getAuth().getUser(uid);
-  if (user.disabled) throw new HttpsError('permission-denied', 'The uploader no longer has access to this card.');
-  return { uid, ...sessionAccess(user.customClaims ?? {}, {}) };
+  const account = await mcpAccount(uid);
+  if (!account.ok) throw new HttpsError('permission-denied', account.message);
+  return { uid, ...account.access };
 }
 
 async function checkUploadAccess(tx: Transaction, boardId: string, actor: Awaited<ReturnType<typeof uploadActor>>) {

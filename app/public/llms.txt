@@ -8,6 +8,8 @@ Use the MCP server. Do not open the website in a browser or scrape it: the app n
 
 MCP server: https://sabeel-institute-kanban.web.app/mcp (Streamable HTTP). Sign-in is OAuth with the person's Sabeel Institute Google account; the server advertises it (a call without a token answers 401 with the details).
 
+Kanban MCP is available to active administrators, organizers, and board owners. After connecting, the agent acts with the signed-in person's existing board permissions.
+
 1. **Check whether it is already connected.** Claude Code: `claude mcp list`. Codex: `codex mcp list`. If `sabeel-kanban` is there and signed in, skip to "Using it".
 2. **Work out where the person is.** The sign-in page has to open in a browser the person can use.
    - Signs they are NOT at this computer: you are running in a remote-control or SSH session, there is no display (`DISPLAY` and `WAYLAND_DISPLAY` empty), or they said so.
