@@ -22,27 +22,30 @@ MCP server: https://sabeel-institute-kanban.web.app/mcp (Streamable HTTP). Sign-
    - Send the person the sign-in link your client prints. They open it on their device and sign in with Google.
    - The page then shows a box, "Copy for my agent". Ask them to tap it and paste the line to you. It is a `http://127.0.0.1:…/callback?code=…&state=…` address: it works once, for five minutes, and only for your client.
    - Give that line to your client's waiting prompt (Codex asks for it). If your client is instead waiting on a local 127.0.0.1 listener, request that exact URL from this machine (for example `curl -s '<the line>'`) and the sign-in completes.
-5. Confirm by calling `my_work`.
+5. Confirm by calling `query_boards`.
 
 ## Using it
 
 The server names the person it acts for ("me") and today's date in Houston. Four composable queries share one vocabulary: `board` (names or ids; a unique part of a name will do), `person` ("me", a handle, a name, or "none"), dates `YYYY-MM-DD` (inclusive), `ids`, and `limit` / `cursor` for paging. Every result carries ids and urls to chain into the next call, and urls to give the person.
 
 - `query_cards`: cards with the app's Search filters and more (text, person, labels, priorities, due state and range, activity and creation ranges, board, column, lane, finished, archive, parent, ids). `group_by` counts instead of listing; `include` adds comments, history, subtasks, description or attachments to each card listed.
-- `query_boards`: boards with their columns, lanes, members (handles), details (start and end dates and other fields) and counts of open, overdue, due-this-week and unassigned cards, by column and by lane.
+- `query_boards`: find boards and templates by name. Results include the template flag and board id. Request columns, lanes, members and owners, detail field definitions and values, labels, or card counts as needed.
 - `query_activity`: what happened, newest first: card history, comments and boards' own history, by board, card, person, type, dates, and moves into a column or lane.
 - `query_alerts`: the person's inbox (mentions, replies, assignments), unread first.
-- `create_board`, `clone_board`, `update_board`, `set_board_archived`: create a board, clone its open work, edit board settings together, or archive and restore. Use `list_addable_people` to find people before adding them.
+- `create_board` starts a blank board. `clone_board` starts from an active board or template and copies its columns, lanes, detail fields with blank values, and unarchived cards and subtasks. The signed-in person is the only initial board member and owner. Institute admins can see every board.
+- `update_board` edits board settings together. Use `list_addable_people` to find people before adding them. `set_board_archived` archives or restores a board.
 - `add_card`, `update_card`, `move_cards`, `copy_cards`, `set_cards_archived`: create, edit, move, copy, archive and restore work. `comment` posts or edits your own comments (`@handle` mentions a person; `@all` mentions the whole board).
 - Attachments: pass file names and sizes in a card write, or use `prepare_attachments`. PUT the raw bytes to the returned URL with its headers. Use `get_attachment_url` for a ready file’s temporary download link.
 
-Recipes, each one or two calls:
+### Common workflows
+
 - What's waiting on me: `query_cards {person: "me", finished: "exclude", sort: "due"}` + `query_alerts {unread: true}`.
 - How is everything doing: `query_boards {include: {counts: true, details: true}}`.
 - Lane progress: `query_cards {board: "X", group_by: ["lane", "finished"]}`.
 - Workload: `query_cards {finished: "exclude", group_by: ["person", "due"]}`.
 - What happened this week: `query_activity {board: "X", from: "<Monday>"}`.
 - What was said on my cards: `query_cards {person: "me", include: {comments: 3}}`.
+- Start a course board with the signed-in person as its only member. Find the template with `query_boards {name: "Multiple Day Program Template"}`, pass its id as `board` to `clone_board` with the new `name`, then fill any supplied detail values with `update_board` on the new board id.
 
 Send only settings the person wants changed. For example:
 - Set and clear board details together: `update_board {board: "Fall Course", details: {"Start date": "2026-12-01", "Classroom": null}}`.

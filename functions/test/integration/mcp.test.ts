@@ -165,13 +165,18 @@ describe('composable queries: every question in at most two calls', () => {
     });
 
     const client = await connect((await signIn(ME)).access_token);
-    const names = (await client.listTools()).tools.map((t) => t.name).sort();
+    const listedTools = (await client.listTools()).tools;
+    const names = listedTools.map((t) => t.name).sort();
     expect(names).toEqual([
       'add_card', 'clone_board', 'comment', 'copy_cards', 'create_board', 'get_attachment_url',
       'list_addable_people', 'move_cards', 'prepare_attachments', 'query_activity', 'query_alerts',
       'query_boards', 'query_cards', 'set_board_archived', 'set_cards_archived', 'update_board', 'update_card',
     ]);
     expect(client.getInstructions()).toContain('Mona (@mcpme)');
+    const cloneDescription = listedTools.find((t) => t.name === 'clone_board')?.description;
+    expect(cloneDescription).toContain('only initial board member and owner');
+    expect(cloneDescription).toContain('Institute admins can see every board');
+    expect(cloneDescription).toContain('detail fields with blank values');
     const call = async (name: string, args: Record<string, unknown>) => parsed(await client.callTool({ name, arguments: args }));
     const titles = async (args: Record<string, unknown>) => (await call('query_cards', args)).cards.map((c: { title: string }) => c.title);
 
@@ -378,6 +383,9 @@ describe('Kanban write tools', () => {
     expect(queried.cards[0]).toMatchObject({ comments: [{ id: comment.commented, text: 'Updated draft' }], attachments: [{ id: upload.id }] });
 
     const quiet = await call('clone_board', { board: source.id, name: 'Quiet clone' });
+    const [clonedBoard] = await call('query_boards', { board: quiet.id, include: { members: true, details: true } });
+    expect(clonedBoard.members).toEqual([{ id: organizer, name: 'Writer', handle: 'mcpwriter', owner: true }]);
+    expect(clonedBoard.details).toEqual({ 'Start date': null, Classroom: null, Instructor: null });
     const followed = await call('clone_board', { board: source.id, name: 'Followed clone', subscribe: true });
     expect((await call('clone_board', { board: source.id, name: 'Repeated clone', clone_id: quiet.id })).id).toBe(quiet.id);
     expect((await client.callTool({ name: 'clone_board', arguments: { board: followed.id, name: 'Wrong source', clone_id: quiet.id } })).isError).toBe(true);

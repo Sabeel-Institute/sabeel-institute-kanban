@@ -212,7 +212,7 @@ async function updateBoard(id: string, me: McpActor, f: Changes & { archived?: b
 
 export function registerBoardWrites({ server, run, me, board }: WriteTools) {
   server.registerTool('create_board', {
-    description: 'Create a board with the app’s default columns. Returns its id and link.',
+    description: 'Create a blank board with the app’s default columns. Use clone_board when the person wants to start from an existing board or template. Returns the new board’s id and link.',
     inputSchema: { name: word },
   }, ({ name }) => run(async (fs: Firestore) => {
     check(validateBoardName(name));
@@ -223,9 +223,14 @@ export function registerBoardWrites({ server, run, me, board }: WriteTools) {
   }));
 
   server.registerTool('clone_board', {
-    description: 'Clone an active board and its open cards. Subscribe to the cloned cards only if requested. Use update_board to fill the new board’s details.',
+    description: [
+      'Start a new board from an active board or template. Available to organizers and admins.',
+      'The signed-in person is the only initial board member and owner. Institute admins can see every board.',
+      'Copies columns, lanes, board detail fields with blank values, and unarchived cards and their subtasks. Card assignees and due dates start empty.',
+      'Subscriptions default to off. Use update_board with the new board id to fill detail values or add members when requested.',
+    ].join(' '),
     inputSchema: {
-      board: word, name: word,
+      board: word.describe('Source board or template name or id'), name: word.describe('Name for the new board'),
       subscribe: z.boolean().optional().describe('Subscribe yourself to every cloned card. Default false.'),
       clone_id: z.string().regex(/^[A-Za-z0-9]{20}$/).optional().describe('Reuse a previously supplied id if retrying a clone. Usually omit.'),
     },
