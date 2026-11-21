@@ -57,7 +57,6 @@ import {
   orderCards,
   toPlainText,
   todayInOrgTz,
-  sessionAccess,
   type SearchableCard,
   withCleanExtras,
   type AttachmentDoc,
@@ -67,6 +66,7 @@ import { appUrl, boardLink, cardLink, type McpActor, type WriteBoard } from './m
 import { registerBoardWrites } from './mcpBoardTools';
 import { registerCardWrites } from './mcpCardTools';
 import { registerAttachmentTools } from './mcpAttachmentTools';
+import { mcpAccessMessage, mcpAccount } from './mcpAccess';
 
 /** The response `onRequest` hands its handler. */
 type Response = Parameters<Parameters<typeof onRequest>[0]>[1];
@@ -258,7 +258,7 @@ $('copy').onclick = async () => {
     page(
       'Connect your agent to the kanban',
       `<div id="signin"><p><b>${esc(r.name)}</b> is asking to use Sabeel Kanban as you: to see your boards and cards, find what is waiting on you, and make changes to boards, cards, comments and files you can manage.</p>
-<p class="hint">It can do only what you can do in the app. Sign in with your Sabeel Institute Google account to allow it.</p>
+<p class="hint">${mcpAccessMessage} Once connected, the agent uses your existing Kanban permissions. Sign in with your Sabeel Institute Google account.</p>
 <button id="go">Sign in with Google</button><p id="msg" class="hint err"></p></div>
 <div id="done" hidden><p>You're signed in. One last step, depending on where your agent runs:</p>
 <div id="here"><p class="hint"><b>Your agent is on this device:</b></p><a id="back" class="btn">Return to my agent</a></div>
@@ -286,6 +286,11 @@ async function approve(req: Request, res: Response) {
     uid = decoded.uid;
   } catch {
     res.status(401).json({ error: 'access_denied', error_description: 'Sign-in failed. Try again.' });
+    return;
+  }
+  const account = await mcpAccount(uid);
+  if (!account.ok) {
+    res.status(403).json({ error: 'access_denied', error_description: account.message });
     return;
   }
   const code = token();
@@ -336,6 +341,8 @@ async function tokenEndpoint(req: Request, res: Response) {
     if (createHash('sha256').update(String(b.code_verifier ?? '')).digest('base64url') !== found.challenge) {
       return fail('invalid_grant', 'PKCE verification failed.');
     }
+    const account = await mcpAccount(found.uid);
+    if (!account.ok) return fail('invalid_grant', account.message);
     res.json(await issue(found.uid, found.clientId));
     return;
   }
@@ -343,6 +350,8 @@ async function tokenEndpoint(req: Request, res: Response) {
     const found = await take(`mcpTokens/${sha(String(b.refresh_token ?? ''))}`);
     if (!found || found.kind !== 'refresh' || found.expiresAt < Date.now()) return fail('invalid_grant', 'Sign in again.');
     if (b.client_id && found.clientId !== b.client_id) return fail('invalid_grant', 'The token was issued to another client.');
+    const account = await mcpAccount(found.uid);
+    if (!account.ok) return fail('invalid_grant', account.message);
     res.json(await issue(found.uid, found.clientId));
     return;
   }
@@ -1010,12 +1019,12 @@ export const mcp = onRequest({ invoker: 'public', cors: true, memory: '512MiB', 
           .json({ error: 'unauthorized', error_description: setupGuide(base) });
         return;
       }
-      const user = await adminAuth().getUser(uid);
-      const access = sessionAccess(user.customClaims ?? {}, {});
-      if (user.disabled || access.status !== 'active') {
-        res.status(403).json({ error: 'This account is not active in Kanban.' });
+      const account = await mcpAccount(uid);
+      if (!account.ok) {
+        res.status(403).json({ error: 'access_denied', error_description: account.message });
         return;
       }
+      const { user, access } = account;
       const me: Me = {
         uid,
         name: user.displayName ?? user.email ?? 'the person',
