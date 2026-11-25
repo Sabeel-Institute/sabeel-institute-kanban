@@ -16,18 +16,13 @@ tells you the command to run.
 
 ## Board colours — v0.26.0
 
-- [ ] **`mcpAttachmentUpload`'s public invoker.** It was added on
-      2026-11-21 and never bound. It works, because invoker checks are off
-      on that service (`run.googleapis.com/invoker-iam-disabled: true`; an
-      unauthenticated PUT gets the function's own JSON 401), but every
-      functions deploy since then tries to add `allUsers`, the organization
-      policy refuses it, and the deploy ends in "Unable to set the invoker"
-      for that one function after updating it (the v0.26.0 deploy,
-      2026-11-25, revision `mcpattachmentupload-00005`). Deploy Functions
-      would fail the same way. Bind it once, as `cloneBoard`'s was:
-      `docs/DEPLOY.md` § Known traps, "A new callable answers 403", with
-      `mcpattachmentupload` as the service. Hand back: done, and the next
-      functions deploy ends clean.
+- [x] **`mcpAttachmentUpload`'s public invoker**, never bound since it was
+      added on 2026-11-21 (it worked, invoker checks being off on its
+      service, but every functions deploy ended in "Unable to set the
+      invoker"): bound on 2026-11-25, the policy lifted on this project for
+      about a minute and put back, its etag unchanged (`docs/DEPLOY.md`
+      § Known traps, "A new callable answers 403"). A deploy of the function
+      afterwards ended clean.
 
 ## Cloning a board — v0.18.0, shipped 2026-11-14
 
