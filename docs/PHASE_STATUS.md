@@ -59,12 +59,10 @@ When a release changes what an old build gets wrong, raise the version floor
 to it last, once the web, Play and TestFlight have it (`docs/DEPLOY.md`
 § Retiring old builds).
 
-**Owed now:** board colours (the stripe on the Boards list).
+**Owed now: nothing.** v0.26.0 retook the Boards list, clone and colour pictures, and re-recorded every film that opens on the Boards list, *Creating a board* with two new lines on giving a board its colour.
 
 | Film or picture | What it lacks |
 |---|---|
-| Film *Creating a board* (`new-board`) | Giving the new board a colour from its stripe, and that only owners and admins can. |
-| Films *Finding your way around*, *Cloning a board* | The Boards list now has stripes; the clone keeps its source's colour. |
 
 ## What works today (2026-10-16)
 
@@ -456,6 +454,16 @@ the team.
 ---
 
 ## Deploy log
+
+### 2026-11-25 — Board colours — v0.26.0
+
+- **A board can have a colour.** It shows as a stripe down the left edge of the board's card on the Boards screen, so boards of a kind (every program, every course) stand out together. It shows nowhere else; the board itself looks the same.
+- The board's owners and admins tap the stripe (click it on a computer) and pick one of eight colours, or **No colour**. Everyone who sees the board sees the same colour. A board with no colour shows them an empty, dashed stripe to tap.
+- A clone starts in the colour of the board it was cloned from. Changing a colour is not recorded in the board's history.
+- The Kanban MCP server's `update_board` sets a board's colour, and `query_boards` reports it.
+- The user manual and the Creating a board help film show how.
+
+Deploy the rules together with the functions, never functions alone: a function that writes a board's colour under the old rules leaves that board unable to be saved from the app (`docs/DEPLOY.md`, Known traps). The version floor goes to 0.26.0 once the web, Play and TestFlight have it.
 
 ### 2026-11-21 — All boards switch for admins — v0.25.0
 
