@@ -253,6 +253,25 @@ name: Board, card, rich text and gestures
       EXPECT: "New board"
       SECONDS: 30
 
+# A board's colour, from its stripe: a separate press target laid over the
+# left of the card, which only a native touch can tell from the card's own
+# (a browser has no overlapping responders to settle). The seed made
+# Fundraising 2026 orange; a tap on its stripe opens the colours in a dialog
+# and Blue repaints it, while a tap that reached the card would open the board.
+- runFlow:
+    file: ci-tools/tap-until.yaml
+    env:
+      TARGET: "Colour of Fundraising 2026: Orange"
+      EXPECT: "Colour of Fundraising 2026"
+      SECONDS: 30
+- takeScreenshot: 10-board-colour
+- tapOn: "Blue"
+- extendedWaitUntil:
+    visible: "Colour of Fundraising 2026: Blue"
+    timeout: 20000
+- assertNotVisible: "To Do"
+- takeScreenshot: 11-board-colour-set
+
 # A board with lanes, the seed's Summer Program 2027: each column lists the
 # board's lanes under a heading with one badge, a list of a new shape on a
 # phone (Yoga lays out the heading's name and badge, and a long name must not
