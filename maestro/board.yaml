@@ -264,13 +264,13 @@ name: Board, card, rich text and gestures
       TARGET: "Colour of Fundraising 2026: Orange"
       EXPECT: "Colour of Fundraising 2026"
       SECONDS: 30
-- takeScreenshot: 10-board-colour
+- takeScreenshot: 09b-board-colour
 - tapOn: "Blue"
 - extendedWaitUntil:
     visible: "Colour of Fundraising 2026: Blue"
     timeout: 20000
 - assertNotVisible: "To Do"
-- takeScreenshot: 11-board-colour-set
+- takeScreenshot: 09c-board-colour-set
 
 # A board with lanes, the seed's Summer Program 2027: each column lists the
 # board's lanes under a heading with one badge, a list of a new shape on a

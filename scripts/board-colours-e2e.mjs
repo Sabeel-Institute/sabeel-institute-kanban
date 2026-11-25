@@ -60,6 +60,7 @@ const BOARD = 'Colour board';
 const CLONE = 'Colour board copy';
 // The theme's blue (palette.ts `boardBlue`), as a browser reports it.
 const BLUE = 'rgb(62, 107, 138)';
+const VIOLET = 'rgb(107, 76, 138)';
 
 initializeApp({ projectId: PROJECT });
 const db = getFirestore();
@@ -139,11 +140,14 @@ try {
 
   await stripeButton(page, BOARD).first().click();
   await popover.waitFor({ timeout: 10000 });
+  // Opened on Blue, the third of nine stops (eight colours and No colour):
+  // twelve Tabs go round once and land on the sixth, Red. Focus that stuck,
+  // or left, would be on something else.
   for (let i = 0; i < 12; i += 1) await page.keyboard.press('Tab');
-  check(
-    'Tab goes round the colours and stays in the popover',
-    await popover.evaluate((el) => el.contains(document.activeElement) && document.activeElement !== el),
+  const focusedName = await popover.evaluate((el) =>
+    el.contains(document.activeElement) ? document.activeElement.getAttribute('aria-label') : null,
   );
+  check('Tab goes round the colours and stays in the popover', focusedName === 'Red', String(focusedName));
   await page.keyboard.press('Escape');
   check('Escape closes the popover', await until(async () => (await popover.count()) === 0));
   await stripeButton(page, BOARD).first().click();
@@ -151,6 +155,20 @@ try {
   await page.getByText('Boards', { exact: true }).first().click();
   check('a click elsewhere closes it', await until(async () => (await popover.count()) === 0));
   check('and neither changes the colour', (await storedColour()) === 'blue', String(await storedColour()));
+
+  // ---- The picker shows the board as it is now -----------------------------------
+  // Someone else colours the board while the popover is open: it marks the
+  // new colour, and picking the one it marked is no change at all.
+  const boardRef = (await db.collection('boards').where('name', '==', BOARD).get()).docs[0].ref;
+  await stripeButton(page, BOARD).first().click();
+  await popover.waitFor({ timeout: 10000 });
+  await boardRef.update({ color: 'green' });
+  check(
+    'a colour picked elsewhere meanwhile is the one the open popover marks',
+    await until(async () => (await popover.getByRole('button', { name: 'Green', exact: true }).getAttribute('aria-pressed')) === 'true'),
+  );
+  await popover.getByRole('button', { name: 'Blue', exact: true }).click();
+  check('and picking from it still saves', await until(async () => (await storedColour()) === 'blue'), String(await storedColour()));
 
   // ---- Press and hold, and a right-click, are still Clone ------------------------
   await page.getByText(BOARD, { exact: true }).first().click({ button: 'right' });
@@ -227,6 +245,18 @@ try {
     String(await stripeLabel(page, BOARD)),
   );
   check('and nothing is stored', (await storedColour()) === 'blue', String(await storedColour()));
+  // Another board coloured after the refusal: its card says nothing, and the
+  // refused board's message stays on that board alone.
+  const clonePopover = page.getByRole('dialog', { name: `Colour of ${CLONE}` });
+  await stripeButton(page, CLONE).first().click();
+  await clonePopover.waitFor({ timeout: 10000 });
+  await clonePopover.getByRole('button', { name: 'Violet', exact: true }).click();
+  await until(async () => (await stripeLabel(page, CLONE)) === `Colour of ${CLONE}: Violet`);
+  check(
+    'a second board coloured meanwhile carries no message, and the refusal stays on its own board',
+    (await refused.count()) === 1 &&
+      (await page.getByRole('button', { name: 'Dismiss', exact: true }).count()) === 1,
+  );
   await page.getByRole('button', { name: 'Dismiss', exact: true }).click();
   check('Dismiss takes the message away', await until(async () => (await refused.count()) === 0));
   await boardDoc.ref.update({ lanes: FieldValue.delete() });
@@ -259,16 +289,26 @@ try {
   await page.setViewportSize({ width: 1280, height: 950 });
   // Back in the wide layout: the stripe's target is a mouse's again.
   await until(async () => ((await stripeButton(page, CLONE).first().boundingBox())?.width ?? 99) < 44);
-  await page.getByText(CLONE, { exact: true }).first().click();
-  await page.getByText('To Do').first().waitFor({ timeout: 30000 });
-  await page.getByRole('button', { name: 'Board settings' }).click();
-  await page.getByRole('button', { name: 'Archive board' }).click();
-  await page.getByRole('button', { name: 'New board' }).waitFor({ timeout: 25000 });
+  // Archived from under an open popover (by someone else, here the Admin
+  // SDK): the board leaves the list, and its popover goes with it.
+  await stripeButton(page, CLONE).first().click();
+  await clonePopover.waitFor({ timeout: 10000 });
+  const cloneRef = (await db.collection('boards').where('name', '==', CLONE).get()).docs[0].ref;
+  await cloneRef.update({ archived: true });
+  check('a board archived from under its open popover closes it', await until(async () => (await clonePopover.count()) === 0));
+  // And it stays closed when the board comes back: nobody asked for it again.
+  // Restored, the board is listed (a positive signal) before the absence is read.
+  await cloneRef.update({ archived: false });
+  await stripeButton(page, CLONE).first().waitFor({ timeout: 15000 });
+  await page.waitForTimeout(1000);
+  check('and stays closed when the board is restored', (await clonePopover.count()) === 0);
+  await cloneRef.update({ archived: true });
+  await until(async () => (await stripeButton(page, CLONE).count()) === 0);
   await page.getByRole('button', { name: /^Archived \(/ }).click();
   await page.getByText(CLONE, { exact: true }).first().waitFor({ timeout: 15000 });
   check(
     'an archived board keeps its colour',
-    await until(async () => (await stripeInk(page, CLONE)) === BLUE),
+    await until(async () => (await stripeInk(page, CLONE)) === VIOLET),
     String(await stripeInk(page, CLONE).catch(() => 'no stripe')),
   );
   check('and offers no way to change it', (await stripeButton(page, CLONE).count()) === 0);

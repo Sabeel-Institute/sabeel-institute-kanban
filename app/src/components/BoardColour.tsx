@@ -3,6 +3,7 @@ import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { BOARD_COLORS, BOARD_COLOR_NAMES, type BoardColor } from '@sabeel/shared';
 import { Icon } from '../icons';
 import { contextMenuProps } from '../contextMenu';
+import { usingKeyboard } from '../inputModality';
 import { space, useTheme } from '../theme';
 import { useLayout } from '../theme/layout';
 import { Sheet } from './Sheet';
@@ -77,11 +78,12 @@ export function BoardStripe({
       accessibilityRole="button"
       accessibilityLabel={`Colour of ${boardName}: ${color ? BOARD_COLOR_NAMES[color] : 'none'}`}
       // The card clips to its corners, so a focus ring drawn outside the
-      // stripe would be cut away: it is drawn inside instead.
+      // stripe would be cut away: it is drawn inside instead, and only for a
+      // keyboard, as the browser's own ring is.
       style={({ focused }: { pressed: boolean; focused?: boolean }) => [
         styles.target,
         { width: target },
-        focused && { outlineColor: t.accent.base, outlineWidth: 2, outlineStyle: 'solid', outlineOffset: -2 },
+        focused && usingKeyboard() && { outlineColor: t.accent.base, outlineWidth: 2, outlineStyle: 'solid', outlineOffset: -2 },
       ]}
     >
       {/* `hovered` and `focused` are react-native-web's; a phone sets neither. */}

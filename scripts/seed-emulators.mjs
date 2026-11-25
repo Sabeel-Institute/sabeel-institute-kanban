@@ -556,9 +556,9 @@ try {
 // Colours in the Boards list: the three program boards green, Fundraising
 // orange, the rest none, so the list shows stripes and an empty one side by
 // side. Picked from the stripe, as an admin does. Not optional, unlike the
-// boards above: the sweep, the manual's pictures and the phone flows all
-// expect stripes, and a seed that carried on without them would let each of
-// them pass on a list with none.
+// boards above: the manual's pictures and the phone flows
+// (maestro/board.yaml taps Fundraising's orange stripe) expect stripes, and a seed that carried on without them would let each of
+// them run on a list with none.
 const BOARD_COLOURS = [
   [LANES_BOARD, 'Green'],
   [CAMP, 'Green'],

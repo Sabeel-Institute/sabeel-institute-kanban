@@ -53,6 +53,7 @@ import { BOARD_CARD_INSET, BoardStripe } from '../components/BoardColour';
 import { BoardColourPicker } from '../components/BoardColourPicker';
 import { contextMenuProps } from '../contextMenu';
 import { useAction } from '../useAction';
+import { timed } from '../slowWrites';
 import { radius, space, type, useTheme } from '../theme';
 
 /** Shared empty array, so absent preferences keep a stable identity. */
@@ -287,9 +288,19 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
    * someone else picks meanwhile is the one it marks and compares against.
    */
   const [colouring, setColouring] = useState<{ boardId: string; anchor: unknown } | null>(null);
-  const colourAction = useAction('setBoardColor');
-  /** The board whose last colour write was refused, so its card says so. */
-  const [colourFailed, setColourFailed] = useState<string | null>(null);
+  /**
+   * Why a board's colour was not saved, BY BOARD. Writes to two boards can be
+   * in flight at once (offline they wait for the server), so one shared error
+   * beside a "last board tried" put the first board's refusal on the second
+   * board's card. Each write answers for its own board.
+   */
+  const [colourErrors, setColourErrors] = useState<Record<string, string>>({});
+  const clearColourError = (id: string) =>
+    setColourErrors((was) => {
+      if (!(id in was)) return was;
+      const { [id]: _gone, ...rest } = was;
+      return rest;
+    });
   // Sections collapsed by this person, on their account (#110). Loading or
   // unreadable reads as nothing collapsed: a display preference, so the list
   // shows in full rather than hiding boards on a failed read, and the failure
@@ -365,14 +376,13 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
   const onColourOf = (b: BoardListItem) =>
     canManageBoard(user, b)
       ? (anchor: unknown) => {
-          colourAction.setError(null);
           setColouring({ boardId: b.id, anchor });
         }
       : undefined;
   const colourProps = (b: BoardListItem) => ({
     onColour: onColourOf(b),
-    colourError: colourFailed === b.id ? colourAction.error : null,
-    onDismissColourError: () => colourAction.setError(null),
+    colourError: colourErrors[b.id] ?? null,
+    onDismissColourError: () => clearColourError(b.id),
   });
 
   function pickColour(board: BoardListItem, color: BoardColor | null) {
@@ -380,8 +390,10 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
     // Closed at once, as a star is: there is nothing typed to lose, and a
     // refusal is said on the board's own card (`colourError`).
     if ((color ?? undefined) === board.color) return;
-    setColourFailed(board.id);
-    void colourAction.run(() => setBoardColor(board.id, color));
+    clearColourError(board.id);
+    timed('setBoardColor', () => setBoardColor(board.id, color)).catch((e: unknown) =>
+      setColourErrors((was) => ({ ...was, [board.id]: toUserMessage(e, 'setBoardColor') })),
+    );
   }
 
   async function clone(

@@ -92,7 +92,6 @@ export async function shutdown() {
   }
 }
 
-/** Poll until `check` returns a value, or throw. Triggers are asynchronous. */
 /**
  * That `check` holds for `ms`, sampled: an ABSENCE, or a figure a trigger
  * would change, held a while after the write rather than read once. The
@@ -110,6 +109,7 @@ export async function stays(label: string, check: () => Promise<boolean>, ms = 5
   }
 }
 
+/** Poll until `check` returns a value, or throw. Triggers are asynchronous. */
 export async function waitFor<T>(
   label: string,
   check: () => Promise<T | undefined | null>,

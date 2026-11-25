@@ -407,9 +407,9 @@ for (const [id, name, laneNames] of OVERVIEW_BOARDS) {
 
 // A board MARKED AS A TEMPLATE, so the Boards list draws its Templates heading
 // and a badge on a row, at every width. A long name, beside which the badge
-// must wrap rather than push the star off the row. Gold, the palest board
-// colour, so the Boards list draws a coloured stripe as well as the empty ones
-// of the boards with none.
+// must wrap rather than push the star off the row. Gold, one of the two
+// palest board colours, so the Boards list draws a coloured stripe as well as
+// the empty ones of the boards with none.
 const TEMPLATE_NAME = 'Weekend program template for the summer term';
 await db.doc('boards/sw_template').set({
   name: TEMPLATE_NAME,

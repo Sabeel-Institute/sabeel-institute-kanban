@@ -92,7 +92,7 @@ function Popover({
         const at = stops.indexOf(document.activeElement as HTMLElement);
         const next = (at + (e.shiftKey ? -1 : 1) + stops.length) % stops.length;
         e.preventDefault();
-        stops[at === -1 ? 0 : next].focus();
+        stops[at === -1 ? (e.shiftKey ? stops.length - 1 : 0) : next].focus();
       }
     };
     // A press outside, not a click: the stripe's own click would otherwise

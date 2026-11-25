@@ -969,6 +969,20 @@ export const TUTORIALS = [
         say: "And because you made it, you own it. You decide who's on the board, and who else gets to help run it.",
         do: (t) => t.highlight(t.btn('Board settings')),
       },
+      {
+        say: "Back on your boards, you can give it a colour, so boards of the same kind stand out together. Tap the stripe down its left edge.",
+        do: async (t) => {
+          await t.tap(t.btn('Back'));
+          await t.tap(t.btn('Colour of Summer Camp: none'));
+        },
+      },
+      {
+        say: "Pick one, and it's done. Everyone who sees the board sees its colour, but only its owners and the admins can change it.",
+        do: async (t) => {
+          await t.tap(t.btn('Green'));
+          await t.waitFor(t.btn('Colour of Summer Camp: Green'));
+        },
+      },
     ],
   },
   {
