@@ -566,6 +566,16 @@ the function's own `UNAUTHENTICATED`, and Deploy Functions' verify step passes.
 Do it right after the deploy that creates the callable, before the clients
 that call it ship; Health probes every callable in main's bundle.
 
+**A deploy that fails on "Unable to set the invoker" for a function that
+works.** An HTTP function declared `invoker: 'public'` whose service has
+invoker checks switched off (`run.googleapis.com/invoker-iam-disabled`)
+answers everyone, so it works with no binding at all; but every deploy still
+tries to add `allUsers`, the policy refuses, and the deploy reports a failure
+after updating the function. Read the function's own answer before acting on
+the error: an unauthenticated request that gets the function's JSON back is
+reachable, and a new revision dated by the deploy is serving. Bind it once as
+above and the deploys end clean (`mcpAttachmentUpload`, 2026-11-25).
+
 **First deploy of a Firestore-trigger function fails on the Eventarc service
 agent.** Not a config error — permissions take 2–5 minutes to propagate. Wait,
 then redeploy just the failed functions.
