@@ -133,7 +133,7 @@ try {
     `${await stripeLabel(page, BOARD)} ${await stripeInk(page, BOARD)}`,
   );
   check('stored by its key', await until(async () => (await storedColour()) === 'blue'), String(await storedColour()));
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'load' });
   await stripeButton(page, BOARD).first().waitFor({ timeout: 30000 });
   check('and kept after a reload', (await stripeLabel(page, BOARD)) === `Colour of ${BOARD}: Blue`);
 
