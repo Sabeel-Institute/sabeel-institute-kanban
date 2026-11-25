@@ -60,6 +60,7 @@ in the app.
 | Theming | **Single light theme, no dark mode** (decided 2026-07-21). Semantic tokens throughout, so a re-theme stays a one-file change. |
 | Subtasks | A card may be a **subtask of one other card on the same board** (`parentId` on the child). The parent's detail view lists them and links straight through; the child shows "Subtask of". On a card's face (Faisal, 2026-11-14, the chips of three prototypes, because people were hand-labelling cards "Main Task" and "subtask" to see this on the board): the parent a grey chip with its count, the child one naming its parent (`parentTitles`), or "Subtask" where the parent is not among the cards loaded — archived, on another board after a move that left the child linked, or on a screen that loads no siblings (My Work, Search, the board's archive). A tile's accessible name says both (`cardTileName`). Deliberately NOT a checklist: a subtask is an ordinary card, with its own column, assignees and comments. Added 2026-07-25 — the ClickUp import had been faking it in description text. **`parentId` is an opaque string to the rules**: same-board is enforced by the picker, not by `firestore.rules`, which check only that it is a string under 200 chars. A child's read access comes from its OWN `boardId`, so a stale or cross-board link leaks nothing: it shows as a plain "Subtask" chip and a "Subtask of" line the child can unlink, never the other card's title. Do not add a rules lookup to "fix" this; it would cost a read on every card write to enforce something the UI already does and no one can exploit. |
 | Template mark | **A board may be marked as a template** (2026-11-15), by its owners and admins on General. The mark does exactly two things: the board is listed under Templates with a badge, and it is left out of the overview. Cloning stays a long press on any board; a clone is never marked; its history opens with one line, "cloned from", and nothing else ties it to its source. |
+| Board colour | **A board may have a colour** (2026-11-25), a lighter stand-in for board categories, which were declined: nothing to name or manage. It is a stripe down the left edge of the board's card in the Boards list, and is drawn nowhere else. Its owners and admins pick it from the stripe itself; a clone keeps it; changing it is not recorded in the board's history. See "Board list and navigation". |
 | Details | **A board may carry details** (2026-11-15): a short list of typed fields (Text, Number, Date, Link, and the fixed Start date and End date), filled in on Board settings → Details. Everyone on the board reads them; its owners and admins change them. See "Details". |
 | Lanes | **A board may be divided into lanes as well as columns** (2026-11-15), so a program board can stand in for a tracking spreadsheet. A switch on Board settings → Lanes, off by default; a card sits in one column and one lane. With lanes, one column holds **finished** cards: a lane's heading counts them, and a finished card is never late. See "Lanes". |
 | Overview | **One screen of every program** (2026-11-15): a row per board with lanes, a mark per lane showing its state, boards with the same lanes under one heading, three orders either way, and boards each person may hide from their own. Opened from an icon in the Boards header, shown only to someone it has a board for. See "Overview". |
@@ -179,6 +180,7 @@ boards/{boardId}
   fields?: [ { id, name, type } ]                # details' fields, at most 20; type text|number|date|link|start|end
   details?: { fieldId: value }                   # every value a string; a date YYYY-MM-DD; no key = not set
   template?: bool                                # listed under Templates; never copied to a clone
+  color?: raspberry|green|blue|violet|orange|red|gold|taupe   # stripe in the Boards list only; copied to a clone; absent = none
 
 boards/{boardId}/activity/{entryId}              # the board's own history
   type: created|renamed|archived|restored|memberAdded|memberRemoved|ownerAdded|ownerRemoved
@@ -609,6 +611,30 @@ their stars; it hides nothing from anyone else. While **Filter boards** holds
 text every section is open, so a match is never behind a fold, and the
 headings do not fold until the filter is cleared.
 
+**A board's colour** (Faisal, 2026-11-25) is a stripe, 12 points wide, down the
+left edge of its card, in every section of the list, Archived included. It is
+the only place a board's colour is drawn: not inside the board, the overview,
+My Work or Search. Eight colours (`BOARD_COLORS`), stored by key and drawn from
+the theme, each at least 3:1 against a card: the label colours, with Antique
+Gold and Mushroom Taupe deepened, since a thin mark in either is too faint.
+
+- **The stripe is the control.** The board's owners and admins tap it on a
+  phone (a target 44 points wide, which reaches into the start of the name)
+  or click it on a computer (24 points, at the card's edge). A phone, and a
+  narrow browser, opens a dialog of swatches; a wide browser a popover beside
+  the stripe. One tap picks, and closes it; **No colour** takes it off. A
+  board with no colour shows them a faint stripe, so there is something to
+  aim at. Everyone else sees the colour and has nothing to press; an
+  uncoloured board looks to them as it always did. An archived board keeps
+  its colour and offers no way to change it.
+- **Press and hold stays Clone**, on the stripe too.
+- **Every card leaves room for the stripe**, coloured or not, so the names
+  line up.
+- **Not history.** A colour change stamps the board like any write, and
+  `diffBoard` does not look at the colour, so nothing is recorded.
+- **The MCP tool sets it too:** `update_board` takes `color` (null takes it
+  off), and `query_boards` reports it.
+
 No folders or groups: they need curation, a permission story of their own, and a
 second tree to navigate on a phone. Revisit only if the team passes ~50 boards and
 the flat list genuinely hurts.
@@ -638,8 +664,9 @@ and opens when it lands.
   description, in the same column and order; subtask links, each pointing at
   its parent's clone; the institute's labels on those cards; the board's
   description; the board's lanes, switched on or off as they were, under new
-  ids, with each card's lane and the finished column; and its details' fields,
-  under new ids, without their values. A card whose lane is gone on the source
+  ids, with each card's lane and the finished column; its details' fields,
+  under new ids, without their values; and its colour in the Boards list
+  (Faisal, 2026-11-25: a clone of a template is the same kind of board). A card whose lane is gone on the source
   has none on the clone.
 - **What stays behind:** archived cards, due dates, assignees, priorities,
   comments, history and attachments, and the template's own labels (Faisal,

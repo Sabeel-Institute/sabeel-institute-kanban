@@ -127,6 +127,11 @@ it again opens it. While you type in **Filter boards**, every section opens
 so nothing you're looking for is hidden. What you fold stays folded, on this
 device and your others, until you open it again.
 
+A coloured **stripe** down the left edge of a board's card is its colour,
+chosen by the board's owners to group boards of a kind, such as every program
+or every course. It shows only here, in the Boards list. To choose one, see
+*Giving a board a colour* in Part 2.
+
 Every board shows as a card in a grid on wide screens, and as a single-column list
 on a phone. If your account can create boards, **New board** is at the top (see
  Part 2).
@@ -792,7 +797,7 @@ Whoever creates a board owns it, and an owner can make any other member an owner
 too. Owning a board says nothing about any other board: a plain member can own
 one, an organizer can own none.
 
-**An owner runs the board**: its name, its columns, who is on it, who else owns
+**An owner runs the board**: its name, its columns, its colour, who is on it, who else owns
 it, archiving it, permanently deleting its cards, and removing anybody's comment.
 
 Everyone else on the board opens the same screen and sees **the member list,
@@ -838,6 +843,20 @@ with one line saying which board it was cloned from; nothing else ties the two.
 For a member, pressing and holding a board does nothing more than a tap: a
 member who wants a clone asks an organizer. An archived board has to be
 restored before it can be cloned.
+
+### Giving a board a colour
+
+*The board's owners and admins.* On **Boards**, tap the **stripe** on the left
+edge of the board's card (click it on a computer) and pick a colour; it applies
+at once, for everyone who sees the board. **No colour** takes it off. A board
+with no colour shows you a faint grey stripe to tap. The colour is only for the
+Boards list: the board itself looks the same. A clone starts in the colour of
+the board it was cloned from.
+
+<div class="pair">
+  <figure class="ph"><img src="manual/img/colour-phone.png" alt="Choosing a board's colour on a phone: the colours in a dialog"><figcaption>On a phone — tap the stripe</figcaption></figure>
+  <figure class="wd"><img src="manual/img/colour-wide.png" alt="Choosing a board's colour in a browser: the colours beside the stripe"><figcaption>In a browser — click the stripe</figcaption></figure>
+</div>
 
 ## 2.2 Board settings
 
@@ -1222,6 +1241,9 @@ at the top of the list to show only those. Nobody is notified again.
 On **Boards**, press and hold the template (right-click on a computer) → a new
 name → **Clone**. Its columns and open cards come along, without dates or
 assignees. Turn on the bell beside Clone to be subscribed to every card.
+
+**…colour a board in the Boards list?** *(the board's owners)*
+On **Boards**, tap the stripe on the board's left edge → pick a colour.
 
 **…rename a board?** *(the board's owners)*
 Open the board → **settings** → **General**. That page is the only place that does it.

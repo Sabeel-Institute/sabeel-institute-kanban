@@ -371,6 +371,33 @@ describe('the MCP server', () => {
 });
 
 describe('Kanban write tools', () => {
+  it('sets a board colour, which a clone keeps, and takes it off, recording no history', async () => {
+    const organizer = 'mcp_colourer';
+    await makeUser({ uid: organizer, email: 'mcpcolourer@oursabeel.com', role: 'organizer', status: 'active', displayName: 'Colourer' });
+    const client = await connect((await signIn(organizer)).access_token);
+    const call = async (name: string, args: Record<string, unknown>) => parsed(await client.callTool({ name, arguments: args }));
+    const made = await call('create_board', { name: 'MCP Colours' });
+    const ref = adminDb().doc(`boards/${made.id}`);
+    expect((await call('query_boards', { board: made.id }))[0].color).toBeNull();
+    expect((await call('update_board', { board: made.id, color: 'green' })).changed).toEqual(['color']);
+    expect((await ref.get()).get('color')).toBe('green');
+    expect((await call('query_boards', { board: made.id }))[0].color).toBe('green');
+    expect((await client.callTool({ name: 'update_board', arguments: { board: made.id, color: 'teal' } })).isError).toBe(true);
+    expect((await call('update_board', { board: made.id, color: 'green' })).changed).toEqual([]);
+    const copy = await call('clone_board', { board: made.id, name: 'MCP Colours copy' });
+    expect((await adminDb().doc(`boards/${copy.id}`).get()).get('color')).toBe('green');
+    expect((await call('update_board', { board: made.id, color: null })).changed).toEqual(['color']);
+    expect((await ref.get()).get('color')).toBeUndefined();
+    expect((await call('update_board', { board: made.id, color: null })).changed).toEqual([]);
+    // The board's history: its creation only. A colour is not a change it records.
+    await call('update_board', { board: made.id, name: 'MCP Colours renamed' });
+    const history = adminDb().doc(`boards/${made.id}`).collection('activity');
+    await waitFor('the rename after the colour changes', async () =>
+      (await history.where('type', '==', 'renamed').get()).docs[0]?.data(),
+    );
+    expect((await history.get()).docs.map((d) => d.get('type')).sort()).toEqual(['created', 'renamed']);
+  });
+
   it('combines board and card edits, uses the app defaults, and transfers file bytes separately', async () => {
     const organizer = 'mcp_writer';
     await makeUser({ uid: organizer, email: 'mcpwriter@oursabeel.com', role: 'organizer', status: 'active', displayName: 'Writer' });

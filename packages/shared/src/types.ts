@@ -2,6 +2,7 @@
  * Shared document shapes. These mirror docs/PRODUCT_BRIEF.md § Data model —
  * change them together.
  */
+import type { BoardColor } from './boardColors';
 
 // ---- Users -----------------------------------------------------------------
 
@@ -231,6 +232,13 @@ export interface BoardDoc {
    * cloned, marked or not, and a clone is never marked. Absent is not.
    */
   template?: boolean;
+  /**
+   * The stripe on the board's card in the Boards list, and nothing more:
+   * never drawn inside the board or anywhere else. Set by its owners and
+   * admins; a clone keeps it. Absent is no colour. One of `BOARD_COLORS`,
+   * rules-checked, and read through `boardExtras`.
+   */
+  color?: BoardColor;
 }
 
 // ---- Cards -----------------------------------------------------------------

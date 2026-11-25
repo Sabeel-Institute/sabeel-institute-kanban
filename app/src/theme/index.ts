@@ -14,7 +14,7 @@
  * keeps every reference honest and makes a future re-theme a one-file change.
  */
 import { palette } from './palette';
-import type { Priority } from '@sabeel/shared';
+import type { BoardColor, Priority } from '@sabeel/shared';
 
 function build() {
   const p = palette;
@@ -65,6 +65,17 @@ function build() {
       high: p.priorityHigh,
       urgent: p.priorityUrgent,
     } satisfies Record<Priority, string>,
+    /** A board's stripe in the Boards list, by its stored key. Nowhere else. */
+    board: {
+      raspberry: p.boardRaspberry,
+      green: p.boardGreen,
+      blue: p.boardBlue,
+      violet: p.boardViolet,
+      orange: p.boardOrange,
+      red: p.boardRed,
+      gold: p.boardGold,
+      taupe: p.boardTaupe,
+    } satisfies Record<BoardColor, string>,
     /** Data visualisation. One bar colour — the chart shows one metric at a time. */
     chart: {
       bar: p.chartBar,

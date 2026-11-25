@@ -91,6 +91,22 @@ export const palette = {
   priorityHigh: '#AD561C',
   priorityUrgent: '#A32218',
 
+  // A board's stripe in the Boards list (BOARD_COLORS in @sabeel/shared).
+  // A stripe is a mark, not text, so each must reach 3:1 on a card (surface)
+  // and on the canvas. Six are the label colours; Antique Gold and Mushroom
+  // Taupe are not, at 2.3:1 and 2.9:1, so they are deepened here, as the
+  // `warning` gold already is. Measured on surface / canvas:
+  //   raspberry 9.06/8.27  green 4.67/4.26  blue 5.32/4.86  violet 6.46/5.90
+  //   orange 3.89/3.55  red 6.98/6.38  gold 3.98/3.63  taupe 4.04/3.69
+  boardRaspberry: '#83114F',
+  boardGreen: '#4E7A43',
+  boardBlue: '#3E6B8A',
+  boardViolet: '#6B4C8A',
+  boardOrange: '#C2611F',
+  boardRed: '#A32218',
+  boardGold: '#977535',
+  boardTaupe: '#8C7563',
+
   overlay: '#3A2F2866',
   shadow: '#A58D7A33',
 } as const;

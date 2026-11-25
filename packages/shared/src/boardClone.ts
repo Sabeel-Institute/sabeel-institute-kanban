@@ -1,5 +1,6 @@
 import { SYSTEM_ACTOR } from './activity';
 import { localId, newBoard } from './boards';
+import type { BoardColor } from './boardColors';
 import type { BoardColumn, BoardDoc, BoardField, BoardLane, CardDoc } from './types';
 
 /**
@@ -9,7 +10,7 @@ import type { BoardColumn, BoardDoc, BoardField, BoardLane, CardDoc } from './ty
  * A clone is a NEW board, so whoever clones is its only member and owner, as
  * when they press New board. It is laid out like the source: its columns, and
  * its lanes switched on or off as they were, with the finished column and each
- * card's lane. A card keeps what a template means — its title,
+ * card's lane, and its colour in the Boards list. A card keeps what a template means — its title,
  * its description, its place, the subtasks under it and the institute's labels
  * — and starts without what belongs to one run of the work: no due date, no
  * assignees, no priority, no comments, no attachments, and a history of one
@@ -90,6 +91,7 @@ export function boardClone(params: {
     lanes?: readonly BoardLane[];
     doneColumnId?: string;
     fields?: readonly BoardField[];
+    color?: BoardColor;
   };
   cards: readonly CloneSourceCard[];
   /** Every label, so only the institute's are kept: a board's own has no `boardId` match on the clone. */
@@ -188,6 +190,9 @@ export function boardClone(params: {
     ...((params.source.fields ?? []).length > 0
       ? { fields: params.source.fields!.map((f) => ({ ...f, id: localId('fld') })) }
       : {}),
+    // A clone of a coloured template is the same kind of board (Faisal,
+    // 2026-11-25), so it starts in the same colour.
+    ...(params.source.color ? { color: params.source.color } : {}),
   };
   return { board, cards };
 }

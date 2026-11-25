@@ -72,6 +72,7 @@ board — is what lets you:
 - add, rename, reorder and remove the board's details, and fill them in
   (Board settings → Details), which everyone on the board reads
 - mark the board as a template, or take the mark off (Board settings → General)
+- choose the board's colour, or take it off (its stripe in the Boards list)
 - add and remove members
 - make another member an owner, or take it away
 - archive the board, and restore it

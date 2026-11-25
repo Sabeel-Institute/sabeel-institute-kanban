@@ -5,6 +5,7 @@ export * from './auth';
 export * from './autoScroll';
 export * from './boardHistory';
 export * from './boardClone';
+export * from './boardColors';
 export * from './boardFields';
 export * from './boardShape';
 export * from './boards';
