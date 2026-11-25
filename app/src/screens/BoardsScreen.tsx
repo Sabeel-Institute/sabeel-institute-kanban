@@ -3,9 +3,11 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Icon } from '../icons';
 import {
   BOARD_NAME_MAX,
+  canManageBoard,
   canSeeEveryBoard,
   overviewBoards,
   sortBoardsForList,
+  type BoardColor,
   type BoardSection,
 } from '@sabeel/shared';
 import {
@@ -14,6 +16,7 @@ import {
   createBoard,
   newBoardId,
   noteBoardOpened,
+  setBoardColor,
   setSectionCollapsed,
   setShowAllBoards,
   toggleFavourite,
@@ -36,6 +39,7 @@ import {
   Card,
   CardGrid,
   DisclosureHeading,
+  IconAction,
   LoadError,
   Row,
   Screen,
@@ -45,8 +49,11 @@ import {
 } from '../components/ui';
 import { PushNudge } from '../components/PushNudge';
 import { CloneBoardSheet } from '../components/CloneBoardSheet';
+import { BOARD_CARD_INSET, BoardStripe } from '../components/BoardColour';
+import { BoardColourPicker } from '../components/BoardColourPicker';
 import { contextMenuProps } from '../contextMenu';
 import { useAction } from '../useAction';
+import { timed } from '../slowWrites';
 import { radius, space, type, useTheme } from '../theme';
 
 /** Shared empty array, so absent preferences keep a stable identity. */
@@ -133,16 +140,31 @@ function BoardRow({
   onOpen,
   onToggleFavourite,
   onClone,
+  onColour,
+  colourError,
+  onDismissColourError,
 }: {
   board: BoardListItem;
   isFavourite: boolean;
   onOpen: () => void;
   onToggleFavourite: () => void;
   onClone: (() => void) | undefined;
+  /** Only for someone who may change the board's colour: its owners and admins. */
+  onColour: ((anchor: unknown) => void) | undefined;
+  /**
+   * Why this board's colour was not saved, on its own card: the picker has
+   * closed and the stripe gone back, and this card is where the person is
+   * looking. At the top of the list it was out of sight for every board
+   * further down a phone's screen.
+   */
+  colourError?: string | null;
+  onDismissColourError?: () => void;
 }) {
   const t = useTheme();
   return (
-    <Card>
+    // Every card leaves room for a stripe, coloured or not, so names line up.
+    <Card style={styles.boardCard}>
+      <BoardStripe boardName={board.name} color={board.color} onColour={onColour} onLongPress={onClone} />
       <Row style={styles.between}>
         <Pressable
           onPress={onOpen}
@@ -184,6 +206,12 @@ function BoardRow({
           />
         </Pressable>
       </Row>
+      {colourError ? (
+        <Row style={styles.colourError}>
+          <Text style={[type.label, styles.grow, { color: t.text.danger }]}>{colourError}</Text>
+          <IconAction icon="close" label="Dismiss" onPress={() => onDismissColourError?.()} />
+        </Row>
+      ) : null}
     </Card>
   );
 }
@@ -254,6 +282,25 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
   /** The board whose clone sheet is open, and the id its clone will have. */
   const [cloning, setCloning] = useState<{ board: BoardListItem; cloneId: string } | null>(null);
   const cloneAction = useAction('cloneBoard');
+  /**
+   * The board whose colour is being picked, by id, and the stripe it was
+   * opened from. By id so the picker shows the board as it is now: a colour
+   * someone else picks meanwhile is the one it marks and compares against.
+   */
+  const [colouring, setColouring] = useState<{ boardId: string; anchor: unknown } | null>(null);
+  /**
+   * Why a board's colour was not saved, BY BOARD. Writes to two boards can be
+   * in flight at once (offline they wait for the server), so one shared error
+   * beside a "last board tried" put the first board's refusal on the second
+   * board's card. Each write answers for its own board.
+   */
+  const [colourErrors, setColourErrors] = useState<Record<string, string>>({});
+  const clearColourError = (id: string) =>
+    setColourErrors((was) => {
+      if (!(id in was)) return was;
+      const { [id]: _gone, ...rest } = was;
+      return rest;
+    });
   // Sections collapsed by this person, on their account (#110). Loading or
   // unreadable reads as nothing collapsed: a display preference, so the list
   // shows in full rather than hiding boards on a failed read, and the failure
@@ -289,6 +336,13 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
   const favourites = prefs.data?.favourites ?? EMPTY;
   const recents = prefs.data?.recents ?? EMPTY;
   const allBoards = boards.data ?? NO_BOARDS;
+  // Gone from the list (archived, or this person taken off it) is closed, and
+  // stays closed should it come back.
+  const colouringBoard = colouring ? allBoards.find((b) => b.id === colouring.boardId) : undefined;
+  const colouringGone = colouring !== null && boards.status === 'ready' && !colouringBoard;
+  useEffect(() => {
+    if (colouringGone) setColouring(null);
+  }, [colouringGone]);
   const visibleBoards = useMemo(
     () => showAllBoards ? allBoards : allBoards.filter((board) => board.memberUids.includes(user.uid)),
     [allBoards, showAllBoards, user.uid],
@@ -317,6 +371,30 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
           setCloning({ board: b, cloneId: newBoardId() });
         }
       : undefined;
+
+  // Its owners and admins: whoever may change the board's settings.
+  const onColourOf = (b: BoardListItem) =>
+    canManageBoard(user, b)
+      ? (anchor: unknown) => {
+          setColouring({ boardId: b.id, anchor });
+        }
+      : undefined;
+  const colourProps = (b: BoardListItem) => ({
+    onColour: onColourOf(b),
+    colourError: colourErrors[b.id] ?? null,
+    onDismissColourError: () => clearColourError(b.id),
+  });
+
+  function pickColour(board: BoardListItem, color: BoardColor | null) {
+    setColouring(null);
+    // Closed at once, as a star is: there is nothing typed to lose, and a
+    // refusal is said on the board's own card (`colourError`).
+    if ((color ?? undefined) === board.color) return;
+    clearColourError(board.id);
+    timed('setBoardColor', () => setBoardColor(board.id, color)).catch((e: unknown) =>
+      setColourErrors((was) => ({ ...was, [board.id]: toUserMessage(e, 'setBoardColor') })),
+    );
+  }
 
   async function clone(
     offer: { board: BoardListItem; cloneId: string },
@@ -494,6 +572,7 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
                 onOpen={() => open(b)}
                 onToggleFavourite={() => toggleFavourite(user, b.id, favourites)}
                 onClone={onCloneOf(b)}
+                {...colourProps(b)}
               />
             ))}
           </CardGrid>
@@ -519,6 +598,7 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
                 onOpen={() => open(b)}
                 onToggleFavourite={() => toggleFavourite(user, b.id, favourites)}
                 onClone={onCloneOf(b)}
+                {...colourProps(b)}
               />
             ))}
           </CardGrid>
@@ -544,6 +624,7 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
                 onOpen={() => open(b)}
                 onToggleFavourite={() => toggleFavourite(user, b.id, favourites)}
                 onClone={onCloneOf(b)}
+                {...colourProps(b)}
               />
             ))}
           </CardGrid>
@@ -571,6 +652,7 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
                 onOpen={() => open(b)}
                 onToggleFavourite={() => toggleFavourite(user, b.id, favourites)}
                 onClone={onCloneOf(b)}
+                {...colourProps(b)}
               />
             ))}
           </CardGrid>
@@ -593,6 +675,16 @@ export function BoardsScreen({ user }: { user: SessionUser }) {
           nothing still could not find a board they were on that someone else
           archived. */}
       <ArchivedBoards user={user} showAllBoards={showAllBoards} onOpen={open} />
+
+      {colouringBoard ? (
+        <BoardColourPicker
+          boardName={colouringBoard.name}
+          value={colouringBoard.color}
+          anchor={colouring?.anchor}
+          onPick={(color) => pickColour(colouringBoard, color)}
+          onClose={() => setColouring(null)}
+        />
+      ) : null}
 
       {cloning ? (
         <CloneBoardSheet
@@ -646,8 +738,9 @@ function ArchivedBoards({
                 isFavourite={false}
                 onOpen={() => onOpen(b)}
                 onToggleFavourite={() => {}}
-                // An archived board is restored before it is cloned.
+                // An archived board is restored before it is cloned or recoloured.
                 onClone={undefined}
+                onColour={undefined}
               />
             ))}
           </CardGrid>
@@ -659,6 +752,8 @@ function ArchivedBoards({
 
 const styles = StyleSheet.create({
   sectionGap: { marginTop: space.lg },
+  colourError: { alignItems: 'center', flexWrap: 'nowrap' },
+  boardCard: { paddingLeft: BOARD_CARD_INSET, overflow: 'hidden' },
   overviewEntry: {
     flexDirection: 'row',
     alignItems: 'center',

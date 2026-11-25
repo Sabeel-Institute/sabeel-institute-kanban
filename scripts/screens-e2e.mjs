@@ -407,14 +407,18 @@ for (const [id, name, laneNames] of OVERVIEW_BOARDS) {
 
 // A board MARKED AS A TEMPLATE, so the Boards list draws its Templates heading
 // and a badge on a row, at every width. A long name, beside which the badge
-// must wrap rather than push the star off the row.
+// must wrap rather than push the star off the row. Gold, one of the two
+// palest board colours, so the Boards list draws a coloured stripe as well as
+// the empty ones of the boards with none.
+const TEMPLATE_NAME = 'Weekend program template for the summer term';
 await db.doc('boards/sw_template').set({
-  name: 'Weekend program template for the summer term',
+  name: TEMPLATE_NAME,
   description: '',
   archived: false,
   columns: [{ id: 't1', name: 'To Do' }],
   columnIds: ['t1'],
   template: true,
+  color: 'gold',
   memberUids: [uid],
   boardOwnerUids: [uid],
   memberProfiles: { [uid]: { displayName: 'Faisal', email: 'faisal@oursabeel.com' } },
@@ -826,6 +830,24 @@ async function tour(page, tag, width) {
     (await page.getByText('Templates', { exact: true }).isVisible().catch(() => false)) &&
       (await page.getByText('Template', { exact: true }).first().isVisible().catch(() => false)),
   );
+  // The stripe is drawn absolutely, so the overlap check above, which compares
+  // controls in the same layer, cannot see it: the name is held clear of the
+  // drawn stripe here, at every width (the touch target beyond it may overlap
+  // the name on purpose; that is not drawn).
+  {
+    const bar = await page.getByTestId(`stripe:${TEMPLATE_NAME}`).first().boundingBox().catch(() => null);
+    const name = await page.getByText(TEMPLATE_NAME, { exact: true }).first().boundingBox().catch(() => null);
+    const ink = await page
+      .getByTestId(`stripe:${TEMPLATE_NAME}`)
+      .first()
+      .evaluate((el) => getComputedStyle(el).backgroundColor)
+      .catch(() => null);
+    check(
+      `${tag} / boards draws a coloured board's stripe, clear of its name`,
+      bar !== null && name !== null && ink === 'rgb(151, 117, 53)' && name.x >= bar.x + bar.width + 4,
+      JSON.stringify({ bar, name, ink }),
+    );
+  }
 
   /*
    * The push nudge is ON this screenshot, and that has to be asserted or the

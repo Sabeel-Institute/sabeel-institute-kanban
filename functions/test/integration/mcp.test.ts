@@ -8,7 +8,7 @@ import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { adminDb, callFunction, functionsOrigin, idTokenFor, makeUser, shutdown, waitFor } from './emulatorClient';
+import { adminDb, callFunction, functionsOrigin, idTokenFor, makeUser, shutdown, stays, waitFor } from './emulatorClient';
 
 const ME = 'mcp_me';
 const OTHER = 'mcp_other';
@@ -177,6 +177,7 @@ describe('composable queries: every question in at most two calls', () => {
     expect(cloneDescription).toContain('only initial board member and owner');
     expect(cloneDescription).toContain('Institute admins can see every board');
     expect(cloneDescription).toContain('detail fields with blank values');
+    expect(cloneDescription).toContain('the board colour');
     const call = async (name: string, args: Record<string, unknown>) => parsed(await client.callTool({ name, arguments: args }));
     const titles = async (args: Record<string, unknown>) => (await call('query_cards', args)).cards.map((c: { title: string }) => c.title);
 
@@ -371,6 +372,37 @@ describe('the MCP server', () => {
 });
 
 describe('Kanban write tools', () => {
+  it('sets a board colour, which a clone keeps, and takes it off, recording no history', async () => {
+    const organizer = 'mcp_colourer';
+    await makeUser({ uid: organizer, email: 'mcpcolourer@oursabeel.com', role: 'organizer', status: 'active', displayName: 'Colourer' });
+    const client = await connect((await signIn(organizer)).access_token);
+    const call = async (name: string, args: Record<string, unknown>) => parsed(await client.callTool({ name, arguments: args }));
+    const made = await call('create_board', { name: 'MCP Colours' });
+    const ref = adminDb().doc(`boards/${made.id}`);
+    expect((await call('query_boards', { board: made.id }))[0].color).toBeNull();
+    expect((await call('update_board', { board: made.id, color: 'green' })).changed).toEqual(['color']);
+    expect((await ref.get()).get('color')).toBe('green');
+    expect((await call('query_boards', { board: made.id }))[0].color).toBe('green');
+    expect((await client.callTool({ name: 'update_board', arguments: { board: made.id, color: 'teal' } })).isError).toBe(true);
+    expect((await call('update_board', { board: made.id, color: 'green' })).changed).toEqual([]);
+    const copy = await call('clone_board', { board: made.id, name: 'MCP Colours copy' });
+    expect((await adminDb().doc(`boards/${copy.id}`).get()).get('color')).toBe('green');
+    expect((await call('update_board', { board: made.id, color: null })).changed).toEqual(['color']);
+    expect((await ref.get()).get('color')).toBeUndefined();
+    expect((await call('update_board', { board: made.id, color: null })).changed).toEqual([]);
+    // The board's history: its creation and a later rename only. A colour is
+    // not a change it records. The rename's line proves the trigger runs; the
+    // emulator runs triggers in parallel, so the colour writes' are held a
+    // while rather than assumed done.
+    await call('update_board', { board: made.id, name: 'MCP Colours renamed' });
+    const history = adminDb().doc(`boards/${made.id}`).collection('activity');
+    await waitFor('the rename after the colour changes', async () =>
+      (await history.where('type', '==', 'renamed').get()).docs[0]?.data(),
+    );
+    const types = async () => (await history.get()).docs.map((d) => d.get('type')).sort().join();
+    await stays('the history holds the creation and the rename only', async () => (await types()) === 'created,renamed', 3000);
+  });
+
   it('combines board and card edits, uses the app defaults, and transfers file bytes separately', async () => {
     const organizer = 'mcp_writer';
     await makeUser({ uid: organizer, email: 'mcpwriter@oursabeel.com', role: 'organizer', status: 'active', displayName: 'Writer' });

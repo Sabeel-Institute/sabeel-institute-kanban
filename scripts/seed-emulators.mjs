@@ -553,6 +553,30 @@ try {
   console.warn('could not seed the template board — continuing:', String(e).slice(0, 160));
 }
 
+// Colours in the Boards list: the three program boards green, Fundraising
+// orange, the rest none, so the list shows stripes and an empty one side by
+// side. Picked from the stripe, as an admin does. Not optional, unlike the
+// boards above: the manual's pictures and the phone flows
+// (maestro/board.yaml taps Fundraising's orange stripe) expect stripes, and a seed that carried on without them would let each of
+// them run on a list with none.
+const BOARD_COLOURS = [
+  [LANES_BOARD, 'Green'],
+  [CAMP, 'Green'],
+  [TEMPLATE_BOARD, 'Green'],
+  ['Fundraising 2026', 'Orange'],
+];
+await admin.getByRole('button', { name: 'Boards', exact: true }).first().click();
+await admin.getByRole('button', { name: 'New board' }).waitFor({ timeout: 25000 });
+for (const [board, colour] of BOARD_COLOURS) {
+  const stripe = admin.getByRole('button', { name: `Colour of ${board}: ${colour}`, exact: true });
+  const any = admin.getByRole('button', { name: new RegExp(`^Colour of ${board}: `) }).first();
+  await any.waitFor({ timeout: 25000 });
+  if (await stripe.isVisible()) continue;
+  await any.click();
+  await admin.getByRole('button', { name: colour, exact: true }).click();
+  await stripe.waitFor({ timeout: 25000 });
+}
+
 await browser.close();
 console.log(
   `Seeded: 3 people, 5 boards (two with ${LANES.length} lanes, one with ${CAMP_LANES.length}, one a template), ${COLUMNS.length + 3} columns, ${

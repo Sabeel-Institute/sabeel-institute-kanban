@@ -1,9 +1,9 @@
 import { isDeepStrictEqual } from 'node:util';
-import { getFirestore } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { addDoc, collection, doc, type Firestore } from 'firebase/firestore';
 import { z } from 'zod';
 import {
-  addField, canEditBoardLabels, canManageBoard, columnsPatch, LABEL_COLORS,
+  addField, BOARD_COLORS, canEditBoardLabels, canManageBoard, columnsPatch, LABEL_COLORS,
   laneAddBlocked, lanesSwitchPatch, localId, newBoard, newLabel, renameColumn, renameField, renameLane,
   validateBoardName, validateColumnName, validateDetailValue, validateLabelName, validateLaneName, withCleanExtras,
   type BoardDoc, type BoardField, type Label,
@@ -34,6 +34,8 @@ const labels = z.object({
 const boardChanges = {
   name: word.optional(),
   template: z.boolean().optional(),
+  color: z.enum(BOARD_COLORS).nullable().optional()
+    .describe('The stripe on the board in the Boards list, nowhere else. Null takes it off.'),
   columns: shape.strict().optional(),
   lanes: shape.extend({ enabled: z.boolean().optional(), finished_column: word.optional() }).strict().optional(),
   detail_fields: detailFields.optional(),
@@ -54,6 +56,9 @@ function changeBoardSettings(board: BoardDoc, f: Changes): Partial<BoardDoc> {
     patch.name = f.name;
   }
   if (f.template !== undefined) patch.template = f.template;
+  // Null takes the colour off, which is deleting the field; off already is nothing to write.
+  if (f.color) patch.color = f.color;
+  else if (f.color === null && board.color) patch.color = FieldValue.delete() as never;
 
   if (f.columns) {
     let columns = [...board.columns];
@@ -229,7 +234,7 @@ export function registerBoardWrites({ server, run, me, board }: WriteTools) {
     description: [
       'Start a new board from an active board or template. Available to organizers and admins.',
       'The signed-in person is the only initial board member and owner. Institute admins can see every board.',
-      'Copies columns, lanes, board detail fields with blank values, and unarchived cards and their subtasks. Card assignees and due dates start empty.',
+      'Copies columns, lanes, the board colour, board detail fields with blank values, and unarchived cards and their subtasks. Card assignees and due dates start empty.',
       'Subscriptions default to off. Use update_board with the new board id to fill detail values or add members when requested.',
     ].join(' '),
     inputSchema: {

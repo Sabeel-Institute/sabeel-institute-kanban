@@ -758,7 +758,7 @@ function buildServer(me: Me, uploadBase: string): McpServer {
     'query_boards',
     {
       description:
-        'Find boards or templates by name. Results include the template flag, id and url. Request columns, lanes, members (with owners), details (field definitions and values), labels or card counts as needed. Admins can see every board.',
+        'Find boards or templates by name. Results include the template flag, the colour of its stripe in the Boards list, id and url. Request columns, lanes, members (with owners), details (field definitions and values), labels or card counts as needed. Admins can see every board.',
       inputSchema: {
         name: z.string().optional().describe('Part of a board name'),
         board: names.optional().describe('Board names or ids'),
@@ -793,6 +793,7 @@ function buildServer(me: Me, uploadBase: string): McpServer {
               has_lanes: live,
               archived: b.archived === true,
               template: b.template === true,
+              color: b.color ?? null,
             };
             if (inc.columns) out.columns = b.columns.map((c) => c.name);
             if (inc.lanes) {

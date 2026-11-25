@@ -677,6 +677,38 @@ describe('the template mark', () => {
   });
 });
 
+describe('the board colour', () => {
+  const owner = () => doc(ctx('owner1', 'member'), 'boards/b_member');
+  it('an owner sets, changes and takes it off', async () => {
+    await assertSucceeds(updateDoc(owner(), { ...stamp('owner1'), color: 'green' }));
+    await assertSucceeds(updateDoc(owner(), { ...stamp('owner1'), color: 'gold' }));
+    await assertSucceeds(updateDoc(owner(), { ...stamp('owner1'), color: deleteField() }));
+  });
+
+  it('an admin off the board sets it', async () => {
+    await assertSucceeds(
+      updateDoc(doc(ctx('admin1', 'admin'), 'boards/b_member'), { ...stamp('admin1'), color: 'blue' }),
+    );
+  });
+
+  it('a member who does not own the board cannot', async () => {
+    await assertFails(
+      updateDoc(doc(ctx('member1', 'member'), 'boards/b_member'), { ...stamp('member1'), color: 'green' }),
+    );
+  });
+
+  it('only a colour the app offers, by its key', async () => {
+    for (const color of ['teal', '#4E7A43', 'Green', '', 3, null]) {
+      await assertFails(updateDoc(owner(), { ...stamp('owner1'), color }));
+    }
+  });
+
+  it('a colour already set does not stop another change to the board', async () => {
+    await assertSucceeds(updateDoc(owner(), { ...stamp('owner1'), color: 'violet' }));
+    await assertSucceeds(updateDoc(owner(), { ...stamp('owner1'), name: 'Renamed' }));
+  });
+});
+
 describe('granting and revoking ownership', () => {
   it('an owner promotes another member', async () => {
     await assertSucceeds(

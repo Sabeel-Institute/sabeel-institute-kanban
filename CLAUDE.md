@@ -316,6 +316,22 @@ shown only to someone it has a board for. Read-only.
   the user document, self-written; the hidden list is bounded at 500 in the
   rules (`OVERVIEW_HIDDEN_MAX`, held by `ruleLimits.test.ts`).
 
+## A board's colour
+
+Added 2026-11-25 (Faisal), in place of board categories, which were declined
+as too much to manage: a stripe down the left edge of a board's card in the
+Boards list (`docs/PRODUCT_BRIEF.md` § Board list and navigation).
+
+- **Drawn in the Boards list only**, Archived included. Never inside the
+  board, the overview, My Work or Search.
+- **Stored as a key from `BOARD_COLORS`, never a hex value.** The shades are
+  `palette.ts`'s, each at least 3:1 on a card (`boardColours.test.ts`), and
+  `firestore.rules` restates the keys (`ruleLimits.test.ts`). Readers take it
+  through `boardExtras`, so a key this build does not know draws as none.
+- **The stripe is the control**, for the board's owners and admins only (the
+  board update rule); press and hold on the card, the stripe included, stays
+  Clone. A clone keeps the colour, and changing it is not board history.
+
 ## Attachments
 
 Added 2026-07-26, reversing the original "no attachments" decision. Multiple

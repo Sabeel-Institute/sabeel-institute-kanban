@@ -1,3 +1,4 @@
+import { isBoardColor, type BoardColor } from './boardColors';
 import { FIELD_TYPES } from './boardFields';
 import type { BoardField, BoardLane } from './types';
 
@@ -19,6 +20,8 @@ export interface BoardExtras {
   doneColumnId?: string;
   fields: BoardField[];
   details: Record<string, string>;
+  /** Left out when it is not one this build knows: a newer build's colour draws as none. */
+  color?: BoardColor;
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
@@ -62,7 +65,7 @@ export function cleanDetails(raw: unknown): Record<string, string> {
   >;
 }
 
-/** The lane and detail parts of a board document, cleaned. */
+/** The lane, detail and colour parts of a board document, cleaned. */
 export function boardExtras(data: Record<string, unknown>): BoardExtras {
   return {
     lanesOn: data.lanesOn === true,
@@ -70,10 +73,14 @@ export function boardExtras(data: Record<string, unknown>): BoardExtras {
     ...(typeof data.doneColumnId === 'string' ? { doneColumnId: data.doneColumnId } : {}),
     fields: cleanFields(data.fields),
     details: cleanDetails(data.details),
+    ...(isBoardColor(data.color) ? { color: data.color } : {}),
   };
 }
 
-/** A board document with its lane and detail parts cleaned, for a reader on the server. */
+/** A board document with its lane, detail and colour parts cleaned, for a reader on the server. */
 export function withCleanExtras<T extends Record<string, unknown>>(data: T): T & BoardExtras {
-  return { ...data, ...boardExtras(data) };
+  // `color` is optional, so a colour this build does not know is taken out,
+  // not merely left unreplaced.
+  const { color: _stored, ...rest } = data;
+  return { ...rest, ...boardExtras(data) } as T & BoardExtras;
 }

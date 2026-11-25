@@ -21,6 +21,7 @@ import {
   canSeeEveryBoard,
   newBoard,
   pushRecent,
+  type BoardColor,
   type BoardColumn,
   type BoardField,
   type BoardLane,
@@ -75,6 +76,8 @@ export interface BoardListItem {
   details: Record<string, string>;
   /** Marked as a template: listed under Templates, with a badge. */
   template: boolean;
+  /** The stripe on its row in the Boards list; absent is none (`boardExtras`). */
+  color?: BoardColor;
   /** When it was made, for the overview's "date created" order. */
   createdAt: number;
 }
@@ -192,6 +195,15 @@ export async function updateBoard(
   patch: BoardPatch,
 ): Promise<void> {
   await writeBoard(boardId, patch);
+}
+
+/**
+ * A board's colour in the Boards list, or none. Stamped like every board
+ * write, which rules require; the history records nothing for it, because
+ * `diffBoard` does not look at the colour.
+ */
+export async function setBoardColor(boardId: string, color: BoardColor | null): Promise<void> {
+  await writeBoard(boardId, { color: color ?? deleteField() });
 }
 
 /**

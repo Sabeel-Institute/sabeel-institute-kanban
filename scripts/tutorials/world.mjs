@@ -56,6 +56,7 @@ const BOARDS = [
   {
     id: 'fundraising',
     name: 'Fundraising 2026',
+    color: 'orange',
     createdBy: 'faisal',
     owners: ['faisal', 'sara'],
     members: ['faisal', 'sara', 'omar'],
@@ -94,6 +95,7 @@ const BOARDS = [
   {
     id: 'weekend-school',
     name: 'Weekend School',
+    color: 'blue',
     createdBy: 'sara',
     createdViaAgent: true,
     owners: ['sara'],
@@ -138,6 +140,7 @@ const BOARDS = [
   {
     id: 'summer-camp',
     name: 'Winter Camp',
+    color: 'green',
     createdBy: 'sara',
     owners: ['sara'],
     members: ['sara', 'omar'],
@@ -166,6 +169,7 @@ const BOARDS = [
   {
     id: 'autumn-camp',
     name: 'Spring Camp',
+    color: 'green',
     createdBy: 'sara',
     owners: ['sara'],
     members: ['sara', 'omar'],
@@ -328,6 +332,9 @@ export async function buildWorld() {
       createdAt: t0,
       createdBy: uids[b.createdBy],
       ...(b.createdViaAgent ? { agentAt: t0 } : {}),
+      // The stripe in the Boards list: the two camps green, so a film shows
+      // what a colour groups; Website Refresh none, so it shows a board without.
+      ...(b.color ? { color: b.color } : {}),
       ...(b.lanes
         ? {
             lanesOn: true,

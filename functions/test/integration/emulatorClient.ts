@@ -92,6 +92,23 @@ export async function shutdown() {
   }
 }
 
+/**
+ * That `check` holds for `ms`, sampled: an ABSENCE, or a figure a trigger
+ * would change, held a while after the write rather than read once. The
+ * emulator runs triggers in parallel, so one trigger's line landing proves
+ * nothing about an earlier write's trigger having finished (CLAUDE.md, "A
+ * server write that makes many cards at once"). Shared here so a new test
+ * finds it; it began as a local helper of the clone tests, and the next test
+ * that needed it waited on trigger order instead.
+ */
+export async function stays(label: string, check: () => Promise<boolean>, ms = 5000) {
+  const until = Date.now() + ms;
+  while (Date.now() < until) {
+    if (!(await check())) throw new Error(`no longer true: ${label}`);
+    await new Promise((r) => setTimeout(r, 250));
+  }
+}
+
 /** Poll until `check` returns a value, or throw. Triggers are asynchronous. */
 export async function waitFor<T>(
   label: string,

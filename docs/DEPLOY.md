@@ -521,6 +521,20 @@ is the Gmail API. Such a report was kept; nothing re-sends it.
 These cost real time on the sibling time-tracker project; see
 `docs/INHERITED-STACK.md` for the full accounts.
 
+**A new board field reaches the server before the rules know it, and the
+board freezes.** The board update rule checks the whole stored document
+against a list of keys (`hasOnly`), not only what a write changes. A function
+that writes a field the deployed rules do not list yet (the Admin SDK passes
+no rules) leaves a board that refuses every client save, its rename and
+archive included, until rules that list the field are deployed. So when one
+release adds a board field written by a function (the board colour, which
+the agent tool and clone write, v0.26.0), deploy the rules first or together
+with functions, `--only firestore:rules,storage,functions` from here, never
+Deploy Functions alone. Rolling the rules back is the same trap from the
+other side: once any board carries the field, rules that do not list it
+freeze that board whatever runs. Strip the field from every board first
+(the Admin SDK, as a maintenance step), then roll back.
+
 **A new callable answers 403.** The same holds for a new blocking function
 (`beforeSignIn` and the like). Deploy Functions' plan step (`sabeel-ci
 ci-functions plan`) names each such function before the deploy and prints the

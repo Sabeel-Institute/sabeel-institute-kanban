@@ -340,6 +340,14 @@ const SHOTS = {
     await name.fill('Spring Open House');
     await p.waitForTimeout(700);
   },
+  // A board's colour: its stripe tapped and the colours open, beside the
+  // stripe on a computer and in a dialog on a phone. Nothing picked.
+  colour: async (p) => {
+    await nav(p, 'Boards');
+    await p.getByRole('button', { name: new RegExp(`^Colour of ${BOARD}: `) }).first().click();
+    await p.getByRole('button', { name: 'No colour', exact: true }).waitFor({ timeout: 30000 });
+    await p.waitForTimeout(700);
+  },
   people: async (p) => {
     await nav(p, 'Boards');
     await p.getByRole('button', { name: 'More' }).click();

@@ -59,10 +59,12 @@ When a release changes what an old build gets wrong, raise the version floor
 to it last, once the web, Play and TestFlight have it (`docs/DEPLOY.md`
 § Retiring old builds).
 
-**Owed now: nothing.** v0.24.1 updated the Board Settings film and the manual’s History screenshots.
+**Owed now:** board colours (the stripe on the Boards list).
 
 | Film or picture | What it lacks |
 |---|---|
+| Film *Creating a board* (`new-board`) | Giving the new board a colour from its stripe, and that only owners and admins can. |
+| Films *Finding your way around*, *Cloning a board* | The Boards list now has stripes; the clone keeps its source's colour. |
 
 ## What works today (2026-10-16)
 

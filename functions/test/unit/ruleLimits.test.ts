@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
+  BOARD_COLORS,
   BOARD_FIELDS_MAX,
   COLLAPSED_LANE_BOARDS_MAX,
   COLLAPSED_SECTIONS_MAX,
@@ -63,5 +64,12 @@ describe('limits restated in firestore.rules', () => {
     expect(m).not.toBeNull();
     const listed = [...m![1].matchAll(/'([^']*)'/g)].map((x) => x[1]);
     expect(listed).toEqual([...OVERVIEW_SORTS]);
+  });
+
+  it('admits exactly the board colours the app offers, and only on a board update', () => {
+    const lists = [...rules.matchAll(/\.color in \[([^\]]*)\]/g)];
+    expect(lists).toHaveLength(1);
+    const listed = [...lists[0][1].matchAll(/'([^']*)'/g)].map((x) => x[1]);
+    expect(listed).toEqual([...BOARD_COLORS]);
   });
 });

@@ -418,7 +418,7 @@ service cloud.firestore {
         && incoming().keys().hasOnly(['name', 'description', 'archived', 'columns',
             'columnIds', 'memberUids', 'memberProfiles', 'boardOwnerUids',
             'activeCardCount', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy',
-            'lanesOn', 'lanes', 'doneColumnId', 'fields', 'details', 'template', 'agentAt'])
+            'lanesOn', 'lanes', 'doneColumnId', 'fields', 'details', 'template', 'color', 'agentAt'])
         && !incoming().diff(existing()).affectedKeys().hasAny(['agentAt'])
         && incoming().get('boardOwnerUids', []) is list
         && incoming().createdBy == existing().createdBy
@@ -448,6 +448,11 @@ service cloud.firestore {
         && (!('fields' in incoming()) || (incoming().fields is list && incoming().fields.size() <= 20))
         && (!('details' in incoming()) || (incoming().details is map && incoming().details.size() <= 20))
         && (!('template' in incoming()) || incoming().template is bool)
+        // The stripe on the board's card in the Boards list. BOARD_COLORS in
+        // @sabeel/shared, held to this list by ruleLimits.test.ts. Absent is
+        // no colour, so taking it off is deleting the field.
+        && (!('color' in incoming())
+            || incoming().color in ['raspberry', 'green', 'blue', 'violet', 'orange', 'red', 'gold', 'taupe'])
         && incoming().name is string
         && incoming().name.size() > 0
         && incoming().name.size() <= 120;

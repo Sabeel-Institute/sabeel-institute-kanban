@@ -30,6 +30,7 @@ function clone(
     doneColumnId?: string;
     fields?: { id: string; name: string; type: 'text' | 'start' }[];
     details?: Record<string, string>;
+    color?: 'green' | 'blue';
   } = {},
 ) {
   let n = 0;
@@ -242,6 +243,16 @@ describe('boardClone: details', () => {
 
   it('gives a board without details none', () => {
     expect('fields' in clone([]).board).toBe(false);
+  });
+});
+
+describe('boardClone: colour', () => {
+  it('starts in the source’s colour', () => {
+    expect(clone([], false, { color: 'blue' }).board.color).toBe('blue');
+  });
+
+  it('gives a clone of an uncoloured board no colour', () => {
+    expect('color' in clone([]).board).toBe(false);
   });
 });
 
