@@ -622,14 +622,18 @@ Gold and Mushroom Taupe deepened, since a thin mark in either is too faint.
   phone (a target 44 points wide, which reaches into the start of the name)
   or click it on a computer (24 points, at the card's edge). A phone, and a
   narrow browser, opens a dialog of swatches; a wide browser a popover beside
-  the stripe. One tap picks, and closes it; **No colour** takes it off. A
-  board with no colour shows them a faint stripe, so there is something to
-  aim at. Everyone else sees the colour and has nothing to press; an
-  uncoloured board looks to them as it always did. An archived board keeps
-  its colour and offers no way to change it.
+  the stripe, below the card. One tap picks, and closes it; **No colour**
+  takes it off. A board with no colour shows them an empty, dashed stripe, so
+  there is something to aim at; it is dashed so it cannot be taken for a
+  colour, and dark enough (3:1) to be seen. Everyone else sees the colour and
+  has nothing to press, and an uncoloured board shows them no stripe. An
+  archived board keeps its colour and offers no way to change it. A refused
+  change is said on the board's own card, which is where the person is
+  looking, and the stripe goes back.
 - **Press and hold stays Clone**, on the stripe too.
 - **Every card leaves room for the stripe**, coloured or not, so the names
-  line up.
+  line up: the left padding of every board card is 24 points, not 12, which is
+  also a mouse's target, so the stripe's focus ring stops where the name starts.
 - **Not history.** A colour change stamps the board like any write, and
   `diffBoard` does not look at the colour, so nothing is recorded.
 - **The MCP tool sets it too:** `update_board` takes `color` (null takes it

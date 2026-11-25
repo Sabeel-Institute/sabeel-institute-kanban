@@ -24,6 +24,11 @@ describe('board colours in the theme', () => {
     expect(ratio(t.board[c], t.bg.canvas)).toBeGreaterThanOrEqual(3);
   });
 
+  it('the empty stripe an owner aims at reaches 3:1 too: it is the only sign of the control', () => {
+    // BoardStripe draws a board with no colour as a dashed outline in this ink.
+    expect(ratio(t.text.secondary, t.bg.surface)).toBeGreaterThanOrEqual(3);
+  });
+
   it('no two colours are the same', () => {
     expect(new Set(Object.values(t.board)).size).toBe(BOARD_COLORS.length);
   });

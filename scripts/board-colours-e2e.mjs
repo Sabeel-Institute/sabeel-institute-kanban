@@ -139,6 +139,11 @@ try {
 
   await stripeButton(page, BOARD).first().click();
   await popover.waitFor({ timeout: 10000 });
+  for (let i = 0; i < 12; i += 1) await page.keyboard.press('Tab');
+  check(
+    'Tab goes round the colours and stays in the popover',
+    await popover.evaluate((el) => el.contains(document.activeElement) && document.activeElement !== el),
+  );
   await page.keyboard.press('Escape');
   check('Escape closes the popover', await until(async () => (await popover.count()) === 0));
   await stripeButton(page, BOARD).first().click();
@@ -197,11 +202,43 @@ try {
   check('and has no stripe to press', (await stripeButton(sara, BOARD).count()) === 0);
   await sCtx.close();
 
+  // ---- A refused write is said on the board's own card ------------------------------
+  // A board stored in a shape the rules refuse on every update (thirteen
+  // lanes, one past LANES_MAX) stands in for any refusal: the write goes, the
+  // rules say no, and the card must say so where the person is looking.
+  const lanes = Array.from({ length: 13 }, (_, i) => ({ id: `ln${i}`, name: `Lane ${i}` }));
+  await boardDoc.ref.update({ lanes });
+  await stripeButton(page, BOARD).first().click();
+  await popover.waitFor({ timeout: 10000 });
+  await popover.getByRole('button', { name: 'Red', exact: true }).click();
+  const refused = page.getByText(/^That was not allowed\./).first();
+  const shown = await refused.waitFor({ timeout: 20000 }).then(() => true, () => false);
+  await page.screenshot({ path: 'shots/board-colours-refused.png' }).catch(() => {});
+  const [said, card] = [await refused.boundingBox().catch(() => null), await stripeButton(page, BOARD).first().boundingBox()];
+  check(
+    'a refused colour is said on the board’s own card, in sight',
+    shown && said && card && said.y >= card.y && said.y + said.height <= card.y + card.height + 1 &&
+      said.y + said.height <= 950,
+    JSON.stringify({ said, card }),
+  );
+  check(
+    'and the stripe goes back to the colour it had',
+    await until(async () => (await stripeLabel(page, BOARD)) === `Colour of ${BOARD}: Blue`),
+    String(await stripeLabel(page, BOARD)),
+  );
+  check('and nothing is stored', (await storedColour()) === 'blue', String(await storedColour()));
+  await page.getByRole('button', { name: 'Dismiss', exact: true }).click();
+  check('Dismiss takes the message away', await until(async () => (await refused.count()) === 0));
+  await boardDoc.ref.update({ lanes: FieldValue.delete() });
+
   // ---- A phone-width screen: the stripe opens a dialog -----------------------------
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.waitForTimeout(500);
-  const target = await stripeButton(page, BOARD).first().boundingBox();
-  check('on a phone the stripe’s target is a finger wide', target && Math.round(target.width) >= 44, JSON.stringify(target));
+  const fingerWide = async () => ((await stripeButton(page, BOARD).first().boundingBox())?.width ?? 0) >= 44;
+  check(
+    'on a phone the stripe’s target is a finger wide',
+    await until(fingerWide),
+    JSON.stringify(await stripeButton(page, BOARD).first().boundingBox()),
+  );
   await stripeButton(page, BOARD).first().click();
   const close = page.getByRole('button', { name: 'Close', exact: true });
   check('a tap opens the colours in a dialog', await close.waitFor({ timeout: 10000 }).then(() => true, () => false));
@@ -214,13 +251,14 @@ try {
   check('No colour takes it off', await until(async () => (await storedColour()) === undefined), String(await storedColour()));
   check('and the dialog closes', await until(async () => (await close.count()) === 0));
   check(
-    'leaving the faint stripe an owner aims at',
+    'leaving the empty stripe an owner aims at',
     await until(async () => (await stripeLabel(page, BOARD)) === `Colour of ${BOARD}: none`),
   );
 
   // ---- Archived: the stripe stays, the control goes ---------------------------------
   await page.setViewportSize({ width: 1280, height: 950 });
-  await stripeButton(page, CLONE).first().waitFor({ timeout: 15000 });
+  // Back in the wide layout: the stripe's target is a mouse's again.
+  await until(async () => ((await stripeButton(page, CLONE).first().boundingBox())?.width ?? 99) < 44);
   await page.getByText(CLONE, { exact: true }).first().click();
   await page.getByText('To Do').first().waitFor({ timeout: 30000 });
   await page.getByRole('button', { name: 'Board settings' }).click();

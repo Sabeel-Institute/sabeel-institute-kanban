@@ -19,8 +19,12 @@ import { Sheet } from './Sheet';
 
 /** The stripe's width, which every card in the list leaves room for. */
 const BOARD_STRIPE = 12;
-/** The left padding of every board card, coloured or not, so names line up. */
-export const BOARD_CARD_INSET = BOARD_STRIPE + 10;
+/**
+ * The left padding of every board card, coloured or not, so names line up. As
+ * wide as a mouse's target (24), so the stripe's focus ring ends where the
+ * name begins instead of cutting into it.
+ */
+export const BOARD_CARD_INSET = BOARD_STRIPE + 12;
 
 /**
  * The stripe, laid over the card's left edge (the card clips it to its
@@ -30,8 +34,11 @@ export const BOARD_CARD_INSET = BOARD_STRIPE + 10;
  * Its target is wider than the stripe: a finger needs 44 points, which on a
  * phone reaches into the start of the name (Faisal chose that, 2026-11-25, over
  * press and hold); a mouse needs about 24, which stays at the edge. A board
- * with no colour shows whoever can colour it a faint stripe, so there is
- * something to aim at.
+ * with no colour shows whoever can colour it an empty, dashed stripe, so there
+ * is something to aim at: dashed so it reads as a place for a colour rather
+ * than one of them (taupe is close to any grey), and in `text.secondary`
+ * because it is the only sign of a control, which wants 3:1 (a pale fill
+ * measured 1.39:1).
  */
 export function BoardStripe({
   boardName,
@@ -50,18 +57,17 @@ export function BoardStripe({
   const { isWide } = useLayout();
   const ref = useRef<View>(null);
   if (!color && !onColour) return null;
-  const ink = color ? t.board[color] : t.border.subtle;
   if (!onColour) {
     return (
       <View
         testID={`stripe:${boardName}`}
-        style={[styles.bar, { width: BOARD_STRIPE, backgroundColor: ink }]}
+        style={[styles.bar, { width: BOARD_STRIPE, backgroundColor: color ? t.board[color] : undefined }]}
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       />
     );
   }
-  const target = Platform.OS === 'web' && isWide ? 24 : 44;
+  const target = Platform.OS === 'web' && isWide ? BOARD_CARD_INSET : 44;
   return (
     <Pressable
       ref={ref}
@@ -70,21 +76,31 @@ export function BoardStripe({
       {...contextMenuProps(onLongPress)}
       accessibilityRole="button"
       accessibilityLabel={`Colour of ${boardName}: ${color ? BOARD_COLOR_NAMES[color] : 'none'}`}
-      style={[styles.target, { width: target }]}
+      // The card clips to its corners, so a focus ring drawn outside the
+      // stripe would be cut away: it is drawn inside instead.
+      style={({ focused }: { pressed: boolean; focused?: boolean }) => [
+        styles.target,
+        { width: target },
+        focused && { outlineColor: t.accent.base, outlineWidth: 2, outlineStyle: 'solid', outlineOffset: -2 },
+      ]}
     >
-      {/* `hovered` is react-native-web's; a phone never sets it. */}
-      {({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => (
-        <View
-          testID={`stripe:${boardName}`}
-          style={[
-            styles.bar,
-            {
-              width: BOARD_STRIPE + (pressed || hovered ? 3 : 0),
-              backgroundColor: color ? ink : pressed || hovered ? t.border.strong : ink,
-            },
-          ]}
-        />
-      )}
+      {/* `hovered` and `focused` are react-native-web's; a phone sets neither. */}
+      {({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => {
+        const lifted = pressed || hovered;
+        const width = BOARD_STRIPE + (lifted ? 3 : 0);
+        return color ? (
+          <View testID={`stripe:${boardName}`} style={[styles.bar, { width, backgroundColor: t.board[color] }]} />
+        ) : (
+          <View
+            testID={`stripe:${boardName}`}
+            style={[
+              styles.bar,
+              styles.unset,
+              { width, borderColor: t.text.secondary, backgroundColor: lifted ? t.bg.inset : undefined },
+            ]}
+          />
+        );
+      }}
     </Pressable>
   );
 }
@@ -167,6 +183,7 @@ export function BoardColourSheet({
 const styles = StyleSheet.create({
   target: { position: 'absolute', left: 0, top: 0, bottom: 0, zIndex: 1 },
   bar: { position: 'absolute', left: 0, top: 0, bottom: 0 },
+  unset: { borderWidth: 2, borderStyle: 'dashed' },
   swatches: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   swatch: { alignItems: 'center', justifyContent: 'center' },
 });

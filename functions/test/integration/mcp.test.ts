@@ -8,7 +8,7 @@ import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { adminDb, callFunction, functionsOrigin, idTokenFor, makeUser, shutdown, waitFor } from './emulatorClient';
+import { adminDb, callFunction, functionsOrigin, idTokenFor, makeUser, shutdown, stays, waitFor } from './emulatorClient';
 
 const ME = 'mcp_me';
 const OTHER = 'mcp_other';
@@ -177,6 +177,7 @@ describe('composable queries: every question in at most two calls', () => {
     expect(cloneDescription).toContain('only initial board member and owner');
     expect(cloneDescription).toContain('Institute admins can see every board');
     expect(cloneDescription).toContain('detail fields with blank values');
+    expect(cloneDescription).toContain('the board colour');
     const call = async (name: string, args: Record<string, unknown>) => parsed(await client.callTool({ name, arguments: args }));
     const titles = async (args: Record<string, unknown>) => (await call('query_cards', args)).cards.map((c: { title: string }) => c.title);
 
@@ -389,13 +390,17 @@ describe('Kanban write tools', () => {
     expect((await call('update_board', { board: made.id, color: null })).changed).toEqual(['color']);
     expect((await ref.get()).get('color')).toBeUndefined();
     expect((await call('update_board', { board: made.id, color: null })).changed).toEqual([]);
-    // The board's history: its creation only. A colour is not a change it records.
+    // The board's history: its creation and a later rename only. A colour is
+    // not a change it records. The rename's line proves the trigger runs; the
+    // emulator runs triggers in parallel, so the colour writes' are held a
+    // while rather than assumed done.
     await call('update_board', { board: made.id, name: 'MCP Colours renamed' });
     const history = adminDb().doc(`boards/${made.id}`).collection('activity');
     await waitFor('the rename after the colour changes', async () =>
       (await history.where('type', '==', 'renamed').get()).docs[0]?.data(),
     );
-    expect((await history.get()).docs.map((d) => d.get('type')).sort()).toEqual(['created', 'renamed']);
+    const types = async () => (await history.get()).docs.map((d) => d.get('type')).sort().join();
+    await stays('the history holds the creation and the rename only', async () => (await types()) === 'created,renamed', 3000);
   });
 
   it('combines board and card edits, uses the app defaults, and transfers file bytes separately', async () => {

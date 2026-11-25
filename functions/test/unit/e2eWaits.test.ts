@@ -11,7 +11,9 @@ import { join, resolve } from 'node:path';
  * with it. `web-e2e.mjs` learnt this and said so in a comment, which the next
  * suite (`board-colours-e2e.mjs`, 2026-11-25) never read and walked into. A
  * reload, and a load-state wait, are only ever made signed in, so neither may
- * wait for `networkidle`; a first `goto`, before sign-in, still may.
+ * wait for `networkidle`; a first `goto`, before sign-in, still may. A `goto`
+ * made after sign-in would hang the same way, and is not caught here: nothing
+ * in a script's text says whether its context is signed in yet.
  *
  * Paths resolve from the functions workspace, vitest's cwd here.
  */

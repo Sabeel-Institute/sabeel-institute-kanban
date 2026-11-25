@@ -33,8 +33,9 @@ function profileName(uid: string, ...boards: (BoardSnapshot | null)[]): string |
  *
  * Ignored on purpose: `activeCardCount` (a trigger's tally of the cards, not a
  * change to the board), `memberProfiles` alone (the server's copy of a name),
- * `description` (nothing in the app edits it) and the `updatedAt`/`updatedBy`
- * stamp, which says WHO, not what.
+ * `description` (nothing in the app edits it), `color` (how the board looks in
+ * the Boards list, not a change to the board; Faisal, 2026-11-25) and the
+ * `updatedAt`/`updatedBy` stamp, which says WHO, not what.
  *
  * Taking someone off the board also takes away their ownership, in the same
  * write. That is one event — "Sara removed Omar" — so the ownership half is

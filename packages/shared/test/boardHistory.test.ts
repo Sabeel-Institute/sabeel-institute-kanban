@@ -46,6 +46,14 @@ describe('diffBoard', () => {
     ).toEqual([]);
   });
 
+  it('ignores a colour set, changed or taken off', () => {
+    const b = board();
+    const green = { ...b, color: 'green' as const };
+    expect(diffBoard(b, green)).toEqual([]);
+    expect(diffBoard(green, { ...b, color: 'blue' as const })).toEqual([]);
+    expect(diffBoard(green, b)).toEqual([]);
+  });
+
   it('records a rename with both names', () => {
     expect(diffBoard(board(), board({ name: 'Fundraising 2027' }))).toEqual([
       { type: 'renamed', from: 'Fundraising', to: 'Fundraising 2027' },

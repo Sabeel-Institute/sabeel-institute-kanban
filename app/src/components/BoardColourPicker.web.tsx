@@ -84,6 +84,16 @@ function Popover({
     box.current?.querySelector<HTMLElement>('[aria-pressed="true"]')?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') close.current();
+      // Tab goes round the swatches, as in any dialog, rather than out to the
+      // end of the page, where the popover has been put.
+      if (e.key === 'Tab' && box.current) {
+        const stops = [...box.current.querySelectorAll<HTMLElement>('[role="button"], button')];
+        if (stops.length === 0) return;
+        const at = stops.indexOf(document.activeElement as HTMLElement);
+        const next = (at + (e.shiftKey ? -1 : 1) + stops.length) % stops.length;
+        e.preventDefault();
+        stops[at === -1 ? 0 : next].focus();
+      }
     };
     // A press outside, not a click: the stripe's own click would otherwise
     // close the popover it opened, and a press on another stripe opens that

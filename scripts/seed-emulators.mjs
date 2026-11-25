@@ -554,26 +554,27 @@ try {
 }
 
 // Colours in the Boards list: the three program boards green, Fundraising
-// orange, the rest none, so the list shows stripes and a plain card side by
-// side. Picked from the stripe, as an admin does.
+// orange, the rest none, so the list shows stripes and an empty one side by
+// side. Picked from the stripe, as an admin does. Not optional, unlike the
+// boards above: the sweep, the manual's pictures and the phone flows all
+// expect stripes, and a seed that carried on without them would let each of
+// them pass on a list with none.
 const BOARD_COLOURS = [
   [LANES_BOARD, 'Green'],
   [CAMP, 'Green'],
   [TEMPLATE_BOARD, 'Green'],
   ['Fundraising 2026', 'Orange'],
 ];
-try {
-  await admin.getByRole('button', { name: 'Boards', exact: true }).first().click();
-  await admin.getByRole('button', { name: 'New board' }).waitFor({ timeout: 25000 });
-  for (const [board, colour] of BOARD_COLOURS) {
-    const stripe = admin.getByRole('button', { name: `Colour of ${board}: ${colour}`, exact: true });
-    if (await stripe.isVisible({ timeout: 3000 }).catch(() => false)) continue;
-    await admin.getByRole('button', { name: new RegExp(`^Colour of ${board}: `) }).first().click();
-    await admin.getByRole('button', { name: colour, exact: true }).click();
-    await stripe.waitFor({ timeout: 25000 });
-  }
-} catch (e) {
-  console.warn('could not colour the seed boards — continuing:', String(e).slice(0, 160));
+await admin.getByRole('button', { name: 'Boards', exact: true }).first().click();
+await admin.getByRole('button', { name: 'New board' }).waitFor({ timeout: 25000 });
+for (const [board, colour] of BOARD_COLOURS) {
+  const stripe = admin.getByRole('button', { name: `Colour of ${board}: ${colour}`, exact: true });
+  const any = admin.getByRole('button', { name: new RegExp(`^Colour of ${board}: `) }).first();
+  await any.waitFor({ timeout: 25000 });
+  if (await stripe.isVisible()) continue;
+  await any.click();
+  await admin.getByRole('button', { name: colour, exact: true }).click();
+  await stripe.waitFor({ timeout: 25000 });
 }
 
 await browser.close();

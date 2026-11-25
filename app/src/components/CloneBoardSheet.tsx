@@ -76,8 +76,8 @@ export function CloneBoardSheet({
       </Row>
       {error ? <Body>{error}</Body> : null}
       <Hint>
-        The clone gets this board&rsquo;s columns, its lanes and its details&rsquo;
-        fields (empty), and its open cards, each in the column it is in now,
+        The clone gets this board&rsquo;s columns, its lanes, its colour and its
+        details&rsquo; fields (empty), and its open cards, each in the column it is in now,
         with their descriptions, subtasks and lanes; you are its only member. Due dates,
         assignees, priorities, comments, attachments, archived cards and this
         board&rsquo;s own labels stay behind. Turn on the bell to subscribe to

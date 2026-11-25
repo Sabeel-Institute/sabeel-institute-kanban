@@ -1,6 +1,6 @@
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import { CLONE_BOARD_MAX_CARDS, NOTICE_MAX_WAIT_MS, SYSTEM_ACTOR, todayInOrgTz } from '@sabeel/shared';
-import { adminDb, callFunction, idTokenFor, makeUser, shutdown, waitFor } from './emulatorClient';
+import { adminDb, callFunction, idTokenFor, makeUser, shutdown, stays, waitFor } from './emulatorClient';
 import { runNoticeSweep } from '../../src/notices';
 
 /**
@@ -61,18 +61,6 @@ const card = (boardId: string, over: Record<string, unknown> = {}) => ({
 
 /** A fresh board id, as the app makes one for each offer of a clone. */
 const newId = () => adminDb().collection('boards').doc().id;
-
-/**
- * That `check` holds for `ms`, sampled: for a figure the triggers would
- * change, had they not stayed out, some time after the write.
- */
-async function stays(label: string, check: () => Promise<boolean>, ms = 5000) {
-  const until = Date.now() + ms;
-  while (Date.now() < until) {
-    expect(await check(), label).toBe(true);
-    await new Promise((r) => setTimeout(r, 250));
-  }
-}
 
 const refusal = async (uid: string, data: unknown) => {
   const res = await callFunction('cloneBoard', data, await idTokenFor(uid));

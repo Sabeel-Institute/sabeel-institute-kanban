@@ -826,7 +826,7 @@ would otherwise tell you about every change to every card.
   <figure class="wd"><img src="manual/img/clone-wide.png" alt="Cloning a board in a browser"><figcaption>In a browser — right-click the board</figcaption></figure>
 </div>
 
-The clone has the same columns and lanes, and each open card in the same place
+The clone has the same columns, lanes and colour, and each open card in the same place
 and lane, with its title, its description and its subtasks, and the institute's
 labels; a card that was finished on the old board is finished on the new one.
 It has the same details' fields, all empty. It starts fresh on everything that
@@ -849,7 +849,7 @@ restored before it can be cloned.
 *The board's owners and admins.* On **Boards**, tap the **stripe** on the left
 edge of the board's card (click it on a computer) and pick a colour; it applies
 at once, for everyone who sees the board. **No colour** takes it off. A board
-with no colour shows you a faint grey stripe to tap. The colour is only for the
+with no colour shows you an empty, dashed stripe to tap. The colour is only for the
 Boards list: the board itself looks the same. A clone starts in the colour of
 the board it was cloned from.
 
