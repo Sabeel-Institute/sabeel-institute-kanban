@@ -63,8 +63,6 @@ to it last, once the web, Play and TestFlight have it (`docs/DEPLOY.md`
 
 | Film or picture | What it lacks |
 |---|---|
-| Pictures `colour-phone`, `colour-wide` | New: the colours open from a board's stripe (`colour` in `manual-shots.mjs`). |
-| Pictures `boards-*`, `clone-*` | The seed's boards now carry stripes. |
 | Film *Creating a board* (`new-board`) | Giving the new board a colour from its stripe, and that only owners and admins can. |
 | Films *Finding your way around*, *Cloning a board* | The Boards list now has stripes; the clone keeps its source's colour. |
 
