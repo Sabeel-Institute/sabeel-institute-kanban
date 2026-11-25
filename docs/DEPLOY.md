@@ -530,7 +530,10 @@ archive included, until rules that list the field are deployed. So when one
 release adds a board field written by a function (the board colour, which
 the agent tool and clone write, v0.26.0), deploy the rules first or together
 with functions, `--only firestore:rules,storage,functions` from here, never
-Deploy Functions alone; and roll back the functions before the rules.
+Deploy Functions alone. Rolling the rules back is the same trap from the
+other side: once any board carries the field, rules that do not list it
+freeze that board whatever runs. Strip the field from every board first
+(the Admin SDK, as a maintenance step), then roll back.
 
 **A new callable answers 403.** The same holds for a new blocking function
 (`beforeSignIn` and the like). Deploy Functions' plan step (`sabeel-ci
