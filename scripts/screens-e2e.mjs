@@ -1636,11 +1636,12 @@ async function tour(page, tag, width) {
       return {
         settings: shown.some((e) => name(e) === 'Board settings'),
         archived: shown.some((e) => name(e) === 'Archived cards'),
+        notes: shown.some((e) => name(e) === 'Board notes'),
       };
     });
     check(
       `${tag} / a board with no columns keeps its board actions`,
-      reachable.settings && reachable.archived,
+      reachable.settings && reachable.archived && reachable.notes,
       JSON.stringify(reachable),
     );
     await page.screenshot({ path: join(SHOTS, `${tag}-board-empty.png`), fullPage: true });
@@ -1679,7 +1680,10 @@ async function tour(page, tag, width) {
       seenRuns.length <= 2,
       seenRuns.join(' -> '),
     );
-    await page.getByRole('button', { name: 'Previous column' }).first().click();
+    // Back where it was, if the arrow moved it: on the board without columns
+    // it does not, and the first column's left control is the notes icon.
+    const back = page.getByRole('button', { name: 'Previous column' });
+    if (await back.count()) await back.first().click();
     await page.waitForTimeout(800);
   }
 

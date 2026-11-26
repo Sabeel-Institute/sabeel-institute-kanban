@@ -901,8 +901,8 @@ of width at all times. Anything with a person or a date stays a card.
   person's, per board, on their user document (`notesOpenBoardIds`, at most
   500). Phone, a page in front of the first column, reached by the notes icon
   that takes the first column's left arrow, or a swipe; editing is a screen of
-  its own (`boardNotes` route). A board with no notes has no page; its first
-  notes start from the notes icon in the column footer.
+  its own (`boardNotes` route). A board with no notes has no page; the same
+  icon in the first column's left arrow opens the editor to start them.
 - **Not**: no notifications, no bell, nothing in the board's own History page,
   not in Search, no files (Faisal: attachments move to Cloudflare first; a
   card linked from the notes holds a file meanwhile). **A clone** copies the

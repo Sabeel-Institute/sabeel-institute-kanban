@@ -370,7 +370,10 @@ try {
     'and the page goes, leaving the first column where it was',
     await until(async () => (await phone.getByTestId('notes-page').count()) === 0 && (await phone.getByText('1 of 3').isVisible())),
   );
-  check('the left arrow is back', await phone.getByRole('button', { name: 'Previous column' }).isVisible());
+  check(
+    'the notes icon stays in the left arrow’s place, the way to start them again',
+    (await notesControl.isVisible()) && (await phone.getByRole('button', { name: 'Previous column' }).count()) === 0,
+  );
   // Opened afresh on a board without notes, on its first column, the pager
   // moves on and DRAWS the next one: it is held invisible while it restores a
   // remembered page, and must not be held so when there was nothing to
@@ -394,7 +397,10 @@ try {
   // pager's on every board and not what is tested here.
   await phone.waitForTimeout(1200);
   const start = phone.getByRole('button', { name: 'Board notes', exact: true });
-  check('and the first notes are started from the column’s actions', await start.isVisible());
+  check(
+    'and the first notes are started from the one notes icon, top left',
+    (await start.count()) === 1 && ((await start.boundingBox())?.y ?? 999) < 300,
+  );
   await start.click();
   await typeInto(phone, phone, 'Back again.');
   await phone.getByRole('button', { name: 'Save', exact: true }).click();

@@ -356,8 +356,9 @@ what both sides decide.
   panel is open is the person's (`notesOpenBoardIds`, bounded in the rules).
 - **On a phone the notes are page 0 of the pager while the board has any**:
   every pager index there is a column index plus `offset`, and the page can
-  appear or go under the person (`NarrowBoard`). A board without notes draws
-  exactly what it did before, apart from the footer's notes icon.
+  appear or go under the person (`NarrowBoard`). The first column's left
+  control is the notes icon on every board: to the page, or, with no notes
+  yet, to the editor.
 - **No files yet**: attachments move to Cloudflare first (Faisal). No
   notifications, not in Search, not in the board's History page.
 
