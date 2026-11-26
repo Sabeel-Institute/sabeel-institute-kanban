@@ -390,6 +390,16 @@ try {
     'a board without notes still pages on from its first column, drawn',
     await until(async () => (await phone.getByText('2 of 3').isVisible()) && (await drawn('No cards in In Progress.'))),
   );
+  // The last column's right arrow is dimmed, not live and inert.
+  const nextArrow = phone.getByRole('button', { name: 'Next column', exact: true });
+  check('the right arrow is live short of the last column', (await nextArrow.getAttribute('aria-disabled')) !== 'true');
+  await nextArrow.click();
+  await until(() => phone.getByText('3 of 3').isVisible());
+  check('and dimmed on the last column', await until(async () => (await nextArrow.getAttribute('aria-disabled')) === 'true'));
+  await phone.waitForTimeout(1200);
+  await phone.getByRole('button', { name: 'Previous column', exact: true }).click();
+  await until(() => phone.getByText('2 of 3').isVisible());
+  await phone.waitForTimeout(1200);
   await phone.getByRole('button', { name: 'Previous column', exact: true }).click();
   await until(() => phone.getByText('1 of 3').isVisible());
   // Let the arrow's scroll finish: a layout change under an unfinished one

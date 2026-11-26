@@ -555,9 +555,12 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
             </Hint>
           )}
         </View>
+        {/* Dimmed on the last column, where there is nowhere to go: an arrow
+            that looks live and does nothing reads as broken. */}
         <IconAction
           icon="chevron-right"
           label="Next column"
+          disabled={!onNotes && visiblePage >= columns.length - 1}
           onPress={() => goTo(onNotes ? 0 : visiblePage + 1)}
         />
       </Row>
