@@ -33,6 +33,7 @@ export const HELP_VIDEOS: readonly HelpVideo[] = [
   { id: 'signing-in', audience: 'everyone', title: 'Signing in', summary: 'Your institute Google account, waiting for approval, and the rules.' },
   { id: 'getting-around', audience: 'everyone', title: 'Finding your way around', summary: 'Boards, My Work, Search, Alerts and More.' },
   { id: 'board', audience: 'everyone', title: 'Inside a board', summary: 'Columns, cards, and adding a card.' },
+  { id: 'notes', audience: 'everyone', title: 'Board notes', summary: 'The links and how-tos a board keeps, changing them, and their history.' },
   { id: 'lanes', audience: 'everyone', title: 'Lanes', summary: 'Boards divided into lanes, and filing a card in one.' },
   { id: 'card', audience: 'everyone', title: 'Working on a card', summary: 'The description, due date, priority, people and labels.' },
   { id: 'comments', audience: 'everyone', title: 'Comments and mentions', summary: 'Talking on a card, mentioning someone, and following a card.' },

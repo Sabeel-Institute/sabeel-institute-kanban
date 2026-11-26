@@ -234,7 +234,7 @@ export function registerBoardWrites({ server, run, me, board }: WriteTools) {
     description: [
       'Start a new board from an active board or template. Available to organizers and admins.',
       'The signed-in person is the only initial board member and owner. Institute admins can see every board.',
-      'Copies columns, lanes, the board colour, board detail fields with blank values, and unarchived cards and their subtasks. Card assignees and due dates start empty.',
+      'Copies columns, lanes, the board colour, the board notes (without their history), board detail fields with blank values, and unarchived cards and their subtasks. Card assignees and due dates start empty.',
       'Subscriptions default to off. Use update_board with the new board id to fill detail values or add members when requested.',
     ].join(' '),
     inputSchema: {
