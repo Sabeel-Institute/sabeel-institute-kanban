@@ -25,7 +25,7 @@
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
-import { RULES_VERSION, addDays, initialRanks, todayInOrgTz } from '@sabeel/shared';
+import { RULES_VERSION, addDays, initialRanks, notesLineCounts, todayInOrgTz } from '@sabeel/shared';
 import { PORTS, PROJECT } from '../lib/emulators.mjs';
 
 process.env.FIRESTORE_EMULATOR_HOST = `127.0.0.1:${PORTS.firestore}`;
@@ -57,6 +57,23 @@ const BOARDS = [
     id: 'fundraising',
     name: 'Fundraising 2026',
     color: 'orange',
+    // Its notes, a version by Faisal and one by Sara, oldest first: [who,
+    // days ago, text]. The board film passes the notes; the notes film reads
+    // them, edits them and opens their history.
+    notes: [
+      ['faisal', 6,
+        '**Forms**\n\n- [Gift Aid declaration](https://example.org/gift-aid)\n' +
+        '- [Expense claim](https://example.org/expenses), within a month of spending\n\n' +
+        '**Shared folders**\n\n- [Donor letters](https://example.org/donor-letters), drafts go here first\n' +
+        '- [Pledge tracker](https://example.org/pledges), update weekly'],
+      ['sara', 2,
+        '**Forms**\n\n- [Gift Aid declaration](https://example.org/gift-aid)\n' +
+        '- [Expense claim](https://example.org/expenses), within a month of spending\n\n' +
+        '**Shared folders**\n\n- [Donor letters](https://example.org/donor-letters), drafts go here first\n' +
+        '- [Pledge tracker](https://example.org/pledges), update after every call\n\n' +
+        '**New to fundraising?**\n\n1. Ask an owner of this board to add you.\n' +
+        '2. Read the [donor care guide](https://example.org/donor-care) before your first call.'],
+    ],
     createdBy: 'faisal',
     owners: ['faisal', 'sara'],
     members: ['faisal', 'sara', 'omar'],
@@ -354,6 +371,19 @@ export async function buildWorld() {
           }
         : {}),
     });
+    // The notes and their history, as the trigger would have left them.
+    let before = '';
+    for (const [n, [who, daysAgo, text]] of (b.notes ?? []).entries()) {
+      const at = Date.now() - daysAgo * 86400000;
+      await db.doc(`boards/${boardId(b.id)}/notes/current/versions/${n + 1}`).set({
+        text, version: n + 1, by: uids[who], byName: PEOPLE[who].name, at, startedAt: at,
+        ...notesLineCounts(before, text),
+      });
+      await db.doc(`boards/${boardId(b.id)}/notes/current`).set({
+        text, version: n + 1, updatedBy: uids[who], updatedAt: at,
+      });
+      before = text;
+    }
     for (const [columnId, , cards] of b.columns) {
       const ranks = initialRanks(cards.length);
       for (const [i, [key, title, x]] of cards.entries()) {

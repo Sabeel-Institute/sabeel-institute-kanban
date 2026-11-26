@@ -183,6 +183,10 @@ export const TUTORIALS = [
         do: (t) => t.highlight(t.id('board-columns')),
       },
       {
+        say: "This icon opens the board's notes: the links and how-tos everyone on the board shares. There's a short film about them too.",
+        do: (t) => t.highlight(t.btn('Board notes')),
+      },
+      {
         say: "Each card shows the important bits at a glance: who it's assigned to, when it's due, how urgent it is, and its labels.",
         do: (t) => t.highlight(t.card('Confirm the caterer')),
       },
@@ -232,6 +236,81 @@ export const TUTORIALS = [
           await t.tap(t.btn('Watch To Do'));
           await t.waitFor(t.btn('Stop watching To Do'));
         },
+      },
+    ],
+  },
+  {
+    id: 'notes',
+    as: 'omar',
+    start: '',
+    steps: [
+      {
+        say: "Every board has a page of notes for the things nobody's assigned: the links, forms and how-tos the team keeps reaching for. Let's open a board.",
+        do: async (t) => {
+          await t.tap(t.text('Fundraising 2026'));
+          await t.waitFor(t.card('Book the venue'));
+        },
+      },
+      {
+        say: 'On a phone, the notes are the page in front of the first column. Tap the notes icon where the left arrow would be, or just swipe across.',
+        cut: 'phone',
+        do: async (t) => {
+          await t.tap(t.btn('Board notes'));
+          await t.wait(900);
+        },
+      },
+      {
+        say: "On a computer, the notes icon at the top opens them beside the columns. They'll stay open for you on this board until you close them.",
+        cut: 'computer',
+        do: (t) => t.tap(t.btn('Board notes')),
+      },
+      {
+        say: 'A link opens with one tap. And if you paste in a link to a card, it opens the card, right here in the app.',
+        do: (t) => t.highlight(t.text('Gift Aid declaration')),
+      },
+      {
+        say: "It says who changed them last, and when, so you can tell if they're out of date.",
+        do: (t) => t.highlight(t.text(/^Edited by /, false)),
+      },
+      {
+        say: "Anyone on the board can change them. Tap the pencil.",
+        do: async (t) => {
+          await t.tap(t.btn('Edit notes'));
+          await t.waitFor(t.editor());
+        },
+      },
+      {
+        say: "It's the same editor as a card's description: bold, lists and links. A bold line makes a good heading.",
+        do: (t) => t.highlight(t.btn('Bold')),
+      },
+      {
+        say: "Add what the team needs, and tap Save. Anything with a person or a date belongs on a card, though, not in the notes.",
+        do: async (t) => {
+          await t.tap(t.editor());
+          await t.press('Control+End');
+          await t.press('Enter');
+          await t.typeFocused('Turn on the bell for To Do, so new requests reach you.');
+          await t.tap(t.btn('Save'));
+          await t.waitFor(t.text('Turn on the bell for To Do, so new requests reach you.'));
+        },
+      },
+      {
+        say: 'Every change is kept. The clock shows the history: who saved each version, when, and how many lines it added and removed.',
+        do: async (t) => {
+          await t.tap(t.btn('Notes history'));
+          await t.waitFor(t.btn(/^Faisal, /));
+        },
+      },
+      {
+        say: 'Open a version to see the notes as they were then.',
+        do: async (t) => {
+          await t.tap(t.btn(/^Faisal, /));
+          await t.waitFor(t.id('notes-version'));
+        },
+      },
+      {
+        say: "And Restore puts them back as the newest version. The ones after it stay in the list, so nothing's ever lost.",
+        do: (t) => t.highlight(t.btn('Restore this version')),
       },
     ],
   },
@@ -1009,7 +1088,7 @@ export const TUTORIALS = [
         do: (t) => t.replace(t.label('Name of the clone'), 'Fundraising 2027'),
       },
       {
-        say: "The clone gets the columns, and every open card with its description and its subtasks. Due dates, who's on each card, comments and files stay behind, so the new run starts clean.",
+        say: "The clone gets the columns, the board's notes, and every open card with its description and its subtasks. Due dates, who's on each card, comments and files stay behind, so the new run starts clean.",
         do: (t) => t.highlight(t.text(/^The clone gets/, false)),
       },
       {
