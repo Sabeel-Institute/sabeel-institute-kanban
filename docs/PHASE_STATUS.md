@@ -455,6 +455,18 @@ the team.
 
 ## Deploy log
 
+### 2026-11-26 — Board notes — v0.27.0
+
+- **Every board has a page of notes** for the things nobody is assigned: the links and forms the team keeps reaching for, where the shared folders are, and how someone new gets started. Anyone on the board can read and change them, and admins too.
+- On a computer the notes icon in the board's header opens them in a panel beside the columns, and the panel stays open or closed for you on that board. On a phone the notes are a page in front of the first column: tap the notes icon in place of the left arrow, or swipe right.
+- The same editor as a card's description: bold, italic, lists and links. If someone saves while you are editing, you are told whose save came first and keep your text: Save mine or Discard mine.
+- **Every change is kept.** The clock lists each version with who saved it, when, and the lines it added and removed. Open one to see the notes as they were, and Restore puts it back as the newest version, so nothing is ever lost.
+- A clone of a board copies its notes. A link to a card or a board pasted into notes, a description or a comment now opens it in the app.
+- The Kanban MCP server reads a board's notes (`query_boards` with `include.notes`) and writes them (`write_board_notes`, by the version read). Descriptions, comments and notes written by an agent are stored the way the app's editors store them: a heading becomes a bold line, and lines a person wrote stay exactly as they were.
+- The user manual and a new Board notes help film show how; Inside a board and Cloning a board mention them.
+
+Deploy the rules together with the functions. The version floor goes to 0.27.0 once the web, Play and TestFlight have it, so everyone updates (Faisal, 2026-11-26).
+
 ### 2026-11-25 — Board colours — v0.26.0
 
 - **A board can have a colour.** It shows as a stripe down the left edge of the board's card on the Boards screen, so boards of a kind (every program, every course) stand out together. It shows nowhere else; the board itself looks the same.
