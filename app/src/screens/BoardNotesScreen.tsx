@@ -41,6 +41,7 @@ export function BoardNotesScreen({ boardId, user }: { boardId: string; user: Ses
           otherName={(uid) => members.find((m) => m.uid === uid)?.displayName ?? 'Someone'}
           onClosed={nav.pop}
           autoFocus
+          actionsFirst
         />
       )}
     </Screen>

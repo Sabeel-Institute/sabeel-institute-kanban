@@ -29,6 +29,7 @@ export function NotesEditor({
   otherName,
   onClosed,
   autoFocus,
+  actionsFirst,
 }: {
   boardId: string;
   /** The page as it stood when editing began. */
@@ -38,6 +39,12 @@ export function NotesEditor({
   otherName: (uid: string | undefined) => string;
   onClosed: () => void;
   autoFocus?: boolean;
+  /**
+   * Save and Cancel above the text rather than below it: on a phone the
+   * editor has the screen, and a page of notes put Save under the iPhone's
+   * keyboard, which the person cannot dismiss from the editor.
+   */
+  actionsFirst?: boolean;
 }) {
   const t = useTheme();
   // The page as editing began, kept: the parent passes the live page, and a
@@ -72,8 +79,16 @@ export function NotesEditor({
     });
   };
 
+  const actions = (
+    <Row style={styles.wrapRow}>
+      <Button label="Save" busy={busy} disabled={over} onPress={() => void save(base)} />
+      <Button label="Cancel" variant="secondary" onPress={onClosed} />
+    </Row>
+  );
+
   return (
     <View style={styles.wrap}>
+      {actionsFirst && !conflict ? actions : null}
       {conflict ? (
         <View
           style={[styles.notice, { backgroundColor: t.bg.raised, borderColor: t.border.strong, borderLeftColor: t.accent.base }]}
@@ -117,12 +132,7 @@ export function NotesEditor({
         <Hint>{BOARD_NOTES_MAX - length} characters left.</Hint>
       ) : null}
       {error ? <Body>{error}</Body> : null}
-      {conflict ? null : (
-        <Row style={styles.wrapRow}>
-          <Button label="Save" busy={busy} disabled={over} onPress={() => void save(base)} />
-          <Button label="Cancel" variant="secondary" onPress={onClosed} />
-        </Row>
-      )}
+      {conflict || actionsFirst ? null : actions}
     </View>
   );
 }

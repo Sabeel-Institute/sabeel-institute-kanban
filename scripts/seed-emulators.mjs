@@ -609,7 +609,9 @@ async function writeNotes(page, board, html, done) {
     await panel.getByRole('button', { name: 'Edit notes', exact: true }).click();
     const editor = panel.locator('[contenteditable="true"]');
     await editor.click();
-    await page.keyboard.press('Control+a');
+    // The platform's select-all: the iOS run seeds from a Mac, where
+    // Control+A selected nothing and the paste was added to what was there.
+    await page.keyboard.press('ControlOrMeta+a');
     await page.evaluate((h) => {
       const el = document.querySelector('[data-testid="notes-panel"] [contenteditable="true"]');
       const dt = new DataTransfer();

@@ -105,7 +105,7 @@ async function typeInto(page, scope, text) {
   const editor = scope.locator('[contenteditable="true"]').first();
   await editor.waitFor({ timeout: 20000 });
   await editor.click();
-  await page.keyboard.press('Control+End');
+  await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.type(text);
   await page.waitForTimeout(300);
 }
@@ -353,7 +353,7 @@ try {
   check('editing is a screen of its own', (await phone.getByTestId('notes-page').count()) === 0);
   const editor = phone.locator('[contenteditable="true"]').first();
   await editor.click();
-  await phone.keyboard.press('Control+a');
+  await phone.keyboard.press('ControlOrMeta+a');
   await phone.keyboard.press('Delete');
   await phone.waitForTimeout(300);
   await phone.getByRole('button', { name: 'Save', exact: true }).click();

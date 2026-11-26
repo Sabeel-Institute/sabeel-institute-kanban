@@ -200,7 +200,8 @@ point the notes at a card that holds a file.
 To change them, tap the **pencil** (**Edit notes**). It is the same editor, and
 the same buttons, as a card's description (see *The formatting buttons*): bold,
 italic, lists and links. A bold line does the work of a heading. On a phone the
-editor fills the screen; in a browser it opens in the panel. **Save** when you
+editor fills the screen, with **Save** and **Cancel** at the top, clear of the
+keyboard; in a browser it opens in the panel. **Save** when you
 are done. Saving with nothing left in the editor empties the notes, and on a
 phone their page goes away until someone writes some again. The notes hold up to
 50,000 characters.
