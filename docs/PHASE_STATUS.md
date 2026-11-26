@@ -59,10 +59,14 @@ When a release changes what an old build gets wrong, raise the version floor
 to it last, once the web, Play and TestFlight have it (`docs/DEPLOY.md`
 § Retiring old builds).
 
-**Owed now: nothing.** v0.27.0 recorded the new *Board notes* film and re-recorded *Inside a board* and *Cloning a board* (one new line each), published the set, and retook the board, bulk, lanes, clone, Help and notes pictures.
+**Owed now:** v0.27.1 moved the phone's notes icon on a board without notes
+from the column footer to the first column's left arrow, and retook
+`lanes-phone.png`, the one picture it changed. Films were left for the next
+store release: no line says where the icon is, so only the picture is off.
 
 | Film or picture | What it lacks |
 |---|---|
+| Phone cuts of films on a board without notes | The notes icon sits in the footer, not in the first column's left arrow |
 
 ## What works today (2026-10-16)
 

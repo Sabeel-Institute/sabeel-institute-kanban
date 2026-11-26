@@ -191,7 +191,8 @@ notes have no assignee, no due date and no reminder.
   panel stays open or closed for you on that board, wherever you sign in.
 - **On a phone** the notes are a page in front of the first column. On the first
   column, the left arrow is replaced by the **notes** icon: tap it, or swipe
-  right. A board with no notes has no such page.
+  right. On a board with no notes yet, the same icon opens the editor to start
+  them.
 
 Links in the notes open with one tap. A link to a card or a board in this app
 opens it here, without leaving for the browser; paste a card's **Share** link to

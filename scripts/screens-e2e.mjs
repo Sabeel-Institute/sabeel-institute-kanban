@@ -1636,11 +1636,12 @@ async function tour(page, tag, width) {
       return {
         settings: shown.some((e) => name(e) === 'Board settings'),
         archived: shown.some((e) => name(e) === 'Archived cards'),
+        notes: shown.some((e) => name(e) === 'Board notes'),
       };
     });
     check(
       `${tag} / a board with no columns keeps its board actions`,
-      reachable.settings && reachable.archived,
+      reachable.settings && reachable.archived && reachable.notes,
       JSON.stringify(reachable),
     );
     await page.screenshot({ path: join(SHOTS, `${tag}-board-empty.png`), fullPage: true });
@@ -1656,6 +1657,27 @@ async function tour(page, tag, width) {
    * screenshotted, because a screenshot of the settled state looks perfect.
    */
   if (width < WIDE_BREAKPOINT) {
+    // On a board with columns to move between: on the board without any the
+    // arrow does nothing, and the check below would pass whatever it did.
+    await nav('Boards');
+    await page.getByText('Fundraising 2026').first().click();
+    // It opens where it was last left: on its notes page (the tour opened
+    // them), so on to the first column; never the last, so the arrow has
+    // somewhere to go.
+    const pager = page.getByText(/^\d+ of \d+$/).first();
+    await page.getByRole('button', { name: 'Next column' }).first().waitFor({ timeout: 30000 });
+    await page.waitForTimeout(1200);
+    if (!(await pager.isVisible())) {
+      await page.getByRole('button', { name: 'Next column' }).first().click();
+      await pager.waitFor({ timeout: 30000 });
+      await page.waitForTimeout(1200);
+    }
+    const [at, of] = (await pager.innerText()).split(' of ').map(Number);
+    if (at === of) {
+      await page.getByRole('button', { name: 'Previous column' }).first().click();
+      await page.waitForTimeout(1200);
+    }
+    const from = Math.min(at, of - 1);
     const seenRuns = await page.evaluate(
       () =>
         new Promise((res) => {
@@ -1676,7 +1698,9 @@ async function tour(page, tag, width) {
     );
     check(
       `${tag} / the column name does not flip while the arrows animate`,
-      seenRuns.length <= 2,
+      // The header answers the tap at once, so the first sample may already
+      // be the next column; it must end there, never having gone back.
+      seenRuns.length <= 2 && seenRuns.at(-1) === String(from + 1) && seenRuns.every((n) => n === String(from) || n === String(from + 1)),
       seenRuns.join(' -> '),
     );
     await page.getByRole('button', { name: 'Previous column' }).first().click();

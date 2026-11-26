@@ -356,8 +356,9 @@ what both sides decide.
   panel is open is the person's (`notesOpenBoardIds`, bounded in the rules).
 - **On a phone the notes are page 0 of the pager while the board has any**:
   every pager index there is a column index plus `offset`, and the page can
-  appear or go under the person (`NarrowBoard`). A board without notes draws
-  exactly what it did before, apart from the footer's notes icon.
+  appear or go under the person (`NarrowBoard`). The first column's left
+  control is the notes icon on every board: to the page, or, with no notes
+  yet, to the editor.
 - **No files yet**: attachments move to Cloudflare first (Faisal). No
   notifications, not in Search, not in the board's History page.
 
@@ -905,6 +906,28 @@ A second round, aimed at the first round's causes, added two more:
     picked date lost on leaving the screen, a Back fixed for one of its three
     ways in); a reviewer given only the fixes' diff found them. A test
     committed without running its suite failed on its first run.
+
+Board notes (v0.27.0) shipped a phone design Faisal had never seen: every
+mock and screenshot showed a board with notes, and what a board without
+them did was one caption. He found it on his phone. Hence two more:
+
+13. **Picture every state a person will meet, not the finished one.** A
+    concept, a build's screenshots and a release report show each new
+    control in each state a real board is in: before first use (empty,
+    switched off, none yet), in use, at the edges (first and last column,
+    one item, the maximum), on a phone and wide. A state only described in
+    words was not decided. Describe a control's look only from the code or
+    a screenshot: the concept called the first column's arrow "dimmed",
+    and it never was.
+14. **Nothing on screen looks live and does nothing.** A control at an
+    edge, or with nothing to act on, is `disabled` (drawn dimmed) or
+    replaced by one that acts; a handler that silently clamps or returns
+    is the bug. The phone pager's left arrow on the first column clamped
+    to where it was for months, and an arrow that does nothing also let a
+    sweep check pass on a board with no columns. Every new control gets a
+    check that it does something in each state of practice 13, or is
+    dimmed there (notes-e2e: the notes icon on a board with and without
+    notes, the last column's Next).
 
 ### The width sweep is the DEFAULT check for layout, on both surfaces
 

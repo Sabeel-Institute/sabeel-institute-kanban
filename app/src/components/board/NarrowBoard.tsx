@@ -473,15 +473,6 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
    */
   const boardActions = (
     <>
-      {/* The first notes are started here; once a board has some, they are
-          the page in front of the first column and this goes. */}
-      {notesPage ? null : (
-        <IconAction
-          icon="sticky-note-2"
-          label="Board notes"
-          onPress={() => nav.push({ name: 'boardNotes', boardId })}
-        />
-      )}
       {/* Everyone gets this, not just owners: members can archive, so
           members must be able to un-archive. */}
       <IconAction
@@ -526,13 +517,17 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
           the app. The name is read-only: a column is renamed and deleted in
           Board settings → Columns. */}
       <Row style={styles.pager}>
-        {/* On the first column of a board with notes, the way back is to
-            them, and the control says so: the notes icon in the arrow's
-            place is the only sign the page is there. */}
+        {/* On the first column the notes icon takes the left arrow's place,
+            on every board: it goes to the notes page in front of the column,
+            or, on a board with none yet, opens the editor to start them. */}
         {onNotes ? (
           <IconAction icon="chevron-left" label="Previous column" disabled onPress={() => undefined} />
-        ) : notesPage && visiblePage === 0 ? (
-          <IconAction icon="sticky-note-2" label="Board notes" onPress={() => goTo(NOTES_PAGE)} />
+        ) : visiblePage === 0 ? (
+          <IconAction
+            icon="sticky-note-2"
+            label="Board notes"
+            onPress={() => (notesPage ? goTo(NOTES_PAGE) : nav.push({ name: 'boardNotes', boardId }))}
+          />
         ) : (
           <IconAction
             icon="chevron-left"
@@ -560,9 +555,12 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
             </Hint>
           )}
         </View>
+        {/* Dimmed on the last column, where there is nowhere to go: an arrow
+            that looks live and does nothing reads as broken. */}
         <IconAction
           icon="chevron-right"
           label="Next column"
+          disabled={!onNotes && visiblePage >= columns.length - 1}
           onPress={() => goTo(onNotes ? 0 : visiblePage + 1)}
         />
       </Row>
