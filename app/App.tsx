@@ -35,6 +35,8 @@ import { BoardsScreen } from './src/screens/BoardsScreen';
 import { BoardScreen } from './src/screens/BoardScreen';
 import { BoardSettingsScreen } from './src/screens/BoardSettingsScreen';
 import { BoardArchiveScreen } from './src/screens/BoardArchiveScreen';
+import { BoardNotesScreen } from './src/screens/BoardNotesScreen';
+import { NotesHistoryScreen } from './src/screens/NotesHistoryScreen';
 import { CardScreen } from './src/screens/CardScreen';
 import { MyWorkScreen } from './src/screens/MyWorkScreen';
 import { OverviewScreen } from './src/screens/OverviewScreen';
@@ -82,6 +84,19 @@ function renderScreen(route: Route, user: SessionUser) {
       return <BoardSettingsScreen boardId={route.boardId} page={route.page} user={user} />;
     case 'boardArchive':
       return <BoardArchiveScreen boardId={route.boardId} user={user} />;
+    case 'boardNotes':
+      return <BoardNotesScreen boardId={route.boardId} user={user} />;
+    case 'boardNotesHistory':
+      // Keyed by version, so a version chosen beside the list on a wide
+      // screen starts its own restore state rather than inheriting one.
+      return (
+        <NotesHistoryScreen
+          key={route.versionId ?? 'list'}
+          boardId={route.boardId}
+          versionId={route.versionId}
+          user={user}
+        />
+      );
     case 'card':
       // KEYED BY CARD ID, deliberately. Only the top of the stack renders, so a
       // card → card push (which subtasks make routine) puts the same component

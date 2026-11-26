@@ -49,6 +49,8 @@ import { useLaneCollapse } from './useLaneCollapse';
 import { useLaneWatch } from './useLaneWatch';
 import { setColumnWatched, useWatchedColumns } from '../../notifications';
 import { useLabels } from '../../labels';
+import { setNotesOpen, useBoardNotes, useLatestNotesVersion, useNotesOpen } from '../../boardNotes';
+import { NotesPanel } from '../notes/NotesPanel';
 import { radius, space, useTheme } from '../../theme';
 import { useAction } from '../../useAction';
 
@@ -93,6 +95,12 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   // alone, so an admin visiting a board they are not on gets neither bell.
   const isMember = board.data?.memberUids.includes(user.uid) ?? false;
   const laneWatch = useLaneWatch(user, boardId, isMember);
+  // The notes panel, as on the web board: open or closed per person and board.
+  const notes = useBoardNotes(boardId);
+  const latestNotes = useLatestNotesVersion(boardId);
+  const notesOpen = useNotesOpen(user);
+  const showNotes = notesOpen.data?.includes(boardId) ?? false;
+  const toggleNotes = (open: boolean) => void run(() => setNotesOpen(user, boardId, open));
   const watched = useWatchedColumns(user);
   // The bells stay disabled until the list is ready: `?? []` reads a list
   // still loading, or one that failed, as watching nothing.
@@ -219,6 +227,13 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         </Title>
         <Row style={styles.headerActions}>
           {live ? <LaneCollapseActions collapse={collapse} /> : null}
+          <IconAction
+            icon="sticky-note-2"
+            label="Board notes"
+            selected={showNotes}
+            disabled={notesOpen.status !== 'ready'}
+            onPress={() => toggleNotes(!showNotes)}
+          />
           {/* Everyone gets this, not just owners: members can archive, so
               members must be able to un-archive. */}
           <IconAction
@@ -276,6 +291,17 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
           composer's field sits INSIDE them, and a focused field otherwise
           makes the ScrollView eat the next tap — on Add, on Cancel, on a
           card. `Sheet` carries the mechanism. */}
+      <View style={styles.boardRow}>
+      {showNotes ? (
+        <NotesPanel
+          boardId={boardId}
+          notes={notes}
+          latest={latestNotes.data}
+          members={members}
+          user={user}
+          onClose={() => toggleNotes(false)}
+        />
+      ) : null}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator
@@ -404,6 +430,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
           );
         })}
       </ScrollView>
+      </View>
 
       {/* No HTML5 drag on native, so moving is explicit — the same sheet the
           narrow board uses, for the same reason: reliable beats clever. */}
@@ -448,6 +475,7 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  boardRow: { flex: 1, flexDirection: 'row', minHeight: 0 },
   between: { justifyContent: 'space-between' },
   headerTitle: { flexShrink: 1 },
   // Small: IconAction's 44px box already separates these.

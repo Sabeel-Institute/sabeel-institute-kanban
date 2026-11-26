@@ -169,6 +169,66 @@ card** are icons to watch the column, open the
 board's **archived cards**, and open the board's **settings** — or, if you do not
 own it, **About this board**, the pages of settings you can use. They sit
 there rather than in the header so the board's name has the top row to itself.
+On a board with no notes yet, the row also has the **notes** icon, to write the
+first ones (see *Board notes*, next).
+
+### Board notes
+
+<div class="pair">
+  <figure class="ph"><img src="manual/img/notes-phone.png" alt="A board's notes on a phone: the page in front of the first column, with its links and steps"><figcaption>On a phone — the page before the first column</figcaption></figure>
+  <figure class="wd"><img src="manual/img/notes-wide.png" alt="A board's notes in a browser: a panel beside the columns"><figcaption>In a browser — a panel beside the columns</figcaption></figure>
+</div>
+
+Every board has one page of **notes** for the things nobody *does*: the links
+and forms the team keeps reaching for, where the shared folders are, and how
+someone new gets started. Anyone on the board can read and change them, and
+admins too. Anything with a person or a date belongs on a card instead: the
+notes have no assignee, no due date and no reminder.
+
+- **In a browser** the **notes** icon is in the board's header, beside archived
+  cards and settings.
+  It opens the notes in a panel beside the columns, and closes it again. The
+  panel stays open or closed for you on that board, wherever you sign in.
+- **On a phone** the notes are a page in front of the first column. On the first
+  column, the left arrow is replaced by the **notes** icon: tap it, or swipe
+  right. A board with no notes has no such page.
+
+Links in the notes open with one tap. A link to a card or a board in this app
+opens it here, without leaving for the browser; paste a card's **Share** link to
+point the notes at a card that holds a file.
+
+To change them, tap the **pencil** (**Edit notes**). It is the same editor, and
+the same buttons, as a card's description (see *The formatting buttons*): bold,
+italic, lists and links. A bold line does the work of a heading. On a phone the
+editor fills the screen, with **Save** and **Cancel** at the top, clear of the
+keyboard; in a browser it opens in the panel. **Save** when you
+are done. Saving with nothing left in the editor empties the notes, and on a
+phone their page goes away until someone writes some again. The notes hold up to
+50,000 characters.
+
+<div class="pair">
+  <figure class="ph"><img src="manual/img/notesEdit-phone.png" alt="Editing a board's notes on a phone"><figcaption>On a phone — the editor has the screen</figcaption></figure>
+  <figure class="wd"><img src="manual/img/notesEdit-wide.png" alt="Editing a board's notes in the panel in a browser"><figcaption>In a browser — edited in the panel</figcaption></figure>
+</div>
+
+**If someone saves while you are editing**, your save is not taken over theirs
+without asking: you are told who saved first, and your text is still there.
+**Save mine** puts yours on top (theirs stays in the history); **Discard mine**
+lets theirs stand.
+
+**History.** Under the notes it says who last edited them and when. The
+**clock** (**Notes history**) lists every version, newest first, each with who
+saved it and how many lines it added and removed: "+3 −1" (a line you
+edited counts once each way). Several saves by one person within ten minutes
+count as one version. Open a version to see the notes as that version left
+them. **Restore this version** puts it back as the newest version; the
+versions after it stay in the list, so a restore is undone the same way, and
+nothing is ever lost.
+
+<div class="pair">
+  <figure class="ph"><img src="manual/img/notesHistory-phone.png" alt="One version of a board's notes on a phone, with Restore"><figcaption>On a phone — one version, before restoring it</figcaption></figure>
+  <figure class="wd"><img src="manual/img/notesHistory-wide.png" alt="The notes history in a browser: the versions beside the one open"><figcaption>In a browser — the versions beside the one open</figcaption></figure>
+</div>
 
 ### Lanes
 
@@ -519,7 +579,9 @@ on a computer, copies the link to paste anywhere.
 
 Whoever opens the link lands directly on that card, as long as they're signed in
 and a member of its board. If they aren't a member, or the card has been deleted,
-the link says so instead of opening a blank screen.
+the link says so instead of opening a blank screen. Pasted into a description, a
+comment or a board's notes, a card's link opens the card right here in the app
+when tapped.
 
 ### Moving cards
 
@@ -829,7 +891,8 @@ would otherwise tell you about every change to every card.
 The clone has the same columns, lanes and colour, and each open card in the same place
 and lane, with its title, its description and its subtasks, and the institute's
 labels; a card that was finished on the old board is finished on the new one.
-It has the same details' fields, all empty. It starts fresh on everything that
+It has the same details' fields, all empty, and the same **notes**, without their
+history. It starts fresh on everything that
 belongs to one run of the work: no due dates, nobody assigned, no priorities,
 comments, history or files, and no details filled in. Archived cards and the
 board's own labels are not cloned. The board you cloned from does not change.
@@ -1212,6 +1275,10 @@ card and change the **column** dropdown.
 **…move or copy cards to a *different board*?**
 Select them (tick boxes, or long-press on a phone) → **move**/**copy to another
 board** → pick the board and column.
+
+**…keep links and how-tos where everyone on a board can find them?**
+In the board's **notes**: the notes icon in the board's header in a browser, or
+the page in front of the first column on a phone → **pencil** → write → **Save**.
 
 **…find a card I can't see?**
 **Search** (its words), or **My Work** if it's assigned to you.

@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Firestore } from 'firebase/firestore';
 import { z } from 'zod';
-import type { BoardDoc, Role, UserStatus } from '@sabeel/shared';
+import { fromAgentMarkdown, type BoardDoc, type Role, type UserStatus } from '@sabeel/shared';
 
 export type WriteBoard = Partial<Omit<BoardDoc, 'memberProfiles'>> & Pick<BoardDoc, 'name' | 'columns'> & {
   id: string;
@@ -63,4 +63,29 @@ export function ordered<T extends { id: string; name: string }>(items: T[], orde
     throw new Error(`Give every ${kind} exactly once in the desired order: ${items.map((item) => item.name).join(', ')}.`);
   }
   return next;
+}
+
+/**
+ * What a rich text field takes, said once for every tool that writes one: a
+ * description, a comment, a board's notes. The app's editors write five
+ * elements and nothing else (`richtext.ts`), so an agent is told exactly
+ * those, and whatever else it sends goes through `fromAgentMarkdown`.
+ */
+export const RICH_TEXT_HELP = [
+  "Rich text, in the app's markdown: **bold**, *italic*, [words](https://address) for a link,",
+  'a line starting "- " for a bullet and "1. " for a numbered item, a blank line between paragraphs.',
+  'Nothing else exists: no headings (a bold line serves), tables, code, quotes, images or nested lists.',
+  'Headings, __bold__, _italic_ and checkboxes are converted; other markup is kept as plain words.',
+  'A bare https:// address shows as a link. Write a literal * [ ] or \\ with a backslash before it.',
+].join(' ');
+
+/**
+ * Rich text from an agent, as the app stores it, refused past `max` stored
+ * characters. `before` is the text being edited, whose lines the agent hands
+ * back untouched are kept as they are (`fromAgentMarkdown`).
+ */
+export function agentRichText(text: string, max: number, what: string, before = ''): string {
+  const stored = fromAgentMarkdown(text, before);
+  if (stored.length > max) throw new Error(`The ${what} is ${stored.length} characters as stored; the most is ${max}.`);
+  return stored;
 }

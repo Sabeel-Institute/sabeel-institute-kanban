@@ -82,6 +82,11 @@ board — is what lets you:
 It grants nothing anywhere else. Owning three boards and owning none are the same
 thing on the fourth.
 
+**A board's notes are anyone's on the board**, owners or not, and admins':
+read, written and restored from their history by all of them (`docs/PRODUCT_BRIEF.md`
+§ Board notes). Their history is the server's alone, so nobody can forge or
+rewrite a version. Whether the notes panel is open is each person's own.
+
 **A card's lane is anyone's on the board**, like its column: everyone on the
 board files a new card in a lane, moves cards between lanes, on the card and
 in bulk. Only the lanes themselves are the owners'.

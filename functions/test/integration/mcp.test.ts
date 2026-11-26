@@ -171,6 +171,7 @@ describe('composable queries: every question in at most two calls', () => {
       'add_card', 'clone_board', 'comment', 'copy_cards', 'create_board', 'get_attachment_url',
       'list_addable_people', 'move_cards', 'prepare_attachments', 'query_activity', 'query_alerts',
       'query_boards', 'query_cards', 'set_board_archived', 'set_cards_archived', 'update_board', 'update_card',
+      'write_board_notes',
     ]);
     expect(client.getInstructions()).toContain('Mona (@mcpme)');
     const cloneDescription = listedTools.find((t) => t.name === 'clone_board')?.description;
@@ -596,6 +597,74 @@ describe('Kanban write tools', () => {
     expect(outcomes.filter((result) => !result.isError)).toHaveLength(1);
     const records = await Promise.all([left, right].map((card) => adminDb().doc(`cards/${card.id}`).get()));
     expect(records.filter((record) => record.get('parentId'))).toHaveLength(1);
+    await client.close();
+  });
+});
+
+describe('board notes, and rich text in the app’s own form', () => {
+  const errorText = (r: unknown) => (r as { content: { text: string }[] }).content[0].text;
+
+  it('reads and writes a board’s notes by the version read, refusing a save over a newer one', async () => {
+    const client = await connect((await signIn(ME)).access_token);
+    const call = async (name: string, args: Record<string, unknown>) => parsed(await client.callTool({ name, arguments: args }));
+    expect(client.getInstructions()).toContain('write_board_notes with the version read');
+
+    const none = await call('query_boards', { board: 'Agent Board', include: { notes: true } });
+    expect(none[0].notes).toEqual({ text: '', version: 0 });
+
+    const wrote = await call('write_board_notes', {
+      board: 'Agent Board',
+      text: '## Forms\n* [Expenses](https://example.org/x)',
+      version: 0,
+    });
+    expect(wrote.version).toBe(1);
+    const stored = (await adminDb().doc('boards/mcp_b1/notes/current').get()).data()!;
+    // Written as the person, under the rules, and in the form the app's editors write.
+    expect(stored).toMatchObject({ text: '**Forms**\n\n- [Expenses](https://example.org/x)', version: 1, updatedBy: ME });
+    expect(stored.agentAt).toBe(stored.updatedAt);
+    const version = await waitFor('the agent’s version', async () =>
+      (await adminDb().collection('boards/mcp_b1/notes/current/versions').get()).docs[0]?.data());
+    expect(version).toMatchObject({ via: 'agent', byName: 'Mona', version: 1 });
+
+    const stale = await client.callTool({ name: 'write_board_notes', arguments: { board: 'Agent Board', text: 'Stale', version: 0 } });
+    expect(stale.isError).toBe(true);
+    expect(errorText(stale)).toContain('These notes are at version 1, not 0');
+    expect((await adminDb().doc('boards/mcp_b1/notes/current').get()).get('text')).toContain('Expenses');
+
+    const read = await call('query_boards', { board: 'Agent Board', include: { notes: true } });
+    expect(read[0].notes).toMatchObject({ version: 1, edited_by: 'Mona', text: stored.text });
+    expect((await client.callTool({ name: 'write_board_notes', arguments: { board: 'Not Mine', text: 'x', version: 0 } })).isError).toBe(true);
+
+    // A colleague's line the app leaves unescaped survives the agent's save
+    // around it; the agent's own heading is converted; the same text again
+    // writes nothing.
+    await adminDb().doc('boards/mcp_b1/notes/current').set({
+      text: '# of guests: 40', version: 2, updatedBy: OTHER, updatedAt: Date.now(),
+    });
+    await call('write_board_notes', { board: 'Agent Board', text: '# of guests: 40\n\n## Parking', version: 2 });
+    expect((await adminDb().doc('boards/mcp_b1/notes/current').get()).get('text')).toBe('# of guests: 40\n\n**Parking**');
+    const same = await call('write_board_notes', { board: 'Agent Board', text: '# of guests: 40\n\n**Parking**', version: 3 });
+    expect(same).toMatchObject({ unchanged: true, version: 3 });
+    expect((await adminDb().doc('boards/mcp_b1/notes/current').get()).get('version')).toBe(3);
+    await client.close();
+  });
+
+  it('stores an agent’s description and comment as the app’s editors would', async () => {
+    const client = await connect((await signIn(ME)).access_token);
+    const call = async (name: string, args: Record<string, unknown>) => parsed(await client.callTool({ name, arguments: args }));
+    const description = (await client.listTools()).tools.find((t) => t.name === 'add_card')?.inputSchema;
+    expect(JSON.stringify(description)).toContain('no headings (a bold line serves)');
+
+    const added = await call('add_card', {
+      board: 'Agent Board', column: 'To Do', title: 'Plan the open day',
+      description: '# Plan\n__Bold__ and _it_\n- [ ] book the hall',
+    });
+    expect((await adminDb().doc(`cards/${added.added}`).get()).get('description'))
+      .toBe('**Plan**\n**Bold** and *it*\n\n- book the hall');
+    await call('comment', { card_id: added.added, text: '## Note\nDone by __Friday__, @mcpother' });
+    const comment = (await adminDb().collection(`cards/${added.added}/comments`).get()).docs[0].data();
+    expect(comment.body).toBe('**Note**\nDone by **Friday**, @mcpother');
+    expect(comment.mentionUids).toEqual([OTHER]);
     await client.close();
   });
 });

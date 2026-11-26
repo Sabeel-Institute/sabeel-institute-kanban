@@ -37,7 +37,9 @@ import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { PORTS, PROJECT } from './lib/emulators.mjs';
 import { RULES_TITLE } from './lib/rules.mjs';
 
-const OUT = 'docs/manual/img';
+// MANUAL_OUT writes elsewhere, to look at a change's screens without
+// touching the manual's pictures, which are taken once per release.
+const OUT = process.env.MANUAL_OUT ?? 'docs/manual/img';
 const BASE = process.env.MANUAL_BASE ?? `http://127.0.0.1:${PORTS.web}`;
 const BOARD = 'Fundraising 2026';
 // Looked up EXACTLY: the card has a subtask (below), whose chip names it, and
@@ -182,6 +184,7 @@ async function enrich() {
 }
 
 await enrich();
+await closeNotesPanels();
 
 const browser = await chromium.launch();
 await mkdir(OUT, { recursive: true });
@@ -238,6 +241,34 @@ async function nav(p, label) {
     await p.waitForTimeout(700);
   }
   throw new Error(`could not reach the "${label}" tab`);
+}
+
+/**
+ * Whether the notes panel is open is the person's, kept on their user
+ * document, so a shot that opens it would leave it open in every later
+ * picture of the board. Shut before the run and after it.
+ */
+async function closeNotesPanels() {
+  const users = await getFirestore().collection('users').get();
+  await Promise.all(users.docs.map((d) => d.ref.update({ notesOpenBoardIds: FieldValue.delete() })));
+}
+
+/** The board's notes on screen: the panel on a computer, the page in front of the first column on a phone. */
+async function openNotes(p, tag) {
+  await openBoard(p);
+  const where = p.getByTestId(tag === 'wide' ? 'notes-panel' : 'notes-page');
+  // On a phone the page is laid out beside the columns whether or not it is
+  // shown, so "visible" says nothing: the pager is swiped to it, and it is on
+  // screen once it starts at the left edge.
+  if (tag !== 'wide' || !(await where.isVisible().catch(() => false))) {
+    await p.getByRole('button', { name: 'Board notes', exact: true }).click();
+  }
+  await where.getByText('Gift Aid declaration').first().waitFor({ timeout: 30000 });
+  if (tag !== 'wide') {
+    for (let i = 0; i < 40 && ((await where.boundingBox())?.x ?? -1) > 24; i += 1) await p.waitForTimeout(150);
+  }
+  await p.waitForTimeout(900);
+  return where;
 }
 
 async function openBoard(p) {
@@ -347,6 +378,22 @@ const SHOTS = {
     await p.getByRole('button', { name: new RegExp(`^Colour of ${BOARD}: `) }).first().click();
     await p.getByRole('button', { name: 'No colour', exact: true }).waitFor({ timeout: 30000 });
     await p.waitForTimeout(700);
+  },
+  // A board's notes: read, being edited, and one version of their history
+  // with what it changed marked. The seed writes two versions, the second
+  // Sara's, which is the one the history opens on.
+  notes: openNotes,
+  notesEdit: async (p, tag) => {
+    const where = await openNotes(p, tag);
+    await where.getByRole('button', { name: 'Edit notes', exact: true }).click();
+    await p.locator('[contenteditable="true"]').first().waitFor({ timeout: 30000 });
+    await p.getByRole('button', { name: 'Bold', exact: true }).first().waitFor({ timeout: 15000 });
+  },
+  notesHistory: async (p, tag) => {
+    const where = await openNotes(p, tag);
+    await where.getByRole('button', { name: 'Notes history', exact: true }).click();
+    if (tag !== 'wide') await p.getByRole('button', { name: /^Sara, / }).first().click();
+    await p.getByTestId('notes-version').waitFor({ timeout: 30000 });
   },
   people: async (p) => {
     await nav(p, 'Boards');
@@ -542,6 +589,7 @@ if (wanted('rules')) {
   }
 }
 
+await closeNotesPanels();
 await browser.close();
 console.log(`\n${made} images written to ${OUT}/`);
 console.log('pending.png is captured by hand — see the header for why.');

@@ -7,37 +7,20 @@
  * card's board can change but its id cannot; when the card is gone or the
  * recipient is not on its board, we say so rather than opening nothing.
  *
- * Navigation goes through nav's module-level `push` directly, so this effect has
+ * Navigation goes through nav's module-level `push` (`openLinkTarget`), so this effect has
  * no reactive dependencies and runs exactly once per signed-in session.
  */
 import { useEffect } from 'react';
-import { push } from './nav';
 import { consumeInitialLink } from './pendingLink';
 import { subscribeLinks } from './deeplink';
 import { parseLinkTarget, type LinkTarget } from './links';
-import { findCardBoard } from './cards';
-import { notifyUser } from './alert';
+import { openLinkTarget } from './openLink';
 
 export function useDeepLinks(): void {
   useEffect(() => {
     let cancelled = false;
 
-    const open = async (target: LinkTarget) => {
-      if (target.kind === 'board') {
-        push({ name: 'board', boardId: target.boardId });
-        return;
-      }
-      const boardId = await findCardBoard(target.cardId);
-      if (cancelled) return;
-      if (boardId) {
-        push({ name: 'card', boardId, cardId: target.cardId });
-      } else {
-        notifyUser(
-          'Card unavailable',
-          "This card may have been deleted, or you're not a member of its board.",
-        );
-      }
-    };
+    const open = (target: LinkTarget) => openLinkTarget(target, () => cancelled);
 
     void consumeInitialLink().then((target) => {
       if (target && !cancelled) void open(target);

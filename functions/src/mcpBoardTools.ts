@@ -1,16 +1,16 @@
 import { isDeepStrictEqual } from 'node:util';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
-import { addDoc, collection, doc, type Firestore } from 'firebase/firestore';
+import { addDoc, collection, doc, getDocFromServer, setDoc, type Firestore } from 'firebase/firestore';
 import { z } from 'zod';
 import {
-  addField, BOARD_COLORS, canEditBoardLabels, canManageBoard, columnsPatch, LABEL_COLORS,
+  addField, BOARD_COLORS, BOARD_NOTES_MAX, canEditBoardLabels, NOTES_DOC_ID, canManageBoard, columnsPatch, LABEL_COLORS,
   laneAddBlocked, lanesSwitchPatch, localId, newBoard, newLabel, renameColumn, renameField, renameLane,
   validateBoardName, validateColumnName, validateDetailValue, validateLabelName, validateLaneName, withCleanExtras,
   type BoardDoc, type BoardField, type Label,
 } from '@sabeel/shared';
 import { cloneBoardFor } from './boards';
 import { agentEdit } from './agentActivity';
-import { boardLink, check, itemNamed, named, ordered, word, writeResult, type McpActor, type WriteTools } from './mcpWrite';
+import { agentRichText, boardLink, check, itemNamed, named, ordered, RICH_TEXT_HELP, word, writeResult, type McpActor, type WriteTools } from './mcpWrite';
 
 const rename = z.object({ from: word, to: word }).strict();
 const order = word.array().min(1);
@@ -255,6 +255,46 @@ export function registerBoardWrites({ server, run, me, board }: WriteTools) {
     description: 'Change any supplied board settings in one call. Omit the rest. Example: {"board":"Course","details":{"Start date":"2026-12-01","End date":null},"members":{"add":["Priya Patel"]}}.',
     inputSchema: changeSchema.extend({ board: word }).strict(),
   }, ({ board: key, ...f }) => run(async (fs) => writeResult(await updateBoard((await board(fs, key)).id, me, f))));
+
+  server.registerTool('write_board_notes', {
+    description: [
+      "Replace a board's notes, its shared page of links, forms and how-tos beside the columns, with new text.",
+      'Read them first (query_boards include notes) and send back the whole page with the version you read, 0 for a board with none.',
+      'If someone saved since, this is refused: read again, merge, and send the new version. Anyone on the board may write the notes; every save is in their history.',
+    ].join(' '),
+    inputSchema: {
+      board: word,
+      text: z.string().max(BOARD_NOTES_MAX).describe(`${RICH_TEXT_HELP} An empty text empties the notes.`),
+      version: z.number().int().min(0).describe('The version read with query_boards'),
+    },
+  }, (f) => run(async (fs) => {
+    const target = await board(fs, f.board);
+    const ref = doc(fs, 'boards', target.id, 'notes', NOTES_DOC_ID);
+    const read = await getDocFromServer(ref);
+    const stored = (read.data()?.text as string | undefined) ?? '';
+    const at = (read.data()?.version as number | undefined) ?? 0;
+    const behind = () =>
+      new Error(`These notes are at version ${at}, not ${f.version}: someone saved since they were read. Read them again with query_boards, merge your change into that text, and send version ${at}.`);
+    if (at !== f.version) throw behind();
+    // The colleague's lines handed back as they were stay exactly so.
+    const text = agentRichText(f.text, BOARD_NOTES_MAX, 'notes', stored);
+    if (text === stored) return writeResult({ board: target.name, version: at, unchanged: true, url: boardLink(target.id) });
+    const now = Date.now();
+    try {
+      await setDoc(ref, { text, version: f.version + 1, updatedBy: me.uid, updatedAt: now, agentAt: now });
+    } catch (e) {
+      // The rules refuse a save over any version but the one it names. Say
+      // which version is there now, or the agent cannot tell a conflict from
+      // a refusal.
+      const current = await getDocFromServer(ref).catch(() => null);
+      const there = (current?.data()?.version as number | undefined) ?? 0;
+      if (current && there !== f.version) {
+        throw new Error(`These notes are at version ${there}, not ${f.version}: someone saved since they were read. Read them again with query_boards, merge your change into that text, and send version ${there}.`);
+      }
+      throw e;
+    }
+    return writeResult({ board: target.name, version: f.version + 1, url: boardLink(target.id) });
+  }));
 
   server.registerTool('list_addable_people', {
     description: 'Find people eligible to be added to this board, by display name. Give the returned id to update_board members.add when needed.',

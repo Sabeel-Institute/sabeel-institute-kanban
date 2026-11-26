@@ -15,9 +15,14 @@ import {
   CLONE_BOARD_MAX_BYTES,
   CLONE_BOARD_MAX_CARDS,
   CLONED_ENTRY_ID,
+  NOTES_DOC_ID,
+  notesLineCounts,
+  utf8Length,
   validateBoardName,
   watchKeyOnBoard,
+  type BoardNotesDoc,
   type CloneSourceCard,
+  type NotesVersionDoc,
 } from '@sabeel/shared';
 import { actorOf } from './actor';
 import { recordStat } from './stats';
@@ -428,7 +433,7 @@ export async function cloneBoardFor(
     }
 
     // One past the cap is enough to refuse, without reading a huge board in full.
-    const [cardsSnap, labelsSnap] = await Promise.all([
+    const [cardsSnap, labelsSnap, notesSnap] = await Promise.all([
       tx.get(
         db
           .collection('cards')
@@ -437,6 +442,7 @@ export async function cloneBoardFor(
           .limit(CLONE_BOARD_MAX_CARDS + 1),
       ),
       tx.get(db.collection('labels')),
+      tx.get(db.doc(`boards/${boardId}/notes/${NOTES_DOC_ID}`)),
     ]);
     if (cardsSnap.size > CLONE_BOARD_MAX_CARDS) {
       throw new HttpsError(
@@ -460,7 +466,10 @@ export async function cloneBoardFor(
       now,
       newCardId: () => db.collection('cards').doc().id,
     });
-    if (boardCloneBytes(clone) > CLONE_BOARD_MAX_BYTES) {
+    // The notes come along as text, without their history: a template's notes
+    // are where a program's run-book lives (Faisal, 2026-11-25).
+    const notesText = (notesSnap.data() as BoardNotesDoc | undefined)?.text ?? '';
+    if (boardCloneBytes(clone) + 2 * utf8Length(notesText) > CLONE_BOARD_MAX_BYTES) {
       throw new HttpsError(
         'failed-precondition',
         'This board holds too much text to clone in one go. Shorten some long descriptions, or archive cards the clone does not need.',
@@ -485,6 +494,25 @@ export async function cloneBoardFor(
     };
     tx.create(cloneRef.collection('activity').doc(CLONED_ENTRY_ID), cloned);
     tx.create(provenance, { sourceBoardId: boardId });
+    if (notesText.trim()) {
+      // Version 1 with its version already written, so onBoardNotesWritten
+      // finds it recorded and adds nothing: its line says where it came from.
+      const notesRef = cloneRef.collection('notes').doc(NOTES_DOC_ID);
+      const notes: BoardNotesDoc = { text: notesText, version: 1, updatedBy: actor.uid, updatedAt: now };
+      const first: NotesVersionDoc = {
+        text: notesText,
+        version: 1,
+        by: actor.uid,
+        at: now,
+        startedAt: now,
+        ...notesLineCounts('', notesText),
+        copiedFrom: board.name,
+        ...(typeof clonerName === 'string' && clonerName ? { byName: clonerName } : {}),
+        ...attribution,
+      };
+      tx.create(notesRef, notes);
+      tx.create(notesRef.collection('versions').doc('1'), first);
+    }
     for (const card of clone.cards) {
       const cardRef = db.doc(`cards/${card.id}`);
       tx.create(cardRef, card.data);

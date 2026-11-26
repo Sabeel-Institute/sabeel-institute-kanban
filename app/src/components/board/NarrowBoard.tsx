@@ -16,7 +16,7 @@
  *
  * The web board is a different component entirely (WideBoard.web.tsx).
  */
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -73,6 +73,8 @@ import { useLaneWatch } from './useLaneWatch';
 import { LaneCollapseActions } from './LaneCollapseActions';
 import { setColumnWatched, useWatchedColumns } from '../../notifications';
 import { useLabels } from '../../labels';
+import { hasNotes, useBoardNotes, useLatestNotesVersion } from '../../boardNotes';
+import { NotesBody, NotesStamp } from '../notes/NotesView';
 import { radius, space, useTheme } from '../../theme';
 import { KeyboardSticky } from '../KeyboardSticky';
 import { useAction } from '../../useAction';
@@ -152,12 +154,13 @@ function CardTile({
 }
 
 /**
- * Which column each board was last showing.
+ * Which column each board was last showing, or `NOTES_PAGE` for its notes.
  *
  * Module-level on purpose: this must survive the component unmounting, which is
  * exactly what happens when you open a card. Bounded implicitly by the number of
  * boards, which is small.
  */
+const NOTES_PAGE = -1;
 const lastPageByBoard = new Map<string, number>();
 
 export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionUser }) {
@@ -167,6 +170,12 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
   // `sessionCan` — a helper taking no board would be a button that always fails.
   const canManage = canManageBoard(user, board.data);
   const cards = useBoardCards(boardId);
+  // The board's notes are a page in front of its first column, while it has
+  // some. The pager waits for them, or that page would arrive under a finger.
+  const notes = useBoardNotes(boardId);
+  const latestNotes = useLatestNotesVersion(boardId);
+  const notesPage = hasNotes(notes.data);
+  const offset = notesPage ? 1 : 0;
 
   // Remembered PER BOARD, outside the component. The pager's position was
   // component state, so opening a card unmounted the board and lost it —
@@ -178,7 +187,11 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
   const { run, busy, error, setError } = useAction('narrowBoard');
   // Has the pager been scrolled to the remembered column yet? Starts true when
   // there is nothing to restore, so the common case paints immediately.
-  const [restored, setRestored] = useState(() => (lastPageByBoard.get(boardId) ?? 0) === 0);
+  // Not known from the remembered page alone: the first column is the second
+  // page on a board with notes, and the notes are read after this is set. So
+  // it starts false, the pager's first layout sets it (restoring if there is
+  // anything to restore), and `needsRestore` decides whether anything waits.
+  const [restored, setRestored] = useState(false);
   const scroller = useRef<ScrollView>(null);
   /**
    * The page an arrow tap is animating towards, or null when nothing is in
@@ -281,11 +294,15 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
    * Landing on the LAST column beats the old behaviour of showing column 1
    * while the header described a column that no longer exists.
    */
-  const visiblePage = columns.length > 0 ? Math.min(page, columns.length - 1) : 0;
+  const visiblePage = columns.length > 0 ? Math.max(0, Math.min(page, columns.length - 1)) : 0;
+  /** On the notes page: remembered there, or the only page there is. */
+  const onNotes = notesPage && (page === NOTES_PAGE || columns.length === 0);
+  /** Where the pager stands, counting the notes page when there is one. */
+  const pagerIndex = onNotes ? 0 : visiblePage + offset;
 
-  // Is there actually a column to scroll back to? False when the pager is
+  // Is there actually a page to scroll back to? False when the pager is
   // already on the first page.
-  const needsRestore = visiblePage > 0;
+  const needsRestore = pagerIndex > 0;
 
   /**
    * Keep the position indicator in step with the visible column.
@@ -303,7 +320,11 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
   }
 
   function syncPage(e: NativeSyntheticEvent<NativeScrollEvent>) {
-    const next = Math.round(e.nativeEvent.contentOffset.x / width);
+    // Before the first layout has put the pager on its page, a scroll event
+    // is the mount's, at 0, not a person's: read as one, it took a board
+    // with notes to its notes page, since page 0 is the notes there.
+    if (!restored) return;
+    const index = Math.round(e.nativeEvent.contentOffset.x / width);
     /*
      * IGNORE THE PAGES AN ANIMATED SCROLL PASSES THROUGH.
      *
@@ -316,18 +337,57 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
      * page ahead of it.
      */
     if (animatingTo.current !== null) {
-      if (next === animatingTo.current) animatingTo.current = null;
+      if (index === animatingTo.current) animatingTo.current = null;
       return;
     }
-    if (next !== page && next >= 0 && next < columns.length) rememberPage(next);
+    const next = index - offsetRef.current;
+    if (next !== page && next >= (notesPage ? NOTES_PAGE : 0) && next < columns.length) rememberPage(next);
   }
 
+  /** Go to a column, or to the notes with `NOTES_PAGE`. */
   function goTo(index: number) {
-    const clamped = Math.max(0, Math.min(index, columns.length - 1));
-    animatingTo.current = clamped;
+    const clamped = Math.max(notesPage ? NOTES_PAGE : 0, Math.min(index, columns.length - 1));
+    animatingTo.current = clamped + offset;
     rememberPage(clamped);
-    scroller.current?.scrollTo({ x: clamped * width, animated: true });
+    scroller.current?.scrollTo({ x: (clamped + offset) * width, animated: true });
   }
+
+  /*
+   * THE NOTES PAGE CAN COME AND GO UNDER THE PAGER: a colleague writes the
+   * board's first notes, or empties them, while it is open. Every page then
+   * shifts by one, so the scroll position is put back on the page being
+   * shown, without animating, and someone on the notes page when they are
+   * emptied is put on the first column.
+   */
+  // Remembered on the notes, and they are gone: emptied while this board was
+  // unmounted behind the editor, or on another device. The first column, as
+  // the pager shows, or the page would be back on the notes when they return.
+  useEffect(() => {
+    if (notes.status === 'ready' && !notesPage && page === NOTES_PAGE) rememberPage(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notes.status, notesPage, page]);
+  //
+  // In a LAYOUT effect, before the browser can act: a page inserted in front
+  // makes it shift the scroll to keep the column in view, and that scroll
+  // event, read against the old page count, remembered the next column (the
+  // board came back from saving its first notes on its second column). So
+  // the count `syncPage` reads is a ref set here, and the move to the shown
+  // page is marked as one in flight, as an arrow's is.
+  const offsetRef = useRef(offset);
+  const shownOffset = useRef(offset);
+  useLayoutEffect(() => {
+    offsetRef.current = offset;
+    if (shownOffset.current === offset) return;
+    shownOffset.current = offset;
+    if (!notesPage && page === NOTES_PAGE) rememberPage(0);
+    if (width > 0) {
+      const index = notesPage && page === NOTES_PAGE ? 0 : visiblePage + offset;
+      animatingTo.current = index;
+      scroller.current?.scrollTo({ x: index * width, animated: false });
+    }
+    // Only a change of the page count moves anything.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offset]);
 
 
   // The title comes from `AddCardForm`, already trimmed and non-empty — the
@@ -359,7 +419,7 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
   }
 
 
-  if (board.status === 'loading' || cards.status === 'loading') {
+  if (board.status === 'loading' || cards.status === 'loading' || notes.status === 'loading') {
     return <Spinner label="Loading board…" />;
   }
   // A failed cards query used to render a board with every column and no
@@ -413,6 +473,15 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
    */
   const boardActions = (
     <>
+      {/* The first notes are started here; once a board has some, they are
+          the page in front of the first column and this goes. */}
+      {notesPage ? null : (
+        <IconAction
+          icon="sticky-note-2"
+          label="Board notes"
+          onPress={() => nav.push({ name: 'boardNotes', boardId })}
+        />
+      )}
       {/* Everyone gets this, not just owners: members can archive, so
           members must be able to un-archive. */}
       <IconAction
@@ -457,13 +526,27 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
           the app. The name is read-only: a column is renamed and deleted in
           Board settings → Columns. */}
       <Row style={styles.pager}>
-        <IconAction
-          icon="chevron-left"
-          label="Previous column"
-          onPress={() => goTo(visiblePage - 1)}
-        />
+        {/* On the first column of a board with notes, the way back is to
+            them, and the control says so: the notes icon in the arrow's
+            place is the only sign the page is there. */}
+        {onNotes ? (
+          <IconAction icon="chevron-left" label="Previous column" disabled onPress={() => undefined} />
+        ) : notesPage && visiblePage === 0 ? (
+          <IconAction icon="sticky-note-2" label="Board notes" onPress={() => goTo(NOTES_PAGE)} />
+        ) : (
+          <IconAction
+            icon="chevron-left"
+            label="Previous column"
+            onPress={() => goTo(visiblePage - 1)}
+          />
+        )}
         <View style={styles.pagerLabel}>
-          {current ? (
+          {onNotes && notes.data ? (
+            <>
+              <ColumnHeading name="Board notes" center lines={2} />
+              <NotesStamp notes={notes.data} latest={latestNotes.data} members={members} />
+            </>
+          ) : current ? (
             // Two lines here and nowhere else: the pager squeezes the name
             // between Prev and Next, and there is nothing above or below it
             // to displace.
@@ -471,14 +554,16 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
           ) : (
             <Body>—</Body>
           )}
-          <Hint>
-            {columns.length > 0 ? `${visiblePage + 1} of ${columns.length}` : 'No columns'}
-          </Hint>
+          {onNotes ? null : (
+            <Hint>
+              {columns.length > 0 ? `${visiblePage + 1} of ${columns.length}` : 'No columns'}
+            </Hint>
+          )}
         </View>
         <IconAction
           icon="chevron-right"
           label="Next column"
-          onPress={() => goTo(visiblePage + 1)}
+          onPress={() => goTo(onNotes ? 0 : visiblePage + 1)}
         />
       </Row>
 
@@ -526,7 +611,10 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
         onError={setError}
       />
 
-      {!selection.active && (byColumn.get(current?.id ?? '')?.length ?? 0) > 0 ? (
+      {/* Three states: a board whose notes could not be read is not a board
+          without notes, though it draws as one until they can be. */}
+      {notes.status === 'error' ? <Hint>This board&rsquo;s notes could not be loaded.</Hint> : null}
+      {!onNotes && !selection.active && (byColumn.get(current?.id ?? '')?.length ?? 0) > 0 ? (
         <Hint>
           Tap a card to open it. Long-press to start selecting, then tap others
           to move or archive them together.
@@ -553,9 +641,9 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
         if (w > 0 && Math.abs(w - width) > 1) {
           const hadWidth = width > 0;
           setWidth(w);
-          if (hadWidth && visiblePage > 0) {
+          if (hadWidth && pagerIndex > 0) {
             requestAnimationFrame(() =>
-              scroller.current?.scrollTo({ x: visiblePage * w, animated: false }),
+              scroller.current?.scrollTo({ x: pagerIndex * w, animated: false }),
             );
           }
         }
@@ -573,8 +661,11 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
         // nowhere. onContentSizeChange fires once the pages are laid out, which
         // is the first moment a scroll can actually take effect.
         onContentSizeChange={() => {
-          if (!needsRestore || restored) return;
-          scroller.current?.scrollTo({ x: visiblePage * width, animated: false });
+          if (restored) return;
+          // The first layout settles it either way: a pager that opened on
+          // its first page has nothing to restore, and must not be hidden
+          // later when a tap takes it to another page.
+          if (needsRestore) scroller.current?.scrollTo({ x: pagerIndex * width, animated: false });
           setRestored(true);
         }}
         // Held invisible until it is sitting on the right column. Showing the
@@ -602,9 +693,43 @@ export function NarrowBoard({ boardId, user }: { boardId: string; user: SessionU
         onScrollEndDrag={syncPage}
         scrollEventThrottle={32}
       >
+        {notesPage && notes.data ? (
+          // The notes page: read here, edited on a screen of its own. Hidden
+          // from assistive tech while off screen, as every column is.
+          <View
+            key="board-notes"
+            style={[styles.page, { width }]}
+            aria-hidden={!onNotes}
+            accessibilityElementsHidden={!onNotes}
+            importantForAccessibility={onNotes ? 'auto' : 'no-hide-descendants'}
+            testID="notes-page"
+          >
+            <ScrollView
+              style={styles.fill}
+              contentContainerStyle={styles.listContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Panel>
+                <NotesBody notes={notes.data} />
+              </Panel>
+            </ScrollView>
+            <Row style={[styles.footer, styles.notesFooter]}>
+              <IconAction
+                icon="history"
+                label="Notes history"
+                onPress={() => nav.push({ name: 'boardNotesHistory', boardId })}
+              />
+              <IconAction
+                icon="edit"
+                label="Edit notes"
+                onPress={() => nav.push({ name: 'boardNotes', boardId })}
+              />
+            </Row>
+          </View>
+        ) : null}
         {columns.map((col, colIndex) => {
           const rows = rowsByColumn.get(col.id) ?? [];
-          const onScreen = colIndex === visiblePage;
+          const onScreen = !onNotes && colIndex === visiblePage;
           return (
             /*
               OFF-SCREEN PAGES ARE HIDDEN FROM ASSISTIVE TECH.
@@ -793,5 +918,6 @@ const styles = StyleSheet.create({
     gap: space.sm,
   },
   footer: { gap: space.sm },
+  notesFooter: { justifyContent: 'flex-end' },
   wrap: { flexWrap: 'wrap' },
 });
