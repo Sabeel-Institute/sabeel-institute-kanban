@@ -47,6 +47,37 @@ name: Board, card, rich text and gestures
 - tapOn: "Previous column"
 - assertVisible: "To Do"
 
+# The board's notes (the seed writes Fundraising's): the page in front of the
+# first column, reached by the control in place of its left arrow and left by
+# a swipe, drawn by the native rich text view; edited on a screen of their
+# own through the native editor, which goes back to the notes on Save.
+- tapOn: "Board notes"
+- extendedWaitUntil:
+    visible: "[\\s\\S]*Gift Aid declaration[\\s\\S]*"
+    timeout: 15000
+- takeScreenshot: 02b-board-notes
+- swipe:
+    direction: LEFT
+- assertVisible: "To Do"
+- tapOn: "Board notes"
+- tapOn: "Edit notes"
+- tapOn:
+    below: "Bold"
+- inputText: "Native notes line"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- tapOn: "Save"
+- extendedWaitUntil:
+    visible: "[\\s\\S]*Native notes line[\\s\\S]*"
+    timeout: 15000
+- takeScreenshot: 02c-board-notes-saved
+- swipe:
+    direction: LEFT
+- assertVisible: "To Do"
+
 # A card, and the native editor: type, bold, save.
 - runFlow:
     file: ci-tools/tap-until.yaml

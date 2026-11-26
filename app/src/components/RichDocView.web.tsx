@@ -12,13 +12,11 @@
  * ignores the app's font, and brings TipTap into the bundle.
  */
 import { Fragment } from 'react';
-import { Linking, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import type { RichDoc, RichInline } from '@sabeel/shared';
 import { space, type, useTheme } from '../theme';
 
-function openHref(href: string) {
-  void Linking.openURL(href).catch(() => undefined);
-}
+import { openRichHref as openHref } from '../openLink';
 
 function Inline({ nodes }: { nodes: RichInline[] }) {
   const t = useTheme();

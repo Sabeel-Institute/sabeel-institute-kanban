@@ -91,7 +91,7 @@ describe('the phone components', () => {
     // Android decodes it already, and decoding twice changes the address.
     const view = src('RichDocView.tsx');
     expect(view).toMatch(/const href = Platform\.OS === 'ios' \? decodeDisplayHref\(url\) : url;/);
-    expect(view).toMatch(/Linking\.openURL\(href\)/);
+    expect(view).toMatch(/openRichHref\(href\)/);
     expect(view).toMatch(/onLinkPress=\{openLink\}/);
   });
 

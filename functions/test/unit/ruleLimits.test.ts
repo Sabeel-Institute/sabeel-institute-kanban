@@ -4,6 +4,9 @@ import { resolve } from 'node:path';
 import {
   BOARD_COLORS,
   BOARD_FIELDS_MAX,
+  BOARD_NOTES_MAX,
+  NOTES_DOC_ID,
+  NOTES_OPEN_MAX,
   COLLAPSED_LANE_BOARDS_MAX,
   COLLAPSED_SECTIONS_MAX,
   COMMENT_BODY_MAX,
@@ -64,6 +67,15 @@ describe('limits restated in firestore.rules', () => {
     expect(m).not.toBeNull();
     const listed = [...m![1].matchAll(/'([^']*)'/g)].map((x) => x[1]);
     expect(listed).toEqual([...OVERVIEW_SORTS]);
+  });
+
+  it('bounds a board’s notes at BOARD_NOTES_MAX, and the boards one person keeps them open on', () => {
+    expect(sizeBounds('text')).toEqual([BOARD_NOTES_MAX]);
+    expect(sizeBounds('notesOpenBoardIds')).toEqual([NOTES_OPEN_MAX]);
+  });
+
+  it('names the one notes document the app writes', () => {
+    expect(rules).toContain(`noteId == '${NOTES_DOC_ID}'`);
   });
 
   it('admits exactly the board colours the app offers, and only on a board update', () => {

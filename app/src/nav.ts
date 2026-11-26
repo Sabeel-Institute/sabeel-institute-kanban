@@ -22,6 +22,10 @@ export type Route =
   /** No page is the list of pages on a phone, and the first page on a wide screen. */
   | { name: 'boardSettings'; boardId: string; page?: BoardSettingsPage }
   | { name: 'boardArchive'; boardId: string }
+  /** The board's notes, being edited: the phone's editor, which gets the whole screen. */
+  | { name: 'boardNotes'; boardId: string }
+  /** The notes' versions; with `versionId`, that one, on its own on a phone and beside the list on a wide screen. */
+  | { name: 'boardNotesHistory'; boardId: string; versionId?: string }
   | { name: 'newBoard' }
   | { name: 'card'; boardId: string; cardId: string }
   | { name: 'overview' }

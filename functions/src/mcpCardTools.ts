@@ -5,14 +5,14 @@ import {
 } from 'firebase/firestore';
 import { z } from 'zod';
 import {
-  canBeSubtaskOf, CARD_DESCRIPTION_MAX, CARD_TITLE_MAX, commentMentions, compareRank, isRealDate,
+  canBeSubtaskOf, CARD_DESCRIPTION_MAX, CARD_TITLE_MAX, COMMENT_BODY_MAX, commentMentions, compareRank, isRealDate,
   labelIdsAfterBoardChange, lanesLive, moveRefusalFor, newCardDoc, newCommentDoc, parentAfterMove,
   rankBetween, subtaskAddRefusal, withCleanExtras,
   type CardDoc, type Label,
 } from '@sabeel/shared';
 import { attachmentInputs, withAttachments } from './mcpAttachmentTools';
 import { agentEdit } from './agentActivity';
-import { cardLink, check, docId, itemNamed, named, word, writeResult, type McpActor, type WriteBoard, type WriteTools } from './mcpWrite';
+import { agentRichText, cardLink, check, docId, itemNamed, named, RICH_TEXT_HELP, word, writeResult, type McpActor, type WriteBoard, type WriteTools } from './mcpWrite';
 
 type Card = CardDoc & { id: string };
 
@@ -21,7 +21,7 @@ const list = word.array().max(30);
 const priority = z.enum(['none', 'low', 'medium', 'high', 'urgent']);
 const dueDate = z.string().refine(isRealDate, 'Use a real date in YYYY-MM-DD format');
 const cardDetails = {
-  description: z.string().max(CARD_DESCRIPTION_MAX).optional().describe('Markdown'),
+  description: z.string().max(CARD_DESCRIPTION_MAX).optional().describe(RICH_TEXT_HELP),
   priority: priority.optional(),
   due_date: dueDate.nullable().optional().describe('YYYY-MM-DD, or null to clear'),
   assignees: list.optional().describe('Board member names, handles or ids. [] clears assignees.'),
@@ -70,9 +70,10 @@ function findLabels(labels: Label[], boardId: string, names: string[]): string[]
   return [...new Set(names.map((name) => itemNamed(available, name, 'label').id))];
 }
 
-function detailPatch(f: CardDetails, board: WriteBoard, me: McpActor) {
+/** `before`: the description being edited, when one card is (`agentRichText`). */
+function detailPatch(f: CardDetails, board: WriteBoard, me: McpActor, before = '') {
   return {
-    ...(f.description !== undefined ? { description: f.description.trim() } : {}),
+    ...(f.description !== undefined ? { description: agentRichText(f.description, CARD_DESCRIPTION_MAX, 'description', before) } : {}),
     ...(f.priority !== undefined ? { priority: f.priority } : {}),
     ...(f.due_date !== undefined ? { dueDate: f.due_date ?? undefined } : {}),
     ...(f.assignees !== undefined ? { assigneeUids: memberIds(board, me, f.assignees) } : {}),
@@ -303,7 +304,7 @@ export function registerCardWrites({ server, run, me, board }: WriteTools, base:
       const adding = findLabels(labels, target.id, f.labels?.add ?? []);
       const removing = findLabels(labels, target.id, f.labels?.remove ?? []);
       if (adding.some((id) => removing.includes(id))) throw new Error('A label cannot be added and removed in the same edit.');
-      const details = detailPatch(f, target, me);
+      const details = detailPatch(f, target, me, current.length === 1 ? current[0].description : '');
       if (parent) await checkParent(fs, tx, current[0], parent, cards, target);
       return current.map((card) => {
         const patch: Record<string, unknown> = { ...details };
@@ -378,9 +379,14 @@ export function registerCardWrites({ server, run, me, board }: WriteTools, base:
   }));
 
   server.registerTool('comment', {
-    description: 'Post a comment, or edit your own comment by passing comment_id. Markdown and @mentions work as in the app.',
-    inputSchema: { card_id: docId, text: word.max(5000), comment_id: docId.optional() },
+    description: 'Post a comment, or edit your own comment by passing comment_id. @mentions work as in the app: @handle, or @all for everyone on the board.',
+    inputSchema: { card_id: docId, text: word.max(COMMENT_BODY_MAX).describe(RICH_TEXT_HELP), comment_id: docId.optional() },
   }, (f) => run(async (fs) => {
+    const asStored = (before = '') => {
+      const converted = agentRichText(f.text, COMMENT_BODY_MAX, 'comment', before);
+      if (!converted) throw new Error('The comment has no words left once its markup is removed.');
+      return converted;
+    };
     const path = collection(fs, 'cards', f.card_id, 'comments');
     const ref = f.comment_id ? doc(path, f.comment_id) : doc(path);
     const now = Date.now();
@@ -391,11 +397,12 @@ export function registerCardWrites({ server, run, me, board }: WriteTools, base:
       if (f.comment_id) {
         const existing = await tx.get(ref);
         if (!existing.exists() || existing.data().authorUid !== me.uid) throw new Error('You can only edit your own comments.');
-        if (existing.data().body !== f.text) {
-          tx.update(ref, { body: f.text, mentionUids: commentMentions(me.uid, f.text, candidates), editedAt: now });
+        const body = asStored(existing.data().body as string);
+        if (existing.data().body !== body) {
+          tx.update(ref, { body, mentionUids: commentMentions(me.uid, body, candidates), editedAt: now });
         }
       } else {
-        tx.set(ref, { ...newCommentDoc({ authorUid: me.uid, body: f.text, candidates, now }), via: 'agent' });
+        tx.set(ref, { ...newCommentDoc({ authorUid: me.uid, body: asStored(), candidates, now }), via: 'agent' });
       }
       return current;
     });

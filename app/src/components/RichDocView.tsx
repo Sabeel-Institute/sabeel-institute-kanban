@@ -17,17 +17,18 @@
  * `Text`. Selecting across one still works by dragging a handle over it.
  */
 import { useMemo } from 'react';
-import { Linking, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import { EnrichedText } from 'react-native-enriched-html';
 import { decodeDisplayHref, richDocToDisplayHtml, type RichDoc } from '@sabeel/shared';
 import { type, useTheme } from '../theme';
 import { useRichHtmlStyle } from './richHtmlStyle';
+import { openRichHref } from '../openLink';
 
 // iOS hands the address back as written in the HTML, escapes included, so
 // `?a=1&b=2` would open as `?a=1&amp;b=2`. Android has decoded it already.
 function openLink({ url }: { url: string }) {
   const href = Platform.OS === 'ios' ? decodeDisplayHref(url) : url;
-  void Linking.openURL(href).catch(() => undefined);
+  openRichHref(href);
 }
 
 export function RichDocView({ doc }: { doc: RichDoc }) {

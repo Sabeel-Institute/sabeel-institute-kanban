@@ -68,7 +68,9 @@ Do not silently change any of these.
   does not switch them on looks and behaves exactly as it would without them.
   The overview (below) is the one cross-board summary, and it is a list of
   boards, not a dashboard: no charts or figures, no settings, and nobody who
-  is on no board with lanes ever sees it. Every addition must justify itself against "does the team actually use this?" —
+  is on no board with lanes ever sees it. A board's notes (below) are one
+  page per board, not a wiki: no second page, no folders.
+  Every addition must justify itself against "does the team actually use this?" —
   when in doubt, leave it out and ask.
 - **No board limit**, anywhere in the model, UI, or rules — the 5-board cap was a
   reason they're leaving.
@@ -332,6 +334,33 @@ Boards list (`docs/PRODUCT_BRIEF.md` § Board list and navigation).
   board update rule); press and hold on the card, the stripe included, stays
   Clone. A clone keeps the colour, and changing it is not board history.
 
+## A board's notes
+
+Added 2026-11-25 (Faisal, over a concept round; `docs/PRODUCT_BRIEF.md`
+§ Board notes): one page of rich text per board for links, forms and
+how-tos, with its own history. `packages/shared/src/boardNotes.ts` holds
+what both sides decide.
+
+- **`boards/{id}/notes/current`, never the board document.** The Boards list
+  reads every board's document and every board write runs the history diff.
+- **The version is the concurrency story.** Rules accept a save only at the
+  stored version plus one; a refused save keeps the editor's text and offers
+  Save mine / Discard mine (`NotesConflict`). Never write the page without
+  the version it was read at, the agent's tool included.
+- **The history is the server's** (`onBoardNotesWritten`), one version per
+  sitting (`foldsIntoSitting`: same person, same way, ten minutes); a restore
+  is a new version. The trigger checks the latest version in a transaction, so
+  a repeated delivery adds nothing; a writer that records its own version
+  (`cloneBoard`) writes it with the page.
+- **Anyone on the board, and admins**, read and write them. Whether the wide
+  panel is open is the person's (`notesOpenBoardIds`, bounded in the rules).
+- **On a phone the notes are page 0 of the pager while the board has any**:
+  every pager index there is a column index plus `offset`, and the page can
+  appear or go under the person (`NarrowBoard`). A board without notes draws
+  exactly what it did before, apart from the footer's notes icon.
+- **No files yet**: attachments move to Cloudflare first (Faisal). No
+  notifications, not in Search, not in the board's History page.
+
 ## Attachments
 
 Added 2026-07-26, reversing the original "no attachments" decision. Multiple
@@ -408,6 +437,10 @@ who has left it, "Someone". Readers show the stored name first.
   through Node ports of the library's two HTML parsers; run it whenever
   `react-native-enriched-html` or `packages/shared/src/richtext*.ts` changes
   (`docs/DEV-TOOLING.md`, "Rich text on the phones").
+- **An agent's rich text goes through `fromAgentMarkdown`** (`richtextAgent.ts`)
+  on every MCP tool that writes a description, a comment or notes, and the
+  tools describe the five elements with one string (`RICH_TEXT_HELP`). Stored
+  raw, an agent's `## Heading` read as those characters on the card.
 - **Autolinking of bare URLs is RENDER-TIME ONLY.** Storage keeps exactly what
   was typed. If either editor rewrote a bare URL, the same keystrokes would store
   different bytes on a phone than in a browser — which is why `linkRegex={null}`

@@ -120,7 +120,15 @@ service cloud.firestore {
                     'notifyPrefs', 'unreadNotifCount', 'watchedColumns',
                     'overviewSort', 'overviewReverse', 'overviewHiddenBoardIds',
                     'collapsedBoardSections', 'collapsedLanes', 'watchedLanes',
-                    'showAllBoards']);
+                    'showAllBoards', 'notesOpenBoardIds']);
+      }
+      // The boards whose notes panel this person keeps open on a wide screen.
+      // A display preference: naming a board you cannot see opens nothing.
+      // 500 is NOTES_OPEN_MAX, held to it by ruleLimits.test.ts.
+      function notesPrefWellFormed() {
+        return !('notesOpenBoardIds' in request.resource.data)
+          || (request.resource.data.notesOpenBoardIds is list
+              && request.resource.data.notesOpenBoardIds.size() <= 500);
       }
       // Boards-list sections and lanes collapsed, by this person, for this
       // person: display preferences that hide nothing from anyone else.
@@ -184,7 +192,8 @@ service cloud.firestore {
         && watchesBounded()
         && overviewPrefsWellFormed()
         && boardScopePrefWellFormed()
-        && collapsePrefsWellFormed();
+        && collapsePrefsWellFormed()
+        && notesPrefWellFormed();
 
       // Accounts are created by the auth trigger and never deleted by clients.
       allow create, delete: if false;
@@ -467,6 +476,64 @@ service cloud.firestore {
     // onBoardWritten trigger alone, so "Sara archived the board" means the
     // server saw Sara do it. Everyone who can see the board can read it.
     match /boards/{boardId}/activity/{entryId} {
+      allow get, list: if isActive()
+        && (isAdmin()
+            || request.auth.uid in get(/databases/$(database)/documents/boards/$(boardId)).data.memberUids);
+      allow create, update, delete: if false;
+    }
+
+    // ---- Board notes ----
+    // One page of rich text per board (`boards/{id}/notes/current`), read and
+    // written by everyone on the board, and by admins, who see every board.
+    // Deliberately wider than the board's settings: whoever finds a dead link
+    // can fix it, and the history makes any edit undoable.
+    //
+    // THE VERSION IS THE WHOLE CONCURRENCY STORY. Each save carries the
+    // version it started from plus one, so of two people saving over the same
+    // version, the second is refused and their editor keeps their text. No
+    // locks, no presence. A create is version 1; a second create racing it
+    // arrives as an update over version 1 and is refused the same way.
+    //
+    // The text is bounded and nothing more: its markdown is the app's
+    // (BOARD_NOTES_MAX and `richtext.ts` in @sabeel/shared; 50000 is held to
+    // it by ruleLimits.test.ts). A save names its writer; who it was, and
+    // when, are recorded by the server in `versions` (functions/src/boardNotes.ts).
+    match /boards/{boardId}/notes/{noteId} {
+      function notesBoard() {
+        return get(/databases/$(database)/documents/boards/$(boardId)).data;
+      }
+      function onNotesBoard() {
+        return isActive() && (isAdmin() || request.auth.uid in notesBoard().memberUids);
+      }
+      function notes() {
+        return request.resource.data;
+      }
+      function notesWellFormed() {
+        return noteId == 'current'
+          && notes().keys().hasOnly(['text', 'version', 'updatedBy', 'updatedAt', 'restoredFrom', 'agentAt'])
+          && notes().text is string
+          && notes().text.size() <= 50000
+          && notes().version is int
+          && notes().updatedBy == request.auth.uid
+          && notes().updatedAt is number
+          && (!('restoredFrom' in notes())
+              || (notes().restoredFrom is string && notes().restoredFrom.size() <= 20))
+          // The robot badge: only an agent session marks its own save.
+          && (!('agentAt' in notes())
+              || (isAgentSession() && notes().agentAt == notes().updatedAt));
+      }
+
+      allow get: if onNotesBoard();
+      allow create: if onNotesBoard() && notesWellFormed() && notes().version == 1;
+      allow update: if onNotesBoard() && notesWellFormed()
+        && notes().version == resource.data.version + 1;
+      // Emptying the page is a save of no text; the history keeps the rest.
+      allow delete: if false;
+    }
+
+    // The notes' history, one version per sitting: the server's alone, read
+    // by everyone who reads the notes.
+    match /boards/{boardId}/notes/{noteId}/versions/{versionId} {
       allow get, list: if isActive()
         && (isAdmin()
             || request.auth.uid in get(/databases/$(database)/documents/boards/$(boardId)).data.memberUids);

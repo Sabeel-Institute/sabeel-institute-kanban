@@ -59,10 +59,14 @@ When a release changes what an old build gets wrong, raise the version floor
 to it last, once the web, Play and TestFlight have it (`docs/DEPLOY.md`
 § Retiring old builds).
 
-**Owed now: nothing.** v0.26.0 retook the Boards list, clone and colour pictures, and re-recorded every film that opens on the Boards list, *Creating a board* with two new lines on giving a board its colour.
+**Owed now: board notes** (2026-11-25). v0.26.0 retook the Boards list, clone and colour pictures, and re-recorded every film that opens on the Boards list, *Creating a board* with two new lines on giving a board its colour.
 
 | Film or picture | What it lacks |
 |---|---|
+| New film *Board notes* (everyone), both cuts | Not scripted: the panel opened from the header, the page in front of the first column, editing, the history and Restore. Its world board needs notes (`scripts/tutorials/world.mjs`). |
+| *Inside a board*, both cuts | The computer cut's header has the notes icon; the phone cut's column footer has the notes icon on a board without notes. One line to say what it is. |
+| *Cloning a board* | A clone copies the notes; the narration lists what comes along. |
+| Pictures of a board: `board`, `bulk` and the lane pictures, both cuts | The header's notes icon on a computer; on a phone the seed's Fundraising board has notes, so its first column shows the notes icon in place of the left arrow. |
 
 ## What works today (2026-10-16)
 

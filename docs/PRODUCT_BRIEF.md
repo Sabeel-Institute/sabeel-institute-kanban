@@ -190,6 +190,10 @@ boards/{boardId}/activity/{entryId}              # the board's own history
         |templateOn|templateOff|cloned                # cloned: a clone's first line, written by cloneBoard
   at, actorUid?, actorName?, subjectUid?, subjectName?, from?, to?, since?
   # Written ONLY by the onBoardWritten trigger. Names are stored, not looked up.
+boards/{boardId}/notes/current                   # the board's notes (§ Board notes)
+  text, version, updatedBy, updatedAt, restoredFrom?, agentAt?
+boards/{boardId}/notes/current/versions/{id}     # their history, server-written, one per sitting
+  text, version, by, byName, at, startedAt, added, removed, restoredFrom?, restoredAt?, copiedFrom?, via?
 
 labels/{labelId}                                 # one collection, two scopes
   boardId?                                       # absent: an INSTITUTE label, on every board, admins only
@@ -396,6 +400,15 @@ doc`, enforced by seeded fuzz over documents full of awkward literals.
 
 **Autolinking is render-time only**, so storage keeps what was typed and a phone
 and a browser cannot diverge.
+
+**An agent's text is stored as the editors would store it** (2026-11-25). The
+MCP tools that write rich text (a description, a comment, a board's notes)
+tell the agent the five elements exactly (`RICH_TEXT_HELP`), and pass what it
+sends through `fromAgentMarkdown`: headings become a bold line, `__bold__` and
+`_italic_` the app's own marks, checkboxes plain bullets, and quotes, rules,
+code and strike-through their words; then the canonical form. Stored as
+given, a heading read as `## Plan` on the card, and the next edit in the app
+kept the characters and lost the intent.
 
 **Accepted residuals.** A hardware Ctrl+U on Android can set underline, markdown
 cannot express it, and the converter drops it — the text visibly un-underlines,
@@ -671,8 +684,10 @@ and opens when it lands.
   description; the board's lanes, switched on or off as they were, under new
   ids, with each card's lane and the finished column; its details' fields,
   under new ids, without their values; and its colour in the Boards list
-  (Faisal, 2026-11-25: a clone of a template is the same kind of board). A card whose lane is gone on the source
-  has none on the clone.
+  (Faisal, 2026-11-25: a clone of a template is the same kind of board); and
+  its notes' text, as version 1 naming the board it came from, without their
+  history (Faisal, 2026-11-25: a template's notes are its run-book). A card
+  whose lane is gone on the source has none on the clone.
 - **What stays behind:** archived cards, due dates, assignees, priorities,
   comments, history and attachments, and the template's own labels (Faisal,
   2026-11-13: institute labels only). A subtask whose parent is archived is
@@ -843,6 +858,57 @@ field has an empty Details page and nothing else changes.
 - **History** records fields added, removed, renamed and reordered, and each
   value set or cleared, naming the field. **A clone** carries the fields under
   new ids and none of the values.
+
+## Board notes (2026-11-25)
+
+One page of rich text per board, for what nobody *does*: quick links, forms,
+where the folders are, how someone new starts. Decided by Faisal over a
+concept round, from the Operations board, where a column of link cards
+counted as open, unassigned work, took two taps to reach a link and a column
+of width at all times. Anything with a person or a date stays a card.
+
+- **One page, `boards/{id}/notes/current`**: `text` (markdown, the five
+  elements, at most 50,000 stored characters, `BOARD_NOTES_MAX`), `version`,
+  `updatedBy`, `updatedAt`, and `restoredFrom` on a restore. Not the board
+  document: the Boards list reads every board's document, every board write
+  runs the history diff, and the notes would share its size limit with
+  columns, lanes and details. The board's dormant `description` stays unused.
+- **Anyone on the board writes it, and admins**: wider than the board's
+  settings on purpose, so whoever finds a dead link can fix it; the history
+  makes every edit undoable.
+- **The version is the concurrency story.** A save carries the version it
+  started from plus one, and the rules accept nothing else. Of two people
+  saving over the same version the second is refused; their editor keeps the
+  text, names whose save came first, and offers **Save mine** (on top of
+  theirs, which stays in the history) or **Discard mine**. No locks, no
+  presence.
+- **History, server-written** (`onBoardNotesWritten`): `versions/{id}`, one per
+  SITTING. A save by the person who made the latest version, within ten
+  minutes of it (`NOTES_SITTING_MS`), the same way (an agent's save never joins
+  the person's own), replaces that version; anyone else's save and every
+  restore start another. A restore is recorded as one only when the version it
+  names holds the text saved. Each names its writer by
+  the stored name and counts the lines it added and removed against the
+  version before, git-style (`notesLineCounts`: lines as a reader sees them,
+  a list item's number not part of it). Opening a version previews the notes
+  as it left them; **Restore** saves that text as the newest version,
+  `restoredFrom` naming it. No marked-up comparison of two versions (Faisal,
+  2026-11-25: counts and a preview are enough). The history is a line, not a
+  tree: a restore is the newest version, the ones after the version restored
+  stay, and nothing is deleted.
+- **Where it is**: wide, a panel docked at the left of the columns, opened from
+  the notes icon in the header and edited in place; open or closed is the
+  person's, per board, on their user document (`notesOpenBoardIds`, at most
+  500). Phone, a page in front of the first column, reached by the notes icon
+  that takes the first column's left arrow, or a swipe; editing is a screen of
+  its own (`boardNotes` route). A board with no notes has no page; its first
+  notes start from the notes icon in the column footer.
+- **Not**: no notifications, no bell, nothing in the board's own History page,
+  not in Search, no files (Faisal: attachments move to Cloudflare first; a
+  card linked from the notes holds a file meanwhile). **A clone** copies the
+  text, not the history, its first version naming the board it came from.
+- **Links**: a card's or board's link in any rich text (notes, descriptions,
+  comments) opens it in the app (`openRichHref`), not in a browser.
 
 ## Overview (2026-11-15)
 

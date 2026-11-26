@@ -577,9 +577,74 @@ for (const [board, colour] of BOARD_COLOURS) {
   await stripe.waitFor({ timeout: 25000 });
 }
 
+// The Fundraising board's notes: its quick links and how-tos, written in the
+// notes panel as a person would, then edited by a colleague so the history
+// has two names in it. Pasted, as links usually arrive, so they carry words.
+// Each panel is closed afterwards: open is remembered per person, and the
+// manual's pictures of the board show it closed.
+const NOTES_HTML = (volunteers) =>
+  '<p><b>Forms</b></p><ul>' +
+  '<li><a href="https://example.org/gift-aid">Gift Aid declaration</a></li>' +
+  '<li><a href="https://example.org/expenses">Expense claim</a>, within a month of spending</li>' +
+  (volunteers ? '<li><a href="https://example.org/volunteers">Event volunteer sign-up</a></li>' : '') +
+  '</ul><p><b>Shared folders</b></p><ul>' +
+  '<li><a href="https://example.org/donor-letters">Donor letters</a>, drafts go here first</li>' +
+  `<li><a href="https://example.org/pledges">Pledge tracker</a>, update ${volunteers ? 'after every call' : 'weekly'}</li>` +
+  '</ul><p><b>New to fundraising?</b></p><ol>' +
+  '<li>Ask an owner of this board to add you.</li>' +
+  '<li>Read the <a href="https://example.org/donor-care">donor care guide</a> before your first call.</li>' +
+  '<li>Turn on the bell for To Do, so new requests reach you.</li></ol>';
+
+async function writeNotes(page, board, html, done) {
+  await page.getByRole('button', { name: 'Boards', exact: true }).first().click();
+  await page.getByText(board, { exact: true }).first().click();
+  await page.getByText('To Do').first().waitFor({ timeout: 30000 });
+  const panel = page.getByTestId('notes-panel');
+  const toggle = page.getByRole('button', { name: 'Board notes', exact: true });
+  await toggle.waitFor({ timeout: 25000 });
+  if (!(await panel.isVisible().catch(() => false))) await toggle.click();
+  await panel.waitFor({ timeout: 25000 });
+  await page.waitForTimeout(800);
+  if (!(await panel.getByText(done).first().isVisible().catch(() => false))) {
+    await panel.getByRole('button', { name: 'Edit notes', exact: true }).click();
+    const editor = panel.locator('[contenteditable="true"]');
+    await editor.click();
+    await page.keyboard.press('Control+a');
+    await page.evaluate((h) => {
+      const el = document.querySelector('[data-testid="notes-panel"] [contenteditable="true"]');
+      const dt = new DataTransfer();
+      dt.setData('text/html', h);
+      el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+    }, html);
+    await page.waitForTimeout(600);
+    await panel.getByRole('button', { name: 'Save', exact: true }).click();
+    await panel.getByText(done).first().waitFor({ timeout: 25000 });
+  }
+  await panel.getByRole('button', { name: 'Close notes', exact: true }).click();
+  await panel.waitFor({ state: 'detached', timeout: 25000 });
+}
+try {
+  await writeNotes(admin, 'Fundraising 2026', NOTES_HTML(false), 'Gift Aid declaration');
+  await writeNotes(colleagues[0], 'Fundraising 2026', NOTES_HTML(true), 'Event volunteer sign-up');
+  // The eight-lane camp, so the notes are seen beside a board that leans on
+  // lanes: the panel beside the grid, the page before a column of headings.
+  await writeNotes(
+    admin,
+    CAMP,
+    '<p><b>Camp forms</b></p><ul>' +
+      '<li><a href="https://example.org/medical">Medical form</a>, one per child</li>' +
+      '<li><a href="https://example.org/photos">Photo consent</a></li></ul>' +
+      '<p><b>Each morning</b></p><ol><li>Count heads at the gate.</li>' +
+      '<li>Check any lane with a red badge first.</li><li>Post the day’s menu by 9.</li></ol>',
+    'Medical form',
+  );
+} catch (e) {
+  console.warn('could not seed the board notes — continuing:', String(e).slice(0, 160));
+}
+
 await browser.close();
 console.log(
-  `Seeded: 3 people, 5 boards (two with ${LANES.length} lanes, one with ${CAMP_LANES.length}, one a template), ${COLUMNS.length + 3} columns, ${
+  `Seeded: 3 people, 5 boards (two with ${LANES.length} lanes, one with ${CAMP_LANES.length}, one a template, one with notes), ${COLUMNS.length + 3} columns, ${
     CARDS.length
   } cards.`,
 );

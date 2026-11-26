@@ -23,6 +23,7 @@ export { onCommentWritten } from './comments';
 export { onCardWritten } from './activity';
 export { onCardBoardCount } from './boardCardCount';
 export { onBoardWritten } from './boardHistory';
+export { onBoardNotesWritten } from './boardNotes';
 export { onCardDeleted } from './cleanup';
 export {
   finalizeAttachment,

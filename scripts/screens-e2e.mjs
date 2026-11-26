@@ -474,7 +474,32 @@ await db.doc(`users/${uid}`).update({ unreadNotifCount: 1 });
 await db.doc(`boards/${BOARD}/activity/agent-fixture`).set({
   type: 'columnAdded', to: 'Agent review', actorUid: uid, actorName: 'Faisal', at: now, via: 'agent',
 });
-console.log(`  seeded 1 board, ${CARDS.length} cards, 2 labels, 1 archived card, 1 alert`);
+// The lane board's notes, so the panel is measured beside the grid and the
+// notes page in front of a column of lane headings.
+await db.doc(`boards/${LANES_BOARD}/notes/current`).set({
+  text: '**Camp forms**\n\n- [Medical form](https://example.org/medical)\n- [Photo consent](https://example.org/photos)\n\n**Each morning**\n\n1. Count heads at the gate.\n2. Check the lane with a red badge first.',
+  version: 1, updatedBy: uid, updatedAt: now,
+});
+await db.doc(`boards/${LANES_BOARD}/notes/current/versions/1`).set({
+  text: 'Camp forms', version: 1, by: uid, byName: 'Faisal', at: now, startedAt: now, added: 6, removed: 0,
+});
+
+// The board's notes, in two versions by two people so the history has a
+// change to mark. A bare address with no break in it, the longest kind of
+// word, so the panel's narrow column is measured with one.
+const NOTES_V1 =
+  '**Forms**\n\n- [Gift Aid declaration](https://example.org/gift-aid)\n- [Pledge tracker](https://example.org/pledges), update weekly\n\n' +
+  '**New to fundraising?**\n\n1. Ask an owner of this board to add you.\n2. Read the [donor care guide](https://example.org/donor-care) before your first call.';
+const NOTES_V2 = NOTES_V1.replace('update weekly', 'update after every call') +
+  '\n\nShared drive: https://example.org/a-very-long-address/that-has-no-spaces-in-it-anywhere/donor-letters-and-drafts';
+await db.doc(`boards/${BOARD}/notes/current`).set({ text: NOTES_V2, version: 2, updatedBy: ownerUid, updatedAt: now });
+await db.doc(`boards/${BOARD}/notes/current/versions/1`).set({
+  text: NOTES_V1, version: 1, by: uid, byName: 'Faisal', at: now - 86400000, startedAt: now - 86400000, added: 6, removed: 0,
+});
+await db.doc(`boards/${BOARD}/notes/current/versions/2`).set({
+  text: NOTES_V2, version: 2, by: ownerUid, byName: 'Sara', at: now, startedAt: now, added: 2, removed: 1,
+});
+console.log(`  seeded 1 board, ${CARDS.length} cards, 2 labels, 1 archived card, 1 alert, notes in 2 versions`);
 console.log(`  breakpoint read from source: ${WIDE_BREAKPOINT}px\n`);
 
 // ---- Assertions ------------------------------------------------------------
@@ -685,7 +710,7 @@ async function rulesScreen(page, tag, width) {
 }
 
 // ---- The tour --------------------------------------------------------------
-const SCREENS = 39;
+const SCREENS = 43;
 
 /**
  * Text that does not reach the brand's contrast against what it is drawn on:
@@ -1056,8 +1081,10 @@ async function tour(page, tag, width) {
   // "columns" at every width — a green-looking check that had stopped looking at
   // anything.
   const expected = width >= WIDE_BREAKPOINT ? 'columns' : 'swipe';
+  // `Next column`: on a board with notes the first column's left control is
+  // the notes, so `Previous column` is not there to find.
   const hasPager = await page
-    .getByRole('button', { name: 'Previous column' })
+    .getByRole('button', { name: 'Next column' })
     .first()
     .isVisible()
     .catch(() => false);
@@ -1359,11 +1386,89 @@ async function tour(page, tag, width) {
   });
 
   /**
+   * THE BOARD'S NOTES (the seed writes Fundraising's): wide, a panel docked
+   * beside the columns; narrow, the page in front of the first column,
+   * reached by the control in place of its left arrow. Then the editor (in
+   * the panel, or a screen of its own) and the history, a version open. The
+   * wide panel is closed again after: open is remembered per person.
+   */
+  const wideNow = width >= WIDE_BREAKPOINT;
+  const notesHere = () => page.getByTestId(wideNow ? 'notes-panel' : 'notes-page');
+  await visit('notes', async () => {
+    await nav('Boards');
+    await page.getByText('Fundraising 2026').first().click();
+    await page.getByRole('button', { name: 'Board notes', exact: true }).first().waitFor({ timeout: 30000 });
+    if (!wideNow || !(await notesHere().isVisible().catch(() => false))) {
+      await page.getByRole('button', { name: 'Board notes', exact: true }).first().click();
+    }
+    await notesHere().getByText('Gift Aid declaration').first().waitFor({ timeout: 30000 });
+    if (!wideNow) {
+      for (let i = 0; i < 40 && ((await notesHere().boundingBox())?.x ?? -1) > 24; i += 1) await page.waitForTimeout(150);
+    }
+  });
+  await visit('notes-editing', async () => {
+    await notesHere().getByRole('button', { name: 'Edit notes', exact: true }).click();
+    await page.locator('[contenteditable="true"]').first().waitFor({ timeout: 30000 });
+  });
+  await visit('notes-history', async () => {
+    if (wideNow) await page.getByRole('button', { name: 'Cancel', exact: true }).first().click();
+    else await page.getByRole('button', { name: 'Back', exact: true }).first().click();
+    await notesHere().getByRole('button', { name: 'Notes history', exact: true }).click();
+    if (!wideNow) await page.getByRole('button', { name: /^Sara, / }).first().click();
+    await page.getByTestId('notes-version').waitFor({ timeout: 30000 });
+  });
+  await page.getByRole('button', { name: 'Back', exact: true }).first().click();
+  if (wideNow) {
+    await page.getByRole('button', { name: 'Close notes', exact: true }).click();
+    await page.getByTestId('notes-panel').waitFor({ state: 'detached', timeout: 20000 });
+  }
+
+  /**
    * THE BOARD WITH LANES: on a phone each column lists the board's lanes under
    * a heading; wide, the board is a grid, a lane's heading once at the left of
    * its row. Checked by what a screen reader hears of the headings in view,
    * which carries both the name and what the badge's colour says.
    */
+  // The lane grid's promises, read from the page: used bare and with the notes beside it.
+  const probeGrid = () => page.evaluate(async () => {
+    const sc = document.querySelector('[data-testid="board-columns"]');
+    const heights = {};
+    for (const c of document.querySelectorAll('[data-testid="lane-cell"]')) {
+      (heights[c.dataset.lane] ??= new Set()).add(Math.round(c.getBoundingClientRect().height));
+    }
+    const rowsEven = Object.values(heights).length > 0 && Object.values(heights).every((h) => h.size === 1);
+    const was = { height: sc.style.height, width: sc.style.width, flex: sc.style.flex };
+    // 600 wide, or what the window leaves beside the notes panel: a grid
+    // pushed past the window's edge has nothing there for a click to hit.
+    const room = Math.floor(window.innerWidth - sc.getBoundingClientRect().left - 8);
+    Object.assign(sc.style, { height: '220px', width: `${Math.min(600, room)}px`, flex: 'none' });
+    sc.scrollTop = sc.scrollHeight;
+    sc.scrollLeft = sc.scrollWidth;
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const box = sc.getBoundingClientRect();
+    const hit = (el) => {
+      const r = el.getBoundingClientRect();
+      const x = r.left + r.width / 2;
+      const y = r.top + r.height / 2;
+      if (x < box.left || x > box.right || y < box.top || y > box.bottom) return null;
+      const at = document.elementFromPoint(x, y);
+      return at && el.contains(at) ? r : null;
+    };
+    const plus = [...document.querySelectorAll('[aria-label^="Add a card to "]')];
+    const headingPlus = plus.filter((b) => !b.getAttribute('aria-label').endsWith(' lane')).map(hit).filter(Boolean);
+    const lanePlus = plus.filter((b) => b.getAttribute('aria-label').endsWith(' lane')).map(hit).filter(Boolean);
+    const out = {
+      rowsEven,
+      sideways: sc.scrollLeft > 0,
+      down: sc.scrollTop > 0,
+      headingsStay: headingPlus.some((r) => r.top - box.top < 60),
+      lanesStay: lanePlus.some((r) => r.left - box.left < 260),
+    };
+    sc.scrollTop = 0;
+    sc.scrollLeft = 0;
+    Object.assign(sc.style, was);
+    return out;
+  });
   await visit('lanes-board', async () => {
     await nav('Boards');
     await page.getByText('Summer Program', { exact: true }).first().click();
@@ -1398,47 +1503,40 @@ async function tour(page, tag, width) {
     // while it is scrolled, and the check fails unless it really scrolled both ways:
     // a board that fits proves nothing about what stays (it once passed with
     // the headings not frozen at all).
-    const grid = await page.evaluate(async () => {
-      const sc = document.querySelector('[data-testid="board-columns"]');
-      const heights = {};
-      for (const c of document.querySelectorAll('[data-testid="lane-cell"]')) {
-        (heights[c.dataset.lane] ??= new Set()).add(Math.round(c.getBoundingClientRect().height));
-      }
-      const rowsEven = Object.values(heights).length > 0 && Object.values(heights).every((h) => h.size === 1);
-      const was = { height: sc.style.height, width: sc.style.width, flex: sc.style.flex };
-      Object.assign(sc.style, { height: '220px', width: '600px', flex: 'none' });
-      sc.scrollTop = sc.scrollHeight;
-      sc.scrollLeft = sc.scrollWidth;
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      const box = sc.getBoundingClientRect();
-      const hit = (el) => {
-        const r = el.getBoundingClientRect();
-        const x = r.left + r.width / 2;
-        const y = r.top + r.height / 2;
-        if (x < box.left || x > box.right || y < box.top || y > box.bottom) return null;
-        const at = document.elementFromPoint(x, y);
-        return at && el.contains(at) ? r : null;
-      };
-      const plus = [...document.querySelectorAll('[aria-label^="Add a card to "]')];
-      const headingPlus = plus.filter((b) => !b.getAttribute('aria-label').endsWith(' lane')).map(hit).filter(Boolean);
-      const lanePlus = plus.filter((b) => b.getAttribute('aria-label').endsWith(' lane')).map(hit).filter(Boolean);
-      const out = {
-        rowsEven,
-        sideways: sc.scrollLeft > 0,
-        down: sc.scrollTop > 0,
-        headingsStay: headingPlus.some((r) => r.top - box.top < 60),
-        lanesStay: lanePlus.some((r) => r.left - box.left < 260),
-      };
-      sc.scrollTop = 0;
-      sc.scrollLeft = 0;
-      Object.assign(sc.style, was);
-      return out;
-    });
+    const grid = await probeGrid();
     check(
       `${tag} / lanes-board is a grid: rows even, headings and lane names stay as it scrolls`,
       grid.rowsEven && grid.sideways && grid.down && grid.headingsStay && grid.lanesStay,
       JSON.stringify(grid),
     );
+  }
+  /**
+   * A LANE BOARD WITH NOTES: wide, the panel beside the grid, which must
+   * keep every promise above with less room; narrow, the notes page in
+   * front of a first column of lane headings. The panel is closed after.
+   */
+  await visit('lanes-notes', async () => {
+    const where = page.getByTestId(wide ? 'notes-panel' : 'notes-page');
+    if (!wide || !(await where.isVisible().catch(() => false))) {
+      await page.getByRole('button', { name: 'Board notes', exact: true }).first().click();
+    }
+    await where.getByText('Camp forms').first().waitFor({ timeout: 20000 });
+    if (!wide) {
+      for (let i = 0; i < 40 && ((await where.boundingBox())?.x ?? -1) > 24; i += 1) await page.waitForTimeout(150);
+    }
+  });
+  if (wide) {
+    const grid = await probeGrid();
+    check(
+      `${tag} / lanes-board beside its notes is still a grid that holds as it scrolls`,
+      grid.rowsEven && grid.sideways && grid.down && grid.headingsStay && grid.lanesStay,
+      JSON.stringify(grid),
+    );
+    await page.getByRole('button', { name: 'Close notes', exact: true }).click();
+    await page.getByTestId('notes-panel').waitFor({ state: 'detached', timeout: 20000 });
+  } else {
+    await page.getByRole('button', { name: 'Next column', exact: true }).click();
+    await page.getByText(/^1 of 3$/).first().waitFor({ timeout: 15000 });
   }
   await visit('lanes-add-card', async () => {
     // Wide, the + on To Do's heading, which asks for the lane; on a phone,

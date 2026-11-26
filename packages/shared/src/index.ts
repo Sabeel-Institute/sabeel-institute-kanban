@@ -32,3 +32,5 @@ export * from './constants';
 export * from './types';
 export * from './collapse';
 export * from './subtaskFinish';
+export * from './boardNotes';
+export * from './richtextAgent';

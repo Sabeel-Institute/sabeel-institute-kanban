@@ -64,6 +64,8 @@ import { acceptsDrop, dropPlacement } from '../../boardDrop';
 import type { AddCardDraft } from './AddCardForm';
 import { useListenerError } from '../../liveQuery';
 import { useLabels } from '../../labels';
+import { setNotesOpen, useBoardNotes, useLatestNotesVersion, useNotesOpen } from '../../boardNotes';
+import { NotesPanel } from '../notes/NotesPanel';
 import { toUserMessage } from '../../errors';
 import { getTheme, radius, space, type Theme } from '../../theme';
 
@@ -491,6 +493,13 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
   // alone, so an admin visiting a board they are not on gets neither bell.
   const isMember = board.data?.memberUids.includes(user.uid) ?? false;
   const laneWatch = useLaneWatch(user, boardId, isMember);
+  // The notes panel: open or closed per person and board (their user doc).
+  const notes = useBoardNotes(boardId);
+  const latestNotes = useLatestNotesVersion(boardId);
+  const notesOpen = useNotesOpen(user);
+  const showNotes = notesOpen.data?.includes(boardId) ?? false;
+  const toggleNotes = (open: boolean) =>
+    void setNotesOpen(user, boardId, open).catch((e: unknown) => setError(toUserMessage(e, 'notesOpen')));
   const watched = useWatchedColumns(user);
   // The bells stay disabled until the list is ready: `?? []` reads a list
   // still loading, or one that failed, as watching nothing.
@@ -1220,6 +1229,13 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
               be able to un-archive. */}
           {live ? <LaneCollapseActions collapse={collapse} /> : null}
           <IconAction
+            icon="sticky-note-2"
+            label="Board notes"
+            selected={showNotes}
+            disabled={notesOpen.status !== 'ready'}
+            onPress={() => toggleNotes(!showNotes)}
+          />
+          <IconAction
             icon="inventory-2"
             label="Archived cards"
             onPress={() => nav.push({ name: 'boardArchive', boardId })}
@@ -1281,7 +1297,22 @@ export function WideBoard({ boardId, user }: { boardId: string; user: SessionUse
         </div>
       ) : null}
 
-      {live && laneBoard ? laneGrid() : plainColumns()}
+      {/* The notes beside the columns, which keep their own sideways scroll. */}
+      <div style={{ display: 'flex', flex: 1, minHeight: 0, minWidth: 0 }}>
+        {showNotes ? (
+          <NotesPanel
+            boardId={boardId}
+            notes={notes}
+            latest={latestNotes.data}
+            members={members}
+            user={user}
+            onClose={() => toggleNotes(false)}
+          />
+        ) : null}
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0 }}>
+          {live && laneBoard ? laneGrid() : plainColumns()}
+        </div>
+      </div>
     </div>
   );
 }
