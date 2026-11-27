@@ -121,6 +121,35 @@ describe('onCardDeleted unlinks subtasks', () => {
     expect(entry.actorUid).toBe('unknown');
   });
 
+  it("leaves nothing under the deleted parent's path", async () => {
+    // The unlink is a write to the child, whose history mirrors a subtask
+    // change onto the parent. The parent is gone by then, so a mirror line
+    // there is an orphan nothing reads or removes.
+    await adminDb().doc('cards/ct_gone_parent').set(card());
+    await adminDb().doc('cards/ct_gone_kid').set(card({ parentId: 'ct_gone_parent' }));
+    // Both cards' "created" lines first, so none lands after the delete.
+    for (const id of ['ct_gone_parent', 'ct_gone_kid']) {
+      await waitFor(`${id} created`, async () =>
+        (await adminDb().collection(`cards/${id}/activity`).get()).empty ? undefined : true,
+      );
+    }
+
+    await adminDb().doc('cards/ct_gone_parent').delete();
+
+    // The child's unlink line is written in the same batch as any mirror,
+    // so once it is there, the mirror would be too.
+    await waitFor('unlink activity', async () => {
+      const snap = await adminDb()
+        .collection('cards/ct_gone_kid/activity')
+        .where('type', '==', 'subtaskOf')
+        .get();
+      return snap.docs.find((d) => d.data().to === undefined) ? true : undefined;
+    });
+    const left = await adminDb().doc('cards/ct_gone_parent').listCollections();
+    const docs = await Promise.all(left.map((c) => c.get()));
+    expect(docs.flatMap((s) => s.docs.map((d) => d.ref.path))).toEqual([]);
+  });
+
   it('preserves a replacement parent if the cleanup query saw the earlier link', async () => {
     const child = adminDb().doc('cards/ct_reparented_child');
     await child.set(card({ parentId: 'ct_old_parent' }));
