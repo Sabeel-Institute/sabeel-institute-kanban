@@ -459,6 +459,12 @@ the team.
 
 ## Deploy log
 
+### 2026-11-26 — Notes icon on every phone board — v0.27.1
+
+- On a phone, the notes icon now takes the first column's left arrow on every board. On a board with notes it goes to them; on a board without any yet it opens the editor to start them. The notes icon at the bottom of the column is gone, and so is the left arrow on the first column, which did nothing there.
+
+App only; nothing on the server changed. The version floor stays at 0.27.0.
+
 ### 2026-11-26 — Board notes — v0.27.0
 
 - **Every board has a page of notes** for the things nobody is assigned: the links and forms the team keeps reaching for, where the shared folders are, and how someone new gets started. Anyone on the board can read and change them, and admins too.
