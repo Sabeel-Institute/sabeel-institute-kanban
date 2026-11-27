@@ -743,6 +743,22 @@ release exists.
   (`gh auth refresh -h github.com -s workflow`). `--ship` tags main's HEAD, so a
   normal ship never hits it.
 
+## Finding leftover data
+
+```bash
+node scripts/audit-orphans.mjs    # read-only; exits 1 when it finds any
+```
+
+It walks every document and stored file in production and lists what nothing
+reads and nothing will remove: documents under a deleted card or board, cards,
+labels and Stats pages of boards that are gone, people's lists and watches
+naming them, unread counts that disagree with the inbox, and files without
+their attachment document. Run it after anything done to production by hand (a
+permanent delete, a migration, a backfill), and remove what it lists only after
+reading why it is there: each kind is a trigger or a delete path that missed
+something, and the fix belongs there too. Its header says how to run it
+against the emulators.
+
 ## Retiring old builds
 
 Every Android and iPhone build reads `config/app.minVersionCode` before sign-in

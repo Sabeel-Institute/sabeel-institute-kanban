@@ -66,12 +66,16 @@ export const onCardWritten = onDocumentWritten(
       // says nothing where the action was taken reads as the action not being
       // recorded. So mirror it: the parent gets its own entry, pointing back at
       // the child. Both are trigger-written, so neither can be forged.
+      //
+      // Only onto a parent that still exists. Deleting a parent unlinks its
+      // subtasks AFTER the parent and its history are gone (onCardDeleted),
+      // and a mirror line written then is an orphan nothing reads or removes.
       if (entry.type === 'subtaskOf') {
         for (const [otherId, to] of [
           [entry.to, cardId],
           [entry.from, undefined],
         ] as const) {
-          if (!otherId) continue;
+          if (!otherId || !(await db.doc(`cards/${otherId}`).get()).exists) continue;
           batch.set(db.collection(`cards/${otherId}/activity`).doc(), {
             type: 'subtask',
             ...by,

@@ -614,6 +614,13 @@ itself is deliberately NOT darkened — that would collapse it into
   queue: its form closes at once, and a refused add reopens it with what was
   typed. A form held open until the server answered sat over its own card and
   closed whatever form was open by then.
+- **A trigger writes under another document only while that document exists.**
+  A write under a missing parent succeeds and leaves an orphan no query
+  reaches: unlinking a deleted parent's subtasks mirrored a history line onto
+  the parent after `onCardDeleted` had emptied it, once per subtask, for
+  months. `node scripts/audit-orphans.mjs` finds every kind of leftover
+  (`docs/DEPLOY.md` § Finding leftover data); run it after anything done to
+  production by hand, and fix the path that left each one.
 - **Card ordering is fractional string ranks** in `@sabeel/shared`; a move is one
   document write. Never reintroduce an array-of-ids ordering.
 - **Stats are server-written, ADMIN-gated, and must never be able to break what
