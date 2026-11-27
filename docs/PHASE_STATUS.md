@@ -463,7 +463,7 @@ the team.
 
 - On a phone, the notes icon now takes the first column's left arrow on every board. On a board with notes it goes to them; on a board without any yet it opens the editor to start them. The notes icon at the bottom of the column is gone, and so is the left arrow on the first column, which did nothing there.
 
-App only; nothing on the server changed. The version floor stays at 0.27.0.
+App only; nothing on the server changed. The version floor went to 0.27.1 once the web, Play and TestFlight had it, so everyone updates (Faisal, 2026-11-26).
 
 ### 2026-11-26 — Board notes — v0.27.0
 
